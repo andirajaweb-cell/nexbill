@@ -1,0 +1,76 @@
+"use client";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { setEffectivePermissions, type StaffRole } from "@/lib/auth/permissions";
+
+export interface LinkedOutlet {
+  id: string;
+  name: string;
+  slug: string | null;
+  isHome: boolean;
+}
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  outletId: string;
+  permissions?: string[];
+  // Every outlet this account can switch into (always includes the home/current one — see
+  // GET /api/auth/me). Length 1 for the common single-outlet case; the TopBar outlet
+  // switcher only renders when this has more than one entry.
+  linkedOutlets?: LinkedOutlet[];
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+  loading: boolean;
+  logout: () => Promise<void>;
+  refresh: () => void;
+}
+
+const AuthContext = createContext<AuthContextValue>({
+  user: null,
+  loading: true,
+  logout: async () => {},
+  refresh: () => {},
+});
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch("/api/auth/me")
+      .then(async (res) => {
+        const data: AuthUser | null = res.ok ? await res.json() : null;
+        setUser(data);
+        // Warms this tab's in-memory permission cache (see permissions.ts) so
+        // hasPermission() checks made directly in client-component render
+        // reflect the DB-edited matrix, not just the hardcoded defaults.
+        if (data?.permissions) setEffectivePermissions(data.role as StaffRole, data.permissions);
+      })
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const logout = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUser(null);
+    window.location.href = "/login";
+  }, []);
+
+  return <AuthContext.Provider value={{ user, loading, logout, refresh: load }}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+/** True for the top-level role allowed to bypass approval workflows and access the admin data panel. */
+export function isSuperRole(role: string | undefined) {
+  return role === "superuser";
+}

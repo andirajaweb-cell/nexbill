@@ -1,0 +1,378 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Tells the browser to render native form-control chrome (select dropdown popups,
+     date/time pickers, checkboxes, scrollbars) using its dark variant instead of
+     defaulting to a white popup with light text baked in — without this, every
+     <select> on the site opens its options list with an OS-default white background
+     that swallows our light text color, exactly the bug being fixed here. */
+  color-scheme: dark;
+
+  --accent: oklch(0.97 0 0);
+
+  /* GameMaster neon palette */
+  --gm-bg: #050914;
+  --gm-bg-alt: #0a1020;
+  --gm-surface: rgba(15, 20, 38, 0.72);
+  --gm-surface-solid: #0d1326;
+  --gm-border: rgba(148, 163, 184, 0.14);
+
+  --gm-cyan: #22d3ee;
+  --gm-blue: #3b82f6;
+  --gm-purple: #a855f7;
+  --gm-magenta: #ec4899;
+  --gm-green: #22c55e;
+  --gm-amber: #f59e0b;
+  --gm-red: #f43f5e;
+
+  --gm-text: #eef2f9;
+  --gm-text-muted: #8b96ad;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.gm-body {
+  min-height: 100vh;
+  background: var(--gm-bg);
+  color: var(--gm-text);
+  font-family: var(--font-body), system-ui, sans-serif;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Ambient neon glow blobs + faint circuit grid, fixed behind all content — a subtle
+   backdrop, not a decoration meant to be stared at, so kept low-opacity and non-interactive. */
+.gm-body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(600px circle at 8% 10%, rgba(56, 189, 248, 0.10), transparent 60%),
+    radial-gradient(700px circle at 95% 15%, rgba(168, 85, 247, 0.10), transparent 60%),
+    radial-gradient(800px circle at 50% 100%, rgba(236, 72, 153, 0.06), transparent 60%),
+    linear-gradient(180deg, var(--gm-bg) 0%, var(--gm-bg-alt) 100%);
+}
+.gm-body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.5) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 90%);
+}
+
+.gm-heading {
+  font-family: var(--font-heading), sans-serif;
+  letter-spacing: 0.02em;
+}
+.gm-display {
+  font-family: var(--font-display), sans-serif;
+  letter-spacing: 0.03em;
+}
+
+.gm-text-glow-cyan {
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.55);
+}
+.gm-text-glow-purple {
+  text-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}
+
+.gm-gradient-title {
+  background: linear-gradient(90deg, var(--gm-cyan), var(--gm-purple) 60%, var(--gm-magenta));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Belt-and-suspenders on top of `color-scheme: dark` above — some Chrome/Windows
+   combos still render the <option> popup list with a white background unless the
+   options themselves carry an explicit dark background + light text. Applies to
+   every <select>/<option> site-wide, so every dropdown (Rental accessory picker,
+   POS category filters, all the CRUD page forms, etc.) gets fixed in one place
+   instead of touching each page's markup individually. */
+select {
+  color-scheme: dark;
+}
+select option,
+select optgroup {
+  background-color: #0a1020;
+  color: #eef2f9;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--gm-cyan), var(--gm-purple));
+  border-radius: 4px;
+  opacity: 0.6;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* =========================================================================
+   PS5-style cursor system
+   Deliberately written OUTSIDE any @layer — Tailwind's own utilities (like
+   `cursor-pointer` / `cursor-not-allowed`, used throughout the app) live
+   inside its `utilities` cascade layer, and per the CSS Cascade Layers spec
+   any unlayered rule always beats a layered one regardless of source order
+   or selector specificity. So these rules override Tailwind's cursor
+   utilities everywhere automatically, with no per-component changes needed.
+   Assets: public/cursors/*.png (32x32, generated from the matching .svg in
+   the same folder). Colors reuse the existing --gm-* neon palette above so
+   the cursor matches the rest of the UI.
+   ========================================================================= */
+
+/* Default — "Sleek Arrow": angular PS5-style pointer, black fill, neon blue outline. */
+html,
+body {
+  cursor: url("/cursors/ps-arrow.png") 2 2, auto;
+}
+
+/* Hover/clickable — "The Action Button": glowing O ring with the arrow tip poking out of its
+   bottom-right edge (one composited 40x40 image — hotspot lines up with the arrow tip inside it,
+   same spot as the default cursor's own hotspot, so click precision doesn't shift on hover). */
+a,
+button:not(:disabled),
+select,
+summary,
+[role="button"]:not([aria-disabled="true"]),
+.cursor-pointer {
+  cursor: url("/cursors/ps-action.png") 16 16, pointer;
+}
+
+/* Disabled/blocked — "Locked Console": glowing red padlock with a small "denied" badge. */
+button:disabled,
+select:disabled,
+[disabled],
+[aria-disabled="true"],
+.cursor-not-allowed {
+  cursor: url("/cursors/ps-locked.png") 8 8, not-allowed;
+}
+
+/* Loading — "Spinning Symbols": native cursor images can't animate, so this state is a
+   mouse-following overlay instead (see components/PsCursorSystem.tsx). Activated by adding
+   .ps-cursor-loading-active to <html> via the setPsCursorLoading() helper in lib/ui/ps-cursor.ts —
+   hides the real cursor everywhere so only the animated overlay is visible. */
+html.ps-cursor-loading-active,
+html.ps-cursor-loading-active * {
+  cursor: none !important;
+}
+
+.ps-spinner-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 56px;
+  height: 56px;
+  pointer-events: none;
+  z-index: 2147483647;
+  display: none;
+  transform: translate(-50%, -50%);
+  animation: ps-spin 1.4s linear infinite;
+}
+html.ps-cursor-loading-active .ps-spinner-ring {
+  display: block;
+}
+
+/* Four-color arc track connecting the symbols, matching the reference "friendship ring" look. */
+.ps-ring-track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ps-ring-track path {
+  filter: drop-shadow(0 0 2.5px currentColor);
+}
+
+.ps-spinner-ring .ps-sym {
+  position: absolute;
+  width: 17px;
+  height: 17px;
+  animation: ps-pulse 1.4s ease-in-out infinite;
+}
+.ps-spinner-ring .ps-sym svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+.ps-sym-triangle {
+  top: -2px;
+  left: 50%;
+  margin-left: -8.5px;
+  color: var(--gm-green);
+  animation-delay: 0s;
+}
+.ps-sym-circle {
+  top: 50%;
+  right: -2px;
+  margin-top: -8.5px;
+  color: var(--gm-red);
+  animation-delay: 0.35s;
+}
+.ps-sym-cross {
+  bottom: -2px;
+  left: 50%;
+  margin-left: -8.5px;
+  color: var(--gm-cyan);
+  animation-delay: 0.7s;
+}
+.ps-sym-square {
+  top: 50%;
+  left: -2px;
+  margin-top: -8.5px;
+  color: var(--gm-magenta);
+  animation-delay: 1.05s;
+}
+
+@keyframes ps-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+@keyframes ps-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}

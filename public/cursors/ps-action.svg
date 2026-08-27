@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44">
+  <defs>
+    <filter id="glowRing" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="2.6"/>
+    </filter>
+    <filter id="glowArrow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="1.6"/>
+    </filter>
+  </defs>
+  <!-- big glowing ring (the "O" button), upper-left -->
+  <circle cx="15" cy="15" r="12" fill="none" stroke="#22d3ee" stroke-width="5.4" filter="url(#glowRing)" opacity="0.95"/>
+  <circle cx="15" cy="15" r="12" fill="none" stroke="#a5f3fc" stroke-width="3.4"/>
+  <!-- small arrow tip poking out bottom-right, same as default cursor -->
+  <g transform="translate(15,15) scale(0.62)">
+    <polygon points="2,2 2,23 7,19 10,27 14,25.5 11,17.5 20,17.5"
+             fill="none" stroke="#22d3ee" stroke-width="4" filter="url(#glowArrow)" opacity="0.95"/>
+    <polygon points="2,2 2,23 7,19 10,27 14,25.5 11,17.5 20,17.5"
+             fill="#05070d" stroke="#a5f3fc" stroke-width="1.8" stroke-linejoin="round"/>
+  </g>
+</svg>
