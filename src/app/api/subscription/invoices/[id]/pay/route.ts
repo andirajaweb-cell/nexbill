@@ -7,7 +7,7 @@ import { db } from "@/db/client";
 import { subscriptionInvoices, subscriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-const VALID_METHODS = new Set(["cash", "qris", "va_bca", "va_bni", "va_mandiri", "va_bri", "va_permata", "ipaymu_crossborder"]);
+const VALID_METHODS = new Set(["cash", "qris", "va_bca", "va_bni", "va_mandiri", "va_bri", "va_permata", "ipaymu_crossborder", "ipaymu_hosted"]);
 
 /** Initiates payment on one platform-billing invoice (cash, QRIS, or bank VA) — mirrors the
  * customer-facing bayar-dimuka flow, but money flows the other direction (outlet -> NEXBILL). */

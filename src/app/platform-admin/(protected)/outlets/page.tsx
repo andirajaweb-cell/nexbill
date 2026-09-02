@@ -4,12 +4,13 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { showAlert } from "@/lib/ui/dialog";
 import { ChevronDown, ChevronRight, Building2, Plus } from "lucide-react";
 
-const STATUS_BADGE: Record<string, string> = { active: "success", grace: "pending", trial: "pending", trial_expired: "failed", suspended: "failed", cancelled: "failed", pending_payment: "pending" };
-const STATUS_LABEL: Record<string, string> = { active: "Aktif", grace: "Tenggang", trial: "Trial", trial_expired: "Trial Habis", suspended: "Suspend", cancelled: "Batal", pending_payment: "Menunggu Bayar" };
+const STATUS_BADGE: Record<string, string> = { active: "success", grace: "pending", trial: "pending", trial_expired: "failed", suspended: "failed", cancelled: "failed", pending_payment: "pending", free_forever: "success" };
+const STATUS_LABEL: Record<string, string> = { active: "Aktif", grace: "Tenggang", trial: "Trial", trial_expired: "Trial Habis", suspended: "Suspend", cancelled: "Batal", pending_payment: "Menunggu Bayar", free_forever: "Gratis Selamanya" };
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 const EMPTY_FORM = { name: "", address: "", phone: "", ownerName: "", email: "", password: "" };
 
@@ -131,7 +132,7 @@ export default function PlatformOutletsPage() {
             <input className={`${inputCls} sm:col-span-2`} placeholder="Alamat (opsional)" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
             <input className={inputCls} placeholder="Nama Owner" value={form.ownerName} onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))} />
             <input className={inputCls} type="email" placeholder="Email Owner" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-            <input className={inputCls} type="password" placeholder="Password (min. 8 karakter)" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
+            <PasswordInput className={inputCls} placeholder="Password (min. 8 karakter)" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
           </div>
           <Button onClick={createOutlet} disabled={busy}>{busy ? "Memproses..." : "Buat Outlet"}</Button>
         </Card>

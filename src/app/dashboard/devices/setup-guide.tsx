@@ -7,14 +7,18 @@ import { showAlert } from "@/lib/ui/dialog";
 import { setPsCursorLoading } from "@/lib/ui/ps-cursor";
 import "@/lib/i18n/dict-devices-guide";
 
-/** One zip per dashboard language, matching the folders in nexbill-agent-dist/ (ID/EN/MY/TH/PH/VN) — see public/downloads/nexbill-agent/. */
+/** One zip per dashboard language, matching the folders in nexbill-agent-dist/ (ID/EN/MY/TH/PH/VN) —
+ * see public/downloads/nexbill-agent/. Filenames on disk are actually "NexbillRelay-v1.0-<code>.zip"
+ * (not "NexbillAgent-<code>.zip" — this map used the wrong prefix, which 404'd on every download
+ * click: "File wasn't available on site"), and the Vietnamese file is named with "vn", not "vi" —
+ * matching the dashboard's own lang code for Vietnamese would 404 too if left as "vi" here. */
 const DOWNLOAD_BY_LANG: Record<LangCode, string> = {
-  id: "/downloads/nexbill-agent/NexbillAgent-id.zip",
-  en: "/downloads/nexbill-agent/NexbillAgent-en.zip",
-  ms: "/downloads/nexbill-agent/NexbillAgent-ms.zip",
-  th: "/downloads/nexbill-agent/NexbillAgent-th.zip",
-  fil: "/downloads/nexbill-agent/NexbillAgent-fil.zip",
-  vi: "/downloads/nexbill-agent/NexbillAgent-vi.zip",
+  id: "/downloads/nexbill-agent/NexbillRelay-v1.0-id.zip",
+  en: "/downloads/nexbill-agent/NexbillRelay-v1.0-en.zip",
+  ms: "/downloads/nexbill-agent/NexbillRelay-v1.0-ms.zip",
+  th: "/downloads/nexbill-agent/NexbillRelay-v1.0-th.zip",
+  fil: "/downloads/nexbill-agent/NexbillRelay-v1.0-fil.zip",
+  vi: "/downloads/nexbill-agent/NexbillRelay-v1.0-vn.zip",
 };
 
 const linkButtonCls =
@@ -35,25 +39,23 @@ export function DeviceSetupGuide() {
   const [open, setOpen] = useState<SectionKey | null>("tv");
   const [requesting, setRequesting] = useState(false);
 
+  // Fully automatic since the /api/devices/relay-agent-token-request endpoint shipped — no
+  // platform-admin action needed, the token is minted and delivered into a support ticket
+  // synchronously within this one request. One token per outlet ever via this button; a second
+  // click gets the backend's own "sudah pernah meminta, hubungi Customer Service" message verbatim.
   const requestToken = async () => {
     setRequesting(true);
     setPsCursorLoading(true); // demo of the "Spinning Symbols" cursor — see lib/ui/ps-cursor.ts
     try {
-      const res = await fetch("/api/support-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject: t("devices.guide.tv.ticketSubject", "Minta Token Relay Agent (TV)"),
-          category: "kendala_teknis",
-          message: t(
-            "devices.guide.tv.ticketMessage",
-            "Halo tim NEXBILL, saya ingin mengaktifkan kontrol TV (Android/Google TV) untuk outlet ini. Mohon dibuatkan token Relay Agent-nya. Terima kasih."
-          ),
-        }),
-      });
+      const res = await fetch("/api/devices/relay-agent-token-request", { method: "POST" });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
-      showAlert(t("devices.guide.tv.ticketSent", "Permintaan terkirim! Cek balasannya di menu Chat/Bantuan (biasanya tidak lama)."));
+      showAlert(
+        t(
+          "devices.guide.tv.ticketSent",
+          "Token Relay Agent sudah dibuat dan dikirim! Cek menu Chat/Bantuan untuk melihat tokennya, lalu lanjut ke Langkah 2 di bawah."
+        )
+      );
     } catch {
       showAlert(t("devices.guide.tv.ticketFailed", "Gagal mengirim permintaan. Coba lagi, atau hubungi tim NEXBILL lewat menu Chat/Bantuan."));
     } finally {
@@ -102,12 +104,20 @@ export function DeviceSetupGuide() {
                 )}
 
                 {s.key === "tuya" && (
-                  <p>
-                    {t(
-                      "devices.guide.tuya.body",
-                      'Untuk smart plug yang pakai aplikasi Tuya Smart / Smart Life. Koneksi ke Tuya Cloud API sudah disiapkan oleh tim NEXBILL — kamu tidak perlu setting apa pun di sisi cloud. Langkah: 1) Pasang perangkat & hubungkan ke WiFi lewat aplikasi Tuya Smart / Smart Life seperti biasa. 2) Buka aplikasi itu, masuk ke detail perangkat > ikon pensil/Device Information, salin "Device ID"-nya. 3) Di sini, pilih protokol "Tuya Smart Life", tempel Device ID itu — kolom "Kode DP Switch" boleh dikosongkan (default switch_1). 4) Simpan dan coba tombol Nyalakan/Matikan.'
-                    )}
-                  </p>
+                  <div className="space-y-2">
+                    <p>
+                      {t(
+                        "devices.guide.tuya.body",
+                        'Untuk smart plug yang pakai aplikasi Tuya Smart / Smart Life. Langkah: 1) Pasang perangkat & hubungkan ke WiFi lewat aplikasi Tuya Smart / Smart Life seperti biasa — pakai akun Tuya/Smart Life milik outlet sendiri. 2) Buka aplikasi itu, masuk ke detail perangkat > ikon pensil/Device Information, salin "Device ID"-nya. 3) Di sini, pilih protokol "Tuya Smart Life", tempel Device ID itu — kolom "Kode DP Switch" boleh dikosongkan (default switch_1). 4) Simpan dan coba tombol Nyalakan/Matikan.'
+                      )}
+                    </p>
+                    <p className="text-amber-400/90">
+                      {t(
+                        "devices.guide.tuya.activationNote",
+                        'Penting: setelah Langkah 1, akun Tuya/Smart Life outlet ini WAJIB "diaktifkan" satu kali oleh tim NEXBILL sebelum tombol Nyalakan/Matikan di sini bisa berfungsi — ini aturan dari Tuya, bukan dari NEXBILL. Kalau tombol belum berfungsi setelah Langkah 4, hubungi tim NEXBILL lewat menu Chat/Bantuan dan minta "aktivasi akun Tuya outlet" — prosesnya cepat (kirim/scan kode QR), tidak perlu remote/team datang ke lokasi.'
+                      )}
+                    </p>
+                  </div>
                 )}
 
                 {s.key === "ewelink" && (
@@ -133,7 +143,7 @@ export function DeviceSetupGuide() {
                       <p>
                         {t(
                           "devices.guide.tv.step1Body",
-                          "Klik tombol di bawah untuk kirim permintaan token ke tim NEXBILL. Token ini rahasia dan hanya dipakai satu kali di aplikasi NexbillAgent nanti — tunggu balasannya di menu Chat/Bantuan (biasanya tidak lama)."
+                          "Klik tombol di bawah — token dibuat otomatis dan langsung dikirim ke menu Chat/Bantuan, tidak perlu menunggu tim NEXBILL. Token ini rahasia, hanya dipakai satu kali di aplikasi NexbillAgent nanti, dan hanya bisa diminta sekali per outlet lewat tombol ini — kalau butuh token lagi (mis. TV/PC kedua), hubungi Customer Service lewat menu Chat/Bantuan."
                         )}
                       </p>
                       <Button className="text-xs" onClick={requestToken} disabled={requesting}>

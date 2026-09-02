@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 const REGIONS: { value: string; label: string }[] = [
@@ -110,7 +111,7 @@ export default function PlatformTuyaPage() {
               </div>
               <div>
                 <label className="text-xs text-neutral-500">Access Secret / Client Secret (kosongkan jika tidak diganti)</label>
-                <input type="password" className={inputCls} value={form.accessSecret} onChange={(e) => setForm({ ...form, accessSecret: e.target.value })} placeholder="••••••••" />
+                <PasswordInput className={inputCls} value={form.accessSecret} onChange={(e) => setForm({ ...form, accessSecret: e.target.value })} placeholder="••••••••" />
               </div>
               <div>
                 <label className="text-xs text-neutral-500">Project Code</label>

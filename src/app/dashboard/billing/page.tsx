@@ -1,8 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -10,10 +11,21 @@ import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { ShoppingCart, Plus, Minus, Zap, Wrench, Tv, Sparkles, Share2, Timer } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Zap, Wrench, Tv, Sparkles, Share2, Timer, LayoutDashboard, FileText, Wallet, TrendingUp, Receipt } from "lucide-react";
 import { BillingFaq } from "@/components/billing/BillingFaq";
+import { BillingProfileTab } from "@/components/billing/BillingProfileTab";
+import { DepositTab } from "@/components/billing/DepositTab";
+import { InvoiceHistoryTab } from "@/components/billing/InvoiceHistoryTab";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-billing";
+
+// UsageGrowthTab pulls in recharts — only fetched when the "Pertumbuhan Data" tab is actually
+// opened (most visits to this page never touch it) instead of bundled into every billing page
+// load. Named export, so the dynamic import needs the .then() re-map to a default.
+const UsageGrowthTab = dynamic(() => import("@/components/billing/UsageGrowthTab").then((m) => m.UsageGrowthTab), {
+  ssr: false,
+  loading: () => <div className="h-64 animate-pulse rounded-lg bg-white/5" />,
+});
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 
@@ -75,6 +87,9 @@ interface InvoiceData {
   vaBankCode: string | null;
   qrImageUrl: string | null;
   expiresAt?: string | null; // Ditambahkan untuk hitung mundur iPaymu
+  cancelReason?: string | null;
+  createdAt?: string | null;
+  paidAt?: string | null;
 }
 
 interface ProductData {
@@ -148,6 +163,7 @@ const STATUS_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
   grace: { key: "billing.status.grace", fallback: "Masa Tenggang" },
   suspended: { key: "billing.status.suspended", fallback: "Ditangguhkan" },
   cancelled: { key: "billing.status.cancelled", fallback: "Dibatalkan" },
+  free_forever: { key: "billing.status.freeForever", fallback: "Gratis Selamanya" },
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -158,6 +174,7 @@ const STATUS_BADGE: Record<string, string> = {
   grace: "pending",
   suspended: "failed",
   cancelled: "failed",
+  free_forever: "success",
 };
 
 const INVOICE_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
@@ -168,6 +185,21 @@ const INVOICE_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }>
   cart_order: { key: "billing.invoiceType.cartOrder", fallback: "Belanja Langganan" },
   group_renewal: { key: "billing.invoiceType.groupRenewal", fallback: "Tagihan Gabungan Multi-Outlet" },
   ai_addon: { key: "billing.invoiceType.aiAddon", fallback: "AI Add-on" },
+  deposit_topup: { key: "billing.invoiceType.depositTopup", fallback: "Top Up Saldo Deposit" },
+};
+
+const INVOICE_STATUS_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
+  unpaid: { key: "billing.invoiceStatus.unpaid", fallback: "Belum Bayar" },
+  paid: { key: "billing.invoiceStatus.paid", fallback: "Lunas" },
+  expired: { key: "billing.invoiceStatus.expired", fallback: "Kedaluwarsa (Otomatis)" },
+  cancelled: { key: "billing.invoiceStatus.cancelled", fallback: "Dibatalkan" },
+};
+
+const INVOICE_STATUS_COLOR: Record<string, string> = {
+  unpaid: "text-amber-400",
+  paid: "text-emerald-400",
+  expired: "text-neutral-500",
+  cancelled: "text-rose-400",
 };
 
 const CATEGORY_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
@@ -201,6 +233,7 @@ export default function BillingPage() {
 
   const [data, setData] = useState<BillingResponse | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
+  const [tab, setTab] = useState<"dashboard" | "profile" | "deposit" | "invoices" | "usage">("dashboard");
 
   // --- Clock Ticker untuk Countdown Jangka Waktu Pembayaran ---
   useEffect(() => {
@@ -226,20 +259,19 @@ export default function BillingPage() {
   const [ratesError, setRatesError] = useState("");
   const [selectedRate, setSelectedRate] = useState<ShippingRateOption | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchBilling = async () => {
-      const res = await fetchJsonObject<BillingResponse>("/api/subscription");
-      if (!cancelled) setData(res);
-    };
-
-    void fetchBilling();
-
-    return () => {
-      cancelled = true;
-    };
+  // Was previously a broken bare `function load() { throw new Error("Function not implemented.");
+  // }` declared at the bottom of this file — every handler below (doCheckout, doPay, doSync,
+  // doConfirm, doRenew, doActivateAi) called `await load()` expecting it to refresh `data`, but
+  // that stub always threw instead. A stable useCallback (not redefined every render, so effects/
+  // handlers that depend on it don't need to worry about identity churn) is the actual fix.
+  const load = useCallback(async () => {
+    const res = await fetchJsonObject<BillingResponse>("/api/subscription");
+    setData(res);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   // --- Auto-Polling: Mengecek status pembayaran otomatis ke API jika ada tagihan Pending iPaymu ---
   useEffect(() => {
@@ -502,6 +534,44 @@ export default function BillingPage() {
         <Badge status={STATUS_BADGE[sub.status] ?? "unknown"}>{STATUS_LABEL_KEYS[sub.status] ? t(STATUS_LABEL_KEYS[sub.status].key, STATUS_LABEL_KEYS[sub.status].fallback) : sub.status}</Badge>
       </div>
 
+      {/* Accurate.id-style tab bar — Dashboard / Profil Billing / Saldo Deposit / Riwayat Faktur / Pertumbuhan Data */}
+      <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/5 p-1">
+        {([
+          { id: "dashboard", label: t("billing.tab.dashboard", "Dashboard"), Icon: LayoutDashboard },
+          { id: "profile", label: t("billing.tab.profile", "Profil Billing"), Icon: FileText },
+          { id: "deposit", label: t("billing.tab.deposit", "Saldo Deposit"), Icon: Wallet },
+          { id: "invoices", label: t("billing.tab.invoices", "Riwayat Faktur"), Icon: Receipt },
+          { id: "usage", label: t("billing.tab.usage", "Pertumbuhan Data"), Icon: TrendingUp },
+        ] as const).map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`flex items-center gap-1.5 shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              tab === id ? "bg-cyan-500/15 text-cyan-300" : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
+            }`}
+          >
+            <Icon size={14} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "profile" && <BillingProfileTab />}
+      {tab === "deposit" && (
+        <DepositTab
+          money={money}
+          onTopupCreated={async () => {
+            await load();
+            setTab("dashboard");
+          }}
+        />
+      )}
+      {tab === "invoices" && <InvoiceHistoryTab invoices={safeInvoices} money={money} />}
+      {tab === "usage" && <UsageGrowthTab money={money} />}
+
+      {tab === "dashboard" && (
+      <>
+
       {data.billingCurrency?.code && (
         <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 px-4 py-2.5 text-xs text-cyan-200">
           {data.billingCurrency.effectiveRateIdrPerUnit
@@ -614,7 +684,27 @@ export default function BillingPage() {
         </Card>
       )}
 
-      {isPaid && (
+      {!isSuperuser && sub.status === "free_forever" && (
+        <Card className="p-4 border-emerald-400/30">
+          <div className="font-semibold text-emerald-300">{t("billing.freeForever.title", "Akses Gratis Selamanya")}</div>
+          <p className="text-sm text-neutral-400 mt-1">
+            {t(
+              "billing.freeForever.body",
+              "Outlet ini mendapat akses NEXBILL gratis permanen dari tim NEXBILL — tidak akan pernah ditagih. Konsol, cabang, dan staf tanpa batas. AI Add-on (Business Assistant & Insights) tetap dibeli terpisah seperti outlet lain."
+            )}
+          </p>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.consoles", "Unlimited Konsol")}</span>
+            <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.branches", "Unlimited Cabang")}</span>
+            <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.users", "Unlimited User")}</span>
+          </div>
+          {sub.smartPlugOwnedQty > 0 && (
+            <p className="text-xs text-neutral-500 mt-2">{t("billing.paid.smartPlugRegistered", "{n} smart plug terdaftar.").replace("{n}", String(sub.smartPlugOwnedQty))}</p>
+          )}
+        </Card>
+      )}
+
+      {isPaid && sub.status !== "free_forever" && (
         <Card className="p-4">
           <div className="font-semibold text-emerald-300">{t("billing.paid.planTitle", "Paket {plan}").replace("{plan}", String(plan?.name ?? ""))}</div>
           {plan?.unlimitedEntitlement && (
@@ -881,7 +971,13 @@ export default function BillingPage() {
 
       {unpaidInvoices.length > 0 && (
         <Card className="p-4 space-y-3">
-          <div className="font-semibold">{t("billing.invoices.unpaidHeading", "Tagihan Belum Lunas")}</div>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="font-semibold">{t("billing.invoices.unpaidHeading", "Tagihan Belum Lunas")}</div>
+            <div className="flex items-center gap-1.5 text-[11px] text-amber-400/80">
+              <Timer size={12} />
+              {t("billing.invoices.autoExpireNotice", "Tagihan yang belum dibayar dalam 2x24 jam akan otomatis kedaluwarsa (dibatalkan otomatis, tetap tercatat di Riwayat Faktur).")}
+            </div>
+          </div>
           {unpaidInvoices.map((inv) => {
             let lines: CartLine[] = [];
             try {
@@ -939,7 +1035,7 @@ export default function BillingPage() {
                         ) : (
                           <>
                             <Button variant="secondary" onClick={() => doSync(inv.id)}>
-                              {t("billing.invoices.syncStatus", "Cek Status iPaymu")}
+                              {t("billing.invoices.syncStatus", "Cek Status Pembayaran")}
                             </Button>
                             {(inv.method === "ipaymu_hosted" || inv.method === "ipaymu_crossborder") && (
                               <Button variant="secondary" onClick={() => doPay(inv.id, inv.method as string)}>
@@ -1002,16 +1098,26 @@ export default function BillingPage() {
 
       {safeInvoices.length > 0 && (
         <Card className="p-4">
-          <div className="font-semibold mb-2">{t("billing.history.heading", "Riwayat Tagihan")}</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-semibold">{t("billing.history.heading", "Riwayat Tagihan")}</div>
+            <button type="button" className="text-xs text-cyan-400 hover:underline" onClick={() => setTab("invoices")}>
+              {t("billing.history.viewAll", "Lihat semua di Riwayat Faktur →")}
+            </button>
+          </div>
           <div className="space-y-1 text-sm">
-            {safeInvoices.map((inv) => (
+            {safeInvoices.slice(0, 5).map((inv) => (
               <div key={inv.id} className="flex justify-between text-neutral-400">
                 <span>{inv.invoiceNumber} — {INVOICE_TYPE_LABEL_KEYS[inv.type] ? t(INVOICE_TYPE_LABEL_KEYS[inv.type].key, INVOICE_TYPE_LABEL_KEYS[inv.type].fallback) : inv.type}</span>
-                <span className={inv.status === "paid" ? "text-emerald-400" : "text-amber-400"}>{money(inv.amount)} · {inv.status === "paid" ? t("billing.history.paid", "Lunas") : t("billing.history.unpaid", "Belum Bayar")}</span>
+                <span className={INVOICE_STATUS_COLOR[inv.status] ?? "text-neutral-400"}>
+                  {money(inv.amount)} · {INVOICE_STATUS_LABEL_KEYS[inv.status] ? t(INVOICE_STATUS_LABEL_KEYS[inv.status].key, INVOICE_STATUS_LABEL_KEYS[inv.status].fallback) : inv.status}
+                </span>
               </div>
             ))}
           </div>
         </Card>
+      )}
+
+      </>
       )}
 
       <BillingFaq
@@ -1036,8 +1142,4 @@ export default function BillingPage() {
       </p>
     </div>
   );
-}
-
-function load() {
-  throw new Error("Function not implemented.");
 }

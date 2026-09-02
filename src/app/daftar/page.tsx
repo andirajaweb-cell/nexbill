@@ -3,7 +3,9 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { createClient } from "@/lib/client";
+import { SEA_BANKS } from "@/lib/data/sea-banks";
 
 interface PlanInfo {
   name: string;
@@ -52,6 +54,10 @@ function DaftarPageInner() {
   const [businessName, setBusinessName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
+  // Drives the outlet's display-currency symbol everywhere in the dashboard from day one (see
+  // lib/currency/format.ts) — same field editable later in Settings > Business & Tax > Negara.
+  // Defaults to Indonesia since that's still NEXBILL's primary market.
+  const [country, setCountry] = useState("ID");
 
   const [branchCount, setBranchCount] = useState(1);
 
@@ -161,10 +167,18 @@ function DaftarPageInner() {
     setBusy(true);
     // Without a client-side timeout, a hung request (DB pool exhaustion, cold serverless
     // function, etc.) leaves the "Memproses..." button stuck forever with no feedback — the
-    // fetch promise just never resolves. 25s is generous for outlet provisioning (COA seed +
-    // account mapping + subscription setup can take a few seconds) but still bounded.
+    // fetch promise just never resolves. 45s covers even a several-branch signup (each branch
+    // re-runs seedChartOfAccounts + ensureDefaultAccountMappings) with real margin — bumped up
+    // from the previous 25s, which real registrations were actually exceeding: those two
+    // functions used to issue roughly one DB round-trip PER chart-of-accounts/mapping row
+    // (~600+ sequential queries for one outlet), so a normal signup could legitimately take
+    // longer than 25s even though every row eventually landed in the database in the background
+    // (visible in Supabase) — the user just saw this exact timeout error despite the account
+    // having been created successfully underneath it. Now fixed at the query level (bulk
+    // inserts instead of one-row-at-a-time — see coa.ts/account-mapping.ts), so this should
+    // rarely if ever be hit, but the wider margin stays as a safety net.
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25_000);
+    const timeout = setTimeout(() => controller.abort(), 45_000);
     try {
       const res = await fetch("/api/onboarding/register", {
         method: "POST",
@@ -175,16 +189,26 @@ function DaftarPageInner() {
           outletName,
           address,
           phone,
+          country,
           branchCount,
           tv: { android: tvAndroid, smart: tvSmart, analog: tvAnalog },
           shifts,
           employees: { kasir: empKasir, dapur: empDapur, lainnya: empLainnya },
           owner: { name: ownerName, email, password },
           ref: refCode,
+          viaGoogleHint: viaGoogle,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === "google_session_expired") {
+          // The bridge cookie (30 min TTL — see google-pending.ts) expired mid-wizard. Drop back
+          // to the account step with password fields now visible instead of leaving the user
+          // stuck on Review with an error about a field they never saw — they can just set a
+          // password and continue without redoing the whole Google flow.
+          setViaGoogle(false);
+          setStep(4);
+        }
         setError(data.error ?? "Pendaftaran gagal.");
         return;
       }
@@ -339,6 +363,15 @@ function DaftarPageInner() {
               <div>
                 <label className={labelClass}>No. Telepon/WhatsApp (opsional)</label>
                 <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>Negara</label>
+                <select className={inputClass} value={country} onChange={(e) => setCountry(e.target.value)}>
+                  {SEA_BANKS.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-neutral-600 mt-1">Menentukan simbol mata uang (Rp, RM, ฿, dst.) yang tampil di seluruh dashboard outlet ini — bisa diganti lagi nanti di Pengaturan.</p>
               </div>
             </>
           )}
@@ -504,11 +537,11 @@ function DaftarPageInner() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className={labelClass}>Password</label>
-                    <input type="password" className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <PasswordInput className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} />
                   </div>
                   <div>
                     <label className={labelClass}>Konfirmasi Password</label>
-                    <input type="password" className={inputClass} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                    <PasswordInput className={inputClass} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
                   </div>
                 </div>
               )}

@@ -9,6 +9,7 @@ const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const STATUS_LABEL: Record<string, string> = {
   trial: "Trial", trial_expired: "Trial Habis", pending_payment: "Menunggu Bayar",
   active: "Aktif", grace: "Masa Tenggang", suspended: "Suspend", cancelled: "Batal",
+  free_forever: "Gratis Selamanya",
 };
 
 interface Overview {

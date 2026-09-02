@@ -51,8 +51,8 @@ function buildSignature(va: string, apiKey: string, jsonBody: string): string {
   return crypto.createHmac("sha256", apiKey).update(stringToSign).digest("hex");
 }
 
-function mockCreatePayment(req: PaymentRequest): PaymentResult {
-  const providerRef = `MOCK-IPAYMU-XB-${Date.now()}`;
+function mockCreatePayment(req: PaymentRequest, refPrefix: string, note: string): PaymentResult {
+  const providerRef = `MOCK-${refPrefix}-${Date.now()}`;
   const displayNote =
     req.displayCurrencyCode && req.displayAmount
       ? ` (ditampilkan ke pelanggan sebagai ${req.displayCurrencyCode} ${req.displayAmount.toFixed(2)})`
@@ -68,95 +68,123 @@ function mockCreatePayment(req: PaymentRequest): PaymentResult {
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     rawResponse: {
       mock: true,
-      note: `IPAYMU_* env vars not set — using mock cross-border payment for development.${displayNote}`,
+      note: `${note}${displayNote}`,
       mockCheckoutUrl: `https://sandbox.ipaymu.com/mock-checkout/${providerRef}`,
     },
   };
 }
 
-export const ipaymuCrossBorderGateway: PaymentGateway = {
-  method: "ipaymu_crossborder",
+/**
+ * Shared factory behind both exported gateways below — same iPaymu Direct API v2 `/payment`
+ * endpoint and signature recipe, the only difference is whether `paymentMethod` locks the checkout
+ * to card-only cross-border acceptance ("cc") or is left unset so iPaymu's hosted checkout page
+ * shows every domestic channel it has enabled for this merchant (VA, e-wallet, retail/Alfamart,
+ * etc — "E-Wallet / Retail" on the Billing page). See the top-of-file caveats: this whole request/
+ * response shape is still an unverified scaffold, cross-check against real docs before going live.
+ */
+function createIpaymuGateway(config: { method: "ipaymu_crossborder" | "ipaymu_hosted"; refPrefix: string; lockToCard: boolean }): PaymentGateway {
+  return {
+    method: config.method,
 
-  async createPayment(req: PaymentRequest): Promise<PaymentResult> {
-    if (!isConfigured()) return mockCreatePayment(req);
+    async createPayment(req: PaymentRequest): Promise<PaymentResult> {
+      if (!isConfigured()) {
+        return mockCreatePayment(
+          req,
+          config.refPrefix,
+          config.lockToCard
+            ? "IPAYMU_* env vars not set — using mock cross-border payment for development."
+            : "IPAYMU_* env vars not set — using mock hosted checkout (e-wallet/retail) for development."
+        );
+      }
 
-    const va = process.env.IPAYMU_VA!;
-    const apiKey = process.env.IPAYMU_API_KEY!;
-    const referenceId = `NEXBILL-XB-${req.orderId}-${Date.now()}`;
+      const va = process.env.IPAYMU_VA!;
+      const apiKey = process.env.IPAYMU_API_KEY!;
+      const referenceId = `NEXBILL-${config.lockToCard ? "XB" : "HOSTED"}-${req.orderId}-${Date.now()}`;
 
-    const body = {
-      product: [req.description || `NEXBILL Langganan - ${req.orderId}`],
-      qty: [1],
-      price: [req.amount], // always IDR — see top-of-file note
-      referenceId,
-      buyerPhone: req.customerPhone,
-      returnUrl: process.env.IPAYMU_RETURN_URL,
-      notifyUrl: process.env.IPAYMU_NOTIFY_URL,
-      cancelUrl: process.env.IPAYMU_CANCEL_URL,
-      // Cross-border card acceptance — TODO: confirm this is the correct paymentMethod/
-      // paymentChannel value with iPaymu docs/support before going live.
-      paymentMethod: "cc",
-    };
-    const jsonBody = JSON.stringify(body);
-    const signature = buildSignature(va, apiKey, jsonBody);
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[-:T.Z]/g, "")
-      .slice(0, 14);
+      const body: Record<string, unknown> = {
+        product: [req.description || `NEXBILL Langganan - ${req.orderId}`],
+        qty: [1],
+        price: [req.amount], // always IDR — see top-of-file note
+        referenceId,
+        buyerPhone: req.customerPhone,
+        returnUrl: process.env.IPAYMU_RETURN_URL,
+        notifyUrl: process.env.IPAYMU_NOTIFY_URL,
+        cancelUrl: process.env.IPAYMU_CANCEL_URL,
+      };
+      // Cross-border card acceptance locks the channel to "cc" — TODO: confirm this is the
+      // correct paymentMethod/paymentChannel value with iPaymu docs/support before going live.
+      // Hosted checkout (ipaymu_hosted) deliberately omits paymentMethod entirely so iPaymu shows
+      // its own channel-picker page (VA/e-wallet/retail) rather than this app guessing one.
+      if (config.lockToCard) body.paymentMethod = "cc";
 
-    const res = await fetch(`${process.env.IPAYMU_BASE_URL}/api/v2/payment`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        va,
-        signature,
-        timestamp,
-      },
-      body: jsonBody,
-    });
+      const jsonBody = JSON.stringify(body);
+      const signature = buildSignature(va, apiKey, jsonBody);
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[-:T.Z]/g, "")
+        .slice(0, 14);
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`iPaymu cross-border error ${res.status}: ${text}`);
-    }
+      const res = await fetch(`${process.env.IPAYMU_BASE_URL}/api/v2/payment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          va,
+          signature,
+          timestamp,
+        },
+        body: jsonBody,
+      });
 
-    const data = await res.json();
-    // Field names below (Data.SessionID/Url/TransactionId) are placeholders modeled on iPaymu's
-    // publicly documented v2 response shape — confirm against your real account's response.
-    return {
-      providerRef: data?.Data?.TransactionId ?? data?.Data?.SessionID ?? referenceId,
-      status: "pending",
-      feeAmount: data?.Data?.Fee ?? 0,
-      expiresAt: data?.Data?.Expired,
-      rawResponse: data,
-    };
-  },
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`iPaymu error ${res.status}: ${text}`);
+      }
 
-  async checkStatus(providerRef: string) {
-    if (!isConfigured()) return "pending";
-    const va = process.env.IPAYMU_VA!;
-    const apiKey = process.env.IPAYMU_API_KEY!;
-    const body = { transactionId: providerRef };
-    const jsonBody = JSON.stringify(body);
-    const signature = buildSignature(va, apiKey, jsonBody);
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[-:T.Z]/g, "")
-      .slice(0, 14);
+      const data = await res.json();
+      // Field names below (Data.SessionID/Url/TransactionId) are placeholders modeled on iPaymu's
+      // publicly documented v2 response shape — confirm against your real account's response.
+      return {
+        providerRef: data?.Data?.TransactionId ?? data?.Data?.SessionID ?? referenceId,
+        status: "pending",
+        feeAmount: data?.Data?.Fee ?? 0,
+        expiresAt: data?.Data?.Expired,
+        rawResponse: data,
+      };
+    },
 
-    const res = await fetch(`${process.env.IPAYMU_BASE_URL}/api/v2/transaction`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", va, signature, timestamp },
-      body: jsonBody,
-    });
-    if (!res.ok) return "pending";
-    const data = await res.json();
-    const status = String(data?.Data?.Status ?? data?.Data?.StatusDesc ?? "").toLowerCase();
-    if (status === "berhasil" || status === "success" || status === "1") return "success";
-    if (status === "gagal" || status === "failed" || status === "cancel" || status === "-2" || status === "-1") return "failed";
-    return "pending";
-  },
-};
+    async checkStatus(providerRef: string) {
+      if (!isConfigured()) return "pending";
+      const va = process.env.IPAYMU_VA!;
+      const apiKey = process.env.IPAYMU_API_KEY!;
+      const body = { transactionId: providerRef };
+      const jsonBody = JSON.stringify(body);
+      const signature = buildSignature(va, apiKey, jsonBody);
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[-:T.Z]/g, "")
+        .slice(0, 14);
+
+      const res = await fetch(`${process.env.IPAYMU_BASE_URL}/api/v2/transaction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", va, signature, timestamp },
+        body: jsonBody,
+      });
+      if (!res.ok) return "pending";
+      const data = await res.json();
+      const status = String(data?.Data?.Status ?? data?.Data?.StatusDesc ?? "").toLowerCase();
+      if (status === "berhasil" || status === "success" || status === "1") return "success";
+      if (status === "gagal" || status === "failed" || status === "cancel" || status === "-2" || status === "-1") return "failed";
+      return "pending";
+    },
+  };
+}
+
+export const ipaymuCrossBorderGateway: PaymentGateway = createIpaymuGateway({ method: "ipaymu_crossborder", refPrefix: "IPAYMU-XB", lockToCard: true });
+
+/** Domestic "E-Wallet / Retail" checkout on the Billing page — was previously a dead button (the
+ * frontend called doPay(id, "ipaymu_hosted") but no gateway/route ever recognized that method key,
+ * so it 400'd). Shares everything with ipaymuCrossBorderGateway except the paymentMethod lock. */
+export const ipaymuHostedGateway: PaymentGateway = createIpaymuGateway({ method: "ipaymu_hosted", refPrefix: "IPAYMU-HOSTED", lockToCard: false });
 
 /** Verify inbound webhook signature from iPaymu before trusting the payload. Not yet wired to a
  * route — implement POST /api/payments/webhook/ipaymu and call this first, same pattern as

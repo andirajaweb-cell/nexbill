@@ -3,6 +3,7 @@ import { TopBar } from "@/components/dashboard/TopBar";
 import { AuthProvider } from "@/lib/auth/client";
 import { SubscriptionGate } from "@/components/dashboard/SubscriptionGate";
 import { AnnouncementPopup } from "@/components/dashboard/AnnouncementPopup";
+import { EmailVerificationBanner } from "@/components/dashboard/EmailVerificationBanner";
 import { DashboardLangProvider } from "@/lib/i18n/dashboard-lang";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +16,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex-1 flex flex-col min-w-0">
             <TopBar />
             <main className="flex-1 p-6 overflow-x-hidden">
+              <EmailVerificationBanner />
               <SubscriptionGate>{children}</SubscriptionGate>
             </main>
             <footer className="px-6 py-3 text-center text-xs text-neutral-600 border-t border-neutral-900">

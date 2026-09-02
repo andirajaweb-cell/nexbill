@@ -14,6 +14,18 @@ registerDict({
   "ai.restrictedTitle": { id: "Fitur AI hanya untuk Owner/Superuser", en: "AI features are for Owner/Superuser only", ms: "Ciri AI hanya untuk Owner/Superuser", th: "ฟีเจอร์ AI สำหรับ Owner/Superuser เท่านั้น", fil: "Ang AI feature ay para lang sa Owner/Superuser", vi: "Tính năng AI chỉ dành cho Chủ sở hữu/Superuser" },
   "ai.restrictedBody": { id: "Role kamu saat ini belum bisa mengakses AI Business Assistant maupun AI Insights. Hubungi pemilik outlet kalau butuh akses.", en: "Your current role can't access the AI Business Assistant or AI Insights yet. Contact the outlet owner if you need access.", ms: "Peranan anda sekarang belum boleh mengakses AI Business Assistant atau AI Insights. Hubungi pemilik outlet jika perlukan akses.", th: "บทบาทของคุณตอนนี้ยังไม่สามารถเข้าถึง AI Business Assistant หรือ AI Insights ได้ กรุณาติดต่อเจ้าของสาขาหากต้องการสิทธิ์เข้าถึง", fil: "Hindi pa ma-access ng kasalukuyang role mo ang AI Business Assistant o AI Insights. Makipag-ugnayan sa may-ari ng outlet kung kailangan mo ng access.", vi: "Vai trò hiện tại của bạn chưa thể truy cập AI Business Assistant hay AI Insights. Liên hệ chủ chi nhánh nếu cần quyền truy cập." },
 
+  // --- Payment-gated notice (role allowed, but no active AI Add-on/trial/unlimited plan) ---
+  "ai.paywallTitle": { id: "AI Add-on Belum Aktif", en: "AI Add-on Not Active Yet", ms: "AI Add-on Belum Aktif", th: "AI Add-on ยังไม่เปิดใช้งาน", fil: "Hindi Pa Aktibo ang AI Add-on", vi: "AI Add-on chưa được kích hoạt" },
+  "ai.paywallBody": {
+    id: "AI Business Intelligence adalah produk berbayar terpisah — gratis selama masa percobaan, setelah itu perlu AI Add-on aktif (atau paket unlimited) di halaman Langganan.",
+    en: "AI Business Intelligence is a separate paid product — free during the trial period, after which it needs an active AI Add-on (or an unlimited plan) on the Subscription page.",
+    ms: "AI Business Intelligence ialah produk berbayar berasingan — percuma semasa tempoh percubaan, selepas itu perlukan AI Add-on aktif (atau pelan tanpa had) di halaman Langganan.",
+    th: "AI Business Intelligence เป็นผลิตภัณฑ์แบบชำระเงินแยกต่างหาก — ใช้ฟรีในช่วงทดลองใช้ หลังจากนั้นต้องมี AI Add-on ที่ใช้งานอยู่ (หรือแพ็กเกจไม่จำกัด) ที่หน้าการสมัครสมาชิก",
+    fil: "Ang AI Business Intelligence ay hiwalay na bayad na produkto — libre habang trial period, pagkatapos noon kailangan ng aktibong AI Add-on (o unlimited plan) sa Subscription page.",
+    vi: "AI Business Intelligence là sản phẩm trả phí riêng — miễn phí trong thời gian dùng thử, sau đó cần AI Add-on đang hoạt động (hoặc gói không giới hạn) tại trang Đăng ký gói.",
+  },
+  "ai.paywallCta": { id: "Aktifkan AI Add-on", en: "Activate AI Add-on", ms: "Aktifkan AI Add-on", th: "เปิดใช้งาน AI Add-on", fil: "I-activate ang AI Add-on", vi: "Kích hoạt AI Add-on" },
+
   // --- Tabs ---
   "ai.tabAssistant": { id: "Asisten Bisnis", en: "Business Assistant", ms: "Pembantu Perniagaan", th: "ผู้ช่วยธุรกิจ", fil: "Business Assistant", vi: "Trợ lý kinh doanh" },
   "ai.tabInsights": { id: "Insight & Analisa", en: "Insights & Analysis", ms: "Insight & Analisis", th: "ข้อมูลเชิงลึกและการวิเคราะห์", fil: "Insight at Analysis", vi: "Thông tin & Phân tích" },

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
@@ -12,20 +13,41 @@ const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const TABS = ["assistant", "insights"] as const;
 type Tab = (typeof TABS)[number];
 
+interface AiSubscriptionGate {
+  isAiLocked: boolean;
+  aiAddon: { freeViaTrial: boolean; includedViaPlan: boolean; active: boolean };
+}
+
 export default function AiPage() {
   const { user } = useAuth();
   const { t } = useDashboardLang();
   const [tab, setTab] = useState<Tab>("assistant");
   const [outletId, setOutletId] = useState<string | null>(null);
+  const [aiGate, setAiGate] = useState<AiSubscriptionGate | null>(null);
 
   useEffect(() => {
     fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
-  }, []);
+    // Superuser bypasses this entirely server-side (assertAiAllowed) — no need to even fetch
+    // /api/subscription for that role, since isAiLocked is never consulted for it anyway.
+    if (user?.role !== "superuser") {
+      fetchJsonObject<{ isAiLocked: boolean; aiAddon: AiSubscriptionGate["aiAddon"] }>("/api/subscription").then((d) => {
+        if (d) setAiGate({ isAiLocked: !!d.isAiLocked, aiAddon: d.aiAddon });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
 
   // Server-side (assertAiRoleAllowed in lib/subscription/service.ts) restricts AI usage to
   // Owner/Superuser only, regardless of who holds view_reports — mirrored here so staff roles get
   // a clear explanation instead of a broken chat box that 500s on every message.
   const roleAllowed = user?.role === "superuser" || user?.role === "owner";
+  // Beyond role, an Owner outlet also needs the AI Add-on paid (or still in its free trial window,
+  // or on an unlimited-entitlement plan that bundles AI in) — assertAiAllowed enforces this per
+  // call server-side; this mirrors it so a non-paying Owner sees an upgrade prompt instead of a
+  // chat box that errors on every message. Superuser (NEXBILL's own internal/testing account) is
+  // never gated by payment, matching assertAiAllowed's own bypass.
+  const paymentAllowed = user?.role === "superuser" || (roleAllowed && !!aiGate && !aiGate.isAiLocked);
+  const paymentGateLoading = roleAllowed && user?.role !== "superuser" && !aiGate;
 
   const tabLabels: Record<Tab, string> = {
     assistant: t("ai.tabAssistant", "Asisten Bisnis"),
@@ -43,6 +65,16 @@ export default function AiPage() {
         <Card className="p-4 border-white/10">
           <div className="font-semibold text-neutral-300">{t("ai.restrictedTitle", "Fitur AI hanya untuk Owner/Superuser")}</div>
           <p className="text-sm text-neutral-500 mt-1">{t("ai.restrictedBody", "Role kamu saat ini belum bisa mengakses AI Business Assistant maupun AI Insights. Hubungi pemilik outlet kalau butuh akses.")}</p>
+        </Card>
+      ) : paymentGateLoading ? null : user && roleAllowed && !paymentAllowed ? (
+        <Card className="p-4 border-amber-500/30 space-y-2">
+          <div className="font-semibold text-amber-300">{t("ai.paywallTitle", "AI Add-on Belum Aktif")}</div>
+          <p className="text-sm text-neutral-500">
+            {t("ai.paywallBody", "AI Business Intelligence adalah produk berbayar terpisah — gratis selama masa percobaan, setelah itu perlu AI Add-on aktif (atau paket unlimited) di halaman Langganan.")}
+          </p>
+          <Link href="/dashboard/billing">
+            <Button className="mt-1">{t("ai.paywallCta", "Aktifkan AI Add-on")}</Button>
+          </Link>
         </Card>
       ) : (
         <>

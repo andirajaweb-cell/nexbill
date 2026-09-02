@@ -429,43 +429,53 @@ export async function seedChartOfAccounts(outletId: string) {
     existingByCode.set(target.code, { ...row, code: target.code, name: target.name });
   }
 
-  // 2) Insert every DEFAULT_COA account that doesn't exist yet (by code).
-  // onConflictDoNothing + a re-fetch on conflict guards against two concurrent
-  // requests (e.g. two dashboard tabs loading at once) racing to seed the same
-  // outlet — without it, both could pass the in-memory existingByCode check
-  // before either finishes inserting, producing duplicate rows for the same code.
-  for (const def of DEFAULT_COA) {
-    if (existingByCode.has(def.code)) continue;
-    const [inserted] = await db
+  // 2) Insert every DEFAULT_COA account that doesn't exist yet (by code) — ONE bulk insert instead
+  // of ~220 individual sequential inserts. That per-row version (each one its own awaited
+  // round-trip to Supabase) was the main reason a brand-new signup could take 20+ seconds and time
+  // out client-side even though the outlet's rows kept landing fine in the database in the
+  // background — see the "pendaftaran timeout" investigation. onConflictDoNothing still guards the
+  // same concurrent-caller race (two requests seeding the same outlet at once); a single re-SELECT
+  // afterward (not a per-row fallback SELECT) refreshes existingByCode with real ids regardless of
+  // whether a row was inserted just now or already existed from a concurrent caller.
+  const missingDefs = DEFAULT_COA.filter((def) => !existingByCode.has(def.code));
+  if (missingDefs.length > 0) {
+    await db
       .insert(accounts)
-      .values({
-        outletId,
-        code: def.code,
-        name: def.name,
-        type: def.type,
-        normalBalance: normalBalanceFor(def.type),
-        isSystemAccount: true,
-        isPostingAllowed: def.isPostingAllowed ?? true,
-      })
-      .onConflictDoNothing({ target: [accounts.outletId, accounts.code] })
-      .returning();
-    if (inserted) {
-      existingByCode.set(def.code, inserted);
-    } else {
-      const [row] = await db.select().from(accounts).where(and(eq(accounts.outletId, outletId), eq(accounts.code, def.code))).limit(1);
-      if (row) existingByCode.set(def.code, row);
-    }
+      .values(
+        missingDefs.map((def) => ({
+          outletId,
+          code: def.code,
+          name: def.name,
+          type: def.type,
+          normalBalance: normalBalanceFor(def.type),
+          isSystemAccount: true,
+          isPostingAllowed: def.isPostingAllowed ?? true,
+        }))
+      )
+      .onConflictDoNothing({ target: [accounts.outletId, accounts.code] });
+
+    const refreshed = await db.select().from(accounts).where(eq(accounts.outletId, outletId));
+    existingByCode.clear();
+    for (const row of refreshed) existingByCode.set(row.code, row);
   }
 
-  // 3) Wire parentId for the whole tree (two-pass: every code now has a row).
+  // 3) Wire parentId for the whole tree — grouped by parent so this is one UPDATE per DISTINCT
+  // parent (~40 queries) instead of one UPDATE per child row (~200 queries), same perf reasoning
+  // as step 2 above.
   const codeToId = new Map<string, string>();
   for (const [code, row] of existingByCode) codeToId.set(code, row.id);
+  const childIdsByParentId = new Map<string, string[]>();
   for (const def of DEFAULT_COA) {
     if (!def.parentCode) continue;
     const row = existingByCode.get(def.code);
     const parentId = codeToId.get(def.parentCode);
     if (!row || !parentId || row.parentId === parentId) continue;
-    await db.update(accounts).set({ parentId }).where(eq(accounts.id, row.id));
+    const list = childIdsByParentId.get(parentId) ?? [];
+    list.push(row.id);
+    childIdsByParentId.set(parentId, list);
+  }
+  for (const [parentId, childIds] of childIdsByParentId) {
+    await db.update(accounts).set({ parentId }).where(inArray(accounts.id, childIds));
   }
 
   // Default cash/bank accounts linked to the GL, only if none exist yet.

@@ -97,9 +97,18 @@ export function Sidebar() {
       .catch(() => setHomeRentalEnabled(false));
   }, [user]);
 
+  // AI Business Intelligence is Owner/Superuser only (assertAiRoleAllowed in
+  // lib/subscription/service.ts) and, for Owner, additionally gated on a paid AI Add-on/trial
+  // (see /dashboard/ai's own paywall card) — hide the nav entry entirely for roles that can never
+  // reach it (Manager/Supervisor/Akuntan/Kasir/Dapur) rather than let them click into a
+  // role-restricted message. Owner still sees it even unpaid, so they can discover and upgrade.
+  const aiAllowedRole = user?.role === "superuser" || user?.role === "owner";
+
   let items: { href: string; key: string; icon: typeof LayoutDashboard }[] = (
     homeRentalEnabled ? [...nav, { href: "/dashboard/home-rental", key: "nav.homeRental", icon: Truck }] : [...nav]
-  ).filter((n) => n.href !== "/dashboard/ppob" || ppobEnabled);
+  )
+    .filter((n) => n.href !== "/dashboard/ppob" || ppobEnabled)
+    .filter((n) => n.href !== "/dashboard/ai" || aiAllowedRole);
   if (superuser) items = [...items, { href: "/dashboard/admin", key: "nav.adminData", icon: Database }];
   // Only shown for accounts linked to more than one outlet (see outletMemberships) — the
   // common single-outlet case never sees this entry at all.

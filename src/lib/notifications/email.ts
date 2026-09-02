@@ -109,6 +109,19 @@ export function forgotPasswordEmail(name: string, resetUrl: string) {
   };
 }
 
+export function verifyEmailEmail(name: string, verifyUrl: string) {
+  return {
+    subject: "Verifikasi email akun NEXBILL kamu",
+    html: wrapTemplate(
+      "Verifikasi Email",
+      `<p>Halo ${name},</p>
+       <p>Terima kasih sudah mendaftar di NEXBILL. Klik tombol di bawah untuk memverifikasi alamat email akun kamu — link ini berlaku 3 hari.</p>
+       <p><a href="${verifyUrl}" style="background:#0891b2;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block">Verifikasi Email</a></p>
+       <p style="font-size:12px;color:#888">Kalau kamu tidak merasa mendaftar di NEXBILL, abaikan saja email ini.</p>`
+    ),
+  };
+}
+
 export function invoicePaidEmail(outletName: string, invoiceNumber: string, amount: number, manualUrl?: string) {
   return {
     subject: `Pembayaran diterima — ${invoiceNumber}`,

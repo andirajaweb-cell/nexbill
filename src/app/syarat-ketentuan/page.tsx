@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Breadcrumb } from "@/components/seo/Breadcrumb";
 
 export const metadata = {
   title: "Syarat & Ketentuan — NEXBILL",
@@ -19,16 +20,17 @@ export default function TermsPage() {
     <div className="min-h-screen bg-[#05070f] px-4 py-10">
       <div className="max-w-3xl mx-auto space-y-8">
         <div>
-          <Link href="/dashboard/billing" className="text-xs text-cyan-400 hover:underline">
+          <Breadcrumb items={[{ label: "Beranda", href: "/" }, { label: "Syarat & Ketentuan" }]} />
+          <Link href="/dashboard/billing" className="text-xs text-cyan-400 hover:underline mt-2 inline-block">
             ← Kembali ke Halaman Langganan
           </Link>
           <h1 className="gm-display text-2xl font-bold gm-gradient-title mt-2">Syarat &amp; Ketentuan</h1>
-          <p className="text-sm text-neutral-500 mt-1">Berlaku untuk semua pengguna nextbill.id. Terakhir diperbarui: Agustus 2026.</p>
+          <p className="text-sm text-neutral-500 mt-1">Berlaku untuk semua pengguna nexbill.id. Terakhir diperbarui: Agustus 2026.</p>
         </div>
 
         <Section title="1. Definisi & Ruang Lingkup">
           <p>
-            "NEXBILL" merujuk pada layanan software-as-a-service (SaaS) yang diakses lewat nextbill.id, mencakup kasir (POS), manajemen
+            "NEXBILL" merujuk pada layanan software-as-a-service (SaaS) yang diakses lewat nexbill.id, mencakup kasir (POS), manajemen
             rental PlayStation, kontrol perangkat TV/konsol jarak jauh, booking online, membership, akuntansi, laporan, dan AI Assistant.
             "Outlet" atau "Merchant" adalah bisnis yang mendaftar dan menggunakan NEXBILL. "Pengguna" adalah setiap akun staf (Owner,
             Manager, Kasir, dsb.) yang login ke dashboard outlet tersebut. Dengan mendaftar atau menggunakan NEXBILL, Outlet dan setiap

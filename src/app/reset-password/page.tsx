@@ -2,6 +2,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -87,23 +88,23 @@ function ResetPasswordForm() {
               <form onSubmit={submit} className="space-y-4">
                 <div>
                   <label className="text-xs font-medium text-neutral-400">Password Baru</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     autoFocus
                     required
                     placeholder="Minimal 8 karakter"
-                    className="w-full mt-1.5 rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-blue-400/50 focus:bg-white/[0.06] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
+                    wrapperClassName="mt-1.5"
+                    className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-blue-400/50 focus:bg-white/[0.06] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-neutral-400">Konfirmasi Password Baru</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     required
                     placeholder="Ulangi password baru"
-                    className="w-full mt-1.5 rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-blue-400/50 focus:bg-white/[0.06] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
+                    wrapperClassName="mt-1.5"
+                    className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-blue-400/50 focus:bg-white/[0.06] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                   />

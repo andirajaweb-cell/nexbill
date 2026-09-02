@@ -196,3 +196,30 @@ export function roleLabel(role: StaffRole): string {
   };
   return labels[role] ?? role;
 }
+
+/**
+ * Approval-hierarchy level per role, per the explicit 6-tier structure NEXBILL uses: 1 =
+ * superuser (pemilik aplikasi NEXBILL), 2 = owner (outlet/merchant), 3 = manager, 4 =
+ * supervisor, 5 = akuntan, 6 = dapur & kasir. Lower number = more senior.
+ *
+ * This sits ON TOP of the existing approve_requests/approve_expenses/manage_staff permission
+ * checks — a role must ALSO be strictly more senior than whoever they're approving/managing,
+ * checked via canApproveForRole() below. E.g. a supervisor with approve_requests can approve a
+ * cashier's void request, but never a manager's or another supervisor's — even though both
+ * currently hold approve_requests. "kitchen" and "cashier" intentionally share level 6, since
+ * neither role ever approves anything.
+ */
+export const ROLE_LEVEL: Record<StaffRole, number> = {
+  superuser: 1,
+  owner: 2,
+  manager: 3,
+  supervisor: 4,
+  accountant: 5,
+  cashier: 6,
+  kitchen: 6,
+};
+
+/** True only if `reviewerRole` is strictly more senior (lower level number) than `requesterRole` — equal or junior levels can never approve/reject each other's requests, regardless of what approve_requests/approve_expenses says. */
+export function canApproveForRole(reviewerRole: StaffRole, requesterRole: StaffRole): boolean {
+  return ROLE_LEVEL[reviewerRole] < ROLE_LEVEL[requesterRole];
+}

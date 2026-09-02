@@ -50,6 +50,16 @@ export const outlets = pgTable("outlets", {
   city: text("city"),
   postalCode: text("postal_code"),
   preferredLang: text("preferred_lang").notNull().default("id"),
+  // Billing/tax profile — "Profil Billing" tab on the Langganan page (mirrors Accurate.id's
+  // Faktur Pajak fields). Purely informational metadata used on invoice/faktur pajak documents;
+  // does not affect tax calculation (see taxPercent above, which drives actual POS tax charged).
+  hasNpwp: boolean("has_npwp").notNull().default(true),
+  npwpNumber: text("npwp_number"),
+  nitku: text("nitku"),
+  taxpayerName: text("taxpayer_name"),
+  taxpayerAddress: text("taxpayer_address"),
+  businessEntityType: text("business_entity_type"),
+  businessType: text("business_type"),
   ...timestamps,
 });
 
@@ -65,6 +75,15 @@ export const staffUsers = pgTable("staff_users", {
     .notNull()
     .default("cashier"),
   isActive: boolean("is_active").notNull().default(true),
+  // Email verification module — see lib/auth/email-verification.ts (token) and
+  // /api/auth/verify-email + /api/auth/resend-verification (routes). Defaults to TRUE
+  // deliberately, not false: this column's default is what every pre-existing account gets
+  // backfilled to the moment this migration runs, and there's no reason to retroactively flag
+  // outlets that were already using the product before this feature existed as "unverified" —
+  // only /api/onboarding/register explicitly sets this false (for password-based signups only;
+  // a Google signup's email is already proven by the OAuth handshake itself, so it stays true).
+  emailVerified: boolean("email_verified").notNull().default(true),
+  emailVerifiedAt: text("email_verified_at"),
   ...timestamps,
 });
 
@@ -217,7 +236,9 @@ export const rentalSessions = pgTable("rental_sessions", {
   bookingId: text("booking_id"),
   shiftId: text("shift_id"),
   ...timestamps,
-});
+},
+  (t) => [index("rental_sessions_outlet_started_idx").on(t.outletId, t.startedAt)]
+);
 
 export const sessionAccessories = pgTable("session_accessories", {
   id: id(),
@@ -521,7 +542,9 @@ export const ppobTransactions = pgTable("ppob_transactions", {
   reversedReason: text("reversed_reason"),
   reversedAt: text("reversed_at"),
   ...timestamps,
-});
+},
+  (t) => [index("ppob_transactions_outlet_created_idx").on(t.outletId, t.createdAt)]
+);
 
 export const ppobPriceRules = pgTable("ppob_price_rules", {
   id: id(),
@@ -1023,7 +1046,9 @@ export const bookings = pgTable("bookings", {
   noShowAt: text("no_show_at"),
   expiredAt: text("expired_at"),
   ...timestamps,
-});
+},
+  (t) => [index("bookings_outlet_status_idx").on(t.outletId, t.status)]
+);
 
 export const bookingNotifications = pgTable("booking_notifications", {
   id: id(),
@@ -1114,7 +1139,9 @@ export const approvalRequests = pgTable("approval_requests", {
   reviewedAt: text("reviewed_at"),
   reviewNote: text("review_note"),
   ...timestamps,
-});
+},
+  (t) => [index("approval_requests_outlet_status_idx").on(t.outletId, t.status)]
+);
 
 export const auditLogs = pgTable("audit_logs", {
   id: id(),
@@ -1146,6 +1173,28 @@ export const featureFlags = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex("feature_flags_outlet_key_idx").on(t.outletId, t.key)]
+);
+
+/** ---------------- HELP CENTER CONTENT OVERRIDES ---------------- */
+// Per-outlet edits to the built-in Help & Guide content (src/lib/help/content.ts holds the
+// shipped default HELP_CATEGORIES — this table only stores what a Superuser has customized on
+// top of that). One row per (outlet, category) actually edited; a category with no row here just
+// renders the default as-is. contentJson is a JSON-serialized Partial<HelpCategory> covering only
+// the fields a Superuser can edit (label, navHint, summary, roles, steps, notes, subsections) —
+// `id`/`group` deliberately stay fixed by the static definition so the sidebar's grouping/order
+// can never break from an edit. See src/lib/help/overrides.ts for the merge logic, and
+// src/app/api/help-content/ for the read/write routes (write is Superuser-role-only).
+export const helpContentOverrides = pgTable(
+  "help_content_overrides",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    categoryId: text("category_id").notNull(),
+    contentJson: text("content_json").notNull(),
+    updatedBy: text("updated_by").references(() => staffUsers.id),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("help_content_overrides_outlet_category_idx").on(t.outletId, t.categoryId)]
 );
 
 /** ---------------- HOME RENTAL (Sewa Dibawa Pulang) ---------------- */
@@ -1456,6 +1505,9 @@ export const billingGroups = pgTable("billing_groups", {
   id: id(),
   ownerStaffUserId: text("owner_staff_user_id").notNull().references(() => staffUsers.id),
   name: text("name").notNull(),
+  // Shared prepaid balance for the whole group — see subscriptions.depositBalance's doc comment
+  // for why a grouped outlet's deposit lives here instead of on its own subscription row.
+  depositBalance: doublePrecision("deposit_balance").notNull().default(0),
   ...timestamps,
 });
 
@@ -1465,7 +1517,14 @@ export const subscriptions = pgTable(
     id: id(),
     outletId: text("outlet_id").notNull().references(() => outlets.id),
     status: text("status", {
-      enum: ["trial", "trial_expired", "pending_payment", "active", "grace", "suspended", "cancelled"],
+      // "free_forever": platform-admin-granted lifetime free access for an outlet/merchant — see
+      // grantFreeForever()/revokeFreeForever() in lib/subscription/service.ts. Deliberately its own
+      // status rather than repurposing "active" with a fake plan/far-future date: every sweep in
+      // that file that could touch billing (sweepGenerateRenewalInvoices, sweepGraceAndSuspend,
+      // ensureRenewalInvoiceExists) keys off status === "active" specifically, so a distinct status
+      // guarantees this subscription is structurally unreachable by any of them, not just
+      // incidentally skipped because planId/currentPeriodEnd happen to be null right now.
+      enum: ["trial", "trial_expired", "pending_payment", "active", "grace", "suspended", "cancelled", "free_forever"],
     })
       .notNull()
       .default("trial"),
@@ -1487,6 +1546,13 @@ export const subscriptions = pgTable(
     entitlementGrantedAt: text("entitlement_granted_at"),
     cancelledAt: text("cancelled_at"),
     cancelReason: text("cancel_reason"),
+    // "Saldo Deposit" — a prepaid balance an outlet can top up (see subscriptionDepositMutations
+    // below) and that's auto-applied against the NEXT renewal/group_renewal invoice as soon as it's
+    // generated (see applyDepositToInvoice in lib/subscription/service.ts), same idea as Accurate.id's
+    // billing deposit. Lives here for a standalone outlet; a grouped outlet (billingGroupId set)
+    // uses billingGroups.depositBalance instead, since a group is billed — and should therefore be
+    // topped up/spent — as one combined entity, not per member outlet.
+    depositBalance: doublePrecision("deposit_balance").notNull().default(0),
     ...timestamps,
   },
   (t) => [uniqueIndex("subscriptions_outlet_idx").on(t.outletId)]
@@ -1499,7 +1565,7 @@ export const subscriptionInvoices = pgTable("subscription_invoices", {
   subscriptionId: text("subscription_id").notNull().references(() => subscriptions.id),
   billingGroupId: text("billing_group_id").references(() => billingGroups.id),
   type: text("type", {
-    enum: ["subscription_fee", "smart_plug_purchase", "setup_service", "extra_console", "cart_order", "group_renewal", "ai_addon"],
+    enum: ["subscription_fee", "smart_plug_purchase", "setup_service", "extra_console", "cart_order", "group_renewal", "ai_addon", "deposit_topup"],
   }).notNull(),
   period: text("period"),
   description: text("description").notNull(),
@@ -1507,7 +1573,13 @@ export const subscriptionInvoices = pgTable("subscription_invoices", {
   unitPrice: doublePrecision("unit_price").notNull(),
   amount: doublePrecision("amount").notNull(),
   lineItemsJson: text("line_items_json"),
-  status: text("status", { enum: ["unpaid", "paid", "cancelled"] }).notNull().default("unpaid"),
+  // "expired" is distinct from "cancelled" — an outlet/staff-initiated void still uses "cancelled";
+  // "expired" is set only by the automatic 2x24-hour sweep (see sweepExpireStaleUnpaidInvoices in
+  // lib/subscription/service.ts) so the two can be told apart in Riwayat Tagihan/reporting.
+  status: text("status", { enum: ["unpaid", "paid", "cancelled", "expired"] }).notNull().default("unpaid"),
+  // Why the invoice was cancelled/expired — e.g. "auto_expired_48h" for the sweep, or a
+  // staff-entered reason for a manual void. Nullable; only ever set alongside a cancelled/expired status.
+  cancelReason: text("cancel_reason"),
   dueDate: text("due_date"),
   method: text("method"),
   providerRef: text("provider_ref"),
@@ -1515,8 +1587,33 @@ export const subscriptionInvoices = pgTable("subscription_invoices", {
   qrImageUrl: text("qr_image_url"),
   vaNumber: text("va_number"),
   vaBankCode: text("va_bank_code"),
+  // Payment-gateway-specific window (VA/QRIS/iPaymu session expiry, typically much shorter than
+  // 24h) — persisted from PaymentResult.expiresAt by initiateInvoicePayment. Distinct from the
+  // 48-hour invoice-level auto-expire sweep above: this is "this specific VA number/QR code stops
+  // being payable at X", not "this invoice record itself expires at X".
+  expiresAt: text("expires_at"),
   paidAt: text("paid_at"),
   emailSentAt: text("email_sent_at"),
+  ...timestamps,
+});
+
+/**
+ * Append-only ledger backing "Saldo Deposit" / "Daftar Mutasi" (see subscriptions.depositBalance /
+ * billingGroups.depositBalance's doc comments) — every top-up, auto-apply-to-invoice usage, or
+ * manual adjustment gets one row here, mirroring the audit-trail pattern already used for
+ * subscriptionEvents. Exactly one of subscriptionId/billingGroupId is set per row, matching
+ * whichever balance actually moved (see getDepositOwner in lib/subscription/service.ts).
+ */
+export const subscriptionDepositMutations = pgTable("subscription_deposit_mutations", {
+  id: id(),
+  subscriptionId: text("subscription_id").references(() => subscriptions.id),
+  billingGroupId: text("billing_group_id").references(() => billingGroups.id),
+  type: text("type", { enum: ["topup", "usage", "refund", "adjustment"] }).notNull(),
+  // Signed — positive for topup/refund (credit), negative for usage (debit against an invoice).
+  amount: doublePrecision("amount").notNull(),
+  balanceAfter: doublePrecision("balance_after").notNull(),
+  relatedInvoiceId: text("related_invoice_id").references(() => subscriptionInvoices.id),
+  note: text("note"),
   ...timestamps,
 });
 
@@ -1608,11 +1705,12 @@ export const subscriptionEvents = pgTable("subscription_events", {
   type: text("type", {
     enum: [
       "trial_started", "trial_reminder_h5", "trial_reminder_h2", "trial_reminder_h0",
-      "trial_expired", "checkout_started", "invoice_created", "invoice_paid",
+      "trial_expired", "checkout_started", "invoice_created", "invoice_paid", "invoice_expired",
       "subscription_activated", "renewal_reminder", "renewal_invoice_created",
       "grace_started", "suspended", "reactivated", "cancelled", "plan_changed",
       "ai_addon_activated", "ai_addon_renewed", "ai_addon_expired",
-      "unlimited_entitlement_granted",
+      "unlimited_entitlement_granted", "deposit_topup", "deposit_used",
+      "free_forever_granted", "free_forever_revoked",
     ],
   }).notNull(),
   note: text("note"),

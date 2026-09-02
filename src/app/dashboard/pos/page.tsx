@@ -7,6 +7,7 @@ import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
 import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { useCurrency } from "@/lib/currency/client";
 import "@/lib/i18n/dict-pos";
 
 interface Product {
@@ -50,7 +51,6 @@ interface OpenOrder {
   createdAt: string;
 }
 
-const rupiah = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
 
 /**
  * Cashier's in-progress order (cart + discount/voucher/tax/method) draft,
@@ -72,6 +72,7 @@ interface PosDraft {
 
 export default function PosPage() {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState("cash");

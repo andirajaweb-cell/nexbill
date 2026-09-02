@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import "@/lib/i18n/dict-admin";
@@ -82,7 +83,6 @@ function FieldInput({ col, value, onChange }: { col: ColumnMeta; value: any; onC
   );
 }
 
-const RESET_CONFIRM_PHRASE = "HAPUS SEMUA DATA";
 const inputCls = "w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm disabled:opacity-60";
 
 /**
@@ -90,21 +90,22 @@ const inputCls = "w-full rounded-lg bg-neutral-800 border border-neutral-700 px-
  * src/lib/admin/full-reset.ts — resetAllData() is always called with session.outletId,
  * never unscoped). Moved here from Pengaturan so every "direct database access" capability
  * lives in one place. Rendered for role "superuser" or "owner" (the two full-authority
- * roles), re-checked server-side by the API route regardless. Requires typing the exact
- * confirm phrase + re-entering the caller's password before the button even enables, plus a
- * native confirm dialog as one more speed bump, since this is irreversible through the app
- * itself (recovery relies on Supabase's own managed backups / point-in-time recovery, not a
- * file this app writes).
+ * roles), re-checked server-side by the API route regardless. Requires typing the caller's
+ * own login email (re-verified server-side against the DB row, not just the session) +
+ * re-entering the caller's password before the button even enables, plus a native confirm
+ * dialog as one more speed bump, since this is irreversible through the app itself.
  */
 function ResetDataSection() {
   const { t } = useDashboardLang();
+  const { user } = useAuth();
   const [confirmText, setConfirmText] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const phraseMatches = confirmText.trim() === RESET_CONFIRM_PHRASE;
+  const confirmPhrase = user?.email ?? "";
+  const phraseMatches = !!confirmPhrase && confirmText.trim().toLowerCase() === confirmPhrase.toLowerCase();
 
   const submit = async () => {
-    if (!phraseMatches) return showAlert(t("admin.reset.retypeExact", 'Ketik ulang persis: "{phrase}"').replace("{phrase}", RESET_CONFIRM_PHRASE));
+    if (!phraseMatches) return showAlert(t("admin.reset.retypeExact", 'Ketik ulang persis: "{phrase}"').replace("{phrase}", confirmPhrase));
     if (!password) return showAlert(t("admin.reset.enterPassword", "Masukkan password kamu."));
     if (!(await showConfirm(
       t("admin.reset.confirmMessage", "Ini akan MENGHAPUS PERMANEN semua data operasional outlet ini — produk, transaksi, booking, akuntansi, staf lain, dan lainnya. Outlet/tenant lain tidak terpengaruh. Tidak bisa dibatalkan dari aplikasi. Lanjutkan?")
@@ -119,7 +120,7 @@ function ResetDataSection() {
       });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
-      await showAlert(t("admin.reset.doneMessage", "Selesai. {n} tabel dikosongkan (hanya milik outlet ini). Pemulihan data mengandalkan backup otomatis Supabase (bukan file lokal). Kamu akan diarahkan ke halaman login.").replace("{n}", String(data.tablesCleared)));
+      await showAlert(t("admin.reset.doneMessage", "Selesai. {n} tabel dikosongkan (hanya milik outlet ini). Kamu akan diarahkan ke halaman login.").replace("{n}", String(data.tablesCleared)));
       window.location.href = "/login";
     } finally {
       setSubmitting(false);
@@ -135,16 +136,15 @@ function ResetDataSection() {
       <p className="text-sm text-neutral-400">
         {t("admin.reset.desc2Pre", "Yang ")}<b>{t("admin.reset.desc2Bold1", "tetap ada")}</b>{t("admin.reset.desc2Mid", " supaya sistem tidak terkunci total: data cabang/outlet itu sendiri, dan akun staf dengan role ")}<b>Superuser</b>/<b>Owner</b>{t("admin.reset.desc2Suffix", " (akun lain dengan role tersebut juga tetap ada). Semua akun staf non-Superuser/Owner (Manager, Kasir, dll) di outlet ini ikut terhapus.")}
       </p>
-      <p className="text-xs text-neutral-500">{t("admin.reset.supabaseNote", "Database di-host Supabase dan sudah punya backup otomatis (lihat Supabase Dashboard) — bukan file lokal yang dibuat aplikasi.")}</p>
 
       <div className="border-t border-neutral-800 pt-3 space-y-2">
         <label className="space-y-1 block">
-          <div className="text-xs text-neutral-500">{t("admin.reset.typeExactly", "Ketik persis: ")}<span className="font-mono text-rose-400">{RESET_CONFIRM_PHRASE}</span></div>
-          <input className={inputCls} value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder={RESET_CONFIRM_PHRASE} />
+          <div className="text-xs text-neutral-500">{t("admin.reset.typeExactly", "Ketik persis: ")}<span className="font-mono text-rose-400">{confirmPhrase}</span></div>
+          <input className={inputCls} value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder={confirmPhrase} />
         </label>
         <label className="space-y-1 block">
           <div className="text-xs text-neutral-500">{t("admin.reset.passwordLabel", "Password kamu (konfirmasi ulang)")}</div>
-          <input type="password" className={inputCls} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput className={inputCls} value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
         <Button
           variant="danger"

@@ -185,26 +185,38 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "home_rental", transactionKey: "deposit", accountCode: "2135", label: "Home Rental — Security Deposit" },
 ];
 
-/** Seeds the default mapping rows above for an outlet — only inserts rows that don't already exist (by module+transactionKey), so re-running after an owner has edited/deleted rows never resurrects what they removed. Call after seedChartOfAccounts (needs the accounts to exist first). */
+/**
+ * Seeds the default mapping rows above for an outlet — only inserts rows that don't already exist
+ * (by module+transactionKey), so re-running after an owner has edited/deleted rows never resurrects
+ * what they removed. Call after seedChartOfAccounts (needs the accounts to exist first).
+ *
+ * Fetches every account + every existing mapping ONCE up front (2 queries) and bulk-inserts
+ * whatever's missing in a single statement, instead of the old one-SELECT-plus-one-INSERT-per-seed-
+ * row loop (~85 seed rows -> up to ~170 sequential round-trips) — that loop, combined with
+ * seedChartOfAccounts' own equivalent per-row pattern, was the actual cause of new-outlet signup
+ * timing out client-side while still slowly finishing (and showing up in the database) in the
+ * background. See the "pendaftaran timeout" fix note on seedChartOfAccounts in coa.ts.
+ */
 export async function ensureDefaultAccountMappings(outletId: string) {
-  const existing = await db.select().from(accountMappings).where(eq(accountMappings.outletId, outletId));
-  const existingKeys = new Set(existing.map((m) => `${m.module}:${m.transactionKey}`));
+  const [existingMappings, allAccounts] = await Promise.all([
+    db.select().from(accountMappings).where(eq(accountMappings.outletId, outletId)),
+    db.select().from(accounts).where(eq(accounts.outletId, outletId)),
+  ]);
+  const existingKeys = new Set(existingMappings.map((m) => `${m.module}:${m.transactionKey}`));
+  const accountIdByCode = new Map(allAccounts.map((a) => [a.code, a.id]));
 
-  for (const seed of DEFAULT_MAPPING_SEED) {
-    const key = `${seed.module}:${seed.transactionKey}`;
-    if (existingKeys.has(key)) continue;
-    const [account] = await db.select().from(accounts).where(and(eq(accounts.outletId, outletId), eq(accounts.code, seed.accountCode))).limit(1);
-    if (!account) continue; // shouldn't happen once seedChartOfAccounts has run, but don't blow up if it does
+  const rowsToInsert = DEFAULT_MAPPING_SEED.filter((seed) => !existingKeys.has(`${seed.module}:${seed.transactionKey}`))
+    .map((seed) => {
+      const accountId = accountIdByCode.get(seed.accountCode);
+      if (!accountId) return null; // shouldn't happen once seedChartOfAccounts has run, but don't blow up if it does
+      return { outletId, module: seed.module, transactionKey: seed.transactionKey, accountId, label: seed.label, isActive: true };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  if (rowsToInsert.length > 0) {
     await db
       .insert(accountMappings)
-      .values({
-        outletId,
-        module: seed.module,
-        transactionKey: seed.transactionKey,
-        accountId: account.id,
-        label: seed.label,
-        isActive: true,
-      })
+      .values(rowsToInsert)
       .onConflictDoNothing({ target: [accountMappings.outletId, accountMappings.module, accountMappings.transactionKey] });
   }
 }

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
@@ -377,7 +378,7 @@ export default function SemuaOutletPage() {
                         </label>
                         <label className="space-y-1 block">
                           <div className="text-[10px] text-neutral-500">{t("semuaOutlet.yourPasswordConfirm", "Password kamu (konfirmasi ulang)")}</div>
-                          <input type="password" className={inputCls} value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+                          <PasswordInput className={inputCls} value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
                         </label>
                         <div className="flex gap-2">
                           <Button

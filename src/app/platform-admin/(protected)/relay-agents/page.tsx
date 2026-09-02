@@ -84,9 +84,15 @@ export default function PlatformRelayAgentsPage() {
       <div>
         <h1 className="gm-display text-2xl font-bold text-amber-300">Relay Agent (Android TV via Cloud)</h1>
         <p className="text-sm text-neutral-500 mt-1">
-          Buat token Relay Agent per outlet di sini, lalu kirim token + NexbillAgent.exe ke outlet lewat support (WhatsApp/email). Outlet
-          hanya perlu install aplikasinya, tempel token sekali saat diminta, dan isi IP TV di halaman Devices mereka — tidak perlu tahu
-          soal hub URL, protokol, atau token setelah itu.
+          Permintaan token pertama tiap outlet sekarang otomatis — tombol &quot;Minta Token Relay Agent&quot; di dashboard outlet
+          (Devices &gt; panduan TV) langsung membuat token dan mengirimkannya lewat tiket Chat/Bantuan mereka, tanpa perlu dibuatkan
+          manual di sini. Daftar di bawah tetap menampilkan SEMUA outlet terdaftar; yang belum pernah minta token tetap kosong
+          (&quot;Belum ada relay agent&quot;).
+        </p>
+        <p className="text-sm text-neutral-500 mt-2">
+          Sistem hanya mengizinkan 1 permintaan mandiri per outlet. Kalau outlet butuh token lagi (TV/PC kedua, atau token lama hilang),
+          mereka diarahkan ke Customer Service — <span className="text-neutral-300">hapus dulu</span> agent lama outlet itu di bawah
+          untuk membuka kembali jatah permintaan mandiri mereka, atau buatkan langsung lewat &quot;Buat Relay Agent Baru&quot;.
         </p>
       </div>
 

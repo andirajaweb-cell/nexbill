@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/client";
 import { roleLabel, type StaffRole } from "@/lib/auth/permissions";
 import { Badge } from "@/components/ui/Badge";
-import { fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { LogOut, Bell, ShieldCheck, Building2, Check, ChevronDown } from "lucide-react";
 import type { NotificationItem } from "@/lib/notifications";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -38,28 +39,21 @@ const DROPDOWN_LIMIT = 5;
  */
 export function TopBar() {
   const { user, loading, logout } = useAuth();
+  const router = useRouter();
   const { t } = useDashboardLang();
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Was a hand-rolled useEffect + setInterval(load, 60000) — moved to useApi/SWR so this poll
+  // (which runs on every dashboard page, since TopBar lives in the persistent layout) pauses
+  // automatically when the browser tab is backgrounded, and so `mutate()` below can do an
+  // optimistic local update on mark-as-read without a full extra round trip. See
+  // src/lib/api/use-api.ts for what this wrapper adds over a plain fetch.
+  const { data, mutate } = useApi<{ items: NotificationItem[]; unreadCount: number }>("/api/notifications", { refreshInterval: 60000 });
+  const items = data?.items ?? [];
+  const unreadCount = data?.unreadCount ?? 0;
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [outletMenuOpen, setOutletMenuOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const outletPanelRef = useRef<HTMLDivElement>(null);
-
-  const load = () => {
-    fetchJsonObject<{ items: NotificationItem[]; unreadCount: number }>("/api/notifications").then((data) => {
-      if (!data) return;
-      setItems(data.items);
-      setUnreadCount(data.unreadCount);
-    });
-  };
-
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 60000);
-    return () => clearInterval(id);
-  }, []);
 
   // Close the dropdown on an outside click, same as any standard notification bell.
   useEffect(() => {
@@ -91,9 +85,9 @@ export function TopBar() {
       });
       if (res.ok) {
         setOutletMenuOpen(false);
-        // Full reload (not just refresh()) so every page's own outletId-scoped fetches
-        // re-run against the new active outlet instead of showing stale cached data.
-        window.location.href = "/dashboard";
+        // Use client-side navigation so the active outlet change triggers a fresh dashboard load
+        // without violating Next.js routing rules in a Client Component.
+        router.push("/dashboard");
       } else {
         setSwitching(false);
       }
@@ -103,15 +97,34 @@ export function TopBar() {
   };
 
   const markRead = async (key: string) => {
-    setItems((prev) => prev.map((i) => (i.key === key ? { ...i, read: true } : i)));
-    setUnreadCount((c) => Math.max(0, c - 1));
-    await fetch("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) });
+    await mutate(
+      async (current) => {
+        await fetch("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) });
+        if (!current) return current ?? null;
+        return { items: current.items.map((i) => (i.key === key ? { ...i, read: true } : i)), unreadCount: Math.max(0, current.unreadCount - 1) };
+      },
+      {
+        optimisticData: (current) =>
+          current ? { items: current.items.map((i) => (i.key === key ? { ...i, read: true } : i)), unreadCount: Math.max(0, current.unreadCount - 1) } : (current ?? null),
+        rollbackOnError: true,
+        revalidate: false,
+      }
+    );
   };
 
   const markAllRead = async () => {
-    setItems((prev) => prev.map((i) => ({ ...i, read: true })));
-    setUnreadCount(0);
-    await fetch("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ all: true }) });
+    await mutate(
+      async (current) => {
+        await fetch("/api/notifications/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ all: true }) });
+        if (!current) return current ?? null;
+        return { items: current.items.map((i) => ({ ...i, read: true })), unreadCount: 0 };
+      },
+      {
+        optimisticData: (current) => (current ? { items: current.items.map((i) => ({ ...i, read: true })), unreadCount: 0 } : (current ?? null)),
+        rollbackOnError: true,
+        revalidate: false,
+      }
+    );
   };
 
   const visible = items.slice(0, DROPDOWN_LIMIT);

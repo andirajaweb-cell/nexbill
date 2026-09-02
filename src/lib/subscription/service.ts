@@ -4,6 +4,7 @@ import {
   subscriptionPlans,
   subscriptionInvoices,
   subscriptionEvents,
+  subscriptionDepositMutations,
   smartPlugOrders,
   platformProducts,
   rentalUnits,
@@ -11,12 +12,13 @@ import {
   staffUsers,
   outlets,
   billingGroups,
+  orders,
 } from "@/db/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, lte, desc, gte } from "drizzle-orm";
 import { DeviceProtocol } from "@/lib/devices/types";
 import { cashGateway } from "@/lib/payments/adapters/cash";
 import { fastpayGateway } from "@/lib/payments/adapters/fastpay";
-import { ipaymuCrossBorderGateway } from "@/lib/payments/adapters/ipaymu-crossborder";
+import { ipaymuCrossBorderGateway, ipaymuHostedGateway } from "@/lib/payments/adapters/ipaymu-crossborder";
 import { VaBankMethod } from "@/lib/payments/types";
 import { resolveBillingCurrencyForOutlet, convertIdrToCurrency } from "@/lib/market-risk/currency";
 import { getRates } from "@/lib/shipping/biteship";
@@ -35,8 +37,14 @@ export type SubscriptionRow = typeof subscriptions.$inferSelect;
 
 /** Statuses where the outlet's dashboard should go read-only + show the "berlangganan" page instead of normal operations. */
 const LOCKED_STATUSES = new Set(["trial_expired", "pending_payment", "suspended", "cancelled"]);
-/** Statuses where the outlet is a real paying customer — no device/AI restrictions. */
-const PAID_STATUSES = new Set(["active", "grace"]);
+/**
+ * Statuses where the outlet is never blocked from normal operation — no device-count/branch
+ * restrictions, dashboard never shows the locked screen, never gets swept toward grace/suspended.
+ * "free_forever" (platform-admin-granted, see grantFreeForever below) belongs here for that reason
+ * — but is NOT automatically "AI included": assertAiAllowed has its own explicit exclusion for it,
+ * since a free-forever outlet still needs the AI Add-on like a trial-graduated paying outlet would.
+ */
+const PAID_STATUSES = new Set(["active", "grace", "free_forever"]);
 
 /**
  * Ensures a "subscription_fee" renewal invoice exists for this subscription's current period —
@@ -74,7 +82,8 @@ async function ensureRenewalInvoiceExists(sub: SubscriptionRow) {
     period,
   });
   await logEvent(sub.outletId, sub.id, "renewal_invoice_created", `${invoice.invoiceNumber} untuk periode ${period}`);
-  return invoice;
+  // Auto-pay from Saldo Deposit if the outlet has topped up in advance — see applyDepositToInvoice.
+  return applyDepositToInvoice(sub, invoice);
 }
 
 interface GroupInvoiceLineItem {
@@ -155,7 +164,45 @@ async function ensureGroupRenewalInvoiceExists(billingGroupId: string) {
   for (const m of billableMembers) {
     await logEvent(m.outletId, m.id, "renewal_invoice_created", `${invoiceNumber} (tagihan gabungan) untuk periode ${period}`);
   }
-  return invoice;
+  // Group deposit lives on billingGroups, not any one member's subscription — passing `anchor`
+  // here is fine either way since getDepositOwner reads scope.billingGroupId first, which is the
+  // same on every member of this group.
+  return applyDepositToInvoice(anchor, invoice);
+}
+
+/** An unpaid invoice older than this is auto soft-cancelled — see sweepExpireStaleUnpaidInvoicesForOutlet. */
+const INVOICE_AUTO_EXPIRE_HOURS = 48;
+
+/**
+ * "Tagihan yang belum lunas memiliki masa berlaku 2x24 jam" — any invoice still `unpaid`
+ * INVOICE_AUTO_EXPIRE_HOURS after it was created gets soft-cancelled: status -> "expired",
+ * cancelReason recorded, method/providerRef/VA/QR cleared (so a stale VA number can never be
+ * reused/paid after the fact). Deliberately a SOFT cancel, not a hard DELETE — the row stays in
+ * Riwayat Tagihan for audit purposes (nothing financial ever silently disappears), it just moves
+ * out of "Tagihan Belum Lunas" and out of the count `ensureRenewalInvoiceExists`'s
+ * "existingUnpaid" guard looks at, so the very next read regenerates a fresh renewal invoice for
+ * whoever needs one. Scoped to one outlet/billing-group (not a blanket table scan) so it's cheap
+ * enough to call inline on every request — see the two call sites: applyLifecycleTransitions
+ * (self-heal on read, same reasoning as that function's own doc comment) and the standalone
+ * scheduler's sweepExpireStaleUnpaidInvoices (global, for outlets nobody happens to be actively
+ * viewing right now).
+ */
+async function sweepExpireStaleUnpaidInvoicesForOutlet(sub: SubscriptionRow): Promise<void> {
+  const cutoff = new Date(Date.now() - INVOICE_AUTO_EXPIRE_HOURS * 3600_000).toISOString();
+  const scope = sub.billingGroupId
+    ? sql`(${subscriptionInvoices.outletId} = ${sub.outletId} or ${subscriptionInvoices.billingGroupId} = ${sub.billingGroupId})`
+    : eq(subscriptionInvoices.outletId, sub.outletId);
+  const stale = await db
+    .select({ id: subscriptionInvoices.id, invoiceNumber: subscriptionInvoices.invoiceNumber, outletId: subscriptionInvoices.outletId, subscriptionId: subscriptionInvoices.subscriptionId })
+    .from(subscriptionInvoices)
+    .where(and(scope, eq(subscriptionInvoices.status, "unpaid"), lte(subscriptionInvoices.createdAt, cutoff)));
+  for (const inv of stale) {
+    await db
+      .update(subscriptionInvoices)
+      .set({ status: "expired", cancelReason: "auto_expired_48h", method: null, providerRef: null, qrString: null, qrImageUrl: null, vaNumber: null, vaBankCode: null })
+      .where(eq(subscriptionInvoices.id, inv.id));
+    await logEvent(inv.outletId, inv.subscriptionId, "invoice_expired", `${inv.invoiceNumber} — kedaluwarsa otomatis setelah ${INVOICE_AUTO_EXPIRE_HOURS} jam tidak dibayar.`);
+  }
 }
 
 /**
@@ -170,6 +217,8 @@ async function ensureGroupRenewalInvoiceExists(billingGroupId: string) {
 async function applyLifecycleTransitions(subIn: SubscriptionRow): Promise<SubscriptionRow> {
   let sub = subIn;
   const now = new Date().toISOString();
+
+  await sweepExpireStaleUnpaidInvoicesForOutlet(sub);
 
   if (sub.status === "trial" && sub.trialEndsAt && sub.trialEndsAt <= now) {
     const [updated] = await db.update(subscriptions).set({ status: "trial_expired" }).where(eq(subscriptions.id, sub.id)).returning();
@@ -258,6 +307,39 @@ export function isLockedStatus(status: string): boolean {
 
 export function isPaidStatus(status: string): boolean {
   return PAID_STATUSES.has(status);
+}
+
+/**
+ * Platform-admin-only: permanently marks an outlet's subscription free — no plan, no billing
+ * period, no invoice ever generated again (see the "free_forever" doc comment on schema.ts's
+ * subscriptions.status for exactly why every sweep/invoice function in this file structurally
+ * can't touch it once planId is cleared and the status itself isn't "active"). Unlimited
+ * devices/branches/staff, same as isPaidStatus(sub.status) grants any other paid outlet — but
+ * deliberately NOT unlimited AI: assertAiAllowed has its own explicit carve-out for this status,
+ * so the AI Add-on still has to be purchased separately like it would for a normal paying outlet.
+ * Idempotent to call again on an already-free-forever outlet (harmless re-set + another log entry).
+ */
+export async function grantFreeForever(outletId: string, grantedByLabel: string, note?: string) {
+  const sub = await getOrCreateSubscription(outletId);
+  await db
+    .update(subscriptions)
+    .set({ status: "free_forever", planId: null, currentPeriodStart: null, currentPeriodEnd: null, graceUntil: null })
+    .where(eq(subscriptions.id, sub.id));
+  await logEvent(outletId, sub.id, "free_forever_granted", note || `Diberikan akses gratis selamanya oleh ${grantedByLabel}.`);
+}
+
+/**
+ * Reverses grantFreeForever — puts the outlet into "trial_expired" (the same locked state any
+ * other outlet lands in once its access runs out), so it goes through the exact same "Selesaikan
+ * pembayaran di halaman Langganan" path as any other outlet whose access needs renewing, rather
+ * than the admin having to also pick and re-activate a specific plan on its behalf. No-op if the
+ * outlet isn't currently free_forever (nothing to revoke).
+ */
+export async function revokeFreeForever(outletId: string, revokedByLabel: string, note?: string) {
+  const sub = await getOrCreateSubscription(outletId);
+  if (sub.status !== "free_forever") return;
+  await db.update(subscriptions).set({ status: "trial_expired" }).where(eq(subscriptions.id, sub.id));
+  await logEvent(outletId, sub.id, "free_forever_revoked", note || `Akses gratis selamanya dicabut oleh ${revokedByLabel}.`);
 }
 
 /** Days remaining until trialEndsAt, floored at 0 — used for the countdown banner + reminder checkpoints. */
@@ -385,7 +467,12 @@ export async function assertAiAllowed(outletId: string, role?: string): Promise<
   // decision, not an oversight. aiAddonActive/aiAddonPeriodEnd are left wired below for any
   // future non-unlimited tier that still wants AI as a paid add-on.
   if (sub.hasUnlimitedEntitlement) return;
-  if (isPaidStatus(sub.status)) {
+  // Deliberately excludes "free_forever": that fallback below checks the PLATFORM's current
+  // default plan, not this subscription's own (a free-forever sub has planId=null, no plan of its
+  // own to check) — without this exclusion, a free-forever outlet would transitively inherit
+  // whatever the platform's default plan happens to be configured with today, which is exactly the
+  // "AI Add-on tetap terpisah" boundary grantFreeForever() is supposed to keep intact.
+  if (isPaidStatus(sub.status) && sub.status !== "free_forever") {
     const plan = await ensureDefaultPlan();
     // Covers the narrow window right after a first payment where confirmInvoicePayment hasn't
     // finished setting hasUnlimitedEntitlement yet — same effective allowance either way.
@@ -481,6 +568,167 @@ async function createInvoice(input: {
     .returning();
   await logEvent(input.outletId, input.subscriptionId, "invoice_created", `${invoiceNumber} — ${input.description} (Rp${amount})`);
   return row;
+}
+
+/** ================= Saldo Deposit ("Daftar Mutasi") ================= */
+
+/** Whatever subscriptions.depositBalance/billingGroups.depositBalance's doc comments describe —
+ * accepts either a full SubscriptionRow or (for the group-renewal path, which only ever has the
+ * anchor member's row on hand, not the caller's own) any row shaped the same way. */
+type DepositScope = { billingGroupId: string | null; id: string; outletId: string };
+type DepositOwner = { kind: "group"; id: string } | { kind: "subscription"; id: string };
+
+function getDepositOwner(scope: DepositScope): DepositOwner {
+  return scope.billingGroupId ? { kind: "group", id: scope.billingGroupId } : { kind: "subscription", id: scope.id };
+}
+
+async function getDepositBalance(scope: DepositScope): Promise<number> {
+  const owner = getDepositOwner(scope);
+  if (owner.kind === "group") {
+    const [g] = await db.select({ depositBalance: billingGroups.depositBalance }).from(billingGroups).where(eq(billingGroups.id, owner.id)).limit(1);
+    return g?.depositBalance ?? 0;
+  }
+  const [s] = await db.select({ depositBalance: subscriptions.depositBalance }).from(subscriptions).where(eq(subscriptions.id, owner.id)).limit(1);
+  return s?.depositBalance ?? 0;
+}
+
+/** Applies a signed delta (positive = credit, negative = debit) to whichever balance owns this
+ * scope, and appends one row to subscriptionDepositMutations recording the change — every top-up/
+ * usage/refund/adjustment goes through here so the ledger and the live balance can never drift
+ * apart. Returns the new balance. */
+async function adjustDepositBalance(
+  scope: DepositScope,
+  delta: number,
+  type: (typeof subscriptionDepositMutations.$inferInsert)["type"],
+  opts: { relatedInvoiceId?: string; note?: string } = {}
+): Promise<number> {
+  const owner = getDepositOwner(scope);
+  let balanceAfter: number;
+  if (owner.kind === "group") {
+    const [updated] = await db
+      .update(billingGroups)
+      .set({ depositBalance: sql`${billingGroups.depositBalance} + ${delta}` })
+      .where(eq(billingGroups.id, owner.id))
+      .returning();
+    balanceAfter = updated.depositBalance;
+  } else {
+    const [updated] = await db
+      .update(subscriptions)
+      .set({ depositBalance: sql`${subscriptions.depositBalance} + ${delta}` })
+      .where(eq(subscriptions.id, owner.id))
+      .returning();
+    balanceAfter = updated.depositBalance;
+  }
+  await db.insert(subscriptionDepositMutations).values({
+    subscriptionId: owner.kind === "subscription" ? owner.id : null,
+    billingGroupId: owner.kind === "group" ? owner.id : null,
+    type,
+    amount: delta,
+    balanceAfter,
+    relatedInvoiceId: opts.relatedInvoiceId ?? null,
+    note: opts.note ?? null,
+  });
+  return balanceAfter;
+}
+
+/**
+ * Auto-applies whatever's sitting in Saldo Deposit against a freshly-created renewal invoice —
+ * called right after ensureRenewalInvoiceExists/ensureGroupRenewalInvoiceExists creates one, so a
+ * topped-up outlet never has to manually remember to pay from deposit. Fully covers the invoice ->
+ * confirms it paid immediately (reusing confirmInvoicePayment's own activation logic, nothing
+ * duplicated here). Partially covers it -> reduces the invoice's own amount by the covered portion
+ * and leaves it unpaid for the remainder (so the payment-method buttons show the smaller number).
+ * A no-op (returns the invoice unchanged) when there's no balance to apply, or the invoice is
+ * already non-unpaid.
+ */
+async function applyDepositToInvoice(scope: DepositScope, invoice: typeof subscriptionInvoices.$inferSelect): Promise<typeof subscriptionInvoices.$inferSelect> {
+  if (invoice.status !== "unpaid") return invoice;
+  const balance = await getDepositBalance(scope);
+  if (balance <= 0) return invoice;
+
+  const deducted = round(Math.min(balance, invoice.amount));
+  await adjustDepositBalance(scope, -deducted, "usage", { relatedInvoiceId: invoice.id, note: `Dipakai otomatis untuk ${invoice.invoiceNumber}` });
+  await logEvent(invoice.outletId, scope.id, "deposit_used", `${invoice.invoiceNumber} — Rp${deducted} dipakai dari saldo deposit.`);
+
+  if (deducted >= invoice.amount) {
+    return (await confirmInvoicePayment(invoice.id)) as typeof subscriptionInvoices.$inferSelect;
+  }
+  const [updated] = await db
+    .update(subscriptionInvoices)
+    .set({ amount: round(invoice.amount - deducted) })
+    .where(eq(subscriptionInvoices.id, invoice.id))
+    .returning();
+  return updated;
+}
+
+/** Creates an unpaid "deposit_topup" invoice for the requested amount — the outlet pays it through
+ * the exact same cash/QRIS/VA/iPaymu flow as any other invoice (initiateInvoicePayment/
+ * confirmInvoicePayment), which is what actually credits the balance once paid (see the
+ * `invoice.type === "deposit_topup"` branch inside confirmInvoicePayment below). */
+export async function createDepositTopupInvoice(outletId: string, amount: number) {
+  if (!(amount > 0)) throw new Error("Jumlah top up harus lebih dari 0.");
+  const sub = await getOrCreateSubscription(outletId);
+  return createInvoice({
+    outletId,
+    subscriptionId: sub.id,
+    type: "deposit_topup",
+    description: `Top up Saldo Deposit — Rp${round(amount)}`,
+    qty: 1,
+    unitPrice: round(amount),
+  });
+}
+
+/** Current balance + full mutation history for the Billing page's "Saldo Deposit" tab. */
+export async function getDepositOverview(outletId: string) {
+  const sub = await getOrCreateSubscription(outletId);
+  const owner = getDepositOwner(sub);
+  const balance = await getDepositBalance(sub);
+  const mutations = await db
+    .select()
+    .from(subscriptionDepositMutations)
+    .where(owner.kind === "group" ? eq(subscriptionDepositMutations.billingGroupId, owner.id) : eq(subscriptionDepositMutations.subscriptionId, owner.id))
+    .orderBy(desc(subscriptionDepositMutations.createdAt));
+  return { balance, mutations, isGroupBalance: owner.kind === "group" };
+}
+
+/** ================= "Pertumbuhan Data" usage-growth stats ================= */
+
+/**
+ * Monthly transaction-count + revenue trend for the "Pertumbuhan Data" chart — NEXBILL's own
+ * equivalent of Accurate.id's data-growth graph, just scoped to something that's actually
+ * meaningful for a POS/rental app (how much is this outlet transacting month over month) rather
+ * than a generic "data row count" metric that has no real analogue here. Always returns exactly
+ * `months` entries in chronological order, zero-filled for any month with no orders, so the chart
+ * never has a gap.
+ */
+export async function getMonthlyUsageStats(outletId: string, months = 6) {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - (months - 1));
+  cutoff.setDate(1);
+  cutoff.setHours(0, 0, 0, 0);
+  const cutoffIso = cutoff.toISOString();
+
+  const rows = await db
+    .select({
+      month: sql<string>`to_char(${orders.createdAt}::timestamptz, 'YYYY-MM')`,
+      orderCount: sql<number>`count(*)`,
+      revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+    })
+    .from(orders)
+    .where(and(eq(orders.outletId, outletId), gte(orders.createdAt, cutoffIso)))
+    .groupBy(sql`to_char(${orders.createdAt}::timestamptz, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${orders.createdAt}::timestamptz, 'YYYY-MM')`);
+
+  const byMonth = new Map(rows.map((r) => [r.month, r]));
+  const out: { month: string; orderCount: number; revenue: number }[] = [];
+  const cursor = new Date(cutoff);
+  for (let i = 0; i < months; i++) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+    const existing = byMonth.get(key);
+    out.push({ month: key, orderCount: Number(existing?.orderCount ?? 0), revenue: Number(existing?.revenue ?? 0) });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return out;
 }
 
 function currentPeriodLabel(): string {
@@ -857,12 +1105,13 @@ export async function startCheckout(input: StartCheckoutInput) {
  * the merchant in IDR, the card network converts at charge time), `invoice.amount` is never
  * touched; displayCurrencyCode/displayAmount are purely what the customer SAW quoted on the
  * Billing page (see money()/data.billingCurrency there), for cosmetic receipt text only. */
-export async function initiateInvoicePayment(invoiceId: string, method: "cash" | "qris" | VaBankMethod | "ipaymu_crossborder") {
+export async function initiateInvoicePayment(invoiceId: string, method: "cash" | "qris" | VaBankMethod | "ipaymu_crossborder" | "ipaymu_hosted") {
   const [invoice] = await db.select().from(subscriptionInvoices).where(eq(subscriptionInvoices.id, invoiceId)).limit(1);
   if (!invoice) throw new Error("Invoice tidak ditemukan.");
   if (invoice.status === "paid") throw new Error("Invoice ini sudah lunas.");
 
-  const gateway = method === "cash" ? cashGateway : method === "ipaymu_crossborder" ? ipaymuCrossBorderGateway : fastpayGateway;
+  const gateway =
+    method === "cash" ? cashGateway : method === "ipaymu_crossborder" ? ipaymuCrossBorderGateway : method === "ipaymu_hosted" ? ipaymuHostedGateway : fastpayGateway;
 
   let displayCurrencyCode: string | undefined;
   let displayAmount: number | undefined;
@@ -892,10 +1141,81 @@ export async function initiateInvoicePayment(invoiceId: string, method: "cash" |
       qrImageUrl: result.qrImageUrl,
       vaNumber: result.vaNumber,
       vaBankCode: result.bankCode,
+      // Previously never persisted — the Billing page's countdown timer reads inv.expiresAt, but
+      // this column was always null until now, so the countdown silently never rendered. See
+      // schema.ts's doc comment on subscriptionInvoices.expiresAt for how this differs from the
+      // 48-hour invoice-level auto-expire sweep.
+      expiresAt: result.expiresAt ?? null,
     })
     .where(eq(subscriptionInvoices.id, invoiceId))
     .returning();
   return updated;
+}
+
+/**
+ * The actual implementation behind the Billing page's "Cek Status Pembayaran" button (POST
+ * /api/subscription/invoices/[id]/sync) — previously a dead route (see the doc comment history on
+ * this file), so this button always 404'd no matter which gateway an invoice was paying through.
+ * Resolves the SAME gateway initiateInvoicePayment used (by invoice.method, not a hardcoded
+ * assumption of iPaymu — most subscription invoices actually pay via fastpayGateway for
+ * QRIS/VA, only ipaymu_crossborder/ipaymu_hosted go through iPaymu), calls its checkStatus(), and:
+ *   - "success" -> confirms the invoice paid (idempotent, reuses confirmInvoicePayment's own
+ *     activation/renewal/deposit-fulfillment logic — nothing duplicated here).
+ *   - "failed" -> clears the stale method/providerRef/VA/QR so the payment-method buttons
+ *     reappear, letting the outlet just try a different channel instead of being stuck.
+ *   - "pending" (or gateway not configured — mock mode always returns "pending", see the fastpay/
+ *     ipaymu-crossborder adapters' isConfigured() checks) -> no-op, invoice stays unpaid.
+ * Every adapter's checkStatus is fully live-safe to call without credentials: mock mode simply
+ * returns "pending" forever, so this never throws or fakes a payment when the IPAYMU_ or FASTPAY_
+ * env vars are unset — exactly the "tetap pakai mock jika kredensial kosong" behavior asked for.
+ */
+export async function syncInvoicePaymentStatus(invoiceId: string): Promise<{ status: string }> {
+  const [invoice] = await db.select().from(subscriptionInvoices).where(eq(subscriptionInvoices.id, invoiceId)).limit(1);
+  if (!invoice) throw new Error("Invoice tidak ditemukan.");
+  if (invoice.status !== "unpaid") return { status: invoice.status };
+  if (!invoice.method || invoice.method === "cash" || !invoice.providerRef) return { status: "unpaid" };
+
+  const gateway =
+    invoice.method === "ipaymu_crossborder" ? ipaymuCrossBorderGateway : invoice.method === "ipaymu_hosted" ? ipaymuHostedGateway : fastpayGateway; // qris + every va_* channel
+
+  if (!gateway.checkStatus) return { status: "unpaid" };
+  const gwStatus = await gateway.checkStatus(invoice.providerRef);
+
+  if (gwStatus === "success") {
+    const updated = await confirmInvoicePayment(invoiceId);
+    return { status: updated.status };
+  }
+  if (gwStatus === "failed") {
+    await db
+      .update(subscriptionInvoices)
+      .set({ method: null, providerRef: null, qrString: null, qrImageUrl: null, vaNumber: null, vaBankCode: null, expiresAt: null })
+      .where(eq(subscriptionInvoices.id, invoiceId));
+    return { status: "unpaid" };
+  }
+  return { status: "unpaid" };
+}
+
+/**
+ * Push counterpart of syncInvoicePaymentStatus's pull-based polling — called from
+ * /api/subscription/webhook/fastpay and /api/subscription/webhook/ipaymu once each route has
+ * already verified the request's signature (verifyFastpayWebhookSignature /
+ * verifyIpaymuWebhookSignature) and extracted the gateway's own transaction reference. Looks the
+ * invoice up by providerRef (not id — a webhook only ever carries the gateway's own reference),
+ * silently no-ops on an unknown/already-settled providerRef (idempotent against replayed/duplicate
+ * webhook deliveries, which every payment gateway can send).
+ */
+export async function applyInvoiceWebhookStatus(providerRef: string, status: "success" | "failed"): Promise<void> {
+  const [invoice] = await db.select().from(subscriptionInvoices).where(eq(subscriptionInvoices.providerRef, providerRef)).limit(1);
+  if (!invoice || invoice.status !== "unpaid") return;
+
+  if (status === "success") {
+    await confirmInvoicePayment(invoice.id);
+    return;
+  }
+  await db
+    .update(subscriptionInvoices)
+    .set({ method: null, providerRef: null, qrString: null, qrImageUrl: null, vaNumber: null, vaBankCode: null, expiresAt: null })
+    .where(eq(subscriptionInvoices.id, invoice.id));
 }
 
 /**
@@ -950,6 +1270,17 @@ export async function confirmInvoicePayment(invoiceId: string) {
 
   let [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, invoice.subscriptionId)).limit(1);
   if (!sub) return updated;
+
+  // Deposit top-up fulfillment — deliberately its own early return, NOT folded into the
+  // status-based if/else-if chain below: crediting Saldo Deposit has nothing to do with the base
+  // subscription's own lifecycle status (trial/active/grace/whatever), and a deposit_topup invoice
+  // should never accidentally activate/renew a subscription just because it happened to be paid
+  // while that subscription was mid pending_payment checkout.
+  if (invoice.type === "deposit_topup") {
+    const balanceAfter = await adjustDepositBalance(sub, invoice.amount, "topup", { relatedInvoiceId: invoice.id, note: `Top up via ${invoice.method ?? "-"}` });
+    await logEvent(invoice.outletId, sub.id, "deposit_topup", `${invoice.invoiceNumber} — saldo bertambah Rp${invoice.amount}, saldo sekarang Rp${balanceAfter}`);
+    return updated;
+  }
 
   // A paid cart_order invoice may have bought smart plug hardware (free-form qty, not tied to
   // sub.smartPlugRequiredQty) — fulfill that qty onto the subscription's owned count right away,
@@ -1050,6 +1381,29 @@ export async function sweepExpireTrials() {
     await logEvent(sub.outletId, sub.id, "trial_expired", "Masa percobaan 30 hari berakhir.");
   }
   return expiring;
+}
+
+/**
+ * Global counterpart of sweepExpireStaleUnpaidInvoicesForOutlet (used by applyLifecycleTransitions'
+ * per-request self-heal) — table-wide, for the standalone scheduler script so an outlet nobody is
+ * actively viewing right now still gets its stale invoices soft-cancelled on schedule rather than
+ * only the next time someone happens to open its Billing page. Returns the expired rows for the
+ * scheduler to log/report.
+ */
+export async function sweepExpireStaleUnpaidInvoices() {
+  const cutoff = new Date(Date.now() - INVOICE_AUTO_EXPIRE_HOURS * 3600_000).toISOString();
+  const stale = await db
+    .select({ id: subscriptionInvoices.id, invoiceNumber: subscriptionInvoices.invoiceNumber, outletId: subscriptionInvoices.outletId, subscriptionId: subscriptionInvoices.subscriptionId })
+    .from(subscriptionInvoices)
+    .where(and(eq(subscriptionInvoices.status, "unpaid"), lte(subscriptionInvoices.createdAt, cutoff)));
+  for (const inv of stale) {
+    await db
+      .update(subscriptionInvoices)
+      .set({ status: "expired", cancelReason: "auto_expired_48h", method: null, providerRef: null, qrString: null, qrImageUrl: null, vaNumber: null, vaBankCode: null })
+      .where(eq(subscriptionInvoices.id, inv.id));
+    await logEvent(inv.outletId, inv.subscriptionId, "invoice_expired", `${inv.invoiceNumber} — kedaluwarsa otomatis setelah ${INVOICE_AUTO_EXPIRE_HOURS} jam tidak dibayar.`);
+  }
+  return stale;
 }
 
 /** Trials crossing an H-5/H-2/H-0 checkpoint that hasn't already been logged — returns who to remind, then the caller must log the event after actually sending it (see scheduler). */

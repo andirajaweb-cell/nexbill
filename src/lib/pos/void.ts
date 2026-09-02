@@ -1,12 +1,27 @@
 import { db } from "@/db/client";
-import { orders, orderItems, payments, journalEntries, journalLines, approvalRequests } from "@/db/schema";
+import { orders, orderItems, payments, journalEntries, journalLines, approvalRequests, staffUsers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { voidJournal } from "@/lib/accounting/journal";
 import { restockForItem } from "@/lib/inventory/stock";
 import { recomputeBillTotals } from "@/lib/pos/bill";
 import { executeRefundOrder } from "@/lib/pos/refund";
-import { hasPermission, StaffRole } from "@/lib/auth/permissions";
+import { hasPermission, StaffRole, canApproveForRole, roleLabel } from "@/lib/auth/permissions";
 import { logAudit } from "@/lib/audit/log";
+
+/**
+ * Shared by approveRequest/rejectRequest: an approval-hierarchy check on top of the
+ * approve_requests permission gate — the reviewer must be strictly more senior (lower
+ * ROLE_LEVEL) than whoever filed the request, per the 6-tier level structure in permissions.ts.
+ * A request with no requestedBy (shouldn't normally happen) skips the check rather than block.
+ */
+async function assertCanReviewRequest(request: typeof approvalRequests.$inferSelect, reviewerRole: StaffRole) {
+  if (!request.requestedBy) return;
+  const [requester] = await db.select({ role: staffUsers.role }).from(staffUsers).where(eq(staffUsers.id, request.requestedBy)).limit(1);
+  if (!requester) return;
+  if (!canApproveForRole(reviewerRole, requester.role as StaffRole)) {
+    throw new Error(`Role kamu (${roleLabel(reviewerRole)}) tidak bisa menyetujui/menolak permintaan dari role yang levelnya setara atau lebih tinggi (${roleLabel(requester.role as StaffRole)}).`);
+  }
+}
 
 /** Actually void a paid order: reverses its accounting journal(s), restocks items, marks payment refunded. */
 export async function executeVoidOrder(orderId: string, reason: string, staffUserId?: string) {
@@ -146,10 +161,11 @@ export async function requestVoidItem(orderItemId: string, staffUserId: string, 
   return { pending: true, request };
 }
 
-export async function approveRequest(requestId: string, reviewerId: string, note?: string) {
+export async function approveRequest(requestId: string, reviewerId: string, reviewerRole: StaffRole, note?: string) {
   const [request] = await db.select().from(approvalRequests).where(eq(approvalRequests.id, requestId)).limit(1);
   if (!request) throw new Error("Permintaan tidak ditemukan.");
   if (request.status !== "pending") throw new Error("Permintaan sudah diproses.");
+  await assertCanReviewRequest(request, reviewerRole);
 
   if (request.type === "void_order") {
     await executeVoidOrder(request.refId, request.reason ?? "Disetujui approval", reviewerId);
@@ -169,7 +185,12 @@ export async function approveRequest(requestId: string, reviewerId: string, note
   return updated;
 }
 
-export async function rejectRequest(requestId: string, reviewerId: string, note?: string) {
+export async function rejectRequest(requestId: string, reviewerId: string, reviewerRole: StaffRole, note?: string) {
+  const [request] = await db.select().from(approvalRequests).where(eq(approvalRequests.id, requestId)).limit(1);
+  if (!request) throw new Error("Permintaan tidak ditemukan.");
+  if (request.status !== "pending") throw new Error("Permintaan sudah diproses.");
+  await assertCanReviewRequest(request, reviewerRole);
+
   const [updated] = await db
     .update(approvalRequests)
     .set({ status: "rejected", reviewedBy: reviewerId, reviewedAt: new Date().toISOString(), reviewNote: note })

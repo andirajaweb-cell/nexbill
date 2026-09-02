@@ -10,8 +10,14 @@ import { cookies } from "next/headers";
  * Google signup, only what's inside this signed httpOnly cookie. Otherwise anyone could submit
  * the registration form claiming an arbitrary email address as "verified via Google".
  *
- * Deliberately short-lived (15 minutes) since it only needs to survive one pass through the
- * /daftar wizard, not act as a real session.
+ * Deliberately short-lived (30 minutes) since it only needs to survive one pass through the
+ * /daftar wizard, not act as a real session. Was originally 15 minutes — bumped up after a real
+ * signup hit "Password minimal 8 karakter" on the review step despite never seeing a password
+ * field: the cookie had expired mid-wizard (6 steps, TV/branch/staff questions take a while to
+ * fill honestly), so by the time they submitted, the server no longer saw them as a Google
+ * signup and fell through to the password-required path with an empty password. See the
+ * viaGoogleHint handling in /api/onboarding/register for the other half of that fix — this alone
+ * just makes the expiry less likely to be hit in the first place.
  */
 
 export interface GooglePendingPayload {
@@ -22,7 +28,7 @@ export interface GooglePendingPayload {
 
 const SECRET = process.env.JWT_SECRET || "dev-insecure-secret-change-me-in-.env";
 export const GOOGLE_PENDING_COOKIE = "google_pending";
-export const GOOGLE_PENDING_MAX_AGE_SECONDS = 60 * 15;
+export const GOOGLE_PENDING_MAX_AGE_SECONDS = 60 * 30;
 
 export function signGooglePendingToken(payload: GooglePendingPayload): string {
   return jwt.sign(payload, SECRET, { expiresIn: GOOGLE_PENDING_MAX_AGE_SECONDS });

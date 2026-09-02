@@ -7,8 +7,6 @@ import { getSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { resetAllData } from "@/lib/admin/full-reset";
 import { describeError } from "@/lib/api/error";
 
-const CONFIRM_PHRASE = "HAPUS SEMUA DATA";
-
 /**
  * Full factory data reset — irreversible through the app itself (recovery
  * relies on Supabase's own managed backups / point-in-time recovery, not a
@@ -17,8 +15,11 @@ const CONFIRM_PHRASE = "HAPUS SEMUA DATA";
  *  - session.role must literally be "superuser" or "owner" — the two full-authority
  *    roles, re-checked directly rather than via hasPermission() so no permission
  *    matrix edit can ever loosen this specific gate.
- *  - the caller must re-type the exact confirm phrase AND re-enter their
- *    password, verified fresh against the DB (not just trusting the JWT).
+ *  - the caller must re-type their OWN login email (verified fresh against the DB
+ *    row, not the possibly-stale JWT) AND re-enter their password, also verified
+ *    fresh against the DB. Using the caller's own email as the confirm phrase (rather
+ *    than a fixed literal string anyone could memorize/screenshot) ties the
+ *    confirmation to the specific account performing the deletion.
  * On success, clears the session cookie so they have to log back in —
  * partly hygiene, partly a forcing function to prove the login still works
  * post-reset before they walk away thinking it's fine.
@@ -32,13 +33,15 @@ export async function POST(req: NextRequest) {
     }
 
     const { confirmPhrase, password } = await req.json();
-    if (confirmPhrase !== CONFIRM_PHRASE) {
-      return NextResponse.json({ error: `Ketik ulang persis: "${CONFIRM_PHRASE}"` }, { status: 400 });
-    }
-    if (!password) return NextResponse.json({ error: "Masukkan password kamu untuk konfirmasi." }, { status: 400 });
 
     const [owner] = await db.select().from(staffUsers).where(eq(staffUsers.id, session.sub)).limit(1);
     if (!owner || !owner.isActive) return NextResponse.json({ error: "Akun tidak ditemukan/nonaktif." }, { status: 401 });
+
+    if (String(confirmPhrase ?? "").trim().toLowerCase() !== owner.email.toLowerCase()) {
+      return NextResponse.json({ error: `Ketik ulang persis: "${owner.email}"` }, { status: 400 });
+    }
+    if (!password) return NextResponse.json({ error: "Masukkan password kamu untuk konfirmasi." }, { status: 400 });
+
     // Google-only accounts (see lib/auth/google-pending.ts) have no passwordHash — there's no
     // password to confirm with, so this destructive action can't be re-authorized that way.
     if (!owner.passwordHash) {

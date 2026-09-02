@@ -1,14 +1,25 @@
 "use client";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import "@/lib/i18n/dict-reports";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { useCurrency } from "@/lib/currency/client";
 
-const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
-const TABS = ["Penjualan", "Rental", "Home Rental", "Inventori & HPP", "Pelanggan", "Beban"] as const;
+// recharts moved to its own lazy-loaded chunks (one per tab's chart) — see BusyHoursChart.tsx's
+// doc comment for the rationale. Only whichever report tab the user actually opens pays for it.
+const SalesTrendChart = dynamic(() => import("@/components/dashboard/SalesTrendChart"), {
+  ssr: false,
+  loading: () => <div className="h-full animate-pulse rounded-lg bg-white/5" />,
+});
+const ExpenseTrendChart = dynamic(() => import("@/components/dashboard/ExpenseTrendChart"), {
+  ssr: false,
+  loading: () => <div className="h-full animate-pulse rounded-lg bg-white/5" />,
+});
+
+const TABS = ["Penjualan", "Rental", "Home Rental", "Inventori & HPP", "Pelanggan", "Beban", "Kesehatan Keuangan"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Penjualan": { key: "reports.tab.sales", fallback: "Penjualan" },
@@ -17,6 +28,7 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Inventori & HPP": { key: "reports.tab.inventory", fallback: "Inventori & HPP" },
   "Pelanggan": { key: "reports.tab.customers", fallback: "Pelanggan" },
   "Beban": { key: "reports.tab.expenses", fallback: "Beban" },
+  "Kesehatan Keuangan": { key: "reports.tab.financialHealth", fallback: "Kesehatan Keuangan" },
 };
 
 function DateRangePicker({ from, to, setFrom, setTo, onApply }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void; onApply: () => void }) {
@@ -73,8 +85,10 @@ export default function ReportsPage() {
         <InventoryTab outletId={outletId} />
       ) : tab === "Pelanggan" ? (
         <CustomerTab outletId={outletId} />
-      ) : (
+      ) : tab === "Beban" ? (
         <ExpenseReportTab outletId={outletId} />
+      ) : (
+        <FinancialHealthTab outletId={outletId} />
       )}
     </div>
   );
@@ -82,6 +96,7 @@ export default function ReportsPage() {
 
 function SalesTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -109,15 +124,7 @@ function SalesTab({ outletId }: { outletId: string }) {
       <Card style={{ height: 280 }}>
         <h2 className="font-medium mb-2 text-sm text-neutral-400">{t("reports.sales.dailyTrend", "Tren Pendapatan Harian")}</h2>
         {data.byDay.length > 0 ? (
-          <ResponsiveContainer width="100%" height="90%">
-            <LineChart data={data.byDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${v / 1000}k`} tickLine={false} axisLine={false} />
-              <Tooltip formatter={(v: any) => rupiah(Number(v))} contentStyle={{ background: "#0d1326", border: "1px solid rgba(34,211,238,0.3)", borderRadius: 8 }} />
-              <Line type="monotone" dataKey="total" stroke="#22d3ee" strokeWidth={2.5} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          <SalesTrendChart data={data.byDay} />
         ) : <p className="text-sm text-neutral-500">{t("reports.noDataPeriod", "Tidak ada data pada periode ini.")}</p>}
       </Card>
 
@@ -142,6 +149,7 @@ function SalesTab({ outletId }: { outletId: string }) {
 
 function RentalTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -193,6 +201,7 @@ function RentalTab({ outletId }: { outletId: string }) {
 /** Home Rental ("sewa dibawa pulang") revenue report — separate from RentalTab above, which is the in-house PS booth-session business. Covers every revenue category the owner sells by: sewa 12/24 jam/mingguan, TV, accessory, delivery/pickup jarak, denda keterlambatan, penggantian kerusakan, dan diskon — same getHomeRentalReports bundle the Home Rental module's own Laporan tab uses. */
 function HomeRentalTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -259,6 +268,7 @@ function HomeRentalTab({ outletId }: { outletId: string }) {
 
 function InventoryTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -322,6 +332,7 @@ function InventoryTab({ outletId }: { outletId: string }) {
 
 function CustomerTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -376,6 +387,7 @@ function CustomerTab({ outletId }: { outletId: string }) {
 /** All 9 requested Expense report views (Detail, by Category/Account/Supplier/Payment Method/Branch/Cost Center, Expense vs Revenue, Trend) from one /api/reports/expenses call. */
 function ExpenseReportTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -412,21 +424,7 @@ function ExpenseReportTab({ outletId }: { outletId: string }) {
       <Card style={{ height: 260 }}>
         <h2 className="font-medium mb-2 text-sm text-neutral-400">{t("reports.expense.trend", "Expense Trend")}</h2>
         {data.trend.length > 0 ? (
-          <ResponsiveContainer width="100%" height="90%">
-            <BarChart data={data.trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `${v / 1000}k`} tickLine={false} axisLine={false} />
-              <Tooltip formatter={(v: any) => rupiah(Number(v))} contentStyle={{ background: "#0d1326", border: "1px solid rgba(244,63,94,0.3)", borderRadius: 8 }} />
-              <Bar dataKey="amount" fill="url(#expenseBarGradient)" radius={[3, 3, 0, 0]} />
-              <defs>
-                <linearGradient id="expenseBarGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#fb7185" />
-                  <stop offset="100%" stopColor="#f59e0b" />
-                </linearGradient>
-              </defs>
-            </BarChart>
-          </ResponsiveContainer>
+          <ExpenseTrendChart data={data.trend} />
         ) : <p className="text-sm text-neutral-500">{t("reports.noDataPeriod", "Tidak ada data pada periode ini.")}</p>}
       </Card>
 
@@ -459,6 +457,124 @@ function ExpenseReportTab({ outletId }: { outletId: string }) {
           </tbody>
         </table>
       </Card>
+    </div>
+  );
+}
+
+function monthStart(): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+}
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function RatioCard({ label, value, hint, tone = "default" }: { label: string; value: string; hint?: string; tone?: "default" | "good" | "warn" }) {
+  const toneClass = tone === "good" ? "text-emerald-400" : tone === "warn" ? "text-amber-400" : "text-neutral-100";
+  return (
+    <Card>
+      <div className="text-xs text-neutral-500">{label}</div>
+      <div className={`text-xl font-bold ${toneClass}`}>{value}</div>
+      {hint && <div className="text-[11px] text-neutral-600 mt-0.5">{hint}</div>}
+    </Card>
+  );
+}
+
+/**
+ * Ratio kesehatan keuangan — profitabilitas, likuiditas, dan efisiensi operasional, dihitung dari
+ * data yang sudah ada (Balance Sheet, P&L, laporan Rental, target BEP di Settings) lewat
+ * computeFinancialHealth() di lib/reports/financial-health.ts, bukan model akuntansi baru.
+ * Defaultnya bulan berjalan (bukan "sepanjang waktu" seperti tab lain) karena rasio di sini —
+ * terutama utilisasi unit — hanya bermakna untuk periode yang jelas batasnya.
+ */
+function FinancialHealthTab({ outletId }: { outletId: string }) {
+  const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
+  const [data, setData] = useState<any>(null);
+  const [from, setFrom] = useState(monthStart());
+  const [to, setTo] = useState(today());
+
+  const load = () => {
+    const params = new URLSearchParams({ outletId, from, to });
+    fetchJsonObject(`/api/reports/financial-health?${params}`).then(setData);
+  };
+  useEffect(load, [outletId]);
+  if (!data) return null;
+
+  const pct = (v: number | null) => (v == null ? "-" : `${v.toFixed(1)}%`);
+  const ratio = (v: number | null) => (v == null ? "-" : `${v.toFixed(2)}x`);
+
+  return (
+    <div className="space-y-6">
+      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} onApply={load} />
+
+      <div>
+        <h2 className="text-sm font-semibold text-neutral-300 mb-2">{t("reports.health.profitability", "Profitabilitas")}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <RatioCard
+            label={t("reports.health.grossMargin", "Margin Kotor (Gross Margin)")}
+            value={pct(data.profitability.grossMarginPercent)}
+            hint={t("reports.health.grossMarginHint", "Laba kotor ÷ pendapatan bersih")}
+            tone={data.profitability.grossMarginPercent != null && data.profitability.grossMarginPercent >= 0 ? "good" : "warn"}
+          />
+          <RatioCard
+            label={t("reports.health.netMargin", "Margin Bersih (Net Margin)")}
+            value={pct(data.profitability.netMarginPercent)}
+            hint={t("reports.health.netMarginHint", "Laba bersih ÷ pendapatan bersih")}
+            tone={data.profitability.netMarginPercent != null && data.profitability.netMarginPercent >= 0 ? "good" : "warn"}
+          />
+          <RatioCard
+            label={t("reports.health.bepAchievement", "Pencapaian Target BEP")}
+            value={data.profitability.salesTargetMonthly ? pct(data.profitability.bepAchievementPercent) : "-"}
+            hint={
+              data.profitability.salesTargetMonthly
+                ? `${t("reports.health.bepHintPrefix", "Target bulanan")}: ${rupiah(data.profitability.salesTargetMonthly)}`
+                : t("reports.health.bepNotSet", "Target Omzet Bulanan belum diatur di Pengaturan")
+            }
+            tone={data.profitability.bepAchievementPercent != null && data.profitability.bepAchievementPercent >= 100 ? "good" : "warn"}
+          />
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-neutral-300 mb-2">{t("reports.health.liquidity", "Likuiditas")}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <RatioCard
+            label={t("reports.health.currentRatio", "Current Ratio")}
+            value={ratio(data.liquidity.currentRatio)}
+            hint={t("reports.health.currentRatioHint", "Aset lancar ÷ kewajiban lancar — kemampuan bayar kewajiban jangka pendek")}
+            tone={data.liquidity.currentRatio != null && data.liquidity.currentRatio >= 1 ? "good" : "warn"}
+          />
+          <RatioCard
+            label={t("reports.health.cashRatio", "Cash Ratio")}
+            value={ratio(data.liquidity.cashRatio)}
+            hint={t("reports.health.cashRatioHint", "Kas & bank ÷ kewajiban lancar — kemampuan bayar pakai kas langsung")}
+            tone={data.liquidity.cashRatio != null && data.liquidity.cashRatio >= 0.5 ? "good" : "warn"}
+          />
+          <RatioCard label={t("reports.health.currentLiabilities", "Total Kewajiban Lancar")} value={rupiah(data.liquidity.currentLiabilities)} />
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-neutral-300 mb-2">{t("reports.health.efficiency", "Efisiensi Operasional")}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <RatioCard
+            label={t("reports.health.cogsRatio", "Rasio HPP (COGS) / Pendapatan")}
+            value={pct(data.efficiency.cogsRatioPercent)}
+            hint={t("reports.health.cogsRatioHint", "Makin rendah makin efisien pembelian/produksi")}
+          />
+          <RatioCard
+            label={t("reports.health.opexRatio", "Rasio Beban Operasional / Pendapatan")}
+            value={pct(data.efficiency.opexRatioPercent)}
+            hint={t("reports.health.opexRatioHint", "Di luar HPP — gaji, sewa, listrik, dll.")}
+          />
+          <RatioCard
+            label={t("reports.health.unitUtilization", "Utilisasi Unit PS")}
+            value={pct(data.efficiency.unitUtilizationPercent)}
+            hint={t("reports.health.unitUtilizationHint", "Estimasi jam pakai vs jam tersedia (asumsi buka 24 jam) — {n} unit.").replace("{n}", String(data.efficiency.unitCount))}
+          />
+        </div>
+      </div>
     </div>
   );
 }

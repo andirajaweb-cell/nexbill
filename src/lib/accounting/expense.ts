@@ -1,11 +1,26 @@
 import { db } from "@/db/client";
-import { expenses, accounts, outlets, cashBankAccounts, recurringExpenseTemplates } from "@/db/schema";
+import { expenses, accounts, outlets, cashBankAccounts, recurringExpenseTemplates, staffUsers } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { postJournal } from "./journal";
 import { EXPENSE_PAYABLE_ACCOUNT_CODE } from "./coa";
 import { logAudit } from "@/lib/audit/log";
 import type { StaffRole } from "@/lib/auth/permissions";
-import { hasPermission } from "@/lib/auth/permissions";
+import { hasPermission, canApproveForRole, roleLabel } from "@/lib/auth/permissions";
+
+/**
+ * Approval-hierarchy check shared by approveExpense/rejectExpense — on top of the
+ * approve_expenses permission gate, the approver must be strictly more senior (lower
+ * ROLE_LEVEL) than whoever submitted the expense, per the 6-tier level structure in
+ * permissions.ts. An expense with no staffUserId (shouldn't normally happen) skips the check.
+ */
+async function assertCanReviewExpense(expense: typeof expenses.$inferSelect, reviewerRole: StaffRole) {
+  if (!expense.staffUserId) return;
+  const [requester] = await db.select({ role: staffUsers.role }).from(staffUsers).where(eq(staffUsers.id, expense.staffUserId)).limit(1);
+  if (!requester) return;
+  if (!canApproveForRole(reviewerRole, requester.role as StaffRole)) {
+    throw new Error(`Role kamu (${roleLabel(reviewerRole)}) tidak bisa menyetujui/menolak expense dari role yang levelnya setara atau lebih tinggi (${roleLabel(requester.role as StaffRole)}).`);
+  }
+}
 
 const round = (n: number) => Math.round(n);
 
@@ -195,6 +210,7 @@ export async function approveExpense(expenseId: string, approverId: string, role
   const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
   if (!expense) throw new Error("Expense tidak ditemukan.");
   if (expense.status !== "pending_approval") throw new Error(`Expense berstatus "${expense.status}" tidak sedang menunggu approval.`);
+  await assertCanReviewExpense(expense, role);
 
   const status = await postAndAdvance(expenseId, approverId);
   await logAudit({ outletId: expense.outletId, staffUserId: approverId, action: "approve_expense", entityType: "expense", entityId: expenseId, after: { status } });
@@ -206,6 +222,7 @@ export async function rejectExpense(expenseId: string, approverId: string, role:
   const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
   if (!expense) throw new Error("Expense tidak ditemukan.");
   if (expense.status !== "pending_approval") throw new Error(`Expense berstatus "${expense.status}" tidak sedang menunggu approval.`);
+  await assertCanReviewExpense(expense, role);
 
   await db
     .update(expenses)

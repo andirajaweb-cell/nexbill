@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/Badge";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
-const STATUS_BADGE: Record<string, string> = { active: "success", grace: "pending", trial: "pending", trial_expired: "failed", suspended: "failed", cancelled: "failed", pending_payment: "pending" };
-const STATUS_LABEL: Record<string, string> = { active: "Aktif", grace: "Tenggang", trial: "Trial", trial_expired: "Trial Habis", suspended: "Suspend", cancelled: "Batal", pending_payment: "Menunggu Bayar" };
+const STATUS_BADGE: Record<string, string> = { active: "success", grace: "pending", trial: "pending", trial_expired: "failed", suspended: "failed", cancelled: "failed", pending_payment: "pending", free_forever: "success" };
+const STATUS_LABEL: Record<string, string> = { active: "Aktif", grace: "Tenggang", trial: "Trial", trial_expired: "Trial Habis", suspended: "Suspend", cancelled: "Batal", pending_payment: "Menunggu Bayar", free_forever: "Gratis Selamanya" };
 
 interface Data {
   growth: { month: string; count: number }[];

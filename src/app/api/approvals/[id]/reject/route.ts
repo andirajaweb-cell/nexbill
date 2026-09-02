@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!existing || existing.outletId !== session.outletId) return NextResponse.json({ error: "Permintaan tidak ditemukan." }, { status: 404 });
   const { note } = await req.json();
   try {
-    return NextResponse.json(await rejectRequest(id, session.sub, note));
+    return NextResponse.json(await rejectRequest(id, session.sub, session.role as StaffRole, note));
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });
   }

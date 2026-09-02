@@ -20,6 +20,7 @@ import {
   sweepExpireTrials,
   sweepGenerateRenewalInvoices,
   sweepGraceAndSuspend,
+  sweepExpireStaleUnpaidInvoices,
   getOutletBillingContact,
   logEvent,
 } from "../src/lib/subscription/service";
@@ -58,9 +59,15 @@ async function tick() {
     // 4) Flip unpaid-past-due active subs to grace, and grace-past-graceUntil subs to suspended.
     const transitions = await sweepGraceAndSuspend();
 
-    if (remindersDue.length || expired.length || renewals.length || transitions.length) {
+    // 5) Soft-cancel any invoice still unpaid 2x24 jam after it was created ("masa berlaku" — see
+    // that function's doc comment for why this is a soft status flip, not a hard delete). The
+    // per-request self-heal in applyLifecycleTransitions already covers outlets someone is
+    // actively viewing; this table-wide sweep is the backstop for everyone else.
+    const staleInvoices = await sweepExpireStaleUnpaidInvoices();
+
+    if (remindersDue.length || expired.length || renewals.length || transitions.length || staleInvoices.length) {
       console.log(
-        `[subscription-scheduler] ${ranAt} — reminders ${remindersDue.length}, expired ${expired.length}, renewal invoices ${renewals.length}, grace/suspend transitions ${transitions.length}`
+        `[subscription-scheduler] ${ranAt} — reminders ${remindersDue.length}, expired ${expired.length}, renewal invoices ${renewals.length}, grace/suspend transitions ${transitions.length}, stale invoices expired ${staleInvoices.length}`
       );
     }
   } catch (err) {

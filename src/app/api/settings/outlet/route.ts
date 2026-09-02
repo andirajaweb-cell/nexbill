@@ -18,6 +18,8 @@ const EDITABLE_FIELDS = [
   "salesTargetMonthly",
   "bankCountry", "bankName", "bankSwiftCode", "bankAccountNumber", "bankAccountHolderName",
   "outletCountry", "province", "city", "postalCode",
+  // "Profil Billing" tab on /dashboard/billing (Faktur Pajak fields, mirrors Accurate.id).
+  "hasNpwp", "npwpNumber", "nitku", "taxpayerName", "taxpayerAddress", "businessEntityType", "businessType",
   // Deliberately NOT "preferredLang" anymore — see the doc comment on that column in schema.ts.
   // It's now derived server-side below from outletCountry, not a direct user-editable field.
 ] as const;

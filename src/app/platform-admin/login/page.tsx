@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 /**
  * Login for NEXBILL's own platform control panel — deliberately a separate page, separate
@@ -60,10 +61,10 @@ export default function PlatformAdminLoginPage() {
           </div>
           <div>
             <label className="text-xs text-neutral-500">Password</label>
-            <input
-              type="password"
+            <PasswordInput
               required
-              className="w-full mt-1 rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm"
+              wrapperClassName="mt-1"
+              className="w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />

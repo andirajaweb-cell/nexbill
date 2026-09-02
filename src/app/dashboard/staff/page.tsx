@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { roleLabel, hasPermission, StaffRole, Permission, PERMISSION_GROUPS, PERMISSION_LABEL } from "@/lib/auth/permissions";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
@@ -199,7 +200,7 @@ export default function StaffPage() {
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("staff.addStaff.namePlaceholder", "Nama")} value={newStaff.name} onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} />
                 <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("staff.addStaff.emailPlaceholder", "Email")} value={newStaff.email} onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })} />
-                <input type="password" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("staff.addStaff.passwordPlaceholder", "Password")} value={newStaff.password} onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
+                <PasswordInput wrapperClassName="w-full" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("staff.addStaff.passwordPlaceholder", "Password")} value={newStaff.password} onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
                 <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={newStaff.role} onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value as StaffRole })}>
                   {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                 </select>

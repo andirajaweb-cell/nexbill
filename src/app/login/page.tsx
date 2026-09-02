@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { showAlert } from "@/lib/ui/dialog";
 import { createClient } from "@/lib/client";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 type LangCode = "id" | "en" | "ms" | "th" | "fil" | "vi";
 
@@ -227,6 +228,14 @@ function LoginForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Both fields start readOnly purely to defeat Chrome/Edge's on-load autofill (a plain
+  // autoComplete="off" is ignored on login forms) — state-driven, not a raw DOM
+  // removeAttribute(), because React re-asserts a literal `readOnly` prop on every re-render
+  // (e.g. the one triggered by the very first keystroke's onChange), which silently made the
+  // field un-typable again after one character. Flipping real state on focus means React itself
+  // drops the attribute and keeps it dropped across every future re-render.
+  const [emailUnlocked, setEmailUnlocked] = useState(false);
+  const [passwordUnlocked, setPasswordUnlocked] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
@@ -401,13 +410,17 @@ function LoginForm() {
                 <p className="text-sm text-neutral-400">{t.welcomeSubtitle}</p>
               </div>
 
-              <form onSubmit={submit} className="space-y-4">
+              <form onSubmit={submit} className="space-y-4" autoComplete="off">
                 <div>
                   <label className="text-xs font-medium text-neutral-400">{t.emailLabel}</label>
                   <input
                     type="email"
+                    name="nexbill_login_email"
                     autoFocus
                     required
+                    autoComplete="off"
+                    readOnly={!emailUnlocked}
+                    onFocus={() => setEmailUnlocked(true)}
                     placeholder={t.emailPlaceholder}
                     className="w-full mt-1.5 rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-blue-400/50 focus:bg-white/[0.06] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
                     value={email}
@@ -416,11 +429,15 @@ function LoginForm() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-neutral-400">{t.passwordLabel}</label>
-                  <input
-                    type="password"
+                  <PasswordInput
+                    name="nexbill_login_password"
                     required
+                    autoComplete="new-password"
+                    readOnly={!passwordUnlocked}
+                    onFocus={() => setPasswordUnlocked(true)}
                     placeholder={t.passwordPlaceholder}
-                    className="w-full mt-1.5 rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-blue-400/50 focus:bg-white/[0.06] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
+                    wrapperClassName="mt-1.5"
+                    className="w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm text-white placeholder:text-neutral-600 outline-none transition focus:border-blue-400/50 focus:bg-white/[0.06] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />

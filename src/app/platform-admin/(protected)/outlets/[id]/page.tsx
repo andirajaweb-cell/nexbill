@@ -1,18 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { Pencil } from "lucide-react";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
-const STATUS_BADGE: Record<string, string> = { active: "success", grace: "pending", trial: "pending", trial_expired: "failed", suspended: "failed", cancelled: "failed", pending_payment: "pending" };
-const STATUS_LABEL: Record<string, string> = { active: "Aktif", grace: "Tenggang", trial: "Trial", trial_expired: "Trial Habis", suspended: "Suspend", cancelled: "Batal", pending_payment: "Menunggu Bayar" };
+const STATUS_BADGE: Record<string, string> = { active: "success", grace: "pending", trial: "pending", trial_expired: "failed", suspended: "failed", cancelled: "failed", pending_payment: "pending", free_forever: "success" };
+const STATUS_LABEL: Record<string, string> = { active: "Aktif", grace: "Tenggang", trial: "Trial", trial_expired: "Trial Habis", suspended: "Suspend", cancelled: "Batal", pending_payment: "Menunggu Bayar", free_forever: "Gratis Selamanya" };
 const ROLE_LABEL: Record<string, string> = { superuser: "Superuser", owner: "Owner", manager: "Manager", cashier: "Kasir", accountant: "Akuntan", kitchen: "Dapur", supervisor: "Supervisor" };
 
 interface Detail {
@@ -30,11 +31,20 @@ interface Detail {
 
 export default function PlatformOutletDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
   const [data, setData] = useState<Detail | null>(null);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", address: "", phone: "" });
   const [busy, setBusy] = useState(false);
+
+  // Permanent delete — only offered once the outlet is already archived (isActive=false), same
+  // pause-to-reconsider rule as the outlet-side self-service version (dashboard/semua-outlet).
+  // See /api/platform-admin/outlets/[id]/delete-permanent for what this actually does.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const load = () => {
     if (id) fetchJsonObject<Detail>(`/api/platform-admin/outlets/${id}`).then(setData);
@@ -64,6 +74,44 @@ export default function PlatformOutletDetailPage() {
     }
   };
 
+  const isFreeForever = data?.subscription?.status === "free_forever";
+
+  const grantFreeForever = async () => {
+    if (!data) return;
+    const ok = await showConfirm(
+      `Jadikan "${data.outlet.name}" gratis selamanya? Outlet ini tidak akan pernah ditagih lagi (paket langganan dilepas, tidak ada batas jumlah konsol/cabang/staf). AI Add-on tetap harus dibeli terpisah seperti outlet lain. Bisa dicabut lagi kapan saja.`,
+      { tone: "default" }
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/platform-admin/outlets/${id}/free-forever`, { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) { await showAlert(d.error ?? "Gagal mengaktifkan akses gratis selamanya."); return; }
+      load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revokeFreeForever = async () => {
+    if (!data) return;
+    const ok = await showConfirm(
+      `Cabut akses gratis selamanya "${data.outlet.name}"? Outlet ini akan langsung terkunci (status "Trial Habis") sampai berlangganan ulang lewat halaman Langganan mereka sendiri.`,
+      { tone: "danger" }
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/platform-admin/outlets/${id}/free-forever`, { method: "DELETE" });
+      const d = await res.json();
+      if (!res.ok) { await showAlert(d.error ?? "Gagal mencabut akses gratis selamanya."); return; }
+      load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggleActive = async () => {
     if (!data) return;
     const nextActive = !data.outlet.isActive;
@@ -86,6 +134,42 @@ export default function PlatformOutletDetailPage() {
       load();
     } finally {
       setBusy(false);
+    }
+  };
+
+  const startDelete = () => {
+    setDeleteConfirmName("");
+    setDeletePassword("");
+    setDeleteOpen(true);
+  };
+  const cancelDelete = () => {
+    setDeleteOpen(false);
+    setDeleteConfirmName("");
+    setDeletePassword("");
+  };
+
+  const submitDelete = async () => {
+    if (!data) return;
+    if (deleteConfirmName.trim() !== data.outlet.name) return showAlert(`Ketik ulang persis nama outlet: "${data.outlet.name}"`);
+    if (!deletePassword) return showAlert("Masukkan password akun platform-admin kamu.");
+    const ok = await showConfirm(
+      `Ini akan MENGHAPUS PERMANEN outlet "${data.outlet.name}" — semua data, staf, dan riwayatnya hilang total, tidak bisa dikembalikan lewat aplikasi. Yakin lanjut?`,
+      { tone: "danger" }
+    );
+    if (!ok) return;
+    setDeleteBusy(true);
+    try {
+      const res = await fetch(`/api/platform-admin/outlets/${id}/delete-permanent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName: deleteConfirmName.trim(), password: deletePassword }),
+      });
+      const d = await res.json();
+      if (!res.ok) { await showAlert(d.error ?? "Gagal menghapus outlet."); return; }
+      await showAlert(`Outlet "${data.outlet.name}" sudah dihapus permanen.`);
+      router.push("/platform-admin/outlets");
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -135,6 +219,24 @@ export default function PlatformOutletDetailPage() {
       </div>
 
       <Card>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="gm-heading font-semibold">Akses Gratis Selamanya</h2>
+            <p className="text-xs text-neutral-500 mt-1 max-w-md">
+              {isFreeForever
+                ? "Outlet ini sedang gratis selamanya — tidak ditagih, tidak ada batas konsol/cabang/staf. AI Add-on tetap dibeli terpisah seperti outlet lain."
+                : "Untuk outlet/merchant yang mendapat akses NEXBILL gratis permanen (mis. sudah termasuk paket beli smart plug). Melepas paket langganan yang sedang berjalan, tidak akan pernah ditagih lagi."}
+            </p>
+          </div>
+          {isFreeForever ? (
+            <Button variant="danger" onClick={revokeFreeForever} disabled={busy}>Cabut Akses Gratis</Button>
+          ) : (
+            <Button onClick={grantFreeForever} disabled={busy}>Jadikan Gratis Selamanya</Button>
+          )}
+        </div>
+      </Card>
+
+      <Card>
         <h2 className="gm-heading font-semibold mb-3">Status Unit PS</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="rounded-lg border border-white/10 p-3"><div className="text-[11px] text-neutral-500">Tersedia</div><div className="text-lg font-semibold text-emerald-300">{data.unitStatusCounts.available}</div></div>
@@ -163,6 +265,42 @@ export default function PlatformOutletDetailPage() {
               </div>
             ))}
           </div>
+        )}
+      </Card>
+
+      <Card className="border-rose-500/20">
+        <h2 className="gm-heading font-semibold text-rose-300 mb-1">Hapus Permanen</h2>
+        {!data.outlet.isActive ? (
+          deleteOpen ? (
+            <div className="space-y-2 max-w-md">
+              <p className="text-xs text-rose-400 font-medium">Hapus permanen &quot;{data.outlet.name}&quot; — tidak bisa dibatalkan.</p>
+              <label className="space-y-1 block">
+                <div className="text-[11px] text-neutral-500">Ketik persis nama outlet: <span className="font-mono text-rose-400">{data.outlet.name}</span></div>
+                <input className={inputCls} value={deleteConfirmName} onChange={(e) => setDeleteConfirmName(e.target.value)} placeholder={data.outlet.name} />
+              </label>
+              <label className="space-y-1 block">
+                <div className="text-[11px] text-neutral-500">Password akun platform-admin kamu (konfirmasi ulang)</div>
+                <PasswordInput className={inputCls} value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+              </label>
+              <div className="flex gap-2 pt-1">
+                <Button variant="danger" disabled={deleteConfirmName.trim() !== data.outlet.name || !deletePassword || deleteBusy} onClick={submitDelete}>
+                  {deleteBusy ? "Menghapus..." : "Hapus Permanen Sekarang"}
+                </Button>
+                <Button variant="secondary" onClick={cancelDelete} disabled={deleteBusy}>Batal</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <p className="text-xs text-neutral-500 max-w-md">
+                Outlet ini sudah nonaktif (arsip). Hapus permanen akan menghapus outlet ini beserta semua data, staf, dan riwayatnya — tidak bisa dikembalikan lewat aplikasi.
+              </p>
+              <Button variant="danger" onClick={startDelete}>Hapus Permanen</Button>
+            </div>
+          )
+        ) : (
+          <p className="text-xs text-neutral-500">
+            Nonaktifkan (arsipkan) outlet ini dulu di atas sebelum bisa dihapus permanen — langkah jeda supaya tidak ada outlet aktif terhapus tidak sengaja.
+          </p>
         )}
       </Card>
     </div>

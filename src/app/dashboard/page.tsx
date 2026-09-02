@@ -1,10 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { useCurrency } from "@/lib/currency/client";
+
+// recharts is a sizeable chunk of client JS that only this section of the page actually uses —
+// loaded on demand (ssr:false, since it reads from the browser canvas/DOM APIs) instead of
+// bundled into every visit of the owner dashboard, most of which never scroll down to the chart.
+const BusyHoursChart = dynamic(() => import("@/components/dashboard/BusyHoursChart"), {
+  ssr: false,
+  loading: () => <div className="h-[200px] animate-pulse rounded-lg bg-white/5" />,
+});
 import {
   Wallet, TrendingUp, TrendingDown, Coins, Receipt, Users, UserPlus, CalendarClock,
   Gamepad2, CheckCircle2, Wrench, Gauge, Landmark, PiggyBank, ArrowDownToLine, ArrowUpFromLine,
@@ -48,7 +56,6 @@ interface OwnerDashboard {
   payablesOutstanding: number;
 }
 
-const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const jamLabel = (h: { hour: number; count: number } | null) => (h ? `${String(h.hour).padStart(2, "0")}:00 (${h.count}x)` : "—");
 
 type Glow = "cyan" | "emerald" | "purple" | "amber" | "rose" | "blue";
@@ -94,6 +101,7 @@ const REVENUE_SOURCE_ROWS: { key: keyof OwnerDashboard["revenueBySource"]; label
  * add-on rentals, PPOB margin only — not the pass-through nominal, service charge/tax). */
 function RevenueBreakdownCard({ data }: { data: OwnerDashboard | null }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const rows = data ? REVENUE_SOURCE_ROWS.map((r) => ({ ...r, amount: data.revenueBySource[r.key] })) : [];
   const maxAmount = Math.max(1, ...rows.map((r) => r.amount));
   const hasTarget = data && data.salesTargetDaily != null;
@@ -164,20 +172,27 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export default function OwnerDashboardPage() {
   const { t } = useDashboardLang();
-  const [outletId, setOutletId] = useState<string | null>(null);
-  const [data, setData] = useState<OwnerDashboard | null>(null);
-
-  const load = (oid: string) => fetchJsonObject<OwnerDashboard>(`/api/dashboard/owner?outletId=${oid}`).then(setData);
-
-  useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => { if (o) { setOutletId(o.id); load(o.id); } });
-  }, []);
-
-  useEffect(() => {
-    if (!outletId) return;
-    const interval = setInterval(() => load(outletId), 30000);
-    return () => clearInterval(interval);
-  }, [outletId]);
+  const { formatMoney: rupiah } = useCurrency();
+  // Was two hand-rolled useEffects (fetch default outlet, then a setInterval(load, 30000) fetch
+  // of the owner-dashboard payload) — now useApi/SWR: the outlet id rarely changes so it uses the
+  // hook's default (no polling), while the dashboard payload itself keeps its 30s refresh but
+  // SWR pauses that polling when the tab isn't visible, and instantly re-shows cached data if the
+  // user navigates away and back instead of a blank reload every time.
+  //
+  // PERF: the owner-dashboard fetch below used to be gated on `outletId ? ... : null` — i.e. it
+  // wouldn't even START until /api/outlets/default had fully round-tripped, even though
+  // /api/dashboard/owner/route.ts derives the outlet from the session server-side and has ignored
+  // any client-supplied outletId for a while now (see that route's own comment: "never trust a
+  // client-supplied outletId"). So this was a pure, unnecessary serial wait — the single biggest
+  // component of "loading Ringkasan lambat," since the owner-dashboard query is itself the
+  // heaviest thing on this page (18-way + follow-up Promise.all waves of DB queries). Firing it
+  // unconditionally, in parallel with /api/outlets/default instead of after it, removes that whole
+  // extra round-trip from the critical path. /api/outlets/default is still called here (its
+  // seeding side effect — chart of accounts/account mappings/deposit channels — matters even
+  // though this page no longer needs its response value), just no longer blocks the query that
+  // actually renders the page.
+  useApi<{ id: string }>("/api/outlets/default");
+  const { data } = useApi<OwnerDashboard>("/api/dashboard/owner", { refreshInterval: 30000 });
 
   const busyHoursChartData = data?.busyHours.map((b) => ({ jam: `${b.hour}:00`, transaksi: b.count })) ?? [];
 
@@ -204,7 +219,7 @@ export default function OwnerDashboardPage() {
         <StatCard label={t("stat.netProfitEst")} value={data ? rupiah(data.netProfit) : "—"} glow={data && data.netProfit < 0 ? "rose" : "emerald"} icon={data && data.netProfit < 0 ? TrendingDown : TrendingUp} />
       </div>
 
-      <RevenueBreakdownCard data={data} />
+      <RevenueBreakdownCard data={data ?? null} />
 
       <SectionTitle>{t("section.transactionsCustomers")}</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -242,21 +257,7 @@ export default function OwnerDashboardPage() {
                 <div><span className="text-neutral-500">{t("card.busyHour")} </span><span className="font-medium text-emerald-300">{jamLabel(data?.busiestHour ?? null)}</span></div>
                 <div><span className="text-neutral-500">{t("card.quietHour")} </span><span className="font-medium text-amber-300">{jamLabel(data?.quietestHour ?? null)}</span></div>
               </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={busyHoursChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-                  <XAxis dataKey="jam" tick={{ fontSize: 10, fill: "#64748b" }} interval={2} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#64748b" }} allowDecimals={false} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ background: "#0d1326", border: "1px solid rgba(34,211,238,0.3)", borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="transaksi" fill="url(#ownerBarGradient)" radius={[3, 3, 0, 0]} />
-                  <defs>
-                    <linearGradient id="ownerBarGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#22d3ee" />
-                      <stop offset="100%" stopColor="#a855f7" />
-                    </linearGradient>
-                  </defs>
-                </BarChart>
-              </ResponsiveContainer>
+              <BusyHoursChart data={busyHoursChartData} />
             </>
           ) : (
             <p className="text-sm text-neutral-500">{t("card.notEnoughData")}</p>

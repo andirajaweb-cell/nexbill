@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Power, Play, Square, Pause, PlayCircle, Clock, UtensilsCrossed, Plus, Minus, Settings, Pencil, Archive, RotateCcw, ArrowLeftRight, AlertTriangle, Gamepad, History, Activity, BadgeCheck, Wrench } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useAuth } from "@/lib/auth/client";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
@@ -12,6 +12,12 @@ import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { describeError } from "@/lib/api/error";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-rental";
+
+// recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
+const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
+  ssr: false,
+  loading: () => <div style={{ width: "100%", height: 220 }} className="animate-pulse rounded-lg bg-white/5" />,
+});
 
 interface RentalUnit {
   id: string;
@@ -1608,27 +1614,7 @@ export default function RentalPage() {
 
       <Card className="space-y-3">
         <h2 className="gm-heading font-semibold flex items-center gap-2 text-sm"><Activity size={14} className="text-cyan-300" /> {t("rental.activityDashboardHeading", "Dashboard Aktivitas — Transaksi per Jam (30 Hari Terakhir)")}</h2>
-        <div style={{ width: "100%", height: 220 }}>
-          <ResponsiveContainer>
-            <BarChart data={busyHours}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="hour" tickFormatter={(h) => `${h}:00`} stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ background: "#0d1326", border: "1px solid rgba(34,211,238,0.3)", borderRadius: 8, fontSize: 12 }}
-                labelFormatter={(h) => t("rental.chartHourLabel", "Jam {h}:00").replace("{h}", String(h))}
-                formatter={(v: any) => [t("rental.chartTransactionsSuffix", "{v} transaksi").replace("{v}", String(v)), t("rental.chartCountLabel", "Jumlah")]}
-              />
-              <Bar dataKey="count" fill="url(#gmBarGradient)" radius={[4, 4, 0, 0]} />
-              <defs>
-                <linearGradient id="gmBarGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22d3ee" />
-                  <stop offset="100%" stopColor="#a855f7" />
-                </linearGradient>
-              </defs>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <RentalActivityChart data={busyHours} t={t} />
       </Card>
     </div>
   );

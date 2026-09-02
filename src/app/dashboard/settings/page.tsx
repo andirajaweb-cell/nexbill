@@ -4,8 +4,9 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { fetchJsonObject, fetchJsonArray } from "@/lib/api/fetch-json";
-import { useAuth } from "@/lib/auth/client";
+import { useAuth, type AuthUser } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { getDevicePrinterSettings, saveDevicePrinterSettings, clearDevicePrinterSettings, type DevicePrinterSettings } from "@/lib/printer/deviceSettings";
@@ -241,9 +242,6 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
           <Field label={t("settings.field.bookingAutoReleaseMinutes", "Auto-release Jika Belum Check-in (menit)")}><input type="number" className={inputCls} disabled={!canManage} value={form.bookingAutoReleaseMinutes ?? 15} onChange={(e) => setForm({ ...form, bookingAutoReleaseMinutes: Number(e.target.value) })} /></Field>
           <Field label={t("settings.field.bookingMinLeadMinutes", "Minimal Lead Time Booking Online/WA (menit)")}><input type="number" className={inputCls} disabled={!canManage} value={form.bookingMinLeadMinutes ?? 0} onChange={(e) => setForm({ ...form, bookingMinLeadMinutes: Number(e.target.value) })} /></Field>
         </div>
-        <p className="text-xs text-neutral-500">
-          {t("settings.businessTax.schedulerPrefix", "Jalankan ")}<code className="text-neutral-400">npm run scheduler</code>{t("settings.businessTax.schedulerMiddle", " (dan ")}<code className="text-neutral-400">npm run bot:whatsapp</code>{t("settings.businessTax.schedulerSuffix", " untuk pengiriman reminder) di komputer server supaya auto-release, waiting list, dan reminder booking berjalan otomatis.")}
-        </p>
 
         <div className="border-t border-neutral-800 pt-3 space-y-2">
           <label className="flex items-center gap-2 text-sm">
@@ -973,11 +971,107 @@ function AuditLogTab({ outletId }: { outletId: string }) {
   );
 }
 
-// Every logged-in staffer can manage their own password here regardless of role/canManage —
-// this is about their own account, not outlet settings, so it's deliberately not gated behind
-// the manage_settings permission the way the other tabs are.
+type TFn = (key: string, fallback?: string) => string;
+
+/** Editable "Nama" field — own display name, same self-service scope as the password/email cards below. */
+function ProfileNameCard({ user, refresh, t }: { user: AuthUser | null; refresh: () => void; t: TFn }) {
+  const [name, setName] = useState(user?.name ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => { setName(user?.name ?? ""); }, [user?.name]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const trimmed = name.trim();
+    if (!trimmed) { setError(t("settings.myAccount.nameRequired", "Nama wajib diisi.")); return; }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/auth/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: trimmed }) });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? t("settings.myAccount.failed", "Gagal menyimpan.")); return; }
+      refresh();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-medium">{t("settings.myAccount.profileHeading", "Profil")}</h2>
+      <p className="text-xs text-neutral-500">{user?.email}</p>
+      <form onSubmit={submit} className="space-y-3">
+        <Field label={t("settings.myAccount.nameLabel", "Nama")}>
+          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        {error && <div className="text-xs text-rose-400">{error}</div>}
+        <Button type="submit" disabled={busy || name.trim() === (user?.name ?? "")}>
+          {busy ? t("settings.common.saving", "Menyimpan...") : saved ? t("settings.printer.savedButton", "Tersimpan!") : t("settings.common.save", "Simpan")}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+/** Change the account's login email — password-confirmed (mirrors change-password's own-account, ungated scope) since it changes how the account signs in. */
+function ChangeEmailCard({ user, hasPassword, refresh, t }: { user: AuthUser | null; hasPassword: boolean; refresh: () => void; t: TFn }) {
+  const [newEmail, setNewEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/auth/change-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newEmail, currentPassword: currentPassword || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? t("settings.myAccount.failed", "Gagal mengubah email.")); return; }
+      setNewEmail("");
+      setCurrentPassword("");
+      refresh();
+      await showAlert(t("settings.myAccount.emailSavedAlert", "Email berhasil diubah — pakai email baru untuk login berikutnya."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-medium">{t("settings.myAccount.emailHeading", "Ganti Email")}</h2>
+      <p className="text-xs text-neutral-500">{t("settings.myAccount.emailDesc", "Email dipakai untuk login — email saat ini: ")}<span className="text-neutral-300">{user?.email}</span>.</p>
+      <form onSubmit={submit} className="space-y-3">
+        <Field label={t("settings.myAccount.newEmail", "Email Baru")}>
+          <input type="email" required className={inputCls} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+        </Field>
+        {hasPassword && (
+          <Field label={t("settings.myAccount.currentPassword", "Password Saat Ini")}>
+            <PasswordInput required className={inputCls} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+          </Field>
+        )}
+        {error && <div className="text-xs text-rose-400">{error}</div>}
+        <Button type="submit" disabled={busy || !newEmail.trim()}>
+          {busy ? t("settings.common.saving", "Menyimpan...") : t("settings.myAccount.emailButton", "Simpan Email Baru")}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+// Every logged-in staffer can manage their own profile/password/email here regardless of
+// role/canManage — this is about their own account, not outlet settings, so it's deliberately
+// not gated behind the manage_settings permission the way the other tabs are.
 function MyAccountTab() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const { t } = useDashboardLang();
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -1017,12 +1111,8 @@ function MyAccountTab() {
 
   return (
     <div className="space-y-4 max-w-md">
-      <Card className="space-y-3">
-        <div>
-          <h2 className="font-medium">{user?.name}</h2>
-          <p className="text-xs text-neutral-500">{user?.email}</p>
-        </div>
-      </Card>
+      <ProfileNameCard user={user} refresh={refresh} t={t} />
+      <ChangeEmailCard user={user} hasPassword={hasPassword} refresh={refresh} t={t} />
 
       <Card className="space-y-3">
         <h2 className="font-medium">
@@ -1036,14 +1126,14 @@ function MyAccountTab() {
         <form onSubmit={submit} className="space-y-3">
           {hasPassword && (
             <Field label={t("settings.myAccount.currentPassword", "Password Saat Ini")}>
-              <input type="password" required className={inputCls} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+              <PasswordInput required className={inputCls} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
             </Field>
           )}
           <Field label={hasPassword ? t("settings.myAccount.newPassword", "Password Baru") : t("settings.myAccount.newPasswordFirst", "Password")}>
-            <input type="password" required placeholder={t("settings.myAccount.minChars", "Minimal 8 karakter")} className={inputCls} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            <PasswordInput required placeholder={t("settings.myAccount.minChars", "Minimal 8 karakter")} className={inputCls} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
           </Field>
           <Field label={t("settings.myAccount.confirmPassword", "Konfirmasi Password")}>
-            <input type="password" required className={inputCls} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+            <PasswordInput required className={inputCls} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
           </Field>
 
           {error && <div className="text-xs text-rose-400">{error}</div>}

@@ -1,3 +1,107 @@
+/* ============================================================
+   PREMIUM PS-THEMED LOADING SCREEN (src/app/loading-screen.tsx)
+   Deliberately OUTSIDE the .nb-landing scope below — it's rendered as a sibling of
+   <LandingPageInner>, before .nb-landing's own wrapper div exists in the tree, so it can't rely
+   on any .nb-landing-scoped CSS custom properties. Colors are hardcoded to match the site's
+   palette (#050810 bg, #38bdf8 cyan) instead. See loading-screen.tsx for the full rationale.
+   ============================================================ */
+.nb-loader {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #050810; overflow: hidden;
+  opacity: 1; transition: opacity 650ms ease, transform 650ms ease;
+}
+.nb-loader-leaving { opacity: 0; transform: scale(1.04); pointer-events: none; }
+/* loading-screen.tsx's React state now starts "visible" (so the loader is part of the very first
+   paint, not a tick behind it) — which means a reduced-motion visitor would otherwise get one real,
+   painted frame of it before the component's own effect can react and hide it. This CSS rule is
+   the actual a11y guarantee: it hides the loader outright regardless of React state, so that frame
+   never renders for them at all. */
+@media (prefers-reduced-motion: reduce) {
+  .nb-loader { display: none; }
+}
+
+.nb-loader-glow {
+  position: absolute; width: 480px; height: 480px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(56,189,248,.22) 0%, rgba(59,130,246,.1) 45%, transparent 72%);
+  filter: blur(20px); animation: nb-loader-glow-pulse 2.6s ease-in-out infinite;
+}
+@keyframes nb-loader-glow-pulse {
+  0%, 100% { transform: scale(1); opacity: .85; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+/* Four PS face-buttons in the classic controller diamond (△ top / ○ right / ✕ bottom / □ left),
+   each in their authentic original PS1-controller color — instantly recognizable PlayStation
+   branding rather than a generic spinner. Staggered pop-in (see inline animation-delay per icon
+   in the TSX) then a slow shared breathing-glow loop once all four are in. */
+.nb-loader-buttons {
+  position: relative; width: 132px; height: 132px; margin-bottom: 28px;
+}
+.nb-loader-btn {
+  position: absolute; width: 34px; height: 34px;
+  opacity: 0; transform: scale(0.3);
+  animation: nb-loader-btn-in 560ms cubic-bezier(.34,1.56,.64,1) forwards,
+             nb-loader-btn-glow 2.2s ease-in-out 900ms infinite;
+  filter: drop-shadow(0 0 0 rgba(0,0,0,0));
+}
+.nb-loader-btn-triangle { top: 0; left: 49px; }
+.nb-loader-btn-circle { top: 49px; right: 0; }
+.nb-loader-btn-cross { bottom: 0; left: 49px; }
+.nb-loader-btn-square { top: 49px; left: 0; }
+@keyframes nb-loader-btn-in {
+  0% { opacity: 0; transform: scale(0.3); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes nb-loader-btn-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
+  50% { filter: drop-shadow(0 0 9px currentColor); }
+}
+.nb-loader-btn-triangle { color: #3ddc97; }
+.nb-loader-btn-circle { color: #ff5d7a; }
+.nb-loader-btn-cross { color: #4fa8ff; }
+.nb-loader-btn-square { color: #f069c9; }
+
+.nb-loader-wordmark {
+  font-family: var(--nb-font-poster, var(--nb-font-display, "Space Grotesk", sans-serif));
+  font-size: 28px; font-weight: 400; letter-spacing: 0.14em; color: #eef2fb;
+  opacity: 0; animation: nb-loader-fade-up 600ms ease-out 620ms forwards;
+}
+.nb-loader-tagline {
+  margin-top: 8px; font-size: 12.5px; color: #93a2c4; letter-spacing: 0.01em;
+  opacity: 0; animation: nb-loader-fade-up 600ms ease-out 760ms forwards;
+}
+@keyframes nb-loader-fade-up {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.nb-loader-bar-track {
+  margin-top: 26px; width: 180px; height: 3px; border-radius: 999px;
+  background: rgba(255,255,255,.08); overflow: hidden;
+  opacity: 0; animation: nb-loader-fade-up 500ms ease-out 900ms forwards;
+}
+.nb-loader-bar-fill {
+  height: 100%; width: 0%; border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #3b82f6);
+  animation: nb-loader-bar-fill 1400ms cubic-bezier(.4,0,.2,1) 900ms forwards;
+}
+@keyframes nb-loader-bar-fill {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .nb-loader-glow { width: 340px; height: 340px; }
+  .nb-loader-buttons { width: 104px; height: 104px; margin-bottom: 22px; }
+  .nb-loader-btn { width: 28px; height: 28px; }
+  .nb-loader-btn-triangle, .nb-loader-btn-cross { left: 38px; }
+  .nb-loader-btn-circle { right: 0; top: 38px; }
+  .nb-loader-btn-square { left: 0; top: 38px; }
+  .nb-loader-wordmark { font-size: 22px; }
+}
+
 /**
  * Styles for the public marketing home page (src/app/page.tsx) — ported from
  * landing-page-gamemaster-billing.html (NEXBILL branding). Every selector is
@@ -7,6 +111,9 @@
  * font) — those are reproduced on the .nb-landing wrapper div instead, since
  * we can't safely touch the real <html>/<body> from a page-scoped stylesheet
  * (see RootLayout in app/layout.tsx, shared by every route).
+ *
+ * Theme: blue + black (NEXBILL's original palette) — a gold/black "collector
+ * showcase" variant was tried and reverted per explicit request to keep blue+black.
  */
 .nb-landing {
   --bg: #050810;
@@ -36,11 +143,17 @@
 .nb-landing p { margin: 0; }
 .nb-landing a { color: inherit; text-decoration: none; }
 .nb-landing img { max-width: 100%; display: block; }
+/* <picture> wrappers (added for WebP + fallback <img> — see page.tsx) should be fully
+   transparent to layout: they only exist for resource-selection, not to introduce a box. */
+.nb-landing picture { display: contents; }
 .nb-landing .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
 .nb-landing .glow-text {
-  background: linear-gradient(90deg, var(--purple), var(--cyan) 60%, var(--pink));
+  background: linear-gradient(90deg, var(--purple), var(--cyan) 40%, var(--pink) 60%, var(--purple));
+  background-size: 250% auto;
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: nb-text-shimmer 6s linear infinite;
 }
+@keyframes nb-text-shimmer { to { background-position: -250% center; } }
 .nb-landing .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 15px;
@@ -56,139 +169,444 @@
 .nb-landing .btn-ghost:hover { background: rgba(255,255,255,.08); border-color: var(--purple-dim); }
 .nb-landing .btn-block { width: 100%; }
 
-.nb-landing nav { position: sticky; top: 0; z-index: 50; background: rgba(5,8,16,.75); backdrop-filter: blur(12px); border-bottom: 1px solid var(--card-border); }
-.nb-landing nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 72px; }
-.nb-landing .logo { display: flex; align-items: center; gap: 10px; font-family: var(--nb-font-display, "Space Grotesk", sans-serif); font-weight: 700; font-size: 20px; }
-.nb-landing .logo-badge {
-  width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--purple), var(--cyan));
-  display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 0 20px rgba(59,130,246,.5);
+/* Navbar modeled on brikken.co, which is itself responsive: a floating rounded "pill" bar with
+   every link spread across it (2 links, centered wordmark, 2 links) on desktop, collapsing to a
+   plain hamburger bar on narrow screens. Both variants below live in the DOM at once and are
+   toggled purely by the 900px media query at the bottom of this file — kept on NEXBILL's own
+   blue/black palette throughout, not Brikken's light/cream theme. */
+/* Fixed, not sticky: nav starts invisible (autoAlpha 0, see page.tsx) while the hero is in view.
+   autoAlpha hides via visibility, not display, so a sticky/static nav would still reserve its
+   full height at the very top of the page — a dead gap between the browser chrome and the hero
+   frame below it. Fixed removes it from layout entirely; it just floats on top once visible. */
+.nb-landing nav { position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 50; padding: 18px 0; background: transparent; }
+.nb-landing .logo { display: flex; align-items: center; gap: 10px; font-family: var(--nb-font-display, "Space Grotesk", sans-serif); font-weight: 700; font-size: 27px; letter-spacing: 0.03em; }
+
+/* Desktop: floating rounded pill, all links visible, logo centered — hidden below 900px.
+   Glassmorphism: low-opacity blue-black fill + heavy blur/saturate so whatever scrolls behind
+   it (hero glow, goo background) tints the bar, plus a faint blue border and inset top
+   highlight to sell the "frosted glass" edge. */
+/* max-width history: 760px -> 1100px -> 1000px -> 1040px. FAQ moved into the left group (see
+   site-navbar.tsx) so the right group is now just About + language switcher + Daftar/Login —
+   lighter than the old FAQ+About+lang+CTA combo, but the About label alone is still the single
+   longest translated nav word (Filipino "Tungkol Sa Amin"), which was still crowding straight into
+   the logo at the narrow end of the pill's old activation range (it only turned on at 900px
+   viewport width, where the equal-fr columns had barely ~300px each to work with — not enough for
+   About + the language button + the Daftar/Login capsule together, in the heavier languages).
+   Fixed at the source this time (see the 900px->1080px activation change further down) instead of
+   re-squeezing font/gap again: the pill now only turns on once there's genuinely enough width for
+   its sizing budget, with real margin to spare, rather than right at its own breaking point.
+   Centering, take 3: attempt #1 was a plain 3-column grid (1fr auto 1fr) — mathematically that
+   only centers the logo column when the left/right flex groups have EQUAL min-content width, and
+   they never do (the right group always carried more than the left) — so the logo drifted
+   off-center by a different amount per language. Attempt #2 decoupled the logo entirely via
+   position:absolute+translate — perfectly centered, but with nothing left reserving space around
+   it, the heavier right group's own content could (and for Malay/Thai/Filipino, did) run straight
+   into it, trading a centering bug for a collision bug.
+   This version keeps the logo in the grid (so its layout box still marks out real, respected
+   space) but changes the side columns to `minmax(0, 1fr)` instead of a bare `1fr`. A bare `1fr`
+   track's automatic minimum size is its content's min-content width — which is exactly what let
+   the two columns end up unequal (and thus off-center) in attempt #1. `minmax(0, ...)` overrides
+   that automatic minimum down to zero, so with an equal flex factor on both sides, the grid sizing
+   algorithm gives them EXACTLY equal pixel widths regardless of content — true, guaranteed
+   centering — while `column-gap` plus the link sizing below keep each side's real content
+   (checked against every language's longest rendering) safely inside its equal half, WITH margin
+   to spare this time rather than a razor-thin fit. */
+.nb-landing .nav-pill {
+  display: none;
+  max-width: 1040px; margin: 0 auto; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: 30px; align-items: center;
+  background: rgba(8, 13, 26, 0.55); border: 1px solid rgba(59, 130, 246, 0.22);
+  backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-radius: 999px; padding: 10px 20px;
+  box-shadow: 0 20px 50px -20px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.03) inset, 0 1px 0 rgba(255,255,255,.06) inset;
 }
-.nb-landing .nav-links { display: flex; align-items: center; gap: 32px; }
-.nb-landing .nav-links a { color: var(--text-dim); font-size: 14.5px; font-weight: 500; transition: color .15s; }
-.nb-landing .nav-links a:hover { color: var(--text); }
-.nb-landing .nav-cta { display: flex; align-items: center; gap: 14px; }
-.nb-landing .nav-toggle { display: none; background: none; border: none; color: var(--text); font-size: 26px; cursor: pointer; }
-.nb-landing .nav-links.open {
-  position: absolute; top: 72px; left: 0; right: 0; background: #0a1020; flex-direction: column;
-  padding: 20px 24px; border-bottom: 1px solid #1c2b47; gap: 18px; display: flex;
+.nb-landing .nav-pill .logo { justify-self: center; flex-shrink: 0; }
+/* NOTE: this used to also carry `overflow: hidden` as a last-resort safety net against a nav link
+   label somehow overflowing its column and bleeding into the logo. Removed it: the language
+   dropdown menu lives INSIDE this same flex container (nav-lang -> nav-lang-menu, position
+   absolute, extending below the pill) — overflow:hidden on an ancestor clips a position:absolute
+   descendant too, so it was silently clipping the entire language menu to invisible every time it
+   opened. A hidden dropdown is a much worse bug than the theoretical text-overflow edge case the
+   safety net was guarding against (already checked against every language's longest label in the
+   sizing budget above), so plain visible overflow wins here. */
+.nb-landing .nav-pill-links { display: flex; align-items: center; gap: 13px; flex-shrink: 0; }
+.nb-landing .nav-pill-links.right { justify-content: flex-end; }
+/* letter-spacing .1em->.06em->.045em, gap 18px->13px, font-size 11.5px->11px: uppercase Latin
+   needs SOME extra tracking to read cleanly, but every notch costs real width per character —
+   multiplied across a longer translated label (and meaningless on Thai, which has no case) that
+   width adds up fast. Trimmed further (alongside .nav-pill's own padding, .nav-lang-btn, and
+   .nav-cta below) to buy back the margin the breakpoint drop to 1024px needed — verified against
+   the actual longest-label language (Filipino "Tungkol Sa Amin") live at 1024px viewport width
+   with these exact values: +20px of clear space before the logo, comfortably non-overlapping. */
+.nb-landing .nav-pill-links a { color: var(--text-dim); font-size: 11px; font-weight: 600; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; transition: color .15s; }
+.nb-landing .nav-pill-links a:hover { color: var(--cyan); }
+
+/* Compact "Daftar / Login" pill — a tight glass capsule instead of a loose text link, so its
+   footprint is precise rather than sprawling across the nav's right side. Sits after "Harga"
+   inside the same right-hand flex group. */
+/* Reworked per explicit request ("lebih presisi, dan superpremium") — the capsule was a flat,
+   single-tone glass panel with no inner highlight, the primary button's padding sat slightly
+   uneven against it, and everything transitioned on a linear ease. Precision here means the outer
+   capsule and inner button now share the exact same "glass" language as the rest of the nav pill
+   (a top inset highlight line, like .nav-pill already has), so the CTA reads as part of the same
+   crafted object instead of a separate loose add-on; premium means a glossy top-light on the
+   gradient button (the classic "physical button" cue), a touch more letter-spacing, an eased
+   cubic-bezier on hover instead of linear, and a real :active press state. */
+.nb-landing .nav-cta {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 5px 4px 11px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,.03) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 1px 0 rgba(255,255,255,.08) inset, 0 10px 24px -16px rgba(0,0,0,.7);
+  flex: none;
+  transition: border-color .2s ease, background .2s ease;
+}
+.nb-landing .nav-cta:hover { border-color: rgba(255, 255, 255, 0.24); background: linear-gradient(180deg, rgba(255,255,255,.09) 0%, rgba(255,255,255,.04) 100%); }
+.nb-landing .nav-cta-divider { color: var(--text-faint); font-size: 10px; line-height: 1; opacity: .55; }
+.nb-landing .nav-cta a.nav-cta-secondary {
+  color: var(--text-dim); font-size: 12px; font-weight: 600; letter-spacing: normal; text-transform: none;
+  white-space: nowrap; padding: 6px 3px; border-radius: 999px;
+  transition: color .15s ease;
+}
+.nb-landing .nav-cta a.nav-cta-secondary:hover { color: var(--text); }
+.nb-landing .nav-cta a.nav-cta-primary {
+  color: #04070f; font-size: 12px; font-weight: 700; letter-spacing: .015em; text-transform: none;
+  white-space: nowrap; padding: 7px 13px; border-radius: 999px;
+  background: linear-gradient(135deg, var(--purple), var(--cyan));
+  box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 0 0 1px rgba(255,255,255,.08) inset, 0 4px 14px -3px rgba(59,130,246,.6);
+  transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s cubic-bezier(.2,.8,.2,1), filter .18s ease;
+}
+.nb-landing .nav-cta a.nav-cta-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 0 0 1px rgba(255,255,255,.12) inset, 0 6px 20px -3px rgba(56,189,248,.75);
+  filter: brightness(1.05);
+  color: #04070f;
+}
+.nb-landing .nav-cta a.nav-cta-primary:active { transform: translateY(0); filter: brightness(.98); }
+
+/* Language switcher — a compact "🌐 EN"-style pill button that opens a small menu listing all 6
+   supported languages. Reused as-is on both the desktop pill nav and the mobile hamburger bar. */
+.nb-landing .nav-lang-btn {
+  display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  background: rgba(255,255,255,.05); border: 1px solid var(--card-border); border-radius: 999px;
+  color: var(--text-dim); font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  padding: 6px 9px; cursor: pointer; transition: color .15s, border-color .15s;
+}
+.nb-landing .nav-lang-btn:hover { color: var(--text); border-color: var(--purple-dim); }
+.nb-landing .nav-lang-menu {
+  position: absolute; top: calc(100% + 10px); min-width: 190px; z-index: 60;
+  background: rgba(8, 13, 26, 0.92); border: 1px solid rgba(59,130,246,.25); border-radius: 14px;
+  padding: 6px; backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: 0 20px 50px -20px rgba(0,0,0,.7); animation: nb-dropdown-in .18s ease;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.nb-landing .nav-lang-menu-right { right: 0; }
+.nb-landing .nav-lang-menu-left { left: 0; }
+.nb-landing .nav-lang-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: none; border: none; border-radius: 9px; padding: 8px 10px; cursor: pointer;
+  color: var(--text-dim); font-size: 13px; font-weight: 500;
+}
+.nb-landing .nav-lang-item:hover { background: rgba(255,255,255,.06); color: var(--text); }
+.nb-landing .nav-lang-item.is-active { color: var(--cyan); background: rgba(56,189,248,.1); }
+.nb-landing .nav-lang-short { flex-shrink: 0; width: 26px; font-weight: 700; font-size: 11px; color: var(--text-faint); }
+
+/* Mobile/tablet: plain hamburger bar — hidden at 900px and up. Same glassmorphism treatment. */
+.nb-landing .nav-bar {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 64px;
+  background: rgba(5, 8, 16, 0.6); border: 1px solid rgba(59, 130, 246, 0.22); border-radius: 18px; padding: 0 10px 0 4px;
+  backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+.nb-landing .nav-bar .logo { justify-self: center; }
+.nb-landing .nav-toggle {
+  justify-self: start; display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; background: none; border: none;
+  color: var(--text); font-size: 22px; line-height: 1; cursor: pointer;
+}
+.nb-landing .nav-dropdown {
+  position: absolute; top: 88px; left: 24px; right: 24px; z-index: 49; background: var(--bg-alt);
+  display: flex; flex-direction: column; padding: 20px 24px; gap: 18px; border-radius: 18px;
+  border: 1px solid var(--card-border); box-shadow: 0 20px 50px -20px rgba(0,0,0,.7); animation: nb-dropdown-in .18s ease;
+}
+.nb-landing .nav-dropdown a { color: var(--text-dim); font-size: 14.5px; font-weight: 500; transition: color .15s; }
+.nb-landing .nav-dropdown a:hover { color: var(--text); }
+@keyframes nb-dropdown-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* 1080px -> 1024px, per explicit report ("di monitor 14 terlihat navbarnya full jangan garis 3"
+   — a 14" laptop was seeing the hamburger instead of the full pill nav). Many 14" Windows laptops
+   report a CSS viewport width well under 1080px once OS display-scaling is factored in (e.g. a
+   common 1920x1080 panel at 150% Windows scaling + a bit of browser zoom, or a 1366x768 panel at
+   125-150% scaling, both land in the 900-1100px range) — 1080px was simply excluding real 14"
+   hardware, not just phones/tablets as intended.
+   Lowering the threshold reopens the exact crowding risk the 900px->1080px move above was raised
+   to fix (see that change's own history: the pill's equal-width columns have the least room right
+   around this pinch point, and the longest translated label — Filipino "Tungkol Sa Amin" — is the
+   tightest fit of all 6 languages). Rather than just moving the number back down and reintroducing
+   that bug, .nav-pill-links/.nav-pill/.nav-lang-btn/.nav-cta above were all tightened first (gap,
+   padding, font-size) to buy back real margin, then this breakpoint was verified live against
+   Filipino specifically: at 960px it still overlaps the logo by ~12px, but at 1024px there's a
+   clean +20px of clear space. 1024px is also a well-established, intentional floor on its own
+   (iPad-landscape width, the classic "safe minimum" for a full desktop nav), so viewports from
+   960-1023px still get the hamburger nav-bar below — genuinely tablet/narrow-window territory,
+   not 14" laptops. */
+@media (min-width: 1024px) {
+  .nb-landing .nav-pill { display: grid; }
+  .nb-landing .nav-bar { display: none; }
 }
 
-.nb-landing .hero { position: relative; padding: 100px 0 90px; overflow: hidden; }
+/* Minimal wordmark hero (modeled on brikken.co's stripped-down hero): a tall 220vh section
+   whose content sticks to the viewport while it scrolls underneath, giving the video below
+   room to "scrub" through its own frames tied to scroll position (see the ScrollTrigger wired
+   up in page.tsx) instead of just autoplaying on a timer. No tagline/CTA here on purpose —
+   that copy lives in .intro-section right after this one. */
+/* Height is a flat 500px — exactly HERO_SCROLL_PX in page.tsx — NOT calc(100vh + 500px) like an
+   earlier version had it. That extra 100vh belonged to when .hero-mono-sticky was position:sticky
+   and needed the parent tall enough to scroll away after unpinning. Now that .hero-mono-sticky is
+   position:fixed (see below) and hidden via display:none/flex at the exact moment this 500px of
+   scroll ends, it no longer occupies document flow at all, so .hero itself only needs to be as
+   tall as the scroll DISTANCE that drives its scrubbed animations — not viewport-height-tall too.
+   Leaving the old calc(100vh + 500px) here was the actual root cause of the "gap kekosongan
+   scroll ~4 scroll" bug: .intro-section's document top is unconditionally hero_top + hero_height,
+   so with hero_height still at 100vh+500px, .intro-section didn't start until a full extra 100vh
+   past where the fixed hero content had already been hidden — reproducing the exact dead zone the
+   position:fixed switch was meant to eliminate. This 500px covers two phases in sequence: the
+   PS-stick spin + "rental ps" video growing to fill the screen (~first 80%), then the fully-grown
+   video HOLDS at full-screen for a short dwell (~last 20%) so it actually gets seen before the
+   section releases. Must stay numerically equal to HERO_SCROLL_PX in page.tsx. */
+.nb-landing .hero { position: relative; height: 500px; padding: 0; overflow: visible; }
+/* position:fixed, not position:sticky — a sticky element always costs its own full height
+   (100vh) of extra scroll to physically leave view once it unpins, no matter how the parent's
+   height is tuned. That was the source of a "section 2 is too far away" gap: after the hero's
+   video/animation finished, there was still a full extra screen of scrolling a frozen background
+   before .intro-section ever appeared. Fixed positioning doesn't occupy document flow at all, so
+   hiding it (see the ScrollTrigger onLeave/onEnterBack in page.tsx, toggling display:none/flex)
+   the instant .hero's scroll range ends means .intro-section — right after .hero in the DOM —
+   is immediately there to reveal, no extra scroll required. */
+.nb-landing .hero-mono-sticky {
+  position: fixed; top: 0; left: 0; right: 0; height: 100vh; overflow: hidden; z-index: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  padding-top: 110px;
+}
+/* Full-bleed video: fills the entire sticky hero viewport, frames scrubbed by scroll (see
+   page.tsx). A dark gradient overlay keeps the wordmark on top legible against whatever's
+   playing underneath it. */
+.nb-landing .hero-scroll-video-frame {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden;
+}
+/* Video moved ABOVE the dark gradient (z-index 2 vs the ::after overlay's 1) per explicit
+   request — the tint was reading as "video covered by a black layer" rather than a subtle
+   legibility aid. Video now paints on top and shows at full brightness/clarity; the gradient
+   still exists underneath (harmless — fully covered by the opaque video) in case a future
+   need for it (e.g. a transparent-edge video) comes back. .hero-wordmark/.hero-corner-copy
+   are unaffected either way — they're separate siblings of .hero-scroll-video-frame with their
+   own higher z-index (2/3), always above this whole frame regardless of what's stacked inside it. */
+/* filter: brightness/contrast boost — the real cause of the "video covered by a black layer"
+   report turned out to be the source spin-frame JPGs themselves (public/spin-frames/bg-blue-hd),
+   which measure ~14% average brightness (checked directly: mean 34.6/255) — a deliberately moody
+   dark-background product shot, not the CSS ::after gradient (that was a red herring; z-index
+   reorder above had correctly zero visible effect once isolated). Brightening here in CSS instead
+   of re-processing all 85 source JPGs — cheap, reversible, and applies identically to every frame. */
+/* Brightness eased down 1.6 -> 1.35 per explicit request ("gambar stick playstation dibuat gelap
+   sedikit lagi") — still well above the source JPGs' native ~35% average brightness that made the
+   video read as "covered by a black layer" originally, just not as blown-out/overexposed as 1.6. */
+.nb-landing .hero-scroll-video { width: 100%; height: 100%; object-fit: cover; display: block; position: relative; z-index: 2; filter: brightness(1.35) contrast(1.08); }
+/* Tint moved ABOVE the video (z-index 3, was 1 — sitting below the video it had zero visible
+   effect) and brought back at a light ~25% opacity per explicit request ("pencahayaan stick
+   playstation agak gelap") — the brightness(1.6) boost above made the controller's own highlights
+   read as slightly blown-out/overexposed. Much lighter than the original pre-brightening tint
+   (which was 60-70%, aimed at legibility, not this) — this is purely a highlight-toning pass. */
+.nb-landing .hero-scroll-video-frame::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: linear-gradient(180deg, rgba(5,8,16,.28) 0%, rgba(5,8,16,.12) 45%, rgba(5,8,16,.3) 100%);
+}
+.nb-landing .hero-wordmark {
+  position: relative; z-index: 2; margin: 0; text-align: center; color: var(--text);
+  font-family: var(--nb-font-poster, var(--nb-font-display, "Space Grotesk", sans-serif));
+  font-weight: 400; line-height: 0.88; letter-spacing: 0.005em;
+  font-size: clamp(56px, 13vw, 200px);
+  text-shadow: 0 10px 40px rgba(0,0,0,.7);
+}
+
+/* Bottom-left blurb + CTA, brikken.co-style ("We turn ambitious ideas..." / "BUILD WITH US"). */
+/* Sizing here is tuned to match brikken.co's own corner-copy proportions: a much bigger, more
+   confident paragraph size relative to the giant wordmark above it (their copy reads at roughly
+   19-20px against our previous 14px, which looked timid next to a 200px wordmark), with a wider
+   box (340px, was 300px) so that bigger text still wraps to a similar 3-line block instead of
+   ballooning to 4-5 lines. */
+.nb-landing .hero-corner-copy {
+  position: absolute; left: 40px; bottom: 40px; z-index: 3; max-width: 340px;
+}
+/* Localized scrim behind ONLY the corner text — now that the full-frame gradient over the video
+   is gone (set to 0% opacity per explicit request) and the video itself is brightened, plain
+   text-dim copy floating directly on the bright video read as washed out/illegible. Rather than
+   re-darkening the whole video, this is a soft radial gradient scoped to the text's own corner
+   (extends a bit beyond the box on every side via negative inset for a natural fade, not a hard
+   rectangle) — video stays bright everywhere else, text gets its own legibility backing. Sits
+   behind the text via normal paint order (::before paints before the element's real children)
+   within .hero-corner-copy's own stacking context, so it can't cover the video (already above it
+   as a whole, per .hero-corner-copy's z-index:3). */
+.nb-landing .hero-corner-copy::before {
+  content: ""; position: absolute; inset: -28px -24px -24px -64px; z-index: -1; pointer-events: none;
+  background: radial-gradient(120% 120% at 0% 100%, rgba(5,8,16,.75) 0%, rgba(5,8,16,.45) 55%, rgba(5,8,16,0) 100%);
+}
+/* Eyebrow moved here from the intro-section copy — kept deliberately small (it has no equivalent
+   on brikken.co) but nudged up slightly so it doesn't read as undersized next to the now-larger
+   paragraph beneath it. */
+.nb-landing .hero-corner-copy .eyebrow {
+  font-size: 12px; padding: 6px 14px; margin-bottom: 16px; white-space: normal;
+}
+.nb-landing .hero-corner-copy p { color: #fff; font-size: 17px; line-height: 1.5; letter-spacing: -0.005em; margin: 0 0 20px; text-shadow: 0 2px 12px rgba(0,0,0,.8); }
+.nb-landing .hero-corner-btn { padding: 12px 24px; font-size: 13.5px; }
+
+/* Bottom-right "rental ps" demo — starts as a small card and grows to fill the whole hero frame
+   as you scroll (see the ScrollTrigger in page.tsx driving width/height/right/bottom/radius
+   directly in px, recomputed every tick so it lands exactly on 100% of the viewport). z-index
+   above the wordmark/corner-copy so it progressively covers them as it grows.
+   position: fixed (not absolute-in-sticky) is deliberate: .hero-mono-sticky always occupies
+   exactly the viewport's top 100vh while it's relevant (sticky top:0), so right/bottom values
+   read identically either way — but fixed means THIS element's exit is driven purely by the
+   opacity fade in page.tsx's onUpdate, not by the sticky box physically scrolling off over a
+   full 100vh of extra scroll. That scroll-away distance was the cause of the video appearing to
+   still sit "in the middle of section 2" — a 100vh block takes a full screen height of scroll to
+   clear the top, so it visually overlapped with section 2's already-visible content the whole
+   time. Fixed + a quick opacity fade timed to finish exactly at the hero's release point removes
+   that overlap window entirely. */
+.nb-landing .hero-grow-video-frame {
+  position: fixed; z-index: 4; right: 40px; bottom: 40px; width: 340px; height: 191px;
+  border-radius: 16px; overflow: hidden; border: 1px solid var(--card-border);
+  box-shadow: 0 20px 50px -15px rgba(0,0,0,.7);
+}
+/* Mild brightness lift for consistency with .hero-scroll-video's boost above (this video measures
+   ~30% average brightness — noticeably dark, though less extreme than the spin frames — a jump
+   straight from the now-brightened canvas into this at its original darkness would read as an odd
+   dip right at the grow handoff). */
+.nb-landing .hero-grow-video { width: 100%; height: 100%; object-fit: cover; display: block; filter: brightness(1.3) contrast(1.05); }
+
 .nb-landing .blob { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .35; pointer-events: none; }
 .nb-landing .blob-1 { width: 420px; height: 420px; background: var(--purple); top: -120px; left: -100px; }
 .nb-landing .blob-2 { width: 380px; height: 380px; background: var(--cyan); bottom: -140px; right: -80px; }
-.nb-landing .hero-inner { position: relative; text-align: center; max-width: 820px; margin: 0 auto; }
+
+/* Intro section — the old hero's sales copy (eyebrow/headline/sub/CTAs/note) split into a
+   two-column layout: text left (.intro-copy), photo right (.intro-media). .intro-grid is the
+   column layout itself; .intro-inner just centers/widths the whole section (now 1180px to match
+   .wrap elsewhere, not the old single-column 820px). Stacks to one column on mobile, photo below
+   text (see the @media block at the bottom of this rule group). */
+.nb-landing .intro-section { padding: 0; position: relative; overflow: hidden; min-height: 88vh; display: flex; align-items: center; }
+/* Full-bleed background photo behind the whole section (replacing the old boxed/framed photo in
+   the right column) — same absolute-inset + object-fit:cover + gradient-overlay technique as
+   .showcase-bg-video/.showcase-bg-overlay above, per explicit request ("background full screen"). */
+.nb-landing .intro-bg-photo {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; pointer-events: none;
+}
+/* Tint set to 0% opacity per explicit request (same as the hero's own overlay) — legibility for
+   the headline/sub now relies on their own text-shadow instead of a section-wide dark scrim. */
+.nb-landing .intro-bg-overlay {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(90deg, rgba(5,8,16,0) 0%, rgba(5,8,16,0) 32%, rgba(5,8,16,0) 58%, rgba(5,8,16,0) 100%);
+}
+.nb-landing .intro-inner { position: relative; z-index: 2; width: 100%; max-width: 1180px; margin: 0 auto; padding: 110px 0 40px; }
+/* Hidden by default in CSS, not just via the JS gsap.set() in page.tsx's mount effect. Before
+   this rule existed, .intro-copy/.intro-media rendered fully visible (their natural, un-hidden
+   DOM state) from first paint until that effect actually ran and hid them — normally an
+   imperceptible flash, but on a slow/cold dev-server compile (this page loads a LOT: 85 spin
+   frames, several videos, GSAP+Lenis+ScrollTrigger setup) that gap can last long enough to see:
+   .hero-mono-sticky is position:fixed and covers the viewport, so this section's own headline/
+   CTAs/floating badges — sitting right below it in normal flow, not yet hidden — showed straight
+   through/behind it, reading as the two sections "bertabrakan" (colliding) on refresh. This CSS
+   default matches the JS's initial gsap.set(.... {autoAlpha:0, y:40}) exactly (opacity+visibility
+   for autoAlpha, translateY for y) so there's no jump when the effect's own gsap.set reapplies the
+   same values as inline styles a moment later, and no window at all where it can render visible
+   before JS decides otherwise. The effect's later gsap.to(...) reveal still works normally since
+   inline styles from GSAP always win over this stylesheet rule. See the prefers-reduced-motion
+   branch in page.tsx's effect for the one path that must explicitly undo this (that branch skips
+   the whole effect early, so without it those users would never see the content revealed). */
+.nb-landing .intro-copy,
+.nb-landing .intro-media {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(40px);
+}
+.nb-landing .intro-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 64px; align-items: center; text-align: left; }
+.nb-landing .intro-headline { font-family: var(--nb-font-poster, var(--nb-font-display, "Space Grotesk", sans-serif)); font-weight: 400; font-size: 50px; line-height: 1.08; margin-bottom: 20px; letter-spacing: 0.01em; }
+.nb-landing .intro-section p.sub { color: var(--text-dim); font-size: 18px; max-width: 520px; margin: 0 0 36px; }
 .nb-landing .eyebrow {
   display: inline-flex; align-items: center; gap: 8px; background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.35);
   color: #bfdbfe; font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 999px; margin-bottom: 24px;
 }
-.nb-landing .hero h1 { font-size: 52px; line-height: 1.08; margin-bottom: 20px; }
-.nb-landing .hero p.sub { color: var(--text-dim); font-size: 18px; max-width: 620px; margin: 0 auto 36px; }
-.nb-landing .hero-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+.nb-landing .hero-ctas { display: flex; gap: 14px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 20px; }
 .nb-landing .hero-note { color: var(--text-faint); font-size: 13.5px; }
-.nb-landing .hero-mock {
-  margin-top: 64px; border-radius: 20px; border: 1px solid var(--card-border);
-  background: linear-gradient(180deg, var(--card), var(--bg-alt)); padding: 28px; box-shadow: 0 30px 80px -30px rgba(0,0,0,.7);
-}
-.nb-landing .hero-mock-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
-.nb-landing .mock-unit { background: var(--bg-alt); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px 12px; text-align: left; }
-.nb-landing .mock-unit .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-.nb-landing .mock-unit.on .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
-.nb-landing .mock-unit.off .dot { background: var(--text-faint); }
-.nb-landing .mock-unit .label { font-size: 12.5px; color: var(--text-faint); margin-top: 8px; }
-.nb-landing .mock-unit .time { font-family: var(--nb-font-display, "Space Grotesk", sans-serif); font-size: 19px; font-weight: 600; margin-top: 2px; }
 
-/* ---- Premium hero product shot (real dashboard screenshot, floating/tilted browser-chrome frame) ---- */
-.nb-landing .hero-shot-stage { position: relative; margin: 80px auto 0; max-width: 980px; perspective: 1800px; }
-.nb-landing .hero-shot-glow {
-  position: absolute; inset: -60px -20px auto -20px; height: 420px; z-index: 0;
-  background: radial-gradient(60% 60% at 30% 20%, rgba(59,130,246,.45), transparent 70%),
-              radial-gradient(50% 50% at 80% 30%, rgba(56,189,248,.35), transparent 70%);
-  filter: blur(50px); pointer-events: none;
+/* Trust badge — small rating/social-proof pill under the hero CTAs. */
+.nb-landing .trust-badge {
+  display: inline-flex; align-items: center; gap: 10px; margin: 22px 0 0; padding: 10px 18px;
+  border: 1px solid var(--card-border); border-radius: 999px; background: rgba(59,130,246,.06);
 }
-/* Split the tilt (transform) from the clip (overflow+radius) — combining a 3D
-   transform with overflow:hidden + border-radius on the SAME element is a
-   known Chromium compositing bug that can render children collapsed/blank,
-   which is exactly the symptom this split avoids. */
-.nb-landing .hero-shot-tilt {
-  position: relative; z-index: 1;
-  transform: rotateX(7deg) rotateY(-3deg);
-  transition: transform .5s cubic-bezier(.16,1,.3,1);
-}
-.nb-landing .hero-shot-stage:hover .hero-shot-tilt { transform: rotateX(0deg) rotateY(0deg); }
-.nb-landing .hero-shot-wrap {
-  border-radius: 20px; overflow: hidden;
-  border: 1px solid rgba(59,130,246,.35);
-  background: linear-gradient(180deg, var(--card), var(--bg-alt));
-  box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset, 0 40px 100px -30px rgba(0,0,0,.85), 0 0 90px -20px rgba(59,130,246,.35);
-}
-.nb-landing .hero-shot-topbar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(255,255,255,.03); border-bottom: 1px solid var(--card-border); }
-.nb-landing .hero-shot-dots { display: flex; gap: 6px; flex-shrink: 0; }
-.nb-landing .hero-shot-dots span { width: 10px; height: 10px; border-radius: 50%; display: block; }
-.nb-landing .hero-shot-dots span:nth-child(1) { background: #f47067; }
-.nb-landing .hero-shot-dots span:nth-child(2) { background: #fbbf24; }
-.nb-landing .hero-shot-dots span:nth-child(3) { background: #34d399; }
-.nb-landing .hero-shot-url {
-  margin: 0 auto; display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.05);
-  border: 1px solid var(--card-border); color: var(--text-faint); font-size: 12.5px; padding: 5px 16px; border-radius: 999px;
-}
-.nb-landing .hero-shot-img-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: var(--bg-alt); overflow: hidden; }
-.nb-landing .hero-shot-img-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
-.nb-landing .hero-shot-fade { position: absolute; inset: auto 0 0 0; height: 40%; background: linear-gradient(180deg, transparent, var(--bg-alt) 92%); pointer-events: none; }
-.nb-landing .hero-badge {
-  position: absolute; z-index: 2; display: flex; align-items: center; gap: 10px;
-  background: rgba(18,12,34,.85); backdrop-filter: blur(10px); border: 1px solid var(--card-border);
-  border-radius: 14px; padding: 12px 16px; box-shadow: 0 20px 45px -15px rgba(0,0,0,.7);
-  animation: nb-float 5s ease-in-out infinite;
-}
-.nb-landing .hero-badge .b-icon {
-  width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;
-}
-.nb-landing .hero-badge .b-title { font-size: 11.5px; color: var(--text-faint); }
-.nb-landing .hero-badge .b-value { font-family: var(--nb-font-display, "Space Grotesk", sans-serif); font-size: 15px; font-weight: 700; }
-.nb-landing .hero-badge-revenue { left: -28px; bottom: 46px; animation-delay: .3s; }
-.nb-landing .hero-badge-revenue .b-icon { background: rgba(52,211,153,.15); color: var(--green); }
-.nb-landing .hero-badge-live { right: -22px; top: 64px; animation-delay: 1s; }
-.nb-landing .hero-badge-live .b-icon { background: rgba(56,189,248,.15); color: var(--cyan); }
-@keyframes nb-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.nb-landing .trust-badge .stars { color: var(--cyan); font-size: 15px; letter-spacing: 1px; }
+.nb-landing .trust-badge .trust-text { color: var(--text-dim); font-size: 13px; }
+.nb-landing .trust-badge .trust-text strong { color: var(--text); }
 
-/* Mascot: a small decorative video "buddy" (NEXBILL's robot) floating beside the
-   dashboard-preview frame — purely decorative, never covers or replaces the real
-   screenshot, per "berdampingan" placement. Its face is a glowing LED display baked
-   into the footage (no separate pupils to move), so "follows the cursor" is done by
-   subtly turning/leaning the whole robot toward the mouse (see useMascotFollowCursor
-   in page.tsx) rather than faking eye movement that isn't really there. Background of
-   the source video is solid black, which blends straight into the dark theme — no
-   chroma-key/transparency needed. */
-.nb-landing .hero-mascot {
-  position: absolute;
-  z-index: 3;
-  right: -60px;
-  bottom: -56px;
-  width: 200px;
-  filter: drop-shadow(0 25px 45px rgba(0,0,0,.55)) drop-shadow(0 0 30px rgba(56,189,248,.35));
-  animation: nb-float 6s ease-in-out infinite;
-  animation-delay: .6s;
-  transform-style: preserve-3d;
-  transition: transform .25s cubic-bezier(.16,1,.3,1);
-  will-change: transform;
+/* Right column — dashboard photo in a glass-glow frame, matching the section's dark/cyan theme. */
+.nb-landing .intro-media { position: relative; }
+.nb-landing .intro-media-glow {
+  position: absolute; inset: -36px; z-index: 0; pointer-events: none;
+  background: radial-gradient(circle, rgba(56,189,248,.22), transparent 70%);
+  filter: blur(36px);
 }
-.nb-landing .hero-mascot-video {
-  width: 100%;
-  display: block;
-  border-radius: 20px;
-  pointer-events: none;
+.nb-landing .intro-media-frame {
+  position: relative; z-index: 1; border-radius: 24px; overflow: hidden;
+  border: 1px solid var(--card-border); background: var(--card);
+  box-shadow: 0 30px 60px -20px rgba(0,0,0,.65);
 }
-@media (max-width: 900px) {
-  .nb-landing .hero-shot-stage { perspective: none; margin-top: 48px; }
-  .nb-landing .hero-shot-tilt { transform: none !important; }
-  .nb-landing .hero-badge { position: static; margin: 12px auto 0; animation: none; width: fit-content; }
-  .nb-landing .hero-badge-revenue, .nb-landing .hero-badge-live { left: auto; right: auto; top: auto; bottom: auto; }
-  .nb-landing .hero-mascot { position: static; margin: 20px auto 0; width: 140px; animation: none; }
+.nb-landing .intro-media-frame img { display: block; width: 100%; height: auto; }
+.nb-landing .intro-media-badge {
+  position: absolute; left: 18px; bottom: 18px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(5,8,16,.75); backdrop-filter: blur(8px);
+  border: 1px solid var(--card-border); border-radius: 999px;
+  padding: 8px 14px; font-size: 12.5px; color: var(--text); font-weight: 600;
+}
+.nb-landing .intro-media-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,.25);
+}
+
+/* Gentle infinite float for the three stat badges over the section-2 photo ("UNIT AKTIF" /
+   "BOOKING" / "OMZET HARI INI") — per explicit request ("ui floating dibuatkan animasi bergerak").
+   Each badge gets its own duration/delay so the three drift out of phase with each other rather
+   than bobbing in lockstep, which reads as more alive/organic. Pure CSS, no GSAP: these aren't
+   scroll-linked, just a small ambient loop, same category of effect as .nb-loader-glow's pulse.
+   MOBILE RESPONSIVE AUDIT: positioning/padding/sizing used to live entirely as inline styles on
+   each badge <div> in page.tsx, which meant a mobile media query had no way to shrink them — at a
+   320-375px phone width, the top-left ("UNIT AKTIF") and top-right ("BOOKING") badges' combined
+   width plus their 18px corner insets ran close enough to the available .intro-media width to risk
+   touching/overlapping (the third, bottom-left "OMZET" badge has no sibling at the same height, so
+   it was never at risk). Moved every value that needs to shrink on phones into these classes
+   instead — see the max-width:480px override at the bottom of this file for the actual shrink. */
+.nb-landing .intro-float-badge {
+  position: absolute; z-index: 2;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  background-color: rgba(8,11,22,.72); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px; padding: 10px 14px;
+  animation: intro-float-badge 4.6s ease-in-out infinite; will-change: transform;
+}
+.nb-landing .intro-float-badge-1 { top: 18px; left: 18px; display: flex; align-items: center; gap: 8px; animation-duration: 4.6s; animation-delay: 0s; }
+.nb-landing .intro-float-badge-2 { top: 18px; right: 18px; animation-duration: 5.4s; animation-delay: 0.9s; }
+.nb-landing .intro-float-badge-3 { left: 18px; bottom: 18px; animation-duration: 5s; animation-delay: 1.6s; }
+.nb-landing .intro-float-badge-value { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.1; }
+.nb-landing .intro-float-badge-value-cyan { font-size: 17px; font-weight: 700; color: #22d3ee; line-height: 1.15; }
+.nb-landing .intro-float-badge-label { font-size: 10.5px; color: #a3a3a3; letter-spacing: .03em; }
+@keyframes intro-float-badge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nb-landing .intro-float-badge { animation: none; }
 }
 
 .nb-landing .stat-strip {
-  margin-top: 40px; display: grid; grid-template-columns: repeat(4,1fr); gap: 14px;
+  margin-top: 48px; display: grid; grid-template-columns: repeat(4,1fr); gap: 14px;
   max-width: 900px; margin-left: auto; margin-right: auto;
 }
 .nb-landing .stat-item {
@@ -198,6 +616,111 @@
 .nb-landing .stat-label { color: var(--text-faint); font-size: 12.5px; line-height: 1.4; }
 @media (max-width: 900px) {
   .nb-landing .stat-strip { grid-template-columns: repeat(2,1fr); }
+  .nb-landing .intro-grid { grid-template-columns: 1fr; gap: 40px; text-align: center; }
+  .nb-landing .intro-section p.sub { margin: 0 auto 36px; }
+  .nb-landing .hero-ctas { justify-content: center; }
+  .nb-landing .trust-badge { margin: 22px auto 0; }
+  /* Single-column stack on mobile — the left-to-right gradient no longer reads correctly since
+     text sits above/below the photo rather than beside it, so switch to a uniform dark scrim. */
+  .nb-landing .intro-section { min-height: auto; display: block; }
+  .nb-landing .intro-bg-overlay { background: rgba(5,8,16,0); }
+  .nb-landing .intro-inner { padding: 80px 0 32px; }
+}
+
+/* Showcase marquee — horizontal drag/scroll track of varied-size cards (bajgartoffice.com-style).
+   .wrap (max-width 1180px, centered) only wraps the heading above it — the track itself sits
+   outside .wrap so it can bleed to the true viewport edges, which is what makes the "there's more,
+   keep scrolling" affordance read correctly. Native overflow-x:auto handles touch/trackpad/
+   shift+wheel scrolling on its own; page.tsx layers mouse-drag support on top via pointer events. */
+.nb-landing .showcase-section { padding-bottom: 40px; position: relative; overflow: hidden; }
+.nb-landing .showcase-bg-video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; pointer-events: none;
+}
+.nb-landing .showcase-bg-overlay {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(5,8,16,.8) 0%, rgba(5,8,16,.6) 45%, rgba(5,8,16,.88) 100%);
+}
+.nb-landing .showcase-section > .wrap, .nb-landing .showcase-track { position: relative; z-index: 2; }
+/* scroll-behavior is deliberately NOT "smooth" here (a previous version had it, which was the
+   actual cause of the marquee looking buggy/stuttery): the auto-scroll ticker in page.tsx writes
+   showcaseTrack.scrollLeft directly every single animation frame (~60x/sec) to produce its own
+   smooth continuous motion. With CSS scroll-behavior:smooth also active, every one of those 60
+   per-frame writes gets picked up as a new "smooth scroll" target, so the browser was constantly
+   re-animating toward a target that a moment later, the browser is already scroll-behaviour
+   changed again — the two smoothing systems fighting each other is what produced the stutter.
+   scroll-behavior:auto (the default, here explicit for clarity) makes every JS write instant, so
+   the ticker's own per-frame increments are the only thing producing motion — genuinely smooth. */
+.nb-landing .showcase-track {
+  display: flex; gap: 20px; overflow-x: auto; scroll-behavior: auto; cursor: grab;
+  padding: 6px 40px 30px; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.nb-landing .showcase-track img, .nb-landing .showcase-track video {
+  -webkit-user-drag: none; user-select: none;
+}
+.nb-landing .showcase-track::-webkit-scrollbar { display: none; }
+.nb-landing .showcase-track.dragging { cursor: grabbing; scroll-behavior: auto; user-select: none; }
+.nb-landing .showcase-track.dragging .showcase-card { pointer-events: none; }
+
+.nb-landing .showcase-card {
+  flex-shrink: 0; position: relative; border-radius: 20px; overflow: hidden;
+  background: var(--card); border: 1px solid var(--card-border);
+  box-shadow: 0 20px 40px -20px rgba(0,0,0,.6);
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.nb-landing .showcase-card.size-tall { width: 260px; height: 420px; }
+.nb-landing .showcase-card.size-wide { width: 440px; height: 280px; }
+.nb-landing .showcase-card.size-medium { width: 300px; height: 340px; }
+.nb-landing .showcase-card.size-square { width: 260px; height: 260px; }
+
+.nb-landing .showcase-media-card img, .nb-landing .showcase-media-card video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;
+}
+.nb-landing .showcase-card-label {
+  position: relative; z-index: 2; padding: 16px 18px; font-weight: 700; font-size: 14.5px; color: var(--text);
+}
+.nb-landing .showcase-media-card .showcase-card-label {
+  background: linear-gradient(0deg, rgba(5,8,16,.85) 0%, rgba(5,8,16,0) 100%); padding-top: 50px;
+}
+.nb-landing .showcase-hint {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 3;
+  background: rgba(5,8,16,.85); backdrop-filter: blur(6px); border: 1px solid var(--card-border);
+  border-radius: 999px; padding: 9px 18px; font-size: 12.5px; font-weight: 600; color: var(--text);
+  white-space: nowrap; pointer-events: none; transition: opacity .4s ease;
+}
+.nb-landing .showcase-track.interacted .showcase-hint { opacity: 0; }
+
+.nb-landing .showcase-quote {
+  background: linear-gradient(160deg, var(--card), var(--bg-alt)); padding: 28px; justify-content: center; gap: 14px;
+}
+.nb-landing .showcase-quote-mark { font-family: var(--nb-font-poster, serif); font-size: 48px; color: var(--purple-dim); line-height: 1; }
+.nb-landing .showcase-quote p { font-size: 17px; line-height: 1.5; color: var(--text); font-weight: 500; }
+.nb-landing .showcase-quote span { color: var(--text-faint); font-size: 13px; }
+
+.nb-landing .showcase-stat {
+  background: linear-gradient(135deg, var(--purple), var(--purple-dim));
+  justify-content: center; align-items: center; text-align: center; gap: 6px; padding: 24px;
+}
+.nb-landing .showcase-stat-num { font-family: var(--nb-font-display, "Space Grotesk", sans-serif); font-size: 52px; font-weight: 700; color: #fff; }
+.nb-landing .showcase-stat p { color: rgba(255,255,255,.85); font-size: 14px; max-width: 180px; }
+
+.nb-landing .showcase-placeholder {
+  align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 24px;
+  background: repeating-linear-gradient(135deg, var(--bg-alt), var(--bg-alt) 10px, var(--card) 10px, var(--card) 20px);
+}
+.nb-landing .showcase-ph-icon { font-size: 34px; opacity: .5; }
+.nb-landing .showcase-placeholder .showcase-card-label { padding: 0; }
+.nb-landing .showcase-ph-hint {
+  font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .08em;
+  border: 1px dashed var(--card-border); padding: 4px 10px; border-radius: 999px;
+}
+
+@media (max-width: 900px) {
+  .nb-landing .showcase-track { padding: 6px 20px 24px; gap: 14px; }
+  .nb-landing .showcase-card.size-tall { width: 190px; height: 320px; }
+  .nb-landing .showcase-card.size-wide { width: 280px; height: 200px; }
+  .nb-landing .showcase-card.size-medium { width: 220px; height: 260px; }
+  .nb-landing .showcase-card.size-square { width: 190px; height: 190px; }
+  .nb-landing .showcase-stat-num { font-size: 40px; }
 }
 
 .nb-landing section { padding: 90px 0; }
@@ -206,11 +729,108 @@
 .nb-landing .section-head h2 { font-size: 36px; margin-bottom: 14px; }
 .nb-landing .section-head p { color: var(--text-dim); font-size: 16px; }
 
-.nb-landing .pain-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
-.nb-landing .pain-card { background: var(--card); border: 1px solid var(--card-border); border-radius: 16px; padding: 26px; }
-.nb-landing .pain-card .icon { font-size: 26px; margin-bottom: 14px; }
-.nb-landing .pain-card h3 { font-size: 17px; margin-bottom: 8px; }
-.nb-landing .pain-card p { color: var(--text-dim); font-size: 14.5px; }
+/* SOLUSI pinned scrollytelling (brikken.co reference). .solusi-pin is the element GSAP's
+   `pin: true` freezes in place — it needs its own defined box (not 100vh; a tall-but-not-full
+   block reads better since the section-head above it keeps scrolling normally first) and
+   overflow:hidden so the decorative orbit rings can bleed off its edges without spilling into
+   surrounding sections. */
+.nb-landing .solusi-pin { position: relative; min-height: 640px; overflow: hidden; display: flex; align-items: center; }
+.nb-landing .solusi-orbit { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.nb-landing .solusi-orbit-ring-1, .nb-landing .solusi-orbit-ring-2 {
+  position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1px solid rgba(255,255,255,.08);
+  transform: translate(-50%, -50%);
+}
+.nb-landing .solusi-orbit-ring-1 { width: 78vmin; height: 78vmin; }
+.nb-landing .solusi-orbit-ring-2 { width: 56vmin; height: 56vmin; border-color: rgba(255,255,255,.14); }
+.nb-landing .solusi-orbit-track { position: absolute; left: 4%; right: 4%; top: 50%; height: 1px; background: rgba(255,255,255,.14); }
+.nb-landing .solusi-orbit-arrow { position: absolute; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.35); font-size: 15px; }
+.nb-landing .solusi-orbit-arrow-left { left: 2%; }
+.nb-landing .solusi-orbit-arrow-right { right: 2%; }
+
+/* 3 columns instead of 2: the 8 pain-point labels now flank the card 4-and-4 (left/right) rather
+   than stacking all 8 in one column to its left (per explicit request) — the card keeps the
+   largest share (1.3fr) since it carries the actual video/icon/title/desc content, the two label
+   columns only need enough room for a short 2-3 word phrase each. */
+.nb-landing .solusi-pin-inner {
+  position: relative; z-index: 1; display: grid; grid-template-columns: 0.85fr 1.3fr 0.85fr;
+  gap: 32px; align-items: center; width: 100%;
+}
+/* Right-hand label column mirrors the left: text right-aligned so both columns read as "pointing
+   toward" the card between them instead of both ragging the same direction. */
+.nb-landing .solusi-words-right { align-items: flex-end; text-align: right; }
+/* font-size history: clamp(46px,9vw,118px) [3 words, one column] -> clamp(19px,2.1vw,31px) [8
+   words, still one column — that giant size would have stacked to 900px+ tall and gotten clipped
+   by .solusi-pin's overflow:hidden while pinned] -> back up to a large size here now that the 8
+   words are split 4-and-4 across two columns (left/right of the card): each column only needs to
+   fit 4 words, not 8, so there's room to go big again without the overflow risk. Scaled off the
+   column's own width (vw here is close enough to "per-column" at this grid's ~0.85fr share) rather
+   than the old single-column layout's much wider available width, so longer translated labels
+   (Filipino "DEPOSITO KULANG", Vietnamese "CỌC THẤT THOÁT") wrap to a second line instead of
+   overflowing past the column edge — wrapping a big display word onto 2 lines reads fine; spilling
+   into the card next to it doesn't -> bumped again (clamp(24,3.2vw,50) -> clamp(30,4.4vw,68)) per
+   follow-up request; .solusi-pin uses min-height (a floor, not a cap) so the box is free to grow
+   taller than 640px to fit any 2-line-wrapped words, it isn't clipped by the overflow:hidden. */
+.nb-landing .solusi-words { display: flex; flex-direction: column; gap: 18px; }
+.nb-landing .solusi-word {
+  font-family: var(--nb-font-poster, var(--nb-font-display, "Space Grotesk", sans-serif));
+  font-weight: 400; font-size: clamp(28px, 3.6vw, 45px); line-height: 1.1; letter-spacing: 0.005em;
+  color: rgba(255,255,255,.16); transition: color .25s ease; cursor: pointer;
+}
+.nb-landing .solusi-word:hover { color: rgba(255,255,255,.6); }
+.nb-landing .solusi-word.is-active,
+.nb-landing .solusi-word.is-active:hover { color: var(--text); }
+
+.nb-landing .solusi-panels { position: relative; min-height: 460px; }
+.nb-landing .solusi-panel {
+  position: absolute; inset: 0; border: 1px solid var(--card-border); border-radius: 18px; padding: 24px;
+  border-top: 1px solid rgba(255,255,255,.1); border-left: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 25px 40px -10px rgba(0,0,0,.5); visibility: hidden; overflow: hidden;
+}
+.nb-landing .solusi-panel.is-active { visibility: visible; }
+/* 5-second placeholder clip (trimmed from rental-ps.mp4, per explicit request — same clip on all
+   3 cards until real per-problem footage exists) shown at the top of each card, above the index
+   readout. */
+.nb-landing .solusi-panel-media {
+  aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; margin-bottom: 18px;
+  background: #04060b; border: 1px solid rgba(255,255,255,.08);
+}
+.nb-landing .solusi-panel-media video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* HUD-style index readout, replacing the old per-problem emoji (per explicit request to remove
+   emoji/icons and read as more elegant/high-tech). A pulsing dot (::before, styled like an
+   active-sensor LED) plus a monospace-feeling "01 / 08" counter — tabular-nums keeps every digit
+   the same width so the counter doesn't jiggle as it crossfades between panels. */
+.nb-landing .solusi-panel-index {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 14px;
+  font-family: var(--nb-font-display, "Space Grotesk", sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+.nb-landing .solusi-panel-index::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(56,189,248,.15), 0 0 10px 1px rgba(56,189,248,.7);
+  animation: solusi-index-pulse 2.2s ease-in-out infinite;
+}
+.nb-landing .solusi-panel-index-num { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; color: var(--cyan); }
+.nb-landing .solusi-panel-index-sep { font-size: 12px; color: rgba(255,255,255,.25); }
+.nb-landing .solusi-panel-index-total { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; color: rgba(255,255,255,.4); }
+@keyframes solusi-index-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.75); }
+}
+.nb-landing .solusi-panel h3 { font-size: 18px; margin-bottom: 8px; }
+.nb-landing .solusi-panel p { color: var(--text-dim); font-size: 14px; line-height: 1.55; }
+@media (max-width: 900px) {
+  /* Stacked words+panel can run taller than the desktop 640px pin box, so overflow switches to
+     visible here instead of clipping — the orbit rings are purely decorative background filler,
+     losing a sliver of them off-screen is fine; losing the actual pain-point copy isn't. */
+  .nb-landing .solusi-pin { min-height: auto; overflow: visible; padding: 56px 0; }
+  .nb-landing .solusi-pin-inner { grid-template-columns: 1fr; gap: 32px; }
+  .nb-landing .solusi-panels { min-height: 520px; }
+  .nb-landing .solusi-orbit-track, .nb-landing .solusi-orbit-arrow { display: none; }
+  /* Right-aligned text only makes sense as a mirror when the two label columns actually sit on
+     opposite sides of the card — stacked into one column on mobile, it would just read as an
+     oddly right-justified paragraph. Left-align both groups here. */
+  .nb-landing .solusi-words-right { align-items: flex-start; text-align: left; }
+}
 
 .nb-landing .feat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 22px; }
 .nb-landing .feat-card {
@@ -218,10 +838,20 @@
   border-radius: 18px; padding: 28px; transition: border-color .2s, transform .2s;
 }
 .nb-landing .feat-card:hover { border-color: var(--purple-dim); transform: translateY(-4px); }
+/* Emoji replaced with a zero-padded index number + reticle-style corner brackets (::before/::after)
+   — reads as a HUD/viewfinder marker rather than a decorative pictogram, matching the "elegant,
+   high-tech" direction already applied to the SOLUSI cards' "01 / 08" readout. */
 .nb-landing .feat-icon {
   width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.3); font-size: 22px; margin-bottom: 18px;
+  background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.3); margin-bottom: 18px;
+  position: relative; font-family: var(--nb-font-display, "Space Grotesk", sans-serif);
+  font-weight: 700; font-size: 15px; letter-spacing: 0.03em; color: var(--cyan); font-variant-numeric: tabular-nums;
 }
+.nb-landing .feat-icon::before, .nb-landing .feat-icon::after {
+  content: ""; position: absolute; width: 9px; height: 9px; border: 1.5px solid rgba(56,189,248,.6);
+}
+.nb-landing .feat-icon::before { top: -1px; left: -1px; border-right: none; border-bottom: none; border-top-left-radius: 4px; }
+.nb-landing .feat-icon::after { bottom: -1px; right: -1px; border-left: none; border-top: none; border-bottom-right-radius: 4px; }
 .nb-landing .feat-card h3 { font-size: 17.5px; margin-bottom: 10px; }
 .nb-landing .feat-card p { color: var(--text-dim); font-size: 14.5px; }
 
@@ -263,14 +893,124 @@
 .nb-landing .addon-card .a-price { color: var(--cyan); font-weight: 700; font-size: 15px; margin-bottom: 6px; }
 .nb-landing .addon-card p { color: var(--text-faint); font-size: 13px; }
 
-.nb-landing .faq-list { max-width: 760px; margin: 0 auto; }
-.nb-landing .faq-item { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; margin-bottom: 12px; overflow: hidden; }
-.nb-landing .faq-q { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; cursor: pointer; font-weight: 600; font-size: 15.5px; }
-.nb-landing .faq-q .plus { color: var(--purple); font-size: 20px; transition: transform .2s; flex-shrink: 0; margin-left: 14px; }
-.nb-landing .faq-item.open .plus { transform: rotate(45deg); }
+/* HARGA premium redesign — bundle layout: subscription card + "+" connector + hardware card,
+   sitting on a soft radial glow. Replaces the old plain-card + 3-item addon-grid look with
+   something closer to a premium product page (gradient-border card, gradient price text,
+   circular check chips, payment-methods trust row under the CTA). */
+.nb-landing .harga-glow {
+  position: absolute; top: 6%; left: 50%; transform: translateX(-50%);
+  width: 900px; height: 900px; max-width: 160vw;
+  background: radial-gradient(circle, rgba(59,130,246,.16), rgba(168,85,247,.08) 45%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+.nb-landing #harga .wrap { position: relative; z-index: 1; }
+
+.nb-landing .harga-bundle { display: flex; align-items: center; justify-content: center; gap: 28px; max-width: 940px; margin: 0 auto; flex-wrap: wrap; }
+
+.nb-landing .price-card-premium {
+  position: relative; border: 1px solid rgba(56,189,248,.25);
+  background: linear-gradient(180deg, rgba(59,130,246,.1), rgba(13,21,38,.94));
+  box-shadow: 0 0 80px -24px rgba(59,130,246,.5), inset 0 1px 0 rgba(255,255,255,.04);
+  padding: 44px 38px 30px; border-radius: 28px;
+}
+.nb-landing .price-card-premium .price-now .amount {
+  background: linear-gradient(135deg, #fff, var(--cyan) 75%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 52px;
+}
+.nb-landing .price-card-premium .price-feats li { border-bottom: 1px dashed rgba(255,255,255,.09); }
+.nb-landing .price-card-premium .check {
+  display: inline-flex; align-items: center; justify-content: center; margin-top: 1px;
+  width: 18px; height: 18px; border-radius: 50%; background: rgba(52,211,153,.16);
+  font-size: 11px; flex-shrink: 0;
+}
+
+.nb-landing .price-pay-trust { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--card-border); text-align: center; }
+.nb-landing .price-pay-label { display: block; font-size: 11.5px; color: var(--text-faint); margin-bottom: 10px; letter-spacing: .01em; }
+.nb-landing .price-pay-badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.nb-landing .pay-badge {
+  font-size: 11px; font-weight: 600; color: var(--text-dim); white-space: nowrap;
+  border: 1px solid var(--card-border); border-radius: 999px; padding: 5px 11px;
+  background: rgba(255,255,255,.03);
+}
+
+.nb-landing .harga-connector { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.nb-landing .harga-connector-plus {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--card-border);
+  display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700;
+  color: var(--text-dim); background: var(--card); flex-shrink: 0;
+}
+.nb-landing .harga-connector-line { width: 1px; height: 34px; background: linear-gradient(180deg, transparent, var(--card-border), transparent); }
+
+.nb-landing .addon-card-premium {
+  max-width: 280px; width: 100%; position: relative; text-align: center;
+  background: linear-gradient(180deg, rgba(6,182,212,.09), var(--card));
+  border: 1px solid var(--card-border); border-radius: 22px; padding: 34px 22px 26px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.nb-landing .addon-photo {
+  width: 128px; height: 128px; border-radius: 18px; margin-bottom: 14px;
+  background: radial-gradient(circle, rgba(56,189,248,.16), transparent 70%);
+  display: flex; align-items: center; justify-content: center; padding: 10px;
+}
+.nb-landing .addon-photo img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 10px 20px rgba(0,0,0,.4)); }
+.nb-landing .addon-compat { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--card-border); text-align: left; width: 100%; }
+.nb-landing .addon-compat-row { display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.5; color: var(--text-faint); padding: 6px 0; }
+.nb-landing .addon-compat-row strong { color: var(--text-dim); font-weight: 700; }
+.nb-landing .addon-compat-icon { flex-shrink: 0; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; margin-top: 1px; }
+.nb-landing .addon-compat-need .addon-compat-icon { background: rgba(52,211,153,.16); color: var(--green); }
+.nb-landing .addon-compat-skip .addon-compat-icon { background: rgba(86,100,133,.2); color: var(--text-faint); }
+
+.nb-landing .addon-alt {
+  margin-top: 14px; padding: 11px 13px; border-radius: 12px; width: 100%; text-align: left;
+  background: rgba(56,189,248,.06); border: 1px dashed rgba(56,189,248,.3);
+  display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; line-height: 1.55; color: var(--text-faint);
+}
+.nb-landing .addon-alt strong { color: var(--cyan); font-weight: 700; }
+.nb-landing .addon-alt-icon { flex-shrink: 0; font-size: 13px; margin-top: 1px; }
+.nb-landing .addon-card-tag {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  background: var(--card); border: 1px solid var(--card-border); border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  padding: 4px 12px; color: var(--text-faint);
+}
+.nb-landing .addon-card-premium h4 { font-size: 15px; margin: 4px 0 10px; }
+.nb-landing .addon-card-premium .a-price { font-size: 21px; color: var(--cyan); font-weight: 700; margin-bottom: 8px; }
+.nb-landing .addon-card-premium .a-price span { display: block; font-size: 11.5px; color: var(--text-faint); font-weight: 500; margin-top: 2px; }
+.nb-landing .addon-card-premium p { color: var(--text-faint); font-size: 12.5px; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .nb-landing .harga-bundle { flex-direction: column; }
+  .nb-landing .harga-connector { flex-direction: row; width: 100%; justify-content: center; }
+  .nb-landing .harga-connector-line { width: 34px; height: 1px; background: linear-gradient(90deg, transparent, var(--card-border), transparent); }
+  .nb-landing .addon-card-premium { max-width: 300px; }
+}
+
+/* FAQ header — brikken.co uses a big, left-aligned headline (not the generic centered
+   "section-head" pattern used elsewhere on the page) with a shorter sub-paragraph directly
+   beneath it, both left-aligned, followed by a full-width top divider that the accordion list
+   sits against. */
+.nb-landing .faq-head { max-width: 720px; margin: 0 0 48px; text-align: left; }
+.nb-landing .faq-headline {
+  font-family: var(--nb-font-poster, var(--nb-font-display, "Space Grotesk", sans-serif));
+  font-weight: 400; font-size: 46px; line-height: 1.12; letter-spacing: 0.005em; margin-bottom: 18px;
+}
+.nb-landing .faq-subhead { color: var(--text-dim); font-size: 17px; line-height: 1.55; max-width: 560px; }
+
+/* FAQ list — no card backgrounds/rounded borders per item like the old version; instead a plain
+   divider-line accordion (top border on the list, bottom border on every item) closer to
+   brikken.co's own FAQ list. Question text is noticeably bigger (20px vs the old 15.5px) to
+   match the size the user pointed at in the reference screenshot. */
+.nb-landing .faq-list { max-width: 900px; margin: 0 auto; border-top: 1px solid var(--card-border); }
+.nb-landing .faq-item { border-bottom: 1px solid var(--card-border); }
+.nb-landing .faq-q {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 28px 4px; cursor: pointer; font-weight: 600; font-size: 20px; line-height: 1.3;
+}
+.nb-landing .faq-toggle { color: var(--cyan); font-size: 24px; line-height: 1; flex-shrink: 0; width: 20px; text-align: center; }
 .nb-landing .faq-a { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
 .nb-landing .faq-item.open .faq-a { max-height: 320px; }
-.nb-landing .faq-a p { padding: 0 24px 20px; color: var(--text-dim); font-size: 14.5px; }
+.nb-landing .faq-a p { padding: 0 4px 28px; color: var(--text-dim); font-size: 16px; line-height: 1.6; max-width: 700px; }
 
 .nb-landing .final-cta {
   text-align: center; background: linear-gradient(135deg, rgba(59,130,246,.15), rgba(56,189,248,.1));
@@ -283,18 +1023,211 @@
 .nb-landing footer .wrap { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .nb-landing footer .foot-links { display: flex; gap: 24px; }
 .nb-landing footer .foot-links a { color: var(--text-dim); font-size: 13.5px; }
+.nb-landing footer .foot-links a:hover { color: var(--text); }
 .nb-landing footer .copyright { color: var(--text-faint); font-size: 13px; }
 
 @media (max-width: 900px) {
-  .nb-landing .nav-links { display: none; }
-  .nb-landing .nav-links.open { display: flex; }
-  .nb-landing .nav-toggle { display: block; }
-  .nb-landing .hero h1 { font-size: 36px; }
-  .nb-landing .hero p.sub { font-size: 16px; }
-  .nb-landing .hero-mock-grid { grid-template-columns: repeat(2,1fr); }
-  .nb-landing .pain-grid, .nb-landing .feat-grid, .nb-landing .steps { grid-template-columns: 1fr; }
+  .nb-landing .hero-corner-copy { max-width: 68vw; left: 20px; bottom: 20px; }
+  .nb-landing .hero-corner-copy .eyebrow { font-size: 10px; padding: 5px 10px; margin-bottom: 10px; }
+  .nb-landing .hero-corner-copy p { font-size: 13.5px; margin-bottom: 12px; }
+  .nb-landing .hero-corner-btn { padding: 9px 18px; font-size: 12px; }
+  .nb-landing .hero-grow-video-frame { width: 130px; height: 73px; right: 20px; bottom: 20px; }
+  .nb-landing .intro-headline { font-size: 34px; }
+  .nb-landing .intro-section p.sub { font-size: 16px; }
+  .nb-landing .feat-grid, .nb-landing .steps { grid-template-columns: 1fr; }
   .nb-landing .addon-grid { grid-template-columns: 1fr; }
   .nb-landing section { padding: 60px 0; }
   .nb-landing .section-head h2 { font-size: 28px; }
+  .nb-landing .faq-headline { font-size: 30px; }
+  .nb-landing .faq-subhead { font-size: 15px; }
+  .nb-landing .faq-q { font-size: 17px; padding: 22px 4px; }
   .nb-landing footer .wrap { flex-direction: column; text-align: center; }
+  /* .foot-links had no flex-wrap at all — fine on desktop's wide row, but on a narrow phone all
+     7 links (Solusi/Fitur/Harga/FAQ/About/Login/Daftar) in one nowrap row run wider than the
+     viewport and get clipped. Safe to add at this shared phone+tablet breakpoint: it only takes
+     effect if the row genuinely doesn't fit. */
+  .nb-landing footer .foot-links { flex-wrap: wrap; justify-content: center; }
+}
+
+/* ============================================================
+   ABOUT PAGE (src/app/about/page.tsx) — standalone one-pager.
+   Full-screen tinted video hero + giant looping "ABOUT" marquee band + a calmer stats/values
+   content block, all still inside .nb-landing so it inherits the same fonts/color variables as
+   the homepage. Section-specific rules only; shared bits (.kicker, .stat-item, .btn, footer,
+   nav-*) already exist above and are reused as-is.
+   ============================================================ */
+/* padding-top reserves room for <SiteNavbar>, which is position:fixed and floats over the top of
+   every page regardless of scroll (see .nb-landing nav above). .about-hero-content used to have no
+   top clearance at all — align-items:flex-end bottom-anchors it, which reads fine on a normal-tall
+   viewport where the content block is much shorter than 100vh, but on any shorter viewport (a
+   landscape phone, a short browser window, mobile Safari's address-bar-shrunk 100vh) the content
+   block's own height can exceed the space below the nav, pushing its TOP edge — the <Breadcrumb>,
+   being the first child — up past y=0 and directly underneath/overlapping the fixed nav pill
+   ("Beranda / Tentang" reading as jammed into the nav, not premium/precise). Padding on the flex
+   CONTAINER itself (not the content) means flex-end alignment happens inside the padded box, so
+   the topmost point content can ever reach is this padding boundary — never above it, regardless
+   of how tall the content or how short the viewport gets. Matches the homepage's own .intro-inner
+   (padding-top: 110px) for the identical reason. */
+.nb-landing .about-hero {
+  position: relative; min-height: 100vh; display: flex; align-items: flex-end;
+  overflow: hidden; padding-top: 110px; padding-bottom: 90px;
+}
+/* <Breadcrumb>'s own default styling (src/components/seo/Breadcrumb.tsx) is deliberately plain —
+   it's shared across blog posts, policy pages, etc. where it sits in an ordinary content flow, not
+   over a video hero. Scoped here (not in Breadcrumb.tsx itself, so other pages are unaffected) to
+   read as an intentional, legible part of this specific hero: real spacing below it before the
+   kicker/title (it had none — sat flush against .about-hero-top), and a text-shadow matching
+   every other piece of hero copy on this page (title/lede both already have one) so it stays
+   readable over bright/busy moments of the background video instead of washing out. */
+.nb-landing .about-hero-content nav[aria-label="Breadcrumb"] { margin-bottom: 26px; }
+.nb-landing .about-hero-content nav[aria-label="Breadcrumb"] a,
+.nb-landing .about-hero-content nav[aria-label="Breadcrumb"] span {
+  text-shadow: 0 2px 10px rgba(0,0,0,.75);
+}
+.nb-landing .about-hero-video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;
+}
+/* "transparansi 50% blue black" — a solid blue-black wash at 50% opacity over the video, plus a
+   touch of extra darkening toward the bottom so the hero text stays legible over busy footage. */
+.nb-landing .about-hero-overlay {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(180deg, rgba(5, 8, 16, 0.5) 0%, rgba(5, 8, 16, 0.5) 60%, rgba(4, 7, 15, 0.82) 100%);
+}
+.nb-landing .about-hero-content { position: relative; z-index: 2; max-width: 880px; }
+.nb-landing .about-hero-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+.nb-landing .about-hero-top .kicker { margin-bottom: 0; }
+.nb-landing .about-hero-index { color: var(--text-faint); font-size: 12.5px; letter-spacing: .08em; }
+.nb-landing .about-hero-title {
+  font-family: var(--nb-font-display, "Space Grotesk", sans-serif); font-weight: 700;
+  font-size: clamp(32px, 5vw, 58px); line-height: 1.12; letter-spacing: -0.01em;
+  margin-bottom: 26px; text-shadow: 0 12px 40px rgba(0,0,0,.6);
+}
+.nb-landing .about-hero-lede { max-width: 640px; font-size: 17px; line-height: 1.65; color: var(--text-dim); text-shadow: 0 4px 16px rgba(0,0,0,.7); }
+
+/* Marquee — content duplicated in the JSX (two .about-marquee-group blocks back to back) so the
+   50%-translate loop point lands exactly on a seam, invisible to the eye. */
+.nb-landing .about-marquee {
+  position: relative; overflow: hidden; padding: 26px 0;
+  background: linear-gradient(90deg, var(--bg), var(--bg-alt) 50%, var(--bg));
+  border-top: 1px solid var(--card-border); border-bottom: 1px solid var(--card-border);
+}
+.nb-landing .about-marquee-track { display: flex; width: max-content; animation: nb-about-marquee 22s linear infinite; }
+.nb-landing .about-marquee-group { display: flex; align-items: center; flex-shrink: 0; }
+.nb-landing .about-marquee-item {
+  display: inline-flex; align-items: center; gap: 18px; flex-shrink: 0;
+  font-family: var(--nb-font-poster, var(--nb-font-display, "Space Grotesk", sans-serif));
+  font-weight: 400; font-size: clamp(48px, 8vw, 96px); line-height: 1; letter-spacing: .01em;
+  color: var(--text); padding: 0 18px;
+  -webkit-text-stroke: 1px rgba(255,255,255,.25);
+}
+.nb-landing .about-marquee-item:nth-child(3n+2) { color: transparent; }
+.nb-landing .about-marquee-dot { color: var(--cyan); font-weight: 700; -webkit-text-stroke: 0; }
+@keyframes nb-about-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.nb-landing .about-content { padding-top: 90px; }
+.nb-landing .about-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 90px; }
+
+.nb-landing .about-values { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; margin-bottom: 100px; }
+.nb-landing .about-value-card {
+  background: linear-gradient(180deg, rgba(59,130,246,.06), var(--card));
+  border: 1px solid var(--card-border); border-radius: 20px; padding: 32px 28px;
+}
+.nb-landing .about-value-num {
+  font-family: var(--nb-font-display, "Space Grotesk", sans-serif); font-weight: 700;
+  font-size: 14px; color: var(--cyan); margin-bottom: 18px; letter-spacing: .05em;
+}
+.nb-landing .about-value-card h3 { font-size: 19px; margin-bottom: 10px; }
+.nb-landing .about-value-card p { color: var(--text-dim); font-size: 14.5px; line-height: 1.6; }
+
+.nb-landing .about-cta {
+  text-align: center; max-width: 640px; margin: 0 auto 100px; padding: 64px 20px;
+  border-top: 1px solid var(--card-border);
+}
+.nb-landing .about-cta h2 { font-size: 32px; margin-bottom: 28px; }
+
+@media (max-width: 900px) {
+  .nb-landing .about-hero { padding-top: 90px; padding-bottom: 60px; }
+  .nb-landing .about-hero-break { display: none; }
+  .nb-landing .about-hero-top { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .nb-landing .about-stats { grid-template-columns: repeat(2,1fr); margin-bottom: 60px; }
+  .nb-landing .about-values { grid-template-columns: 1fr; margin-bottom: 60px; }
+  .nb-landing .about-content { padding-top: 60px; }
+  .nb-landing .about-cta { padding: 48px 20px; margin-bottom: 60px; }
+  .nb-landing .about-cta h2 { font-size: 24px; }
+}
+
+/* ============================================================
+   RESPONSIVE AUDIT PASS — every @media block above this point tops out at a single 900px
+   breakpoint that treats "tablet" and "phone" as one and the same. That's safe (nothing actually
+   overflows) but under-serves real tablets — collapsing a 9-item feature grid to one column on a
+   768px iPad portrait, for instance, turns a 3x3 grid into nine full-width rows for no reason —
+   and a couple of desktop-tuned sizes (the giant "N E X B I L L" wordmark with literal space
+   characters between letters, the 52px price amount, the corner-copy/grow-video pair sharing the
+   hero's bottom edge) were never re-checked against a genuinely narrow ~320-375px phone, where
+   they run wider than the sizing budget the 900px rule assumed and either wrap somewhere ugly or
+   run past their container's edge. Both bands below are placed at the very end of the file
+   (rather than beside each rule they touch, matching this file's usual pattern) specifically so
+   they win the cascade: everything they override lives earlier in the file, and equal-specificity
+   selectors resolve by source order, so a later rule always wins for the width range where both
+   match. */
+
+/* TABLET (641px–900px) — restores a couple of multi-column grids that the shared 900px rule above
+   collapses to one column; a real tablet has the width to spare and a single-column 9-item
+   feature list or a 4-stat strip stacked 1-per-row reads as broken/unfinished on that hardware,
+   even though nothing technically overflows. Phones (<=640px) are excluded on purpose — those
+   still get the single-column treatment from the 900px rule, which is the right call there. */
+@media (min-width: 641px) and (max-width: 900px) {
+  .nb-landing .feat-grid { grid-template-columns: repeat(2, 1fr); }
+  .nb-landing .stat-strip { grid-template-columns: repeat(4, 1fr); }
+  .nb-landing .about-stats { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* PHONE (<=480px) — narrower fixes on top of the shared 900px rules: sizes that hold up fine down
+   to tablet width but specifically break on the narrowest phones. */
+@media (max-width: 480px) {
+  /* "N E X B I L L" is authored with real space characters between letters for the wide poster
+     look — fine at desktop sizes, but the hero-wordmark clamp()'s 56px floor plus 6 literal spaces
+     can add up to wider than a 320-375px viewport, wrapping the wordmark onto two lines instead
+     of the intended one. Smaller font + negative word-spacing (only affects the space characters,
+     not the letters themselves) keeps it on one line. */
+  .nb-landing .hero-wordmark { font-size: 38px; word-spacing: -0.14em; }
+
+  /* Corner copy (bottom-left) and the small grow-video preview (bottom-right) share the hero's
+     bottom edge — sized at the 900px breakpoint for phone-and-up widths generally (68vw + 130px),
+     which leaves the two overlapping once the viewport itself drops under ~400px. Shrinking both
+     and tightening their edge margins restores a real gap between them at the narrowest widths
+     this site needs to support. */
+  .nb-landing .hero-corner-copy { max-width: 50vw; left: 14px; bottom: 14px; }
+  .nb-landing .hero-corner-copy .eyebrow { font-size: 9px; padding: 4px 9px; margin-bottom: 8px; }
+  .nb-landing .hero-corner-copy p { font-size: 11.5px; margin-bottom: 10px; }
+  .nb-landing .hero-corner-btn { padding: 8px 13px; font-size: 10.5px; }
+  .nb-landing .hero-grow-video-frame { width: 88px; height: 50px; right: 14px; bottom: 14px; }
+
+  .nb-landing .intro-headline { font-size: 27px; }
+
+  /* The top two floating badges over the section-2 photo sit at opposite corners with an 18px
+     inset each — comfortable at tablet-and-up widths, tight enough at 320-375px that the two could
+     touch. Smaller inset + tighter padding + smaller type buys back the margin they need without
+     changing the layout itself (still top-left/top-right/bottom-left, just more compact). */
+  .nb-landing .intro-float-badge { padding: 7px 10px; }
+  .nb-landing .intro-float-badge-1 { top: 10px; left: 10px; gap: 6px; }
+  .nb-landing .intro-float-badge-2 { top: 10px; right: 10px; }
+  .nb-landing .intro-float-badge-3 { left: 10px; bottom: 10px; }
+  .nb-landing .intro-float-badge-value { font-size: 13px; }
+  .nb-landing .intro-float-badge-value-cyan { font-size: 14.5px; }
+  .nb-landing .intro-float-badge-label { font-size: 9px; }
+
+  /* "Rp249.000" at the desktop 52px display size runs wider than a phone-width price card's inner
+     content box (the card's own padding is tuned for desktop, see .price-card-premium above),
+     overflowing past the card's rounded edge instead of staying inside it. */
+  .nb-landing .price-card-premium { padding: 30px 20px 22px; }
+  .nb-landing .price-card-premium .price-now .amount { font-size: 34px; }
+  .nb-landing .price-old { font-size: 16px; }
+
+  /* NOTE: .solusi-word used to get an explicit override here (its old 46px clamp() floor risked
+     wrapping on narrow phones). That floor is now clamp(19px,...,31px) at the shared rule above —
+     small enough on every screen size, phones included, that this override is no longer needed. */
+
+  .nb-landing .about-hero-title { font-size: 26px; }
+  .nb-landing .about-marquee-item { padding: 0 12px; }
 }

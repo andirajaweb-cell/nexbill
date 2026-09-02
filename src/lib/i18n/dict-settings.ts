@@ -90,16 +90,6 @@ registerDict({
   },
   "settings.businessTax.salesTargetPlaceholder": { id: "Kosongkan jika belum ada target", en: "Leave blank if there's no target yet", ms: "Biarkan kosong jika belum ada sasaran", th: "เว้นว่างไว้หากยังไม่มีเป้าหมาย", fil: "Iwanang blangko kung wala pang target", vi: "Để trống nếu chưa có mục tiêu" },
   "settings.businessTax.bookingHeading": { id: "Booking / Reservasi", en: "Booking / Reservation", ms: "Tempahan / Reservasi", th: "การจอง/การสำรองที่นั่ง", fil: "Booking / Reservasyon", vi: "Đặt chỗ / Đặt trước" },
-  "settings.businessTax.schedulerPrefix": { id: "Jalankan ", en: "Run ", ms: "Jalankan ", th: "รัน ", fil: "Patakbuhin ang ", vi: "Chạy " },
-  "settings.businessTax.schedulerMiddle": { id: " (dan ", en: " (and ", ms: " (dan ", th: " (และ ", fil: " (at ", vi: " (và " },
-  "settings.businessTax.schedulerSuffix": {
-    id: " untuk pengiriman reminder) di komputer server supaya auto-release, waiting list, dan reminder booking berjalan otomatis.",
-    en: " for sending reminders) on the server computer so auto-release, waiting list, and booking reminders run automatically.",
-    ms: " untuk penghantaran peringatan) di komputer pelayan supaya lepas automatik, senarai menunggu, dan peringatan tempahan berjalan secara automatik.",
-    th: " เพื่อส่งการแจ้งเตือน) บนเครื่องเซิร์ฟเวอร์ เพื่อให้การปล่อยอัตโนมัติ รายการรอ และการแจ้งเตือนการจองทำงานโดยอัตโนมัติ",
-    fil: " para sa pagpapadala ng reminder) sa server computer para gumana nang awtomatiko ang auto-release, waiting list, at booking reminder.",
-    vi: " để gửi lời nhắc) trên máy chủ để tự động hủy, danh sách chờ và nhắc nhở đặt chỗ hoạt động tự động.",
-  },
   "settings.businessTax.acceptOnlineBooking": {
     id: "Terima Booking Online (halaman publik outlet ini di bawah)",
     en: "Accept Online Bookings (this outlet's public page below)",
@@ -138,7 +128,14 @@ registerDict({
   "settings.field.province": { id: "Provinsi", en: "Province", ms: "Negeri", th: "จังหวัด", fil: "Probinsya", vi: "Tỉnh/Thành phố" },
   "settings.field.city": { id: "Kota", en: "City", ms: "Bandar", th: "เมือง", fil: "Lungsod", vi: "Thành phố" },
   "settings.field.postalCode": { id: "Kode Pos", en: "Postal Code", ms: "Poskod", th: "รหัสไปรษณีย์", fil: "Postal Code", vi: "Mã bưu điện" },
-  "settings.field.outletCountryDesc": { id: "Negara dipakai NEXBILL untuk menentukan mata uang tampilan Billing dan bahasa terjemahan otomatis balasan Support — tidak perlu diatur terpisah.", en: "Country is used by NEXBILL to determine the Billing page's display currency and the auto-translate language for Support replies — no need to set these separately.", ms: "Negara digunakan NEXBILL untuk menentukan mata wang paparan Billing dan bahasa terjemahan automatik balasan Support — tidak perlu ditetapkan berasingan.", th: "NEXBILL ใช้ประเทศเพื่อกำหนดสกุลเงินที่แสดงในหน้า Billing และภาษาที่แปลอัตโนมัติสำหรับการตอบกลับของ Support — ไม่ต้องตั้งค่าแยกต่างหาก", fil: "Ginagamit ng NEXBILL ang bansa para tukuyin ang currency na ipapakita sa Billing page at ang wika para sa awtomatikong pagsasalin ng mga sagot ng Support — hindi na kailangang itakda nang hiwalay.", vi: "NEXBILL dùng quốc gia để xác định loại tiền tệ hiển thị trên trang Billing và ngôn ngữ tự động dịch cho các phản hồi Hỗ trợ — không cần thiết lập riêng." },
+  "settings.field.outletCountryDesc": {
+    id: "Negara dipakai NEXBILL untuk menentukan simbol mata uang yang tampil di seluruh dashboard outlet ini (POS, Rental, Laporan, Akuntansi, dst.), mata uang tampilan Billing, dan bahasa terjemahan otomatis balasan Support — tidak perlu diatur terpisah.",
+    en: "Country is used by NEXBILL to determine the currency symbol shown across this outlet's whole dashboard (POS, Rental, Reports, Accounting, etc.), the Billing page's display currency, and the auto-translate language for Support replies — no need to set these separately.",
+    ms: "Negara digunakan NEXBILL untuk menentukan simbol mata wang yang dipaparkan di seluruh dashboard outlet ini (POS, Sewa, Laporan, Perakaunan, dll.), mata wang paparan Billing, dan bahasa terjemahan automatik balasan Support — tidak perlu ditetapkan berasingan.",
+    th: "NEXBILL ใช้ประเทศเพื่อกำหนดสัญลักษณ์สกุลเงินที่แสดงทั่วทั้งแดชบอร์ดของสาขานี้ (POS, การเช่า, รายงาน, บัญชี ฯลฯ) สกุลเงินที่แสดงในหน้า Billing และภาษาที่แปลอัตโนมัติสำหรับการตอบกลับของ Support — ไม่ต้องตั้งค่าแยกต่างหาก",
+    fil: "Ginagamit ng NEXBILL ang bansa para tukuyin ang simbolo ng currency na ipapakita sa buong dashboard ng outlet na ito (POS, Rental, Report, Accounting, atbp.), ang currency na ipapakita sa Billing page, at ang wika para sa awtomatikong pagsasalin ng mga sagot ng Support — hindi na kailangang itakda nang hiwalay.",
+    vi: "NEXBILL dùng quốc gia để xác định ký hiệu tiền tệ hiển thị trên toàn bộ dashboard của chi nhánh này (POS, Cho thuê, Báo cáo, Kế toán, v.v.), loại tiền tệ hiển thị trên trang Billing, và ngôn ngữ tự động dịch cho các phản hồi Hỗ trợ — không cần thiết lập riêng.",
+  },
   "settings.field.taxPercent": { id: "Pajak (%)", en: "Tax (%)", ms: "Cukai (%)", th: "ภาษี (%)", fil: "Buwis (%)", vi: "Thuế (%)" },
   "settings.field.serviceChargePercent": { id: "Service Charge (%)", en: "Service Charge (%)", ms: "Caj Perkhidmatan (%)", th: "ค่าบริการ (%)", fil: "Service Charge (%)", vi: "Phí dịch vụ (%)" },
   "settings.field.billingRoundingMinutes": { id: "Pembulatan Billing (menit)", en: "Billing Rounding (minutes)", ms: "Pembundaran Bil (minit)", th: "การปัดเศษบิล (นาที)", fil: "Billing Rounding (minuto)", vi: "Làm tròn tính phí (phút)" },
@@ -336,4 +333,66 @@ registerDict({
   "settings.audit.table.action": { id: "Aksi", en: "Action", ms: "Tindakan", th: "การกระทำ", fil: "Aksyon", vi: "Hành động" },
   "settings.audit.table.entity": { id: "Entitas", en: "Entity", ms: "Entiti", th: "เอนทิตี", fil: "Entity", vi: "Thực thể" },
   "settings.audit.emptyState": { id: "Belum ada aktivitas tercatat.", en: "No activity recorded yet.", ms: "Belum ada aktiviti direkodkan.", th: "ยังไม่มีการบันทึกกิจกรรม", fil: "Wala pang naitalang aktibidad.", vi: "Chưa có hoạt động nào được ghi lại." },
+
+  // --- Tabs (cont.) ---
+  "settings.tab.myAccount": { id: "Akun Saya", en: "My Account", ms: "Akaun Saya", th: "บัญชีของฉัน", fil: "Aking Account", vi: "Tài khoản của tôi" },
+
+  // --- MyAccountTab: shared ---
+  "settings.myAccount.failed": { id: "Gagal menyimpan.", en: "Failed to save.", ms: "Gagal menyimpan.", th: "บันทึกไม่สำเร็จ", fil: "Hindi na-save.", vi: "Lưu thất bại." },
+  "settings.myAccount.currentPassword": { id: "Password Saat Ini", en: "Current Password", ms: "Kata Laluan Semasa", th: "รหัสผ่านปัจจุบัน", fil: "Kasalukuyang Password", vi: "Mật khẩu hiện tại" },
+
+  // --- MyAccountTab: ProfileNameCard ---
+  "settings.myAccount.profileHeading": { id: "Profil", en: "Profile", ms: "Profil", th: "โปรไฟล์", fil: "Profile", vi: "Hồ sơ" },
+  "settings.myAccount.nameLabel": { id: "Nama", en: "Name", ms: "Nama", th: "ชื่อ", fil: "Pangalan", vi: "Tên" },
+  "settings.myAccount.nameRequired": { id: "Nama wajib diisi.", en: "Name is required.", ms: "Nama wajib diisi.", th: "กรุณากรอกชื่อ", fil: "Kailangan ang pangalan.", vi: "Vui lòng nhập tên." },
+
+  // --- MyAccountTab: ChangeEmailCard ---
+  "settings.myAccount.emailHeading": { id: "Ganti Email", en: "Change Email", ms: "Tukar E-mel", th: "เปลี่ยนอีเมล", fil: "Palitan ang Email", vi: "Đổi email" },
+  "settings.myAccount.emailDesc": {
+    id: "Email dipakai untuk login — email saat ini: ",
+    en: "Email is used to log in — current email: ",
+    ms: "E-mel digunakan untuk log masuk — e-mel semasa: ",
+    th: "อีเมลใช้สำหรับเข้าสู่ระบบ — อีเมลปัจจุบัน: ",
+    fil: "Ginagamit ang email para mag-login — kasalukuyang email: ",
+    vi: "Email dùng để đăng nhập — email hiện tại: ",
+  },
+  "settings.myAccount.newEmail": { id: "Email Baru", en: "New Email", ms: "E-mel Baharu", th: "อีเมลใหม่", fil: "Bagong Email", vi: "Email mới" },
+  "settings.myAccount.emailButton": { id: "Simpan Email Baru", en: "Save New Email", ms: "Simpan E-mel Baharu", th: "บันทึกอีเมลใหม่", fil: "I-save ang Bagong Email", vi: "Lưu email mới" },
+  "settings.myAccount.emailSavedAlert": {
+    id: "Email berhasil diubah — pakai email baru untuk login berikutnya.",
+    en: "Email changed successfully — use the new email for your next login.",
+    ms: "E-mel berjaya ditukar — gunakan e-mel baharu untuk log masuk seterusnya.",
+    th: "เปลี่ยนอีเมลสำเร็จ — ใช้อีเมลใหม่สำหรับการเข้าสู่ระบบครั้งถัดไป",
+    fil: "Matagumpay na napalitan ang email — gamitin ang bagong email sa susunod na pag-login.",
+    vi: "Đổi email thành công — hãy dùng email mới cho lần đăng nhập tiếp theo.",
+  },
+
+  // --- MyAccountTab: password ---
+  "settings.myAccount.tooShort": { id: "Password baru minimal 8 karakter.", en: "New password must be at least 8 characters.", ms: "Kata laluan baharu mestilah sekurang-kurangnya 8 aksara.", th: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร", fil: "Ang bagong password ay dapat 8 karakter pataas.", vi: "Mật khẩu mới phải có ít nhất 8 ký tự." },
+  "settings.myAccount.mismatch": { id: "Konfirmasi password tidak cocok.", en: "Password confirmation doesn't match.", ms: "Pengesahan kata laluan tidak sepadan.", th: "การยืนยันรหัสผ่านไม่ตรงกัน", fil: "Hindi tugma ang kumpirmasyon ng password.", vi: "Xác nhận mật khẩu không khớp." },
+  "settings.myAccount.savedAlert": { id: "Password berhasil diubah.", en: "Password changed successfully.", ms: "Kata laluan berjaya ditukar.", th: "เปลี่ยนรหัสผ่านสำเร็จ", fil: "Matagumpay na napalitan ang password.", vi: "Đổi mật khẩu thành công." },
+  "settings.myAccount.changeHeading": { id: "Ganti Password", en: "Change Password", ms: "Tukar Kata Laluan", th: "เปลี่ยนรหัสผ่าน", fil: "Palitan ang Password", vi: "Đổi mật khẩu" },
+  "settings.myAccount.setHeading": { id: "Buat Password", en: "Set Password", ms: "Tetapkan Kata Laluan", th: "ตั้งรหัสผ่าน", fil: "Gumawa ng Password", vi: "Tạo mật khẩu" },
+  "settings.myAccount.changeDesc": {
+    id: "Password kamu dipakai untuk masuk dengan email & password.",
+    en: "Your password is used to log in with email & password.",
+    ms: "Kata laluan anda digunakan untuk log masuk dengan e-mel & kata laluan.",
+    th: "รหัสผ่านของคุณใช้สำหรับเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน",
+    fil: "Ginagamit ang password mo para mag-login gamit ang email at password.",
+    vi: "Mật khẩu của bạn dùng để đăng nhập bằng email & mật khẩu.",
+  },
+  "settings.myAccount.setDesc": {
+    id: "Akun ini terdaftar via Google dan belum punya password. Buat satu supaya kamu juga bisa masuk pakai email & password.",
+    en: "This account registered via Google and doesn't have a password yet. Set one so you can also log in with email & password.",
+    ms: "Akaun ini didaftarkan melalui Google dan belum mempunyai kata laluan. Tetapkan satu supaya anda juga boleh log masuk menggunakan e-mel & kata laluan.",
+    th: "บัญชีนี้ลงทะเบียนผ่าน Google และยังไม่มีรหัสผ่าน ตั้งรหัสผ่านเพื่อให้คุณสามารถเข้าสู่ระบบด้วยอีเมลและรหัสผ่านได้เช่นกัน",
+    fil: "Nagrehistro ang account na ito gamit ang Google at wala pang password. Gumawa ng isa para makapag-login ka rin gamit ang email at password.",
+    vi: "Tài khoản này đăng ký qua Google và chưa có mật khẩu. Hãy tạo một mật khẩu để bạn cũng có thể đăng nhập bằng email & mật khẩu.",
+  },
+  "settings.myAccount.newPassword": { id: "Password Baru", en: "New Password", ms: "Kata Laluan Baharu", th: "รหัสผ่านใหม่", fil: "Bagong Password", vi: "Mật khẩu mới" },
+  "settings.myAccount.newPasswordFirst": { id: "Password", en: "Password", ms: "Kata Laluan", th: "รหัสผ่าน", fil: "Password", vi: "Mật khẩu" },
+  "settings.myAccount.minChars": { id: "Minimal 8 karakter", en: "At least 8 characters", ms: "Sekurang-kurangnya 8 aksara", th: "อย่างน้อย 8 ตัวอักษร", fil: "Minimum 8 karakter", vi: "Tối thiểu 8 ký tự" },
+  "settings.myAccount.confirmPassword": { id: "Konfirmasi Password", en: "Confirm Password", ms: "Sahkan Kata Laluan", th: "ยืนยันรหัสผ่าน", fil: "Kumpirmahin ang Password", vi: "Xác nhận mật khẩu" },
+  "settings.myAccount.changeButton": { id: "Simpan Password Baru", en: "Save New Password", ms: "Simpan Kata Laluan Baharu", th: "บันทึกรหัสผ่านใหม่", fil: "I-save ang Bagong Password", vi: "Lưu mật khẩu mới" },
+  "settings.myAccount.setButton": { id: "Buat Password", en: "Set Password", ms: "Tetapkan Kata Laluan", th: "ตั้งรหัสผ่าน", fil: "Gumawa ng Password", vi: "Tạo mật khẩu" },
 });
