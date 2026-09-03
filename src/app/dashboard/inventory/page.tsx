@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
+import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-inventory";
@@ -97,7 +98,11 @@ type AdjustReason = "normal" | "waste";
 function ProductTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { user } = useAuth();
-  const canDelete = isSuperRole(user?.role);
+  // Was isSuperRole (Superuser-only) — deactivating your own outlet's product is a routine
+  // day-to-day inventory task, not something that should require NEXBILL's internal account.
+  // manage_inventory_purchasing is the same permission that already covers everything else on
+  // this page (owner + manager get it by default — see DEFAULT_ROLE_PERMISSIONS in permissions.ts).
+  const canDelete = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_inventory_purchasing");
   const [products, setProducts] = useState<Product[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
@@ -136,7 +141,22 @@ function ProductTab({ outletId }: { outletId: string }) {
 
   const deleteProduct = async (p: Product) => {
     if (!await showConfirm(t('inventory.product.confirmDeactivate', 'Nonaktifkan produk "{name}"? Riwayat order tetap tersimpan.').replace("{name}", p.name))) return;
-    const res = await fetch(`/api/admin/products/${p.id}`, { method: "DELETE" });
+    // Was /api/admin/products/${p.id} — that route never existed, so this button silently 404'd
+    // and never actually deactivated anything. The real route lives at /api/products/[id] (same
+    // one PATCH/edit already uses) — see its DELETE handler for why this is a soft
+    // deactivate (isActive: false) rather than a real row delete.
+    const res = await fetch(`/api/products/${p.id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) return showAlert(data.error);
+    load();
+  };
+
+  const reactivateProduct = async (p: Product) => {
+    const res = await fetch(`/api/products/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: true }),
+    });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
     load();
@@ -231,8 +251,11 @@ function ProductTab({ outletId }: { outletId: string }) {
           <tbody>
             {products.map((p) => (
               <Fragment key={p.id}>
-                <tr className="border-b border-neutral-900 align-top">
-                  <td className="py-2">{p.name}</td>
+                <tr className={`border-b border-neutral-900 align-top ${p.isActive === false ? "opacity-50" : ""}`}>
+                  <td className="py-2">
+                    {p.name}
+                    {p.isActive === false && <span className="text-xs text-rose-400 ml-2">{t("inventory.product.inactiveTag", "(nonaktif)")}</span>}
+                  </td>
                   <td className="capitalize text-neutral-400">{CATEGORY_LABEL_KEYS[p.category] ? t(CATEGORY_LABEL_KEYS[p.category].key, CATEGORY_LABEL_KEYS[p.category].fallback) : p.category.replace("_", " ")}</td>
                   <td>{rupiah(p.price)}</td>
                   <td className="text-neutral-500">{rupiah(p.costPrice)}</td>
@@ -242,9 +265,15 @@ function ProductTab({ outletId }: { outletId: string }) {
                   </td>
                   <td className="text-xs text-neutral-500">{suppliers.find((s) => s.id === p.preferredSupplierId)?.name ?? "-"}</td>
                   <td className="text-right whitespace-nowrap">
-                    <Button variant="secondary" className="text-xs px-2 py-1 mr-1" onClick={() => toggleAdjust(p)}>{t("inventory.product.adjustButton", "Penyesuaian")}</Button>
-                    <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => toggleEdit(p)}>{t("inventory.action.edit", "Edit")}</Button>
-                    {canDelete && <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => deleteProduct(p)}>{t("inventory.product.deleteButton", "Hapus")}</Button>}
+                    {p.isActive === false ? (
+                      canDelete && <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => reactivateProduct(p)}>{t("inventory.product.reactivateButton", "Aktifkan")}</Button>
+                    ) : (
+                      <>
+                        <Button variant="secondary" className="text-xs px-2 py-1 mr-1" onClick={() => toggleAdjust(p)}>{t("inventory.product.adjustButton", "Penyesuaian")}</Button>
+                        <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => toggleEdit(p)}>{t("inventory.action.edit", "Edit")}</Button>
+                        {canDelete && <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => deleteProduct(p)}>{t("inventory.product.deleteButton", "Hapus")}</Button>}
+                      </>
+                    )}
                   </td>
                 </tr>
 
