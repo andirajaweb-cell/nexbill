@@ -150,6 +150,28 @@ interface CustomerRow {
 }
 
 const rupiah = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
+
+// Unit names are free text ("PS 1", "TV Android 2", "Meja 10", ...) with no separate numeric
+// column to sort by — this pulls out the first run of digits so units order 1, 2, ..., 10
+// instead of the lexicographic 1, 10, 2 a plain string sort would produce. Names with no digits
+// at all sort after every numbered one (Infinity), then fall back to alphabetical.
+const extractUnitNumber = (name: string): number => {
+  const match = name.match(/\d+/);
+  return match ? parseInt(match[0], 10) : Number.POSITIVE_INFINITY;
+};
+
+// Currently-playing units surface first so a cashier glancing at the grid sees active sessions
+// immediately instead of hunting for them among idle stations; everything else (including other
+// non-available statuses like booked/maintenance) follows in unit-number order.
+const sortUnitsForDisplay = (list: RentalUnit[]): RentalUnit[] =>
+  [...list].sort((a, b) => {
+    const aPlaying = a.status === "occupied" ? 0 : 1;
+    const bPlaying = b.status === "occupied" ? 0 : 1;
+    if (aPlaying !== bPlaying) return aPlaying - bPlaying;
+    const numDiff = extractUnitNumber(a.name) - extractUnitNumber(b.name);
+    if (numDiff !== 0) return numDiff;
+    return a.name.localeCompare(b.name, "id");
+  });
 // `name` doubles as the value sent to the API and matched against (e.g. accessoryForm.name ===
 // "Lainnya") — never translate it directly. `labelKey`/`fallback` are only for the displayed
 // <option> text via t(), so the underlying stored/matched string stays stable across languages.
@@ -857,7 +879,7 @@ export default function RentalPage() {
     }
   };
 
-  const activeUnits = units.filter((u) => u.isActive !== false);
+  const activeUnits = sortUnitsForDisplay(units.filter((u) => u.isActive !== false));
   const availableUnits = activeUnits.filter((u) => u.status === "available");
   const selectedUnit = activeUnitId ? activeUnits.find((u) => u.id === activeUnitId) : null;
   // Packages from /dashboard/promo that apply to the selected station: active, type
