@@ -298,9 +298,18 @@ export default function PlatformOutletDetailPage() {
             </div>
           )
         ) : (
-          <p className="text-xs text-neutral-500">
-            Nonaktifkan (arsipkan) outlet ini dulu di atas sebelum bisa dihapus permanen — langkah jeda supaya tidak ada outlet aktif terhapus tidak sengaja.
-          </p>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <p className="text-xs text-neutral-500 max-w-md">
+              Outlet ini masih aktif — arsipkan dulu sebelum bisa dihapus permanen (langkah jeda supaya tidak ada outlet aktif terhapus tidak sengaja).
+            </p>
+            {/* Shortcut ke toggleActive yang sama dengan tombol "Nonaktifkan" di header, supaya
+                tidak perlu scroll ke atas — sebelumnya kartu ini cuma teks tanpa aksi apa pun,
+                yang bikin orang mengira tombol "Hapus Permanen" macet padahal memang belum
+                dirender (lihat komentar di atas untuk alasan gate-nya). */}
+            <Button variant="secondary" onClick={toggleActive} disabled={busy}>
+              Nonaktifkan Sekarang
+            </Button>
+          </div>
         )}
       </Card>
     </div>
