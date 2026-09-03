@@ -90,18 +90,21 @@ export async function postJournal(input: PostJournalInput): Promise<string> {
     })
     .returning();
 
-  let order = 0;
-  for (const line of resolvedLines) {
-    if (line.debit === 0 && line.credit === 0) continue; // skip zero-amount lines
-    await db.insert(journalLines).values({
+  // Bulk insert instead of one row per line — postJournal is the single hottest write path in
+  // the app (every POS sale, rental checkout, expense/purchase payment, and historical import
+  // row all route through here), so the sequential per-line await here was the same N+1 pattern
+  // already fixed in coa.ts/account-mapping.ts, just on a much busier path.
+  const rows = resolvedLines
+    .filter((line) => line.debit !== 0 || line.credit !== 0) // skip zero-amount lines
+    .map((line, order) => ({
       journalEntryId: entry.id,
       accountId: line.accountId,
       debit: line.debit,
       credit: line.credit,
       description: line.description,
-      lineOrder: order++,
-    });
-  }
+      lineOrder: order,
+    }));
+  if (rows.length > 0) await db.insert(journalLines).values(rows);
 
   return entry.id;
 }

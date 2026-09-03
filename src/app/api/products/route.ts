@@ -9,7 +9,10 @@ export async function GET() {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
-    const rows = await db.select().from(products).where(eq(products.outletId, session.outletId));
+    // No cap before — fine while catalogs stay small, but with no ceiling as merchandise/SKU
+    // count grows. 1000 is well above any real outlet's catalog today; this is a safety ceiling,
+    // not an active pagination limit (POS product picker and Inventory both expect the full list).
+    const rows = await db.select().from(products).where(eq(products.outletId, session.outletId)).limit(1000);
     return NextResponse.json(rows);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });

@@ -92,8 +92,13 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
   const bySku = new Map(existingProducts.filter((p) => p.sku).map((p) => [p.sku!.trim().toLowerCase(), p]));
 
   const details: ImportRowResult[] = [];
-  let created = 0;
-  let updated = 0;
+  // Pass 1: validate every row in memory (no DB calls) and split into inserts vs. updates —
+  // matches this app's established fix for the "one DB round trip per row" pattern (see
+  // coa.ts/account-mapping.ts's earlier fix for the same anti-pattern in registration). A
+  // several-hundred-row product import used to do a few-hundred sequential round trips; now it's
+  // one bulk insert plus a small number of chunked-parallel updates.
+  const toCreate: (typeof products.$inferInsert)[] = [];
+  const toUpdate: { id: string; patch: Record<string, unknown>; rowNum: number; name: string }[] = [];
 
   for (let i = 0; i < dataRows.length; i++) {
     const rowNum = i + 2; // +1 for 0-index, +1 for header row
@@ -119,25 +124,46 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
       const existing = sku ? bySku.get(sku.toLowerCase()) : undefined;
 
       if (existing) {
-        await db
-          .update(products)
-          .set({ name, category, barcode, price, costPrice, lowStockThreshold, unit, updatedAt: new Date().toISOString() })
-          .where(and(eq(products.id, existing.id), eq(products.outletId, outletId)));
-        updated++;
-        details.push({ row: rowNum, name, action: "updated" });
+        toUpdate.push({
+          id: existing.id,
+          rowNum,
+          name,
+          patch: { name, category, barcode, price, costPrice, lowStockThreshold, unit, updatedAt: new Date().toISOString() },
+        });
       } else {
         const stockQty = stockRaw !== undefined && stockRaw !== "" ? Number(stockRaw) : 0;
         if (Number.isNaN(stockQty) || stockQty < 0) throw new Error("Stok Awal harus angka.");
-        await db.insert(products).values({
-          outletId, name, category, sku: sku || null, barcode, price, costPrice, stockQty, lowStockThreshold, unit, isActive: true,
-        });
-        created++;
+        toCreate.push({ outletId, name, category, sku: sku || null, barcode, price, costPrice, stockQty, lowStockThreshold, unit, isActive: true });
         details.push({ row: rowNum, name, action: "created" });
       }
     } catch (err: unknown) {
       details.push({ row: rowNum, name: name || undefined, action: "error", error: describeError(err) });
     }
   }
+
+  // Pass 2: commit. One bulk insert for every new product...
+  if (toCreate.length > 0) await db.insert(products).values(toCreate);
+
+  // ...and updates chunked into small parallel batches rather than either fully sequential (slow)
+  // or one giant unbounded Promise.all (risks exhausting the DB connection pool — see db/client.ts's
+  // note on the transaction pooler's small `max`). Drizzle has no single-statement "bulk update
+  // with per-row different values" without hand-rolled SQL CASE expressions, so this is the
+  // pragmatic middle ground.
+  const UPDATE_CHUNK_SIZE = 20;
+  for (let i = 0; i < toUpdate.length; i += UPDATE_CHUNK_SIZE) {
+    const chunk = toUpdate.slice(i, i + UPDATE_CHUNK_SIZE);
+    await Promise.all(
+      chunk.map((u) => db.update(products).set(u.patch).where(and(eq(products.id, u.id), eq(products.outletId, outletId))))
+    );
+    for (const u of chunk) details.push({ row: u.rowNum, name: u.name, action: "updated" });
+  }
+
+  const created = toCreate.length;
+  const updated = toUpdate.length;
+  // Re-sort details back into original row order — pass 1 pushed "created"/"error" inline but
+  // "updated" entries were appended afterward in pass 2, so without this the returned summary's
+  // row-by-row detail list would no longer match the spreadsheet's top-to-bottom order.
+  details.sort((a, b) => a.row - b.row);
 
   return { totalRows: dataRows.length, created, updated, errors: details.filter((d) => d.action === "error").length, details };
 }

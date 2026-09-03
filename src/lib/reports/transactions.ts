@@ -68,17 +68,28 @@ export async function computeTransactionList(filters: TransactionFilters) {
 
   const orderRows = await db.select().from(orders).where(sql.join(conditions, sql` AND `)).orderBy(sql`${orders.createdAt} DESC`);
   const orderIds = orderRows.map((o) => o.id);
+  // Scope customers/sessions to only what THIS filtered window's orders actually reference,
+  // instead of pulling every customer/session the outlet has ever had on every single load —
+  // both grow unbounded over the outlet's lifetime while a Transaction Center query (often just
+  // "today") only ever needs a handful. staffUsers/membershipTiers/products are left as full
+  // per-outlet fetches since those are naturally small/bounded (staff count, tier count, catalog
+  // size), not per-transaction history.
+  const customerIds = Array.from(new Set(orderRows.map((o) => o.customerId).filter((id): id is string => !!id)));
+  const sessionIds = Array.from(new Set(orderRows.map((o) => o.rentalSessionId).filter((id): id is string => !!id)));
 
-  const [items, paymentRows, staffRows, customerRows, tierRows, sessionRows, unitRows, productRows] = await Promise.all([
+  const [items, paymentRows, staffRows, customerRows, tierRows, sessionRows, productRows] = await Promise.all([
     orderIds.length ? db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds)) : Promise.resolve([]),
     orderIds.length ? db.select().from(payments).where(inArray(payments.orderId, orderIds)) : Promise.resolve([]),
     db.select().from(staffUsers).where(eq(staffUsers.outletId, outletId)),
-    db.select().from(customers).where(eq(customers.outletId, outletId)),
+    customerIds.length ? db.select().from(customers).where(inArray(customers.id, customerIds)) : Promise.resolve([]),
     db.select().from(membershipTiers).where(eq(membershipTiers.outletId, outletId)),
-    db.select().from(rentalSessions).where(eq(rentalSessions.outletId, outletId)),
-    db.select().from(rentalUnits).where(eq(rentalUnits.outletId, outletId)),
+    sessionIds.length ? db.select().from(rentalSessions).where(inArray(rentalSessions.id, sessionIds)) : Promise.resolve([]),
     db.select().from(products).where(eq(products.outletId, outletId)),
   ]);
+  // Units depend on which sessions actually showed up above, so this has to wait for sessionRows
+  // — still just one extra round trip, not per-row, so no N+1 reintroduced.
+  const unitIds = Array.from(new Set(sessionRows.map((s) => s.rentalUnitId).filter((id): id is string => !!id)));
+  const unitRows = unitIds.length ? await db.select().from(rentalUnits).where(inArray(rentalUnits.id, unitIds)) : [];
 
   const staffNameById = new Map(staffRows.map((s) => [s.id, s.name]));
   const customerById = new Map(customerRows.map((c) => [c.id, c]));

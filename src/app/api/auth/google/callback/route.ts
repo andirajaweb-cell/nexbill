@@ -93,8 +93,15 @@ export async function GET(req: NextRequest) {
     // Reached only for the unexpected/downstream branch now (DB lookup, session signing, etc.) —
     // the two more common failure points above (PKCE exchange, missing email) are caught and
     // tagged separately so a screenshot of the URL alone tells us which stage broke.
-    console.error("Google OAuth callback failed (unexpected):", describeError(err));
+    const detail = describeError(err);
+    console.error("Google OAuth callback failed (unexpected):", detail);
     loginUrl.searchParams.set("error", "google_failed");
+    // Put a truncated version of the actual server-side error directly in the redirect URL —
+    // there's no log-reading access available while debugging this remotely, and the owner has
+    // been screenshotting this exact address bar every time it happens, so this is the fastest
+    // way to get the real cause without needing the Vercel dashboard. describeError() already
+    // unwraps to a DB-safe message (see lib/api/error.ts) and never leaks connection strings.
+    loginUrl.searchParams.set("detail", detail.slice(0, 200));
     return NextResponse.redirect(loginUrl);
   }
 }

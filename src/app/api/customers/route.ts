@@ -15,9 +15,14 @@ export async function GET(req: NextRequest) {
     // own outlet so pre-existing customer data doesn't silently vanish, but never any other
     // tenant's rows.
     const scope = or(eq(customers.outletId, session.outletId), isNull(customers.outletId));
+    // Membership/CRM's Customer tab has no pagination UI — it just renders whatever this
+    // returns. Without a cap, an outlet's full customer history (which only ever grows) gets
+    // fetched on every single page load. 200 covers effectively every real outlet today; a
+    // search narrows the result set anyway, so it gets the same cap rather than special-cased
+    // unbounded — a search matching more than 200 customers is itself a sign to narrow the query.
     const rows = search
-      ? await db.select().from(customers).where(and(scope, or(like(customers.name, `%${search}%`), like(customers.phone, `%${search}%`), like(customers.memberNumber, `%${search}%`)))).orderBy(desc(customers.createdAt))
-      : await db.select().from(customers).where(scope).orderBy(desc(customers.createdAt));
+      ? await db.select().from(customers).where(and(scope, or(like(customers.name, `%${search}%`), like(customers.phone, `%${search}%`), like(customers.memberNumber, `%${search}%`)))).orderBy(desc(customers.createdAt)).limit(200)
+      : await db.select().from(customers).where(scope).orderBy(desc(customers.createdAt)).limit(200);
     return NextResponse.json(rows);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });

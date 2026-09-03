@@ -1,7 +1,13 @@
 import { db } from "@/db/client";
 import { stockOpnames, stockOpnameItems, products, stockMovements } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
+
+// Bounds how many stock updates run in parallel per Promise.all batch below — a full physical
+// count can easily span an outlet's entire catalog, and firing that many concurrent queries
+// unbounded risks exhausting the DB connection pool (see db/client.ts's note on the transaction
+// pooler's small `max`). Chosen to match the same chunk size used in inventory/import.ts.
+const PARALLEL_CHUNK_SIZE = 20;
 
 export interface CreateStockOpnameInput {
   outletId: string;
@@ -17,17 +23,24 @@ export async function createStockOpname(input: CreateStockOpnameInput) {
     .values({ outletId: input.outletId, warehouseId: input.warehouseId, staffUserId: input.staffUserId, status: "draft" })
     .returning();
 
-  for (const item of input.items) {
-    const [product] = await db.select().from(products).where(eq(products.id, item.productId)).limit(1);
-    const systemQty = product?.stockQty ?? 0;
-    await db.insert(stockOpnameItems).values({
+  // Was one SELECT + one INSERT per counted product, sequentially — a full-catalog physical
+  // count did 2x the SKU count in round trips. Now one batch SELECT (inArray) to snapshot
+  // current system stock, then a single bulk INSERT for every counted line.
+  const productIds = input.items.map((i) => i.productId);
+  const productRows = productIds.length ? await db.select().from(products).where(inArray(products.id, productIds)) : [];
+  const stockQtyById = new Map(productRows.map((p) => [p.id, p.stockQty]));
+
+  const rows = input.items.map((item) => {
+    const systemQty = stockQtyById.get(item.productId) ?? 0;
+    return {
       stockOpnameId: opname.id,
       productId: item.productId,
       systemQty,
       actualQty: item.actualQty,
       differenceQty: item.actualQty - systemQty,
-    });
-  }
+    };
+  });
+  if (rows.length > 0) await db.insert(stockOpnameItems).values(rows);
 
   return opname;
 }
@@ -39,20 +52,30 @@ export async function completeStockOpname(stockOpnameId: string) {
   if (opname.status === "completed") throw new Error("Stock opname sudah selesai diproses.");
 
   const items = await db.select().from(stockOpnameItems).where(eq(stockOpnameItems.stockOpnameId, stockOpnameId));
+  const changed = items.filter((i) => i.differenceQty !== 0);
 
-  for (const item of items) {
-    if (item.differenceQty === 0) continue;
-    await db.insert(stockMovements).values({
-      productId: item.productId,
-      type: item.differenceQty > 0 ? "adjustment" : "waste",
-      qty: item.differenceQty,
-      note: `Stock opname ${new Date(opname.opnameDate).toLocaleDateString("id-ID")}`,
-      staffUserId: opname.staffUserId,
-    });
-    await db
-      .update(products)
-      .set({ stockQty: sql`${products.stockQty} + ${item.differenceQty}` })
-      .where(eq(products.id, item.productId));
+  // stockMovements rows are independent of each other — one bulk insert instead of N.
+  if (changed.length > 0) {
+    await db.insert(stockMovements).values(
+      changed.map((item) => ({
+        productId: item.productId,
+        type: item.differenceQty > 0 ? ("adjustment" as const) : ("waste" as const),
+        qty: item.differenceQty,
+        note: `Stock opname ${new Date(opname.opnameDate).toLocaleDateString("id-ID")}`,
+        staffUserId: opname.staffUserId,
+      }))
+    );
+  }
+  // The stockQty update itself has a different delta per product (via sql`... + ${delta}`), so
+  // it can't collapse into one statement without a hand-rolled SQL CASE — chunked-parallel
+  // instead of sequential is still a large win without risking the pool (see PARALLEL_CHUNK_SIZE).
+  for (let i = 0; i < changed.length; i += PARALLEL_CHUNK_SIZE) {
+    const chunk = changed.slice(i, i + PARALLEL_CHUNK_SIZE);
+    await Promise.all(
+      chunk.map((item) =>
+        db.update(products).set({ stockQty: sql`${products.stockQty} + ${item.differenceQty}` }).where(eq(products.id, item.productId))
+      )
+    );
   }
 
   const [updatedOpname] = await db.update(stockOpnames).set({ status: "completed" }).where(eq(stockOpnames.id, stockOpnameId)).returning();
