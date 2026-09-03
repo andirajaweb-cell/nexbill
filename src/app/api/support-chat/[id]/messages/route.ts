@@ -11,7 +11,7 @@ async function getOwnedThread(id: string, outletId: string) {
   return thread;
 }
 
-/** Lists messages in one of the caller's own outlet's support tickets. */
+/** Lists messages in one of the caller's own outlet's support tickets. Viewing counts as reading — bumps outletLastReadAt so this thread drops out of the unread badge/list. */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession();
@@ -21,6 +21,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!thread) return NextResponse.json({ error: "Tiket tidak ditemukan." }, { status: 404 });
 
     const rows = await db.select().from(supportMessages).where(eq(supportMessages.threadId, id)).orderBy(asc(supportMessages.createdAt));
+    // Skip the write once already caught up — this route is polled every few seconds while a
+    // ticket is open, so without this guard every single poll tick would issue an UPDATE even
+    // when there's nothing new to mark read.
+    const alreadyRead = !thread.lastMessageAt || (thread.outletLastReadAt && new Date(thread.outletLastReadAt) >= new Date(thread.lastMessageAt));
+    if (!alreadyRead) {
+      await db.update(supportThreads).set({ outletLastReadAt: new Date().toISOString() }).where(eq(supportThreads.id, id));
+    }
     return NextResponse.json(rows);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
@@ -55,7 +62,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         attachmentName: hasAttachment ? body.attachmentName || null : null,
       })
       .returning();
-    await db.update(supportThreads).set({ lastMessageAt: now, status: "open" }).where(eq(supportThreads.id, id));
+    // outletLastReadAt bumped alongside lastMessageAt — the outlet replying is itself an act of
+    // having read the thread up to this point, so it shouldn't show as unread to them afterward.
+    await db.update(supportThreads).set({ lastMessageAt: now, outletLastReadAt: now, status: "open" }).where(eq(supportThreads.id, id));
 
     return NextResponse.json(message);
   } catch (err: unknown) {

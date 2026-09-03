@@ -5,7 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 
-/** Lists this outlet's own support tickets with NEXBILL customer service — always scoped by session.outletId. */
+/** Lists this outlet's own support tickets with NEXBILL customer service — always scoped by session.outletId. Each row gets an `unread` flag: true when the thread has activity (lastMessageAt) more recent than the outlet's own last view/reply (outletLastReadAt). */
 export async function GET() {
   try {
     const session = await getSession();
@@ -15,7 +15,11 @@ export async function GET() {
       .from(supportThreads)
       .where(eq(supportThreads.outletId, session.outletId))
       .orderBy(desc(supportThreads.lastMessageAt), desc(supportThreads.createdAt));
-    return NextResponse.json(rows);
+    const withUnread = rows.map((t) => ({
+      ...t,
+      unread: !!t.lastMessageAt && (!t.outletLastReadAt || new Date(t.lastMessageAt) > new Date(t.outletLastReadAt)),
+    }));
+    return NextResponse.json(withUnread);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }
@@ -38,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     const [thread] = await db
       .insert(supportThreads)
-      .values({ outletId: session.outletId, subject: body.subject || null, category, lastMessageAt: now })
+      .values({ outletId: session.outletId, subject: body.subject || null, category, lastMessageAt: now, outletLastReadAt: now })
       .returning();
     const [message] = await db
       .insert(supportMessages)

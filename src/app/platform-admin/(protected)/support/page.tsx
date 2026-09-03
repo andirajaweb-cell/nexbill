@@ -29,6 +29,12 @@ interface Message {
   createdAt: string;
 }
 
+/** "3 Sep 2026, 14:05" — matches the format used on the outlet-side /dashboard/chat page. */
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 interface PendingAttachment {
   url: string;
   type: string;
@@ -201,7 +207,10 @@ export default function PlatformSupportPage() {
                     {t.status === "open" ? "Dibuka" : "Selesai"}
                   </span>
                 </div>
-                <div className="text-xs text-neutral-500 truncate">{t.subject || CATEGORY_LABEL[t.category]} — {CATEGORY_LABEL[t.category]}</div>
+                <div className="flex items-center justify-between gap-2 text-xs text-neutral-500">
+                  <span className="truncate">{t.subject || CATEGORY_LABEL[t.category]} — {CATEGORY_LABEL[t.category]}</span>
+                  <span className="shrink-0">{formatDateTime(t.lastMessageAt || t.createdAt)}</span>
+                </div>
               </button>
             ))}
             {visibleThreads.length === 0 && <p className="text-xs text-neutral-500">Tidak ada tiket.</p>}
@@ -228,7 +237,10 @@ export default function PlatformSupportPage() {
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                 {messages.map((m) => (
                   <div key={m.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.sender === "outlet" ? "bg-white/5" : "bg-amber-400/10 ml-auto"}`}>
-                    <div className="text-[10px] text-neutral-500 mb-0.5">{m.senderName || (m.sender === "outlet" ? selected.outletName : "NEXBILL Support")}</div>
+                    <div className="flex items-center justify-between gap-3 mb-0.5">
+                      <span className="text-[10px] text-neutral-500">{m.senderName || (m.sender === "outlet" ? selected.outletName : "NEXBILL Support")}</span>
+                      <span className="text-[10px] text-neutral-600 shrink-0">{formatDateTime(m.createdAt)}</span>
+                    </div>
                     {m.body}
                     {m.attachmentUrl && <AttachmentPreview url={m.attachmentUrl} type={m.attachmentType} name={m.attachmentName} />}
                   </div>

@@ -16,6 +16,13 @@ interface Thread {
   status: "open" | "resolved";
   lastMessageAt: string | null;
   createdAt: string;
+  unread?: boolean;
+}
+
+/** "3 Sep 2026, 14:05" — used on both the ticket list (last activity) and each message bubble. */
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 interface Message {
@@ -115,7 +122,10 @@ export default function SupportChatPage() {
   useEffect(() => {
     if (!selected) return;
     const load = () => fetchJsonArray<Message>(`/api/support-chat/${selected.id}/messages`).then(setMessages);
-    load();
+    // Opening a thread marks it read server-side (see GET /api/support-chat/[id]/messages) —
+    // refresh the thread list right away so its unread dot/badge clears immediately instead of
+    // waiting for the next 5s poll.
+    load().then(loadThreads);
     const id = setInterval(load, 3000);
     return () => clearInterval(id);
   }, [selected]);
@@ -259,10 +269,16 @@ export default function SupportChatPage() {
                 className={`w-full text-left rounded-lg px-3 py-2 text-sm ${selected?.id === th.id ? "bg-cyan-500/15" : "hover:bg-white/5"}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate">{th.subject || CATEGORY_LABEL[th.category]}</span>
+                  <span className={`truncate flex items-center gap-1.5 ${th.unread ? "font-semibold text-neutral-50" : ""}`}>
+                    {th.unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.7)]" />}
+                    {th.subject || CATEGORY_LABEL[th.category]}
+                  </span>
                   <Badge status={th.status === "open" ? "pending" : "success"}>{th.status === "open" ? t("chat.statusOpen", "Dibuka") : t("chat.statusResolved", "Selesai")}</Badge>
                 </div>
-                <div className="text-xs text-neutral-500">{CATEGORY_LABEL[th.category]}</div>
+                <div className="flex items-center justify-between gap-2 text-xs text-neutral-500">
+                  <span>{CATEGORY_LABEL[th.category]}</span>
+                  <span className="shrink-0">{formatDateTime(th.lastMessageAt || th.createdAt)}</span>
+                </div>
               </button>
             ))}
             {threads.length === 0 && <p className="text-xs text-neutral-500">{t("chat.noTickets", "Belum ada tiket. Buat tiket baru kalau ada keluhan/saran/kendala.")}</p>}
@@ -279,7 +295,10 @@ export default function SupportChatPage() {
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                 {messages.map((m) => (
                   <div key={m.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.sender === "platform_admin" ? "bg-white/5" : "bg-cyan-500/15 ml-auto"}`}>
-                    <div className="text-[10px] text-neutral-500 mb-0.5">{m.sender === "platform_admin" ? m.senderName || t("chat.supportName", "NEXBILL Support") : m.senderName || t("chat.youLabel", "Kamu")}</div>
+                    <div className="flex items-center justify-between gap-3 mb-0.5">
+                      <span className="text-[10px] text-neutral-500">{m.sender === "platform_admin" ? m.senderName || t("chat.supportName", "NEXBILL Support") : m.senderName || t("chat.youLabel", "Kamu")}</span>
+                      <span className="text-[10px] text-neutral-600 shrink-0">{formatDateTime(m.createdAt)}</span>
+                    </div>
                     {m.body}
                     {m.attachmentUrl && <AttachmentPreview url={m.attachmentUrl} type={m.attachmentType} name={m.attachmentName} t={t} />}
                   </div>

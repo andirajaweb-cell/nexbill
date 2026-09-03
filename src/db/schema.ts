@@ -398,6 +398,12 @@ export const supportThreads = pgTable("support_threads", {
   category: text("category", { enum: ["keluhan", "saran", "kendala_teknis", "lainnya"] }).notNull().default("lainnya"),
   status: text("status", { enum: ["open", "resolved"] }).notNull().default("open"),
   lastMessageAt: text("last_message_at"),
+  // Bumped to now() whenever outlet staff view or reply to this thread (see GET/POST on
+  // /api/support-chat/[id]/messages) — a thread is "unread" from the outlet's side whenever
+  // lastMessageAt is newer than this, i.e. the platform-admin side replied since the outlet last
+  // looked. Drives the unread badge on the Sidebar "Chat" nav item and the ticket list on
+  // /dashboard/chat. Null means never viewed yet.
+  outletLastReadAt: text("outlet_last_read_at"),
   ...timestamps,
 });
 

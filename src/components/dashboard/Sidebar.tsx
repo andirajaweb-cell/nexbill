@@ -40,6 +40,7 @@ import {
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { roleLabel, type StaffRole } from "@/lib/auth/permissions";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 
 const nav = [
@@ -85,6 +86,11 @@ export function Sidebar() {
   // (module left ON), at the cost of a brief flash-of-visible-menu in the rare case an outlet
   // actually turned it off — an acceptable tradeoff since that's the minority state.
   const [ppobEnabled, setPpobEnabled] = useState(true);
+  // Unread count for the "Chat" nav item's badge — see /dashboard/chat and the outletLastReadAt
+  // column on supportThreads. Polled independently here (not tied to the chat page's own faster
+  // 5s poll) since the sidebar is mounted on every dashboard page, not just /dashboard/chat.
+  const { data: supportThreads } = useApi<{ unread?: boolean }[]>(user ? "/api/support-chat" : null, { refreshInterval: 20000 });
+  const unreadTicketCount = (supportThreads ?? []).filter((t) => t.unread).length;
 
   useEffect(() => {
     if (!user) return;
@@ -143,7 +149,12 @@ export function Sidebar() {
             >
               {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
               <Icon size={16} />
-              <span className="truncate">{t(key)}</span>
+              <span className="truncate flex-1">{t(key)}</span>
+              {href === "/dashboard/chat" && unreadTicketCount > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_6px_rgba(244,63,94,0.7)]">
+                  {unreadTicketCount > 9 ? "9+" : unreadTicketCount}
+                </span>
+              )}
             </Link>
           );
         })}
