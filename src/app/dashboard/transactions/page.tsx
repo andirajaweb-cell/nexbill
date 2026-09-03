@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
@@ -113,7 +114,8 @@ export default function TransactionsPage() {
   const { t } = useDashboardLang();
   const [outletId, setOutletId] = useState<string | null>(null);
   const [tab, setTab] = useState<"list" | "cashier">("list");
-  useEffect(() => { fetchJsonObject("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); }); }, []);
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
+  useEffect(() => { if (outlet) setOutletId(outlet.id); }, [outlet]);
 
   const tabs = [
     { k: "list", l: t("transactions.tab.list", "Daftar Transaksi") },

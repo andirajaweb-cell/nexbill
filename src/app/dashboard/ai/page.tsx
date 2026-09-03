@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { showAlert } from "@/lib/ui/dialog";
 import { useAuth } from "@/lib/auth/client";
 import "@/lib/i18n/dict-ai";
@@ -25,8 +26,12 @@ export default function AiPage() {
   const [outletId, setOutletId] = useState<string | null>(null);
   const [aiGate, setAiGate] = useState<AiSubscriptionGate | null>(null);
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
+
+  useEffect(() => {
     // Superuser bypasses this entirely server-side (assertAiAllowed) — no need to even fetch
     // /api/subscription for that role, since isAiLocked is never consulted for it anyway.
     if (user?.role !== "superuser") {

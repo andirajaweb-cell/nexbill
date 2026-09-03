@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { CASH_DENOMINATIONS, denominationLabel } from "@/lib/shift/denominations";
@@ -131,13 +132,13 @@ export default function ShiftPage() {
     }
   };
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => {
-      if (!o) return;
-      setOutletId(o.id);
-      fetchJsonArray(`/api/shifts?outletId=${o.id}`).then(setHistory);
-    });
-  }, []);
+    if (!outlet) return;
+    setOutletId(outlet.id);
+    fetchJsonArray(`/api/shifts?outletId=${outlet.id}`).then(setHistory);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outlet]);
 
   useEffect(() => {
     if (!outletId || !staffUserId) return;

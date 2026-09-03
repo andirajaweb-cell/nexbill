@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
@@ -41,9 +42,10 @@ export default function PaymentsPage() {
   const [outletId, setOutletId] = useState<string | null>(null);
   const [methods, setMethods] = useState<Method[]>([]);
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
-  }, []);
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
 
   const load = () => {
     if (outletId) fetchJsonArray(`/api/payment-methods?outletId=${outletId}`).then(setMethods);

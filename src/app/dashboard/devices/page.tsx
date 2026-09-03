@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
@@ -108,9 +109,13 @@ export default function DevicesPage() {
     fetchJsonArray<RentalUnit>("/api/rental-units").then(setUnits);
     if (outletId) fetchJsonArray<RelayAgent>(`/api/settings/relay-agents?outletId=${outletId}`).then(setRelayAgents);
   };
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
+  useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { load(); }, [outletId]);
 

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import "@/lib/i18n/dict-reports";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
@@ -55,9 +56,10 @@ export default function ReportsPage() {
   const [outletId, setOutletId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("Penjualan");
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
-  }, []);
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
 
   return (
     <div className="space-y-6">

@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert } from "@/lib/ui/dialog";
@@ -44,9 +45,10 @@ export default function AssetsPage() {
   const role = (user?.role ?? "cashier") as StaffRole;
   const { t } = useDashboardLang();
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
-  }, []);
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
 
   return (
     <div className="space-y-6">

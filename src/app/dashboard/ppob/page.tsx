@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
@@ -55,8 +56,12 @@ export default function PpobPage() {
   const [data, setData] = useState<{ transactions: any[]; summary: any } | null>(null);
   const [saldoFastpay, setSaldoFastpay] = useState<number | null>(null);
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
+
+  useEffect(() => {
     fetchJsonObject<{ flags: FeatureFlagRow[] }>("/api/feature-flags").then((d) => setEnabled(!!d?.flags.find((f) => f.key === "PPOB_ENABLED")?.effectiveEnabled));
   }, []);
   useEffect(() => {

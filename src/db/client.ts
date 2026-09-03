@@ -24,19 +24,23 @@ import * as schema from "./schema";
  * the separate DIRECT_URL (session-mode, port 5432) in drizzle.config.ts, not
  * this file.
  *
- * max: kept modest since this is a single Postgres instance shared by every
- * outlet (pooled multi-tenancy) AND by every concurrent serverless instance —
- * the DB/pooler has a fixed capacity regardless of how many of the 2000 outlets
- * are active at once, so a large per-instance pool from just this one Next.js
- * server (times however many instances Vercel spins up concurrently) would
- * crowd out headroom. Tune once real concurrent-load numbers exist.
+ * max: bumped from 3 to 10 (real concurrent-load numbers now exist — see the client-side
+ * polling/dedup fixes in dashboard/rental/page.tsx and SubscriptionGate.tsx from the same pass).
+ * 3 was low enough that a SINGLE API route doing its own internal Promise.all of a few parallel
+ * queries (a normal, correct pattern — see reports/transactions.ts, dashboard/owner/route.ts)
+ * could exhaust the whole per-instance pool by itself, queuing its own unrelated queries behind
+ * each other before any other request even arrives. Transaction-mode pgbouncer (which this pooler
+ * connection string uses) is built to multiplex many client connections over a much smaller
+ * backend pool efficiently, so headroom here is cheap relative to the cost of serializing a
+ * single request's own queries. Still conservative given this is shared by every concurrent
+ * serverless instance across every outlet — raise further only with real pooler metrics in hand.
  */
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error("DATABASE_URL is not set — required for the Postgres (Supabase) client.");
 }
 
-const client = postgres(connectionString, { max: 3, prepare: false });
+const client = postgres(connectionString, { max: 10, prepare: false });
 
 export const db = drizzle(client, { schema });
 export type DB = typeof db;

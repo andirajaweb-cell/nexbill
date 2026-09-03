@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -359,29 +359,62 @@ export default function RentalPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [busyHours, setBusyHours] = useState<{ hour: number; count: number }[]>([]);
 
-  const load = () => {
-    fetchJsonArray("/api/rental-units").then(setUnits);
-    fetchJsonArray("/api/rental-sessions").then((rows) => {
-      const active = rows.filter((s: RentalSession) => s.status === "running" || s.status === "paused");
+  // In-flight guards: this page polls every few seconds while responses can themselves take
+  // several seconds under load, so without a guard a slow response window lets multiple polls'
+  // worth of requests pile up concurrently (the exact "45s waterfall of duplicate calls" pattern
+  // reported from the Network tab). Skipping a tick whenever the previous one hasn't resolved yet
+  // keeps at most one round of these requests in flight at a time. loadingBillsRef is keyed per
+  // session id so one slow session's bill/accessories fetch doesn't block polling for the others.
+  const loadInFlightRef = useRef(false);
+  const widgetsInFlightRef = useRef(false);
+  const sessionFetchInFlightRef = useRef<Set<string>>(new Set());
+
+  const load = async () => {
+    if (loadInFlightRef.current) return;
+    loadInFlightRef.current = true;
+    try {
+      const [unitsRows, sessionRows] = await Promise.all([
+        fetchJsonArray("/api/rental-units"),
+        fetchJsonArray("/api/rental-sessions"),
+      ]);
+      setUnits(unitsRows);
+      const active = sessionRows.filter((s: RentalSession) => s.status === "running" || s.status === "paused");
       setSessions(active);
-      active.forEach((s: RentalSession) => {
-        fetchJsonObject<BillBreakdown>(`/api/rental-sessions/${s.id}/bill`).then((b) => {
-          if (b) setBills((prev) => ({ ...prev, [s.id]: b }));
-        });
-        fetchJsonArray<SessionAccessory>(`/api/rental-sessions/${s.id}/accessories`).then((rows) => {
-          setAccessories((prev) => ({ ...prev, [s.id]: rows.filter((a) => !a.removedAt) }));
-        });
-      });
-    });
+      await Promise.all(
+        active
+          .filter((s: RentalSession) => !sessionFetchInFlightRef.current.has(s.id))
+          .map(async (s: RentalSession) => {
+            sessionFetchInFlightRef.current.add(s.id);
+            try {
+              const [b, rows] = await Promise.all([
+                fetchJsonObject<BillBreakdown>(`/api/rental-sessions/${s.id}/bill`),
+                fetchJsonArray<SessionAccessory>(`/api/rental-sessions/${s.id}/accessories`),
+              ]);
+              if (b) setBills((prev) => ({ ...prev, [s.id]: b }));
+              setAccessories((prev) => ({ ...prev, [s.id]: rows.filter((a) => !a.removedAt) }));
+            } finally {
+              sessionFetchInFlightRef.current.delete(s.id);
+            }
+          })
+      );
+    } finally {
+      loadInFlightRef.current = false;
+    }
   };
 
-  const loadWidgets = (oid: string) => {
-    fetchJsonArray("/api/orders?status=paid").then((rows: any[]) => {
-      setRecentOrders(rows.filter((o) => o.outletId === oid).slice(0, 7));
-    });
-    fetchJsonObject<{ busyHours: { hour: number; count: number }[] }>(`/api/dashboard/owner?outletId=${oid}`).then((data) => {
+  const loadWidgets = async (oid: string) => {
+    if (widgetsInFlightRef.current) return;
+    widgetsInFlightRef.current = true;
+    try {
+      const [orderRows, data] = await Promise.all([
+        fetchJsonArray("/api/orders?status=paid"),
+        fetchJsonObject<{ busyHours: { hour: number; count: number }[] }>(`/api/dashboard/owner?outletId=${oid}`),
+      ]);
+      setRecentOrders(orderRows.filter((o: any) => o.outletId === oid).slice(0, 7));
       if (data) setBusyHours(data.busyHours);
-    });
+    } finally {
+      widgetsInFlightRef.current = false;
+    }
   };
 
   useEffect(() => {
@@ -401,13 +434,17 @@ export default function RentalPage() {
     });
     fetchJsonArray("/api/products").then((rows) => setProducts(rows.filter((p: Product) => p.isActive)));
     load();
-    const id = setInterval(load, 5000);
+    // Was 5000ms — with the in-flight guards above this no longer stacks requests, but 5s was
+    // still needlessly tight for data that's mostly cosmetic countdown-timer accuracy (the visible
+    // per-second countdowns above run off local Date.now() ticks, not this poll). 8s keeps the
+    // board feeling live without over-polling every session's bill+accessories on every tick.
+    const id = setInterval(load, 8000);
     return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
     if (!outletId) return;
-    const id = setInterval(() => loadWidgets(outletId), 15000);
+    const id = setInterval(() => loadWidgets(outletId), 20000);
     return () => clearInterval(id);
   }, [outletId]);
 

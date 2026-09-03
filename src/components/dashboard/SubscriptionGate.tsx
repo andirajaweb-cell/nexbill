@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/client";
+import { useApi } from "@/lib/api/use-api";
 import { Button } from "@/components/ui/Button";
 import { Lock } from "lucide-react";
 
@@ -40,23 +41,20 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const [gate, setGate] = useState<{ isLocked: boolean; status: string } | null>(null);
-
+  // Was a raw fetch("/api/subscription") in a useEffect keyed on [pathname] — refired on every
+  // single dashboard navigation since this component lives once in the persistent layout and
+  // never unmounts. Billing and AI pages independently fetch the same endpoint too, so on a
+  // typical session this was N redundant round trips to the same data. useApi/SWR shares one
+  // cached entry keyed by URL across all of them: `mutate()` below still re-checks on every
+  // navigation (same "never go stale" intent as before, and still drives the lazy lifecycle
+  // self-heal in getOrCreateSubscription), but a call already in flight or freshly resolved
+  // within the dedupingInterval is reused instead of firing a brand new request.
+  const { data, mutate } = useApi<{ isLocked: boolean; subscription: { status: string } }>("/api/subscription");
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/subscription")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data?.subscription) return;
-        setGate({ isLocked: !!data.isLocked, status: data.subscription.status });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-    // Re-check on every navigation — cheap enough at this app's scale, and it also drives the
-    // lazy lifecycle self-heal in getOrCreateSubscription so status never goes stale between visits.
-  }, [pathname]);
+    mutate();
+  }, [pathname, mutate]);
+
+  const gate = data?.subscription ? { isLocked: !!data.isLocked, status: data.subscription.status } : null;
 
   if (user?.role === "superuser") return <>{children}</>;
   if (pathname?.startsWith("/dashboard/billing")) return <>{children}</>;

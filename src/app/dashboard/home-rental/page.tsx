@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonObject, fetchJsonArray } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
@@ -118,8 +119,12 @@ export default function HomeRentalPage() {
   const role = (user?.role ?? "cashier") as StaffRole;
   const canManage = hasPermission(role, "manage_home_rental");
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
+
+  useEffect(() => {
     fetchJsonObject<{ flags: FeatureFlagRow[] }>("/api/feature-flags").then((d) => setEnabled(!!d?.flags.find((f) => f.key === "HOME_RENTAL_ENABLED")?.effectiveEnabled));
   }, []);
 

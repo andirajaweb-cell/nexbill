@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
@@ -44,17 +45,17 @@ export default function OtherIncomePage() {
   const [methods, setMethods] = useState(PAYMENT_METHOD_OPTIONS); // static 8 as a safe default, replaced once the outlet's live catalog loads
   const methodLabel = useMemo(() => Object.fromEntries(methods.map((m) => [m.value, m.label])), [methods]);
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => {
-      if (!o) return;
-      setOutletId(o.id);
-      // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
-      fetchJsonArray(`/api/payment-methods?outletId=${o.id}`).then((rows) => {
-        const active = rows.filter((m: any) => m.isActive);
-        if (active.length > 0) setMethods(active.map((m: any) => ({ value: m.key, label: m.label })));
-      });
+    if (!outlet) return;
+    setOutletId(outlet.id);
+    // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
+    fetchJsonArray(`/api/payment-methods?outletId=${outlet.id}`).then((rows) => {
+      const active = rows.filter((m: any) => m.isActive);
+      if (active.length > 0) setMethods(active.map((m: any) => ({ value: m.key, label: m.label })));
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outlet]);
 
   const range = useMemo(() => ({
     from: fromDate ? startOfDay(new Date(fromDate)).toISOString() : undefined,

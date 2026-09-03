@@ -3,6 +3,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PeriodBar, PeriodPreset, resolvePeriodPreset, describePeriod } from "@/components/reports/PeriodPicker";
@@ -40,9 +41,10 @@ export default function AccountingPage() {
   const isMigrationRole = role === "superuser" || role === "owner";
   const visibleTabs = TABS.filter((tb) => tb !== "Migrasi Data" || isMigrationRole);
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
-  }, []);
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
 
   return (
     <div className="space-y-6">

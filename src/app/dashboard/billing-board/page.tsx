@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Clock, UtensilsCrossed, Gamepad2 } from "lucide-react";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-billing-board";
 
@@ -62,13 +63,13 @@ export default function BillingBoardPage() {
     });
   };
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => {
-      if (!o) return;
-      setOutletId(o.id);
-      load(o.id);
-    });
-  }, []);
+    if (!outlet) return;
+    setOutletId(outlet.id);
+    load(outlet.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outlet]);
 
   useEffect(() => {
     if (!outletId) return;

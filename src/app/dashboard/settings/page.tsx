@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { fetchJsonObject, fetchJsonArray } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { useAuth, type AuthUser } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
@@ -37,9 +38,10 @@ export default function SettingsPage() {
   const canManage = hasPermission(role, "manage_settings");
   const isSuperuser = role === "superuser" || role === "owner"; // the two full-authority roles.
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => { if (o) setOutletId(o.id); });
-  }, []);
+    if (outlet) setOutletId(outlet.id);
+  }, [outlet]);
 
   return (
     <div className="space-y-6">

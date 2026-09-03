@@ -7,6 +7,7 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 import { roleLabel, hasPermission, StaffRole, Permission, PERMISSION_GROUPS, PERMISSION_LABEL } from "@/lib/auth/permissions";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import "@/lib/i18n/dict-staff";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -47,9 +48,11 @@ export default function StaffPage() {
     fetchJsonArray(`/api/audit-logs?outletId=${oid}`).then(setAudit);
   };
 
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => { if (o) { setOutletId(o.id); load(o.id); } });
-  }, []);
+    if (outlet) { setOutletId(outlet.id); load(outlet.id); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outlet]);
 
   const loadMatrix = () => {
     fetch("/api/role-permissions")

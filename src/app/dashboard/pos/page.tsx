@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
+import { useApi } from "@/lib/api/use-api";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
 import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -131,15 +132,18 @@ export default function PosPage() {
     fetchJsonArray("/api/products").then((rows) => setProducts(rows.filter((p: Product) => p.isActive && p.category !== "device_rental")));
     loadOpenOrders();
     const id = setInterval(loadOpenOrders, 5000);
-    // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
-    getOutletId()
-      .then((outletId) => fetchJsonArray(`/api/payment-methods?outletId=${outletId}`))
-      .then((rows) => {
-        const active = rows.filter((m: any) => m.isActive);
-        if (active.length > 0) setMethods(active.map((m: any) => ({ value: m.key, label: m.label })));
-      });
     return () => clearInterval(id);
   }, []);
+
+  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
+  useEffect(() => {
+    if (!outlet) return;
+    // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
+    fetchJsonArray(`/api/payment-methods?outletId=${outlet.id}`).then((rows) => {
+      const active = rows.filter((m: any) => m.isActive);
+      if (active.length > 0) setMethods(active.map((m: any) => ({ value: m.key, label: m.label })));
+    });
+  }, [outlet]);
 
   const addToCart = (p: Product) => {
     setCart((prev) => {
