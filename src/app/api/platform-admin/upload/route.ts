@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
 import path from "path";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
+import { uploadToSupabaseStorage } from "@/lib/storage/supabase-storage";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "platform-products");
 const MAX_BYTES = 3 * 1024 * 1024; // 3MB — a product photo, not a hi-res catalog shoot
 const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
@@ -12,8 +11,8 @@ const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp"]);
  * Generic image upload for platform-admin-managed content — currently just the etalase product
  * catalog (Smart Plug variants, jasa instalasi, konsol tambahan), gated by the SEPARATE
  * platform-admin auth system (requirePlatformAdmin), not outlet staff sessions. Stores to
- * public/uploads/platform-products and returns a URL, same pattern as /api/settings/logo for
- * outlet-side uploads, kept as its own route so outlet staff credentials can never reach it.
+ * Supabase Storage (bucket "platform-products"), kept as its own route so outlet staff
+ * credentials can never reach it.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -27,12 +26,11 @@ export async function POST(req: NextRequest) {
     const ext = path.extname(file.name).toLowerCase() || ".png";
     if (!ALLOWED_EXT.has(ext)) return NextResponse.json({ error: "Format foto tidak didukung (gunakan PNG/JPG/WEBP)." }, { status: 400 });
 
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     const filename = `${crypto.randomUUID()}${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
+    const url = await uploadToSupabaseStorage("platform-products", filename, buffer, file.type || "image/*");
 
-    return NextResponse.json({ url: `/uploads/platform-products/${filename}` });
+    return NextResponse.json({ url });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "UNAUTHENTICATED") return NextResponse.json({ error: "Belum login." }, { status: 401 });
     return NextResponse.json({ error: describeError(err) }, { status: 500 });

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
 import path from "path";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { uploadToSupabaseStorage } from "@/lib/storage/supabase-storage";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "branding");
 const MAX_BYTES = 2 * 1024 * 1024; // 2MB — a logo, not a photo
 const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
 
-/** Stores the company logo (used on exported Excel/PDF report letterheads) to public/uploads/branding and returns its URL — caller then PATCHes it onto outlets.logoUrl via /api/settings/outlet. */
+/** Stores the company logo (used on exported Excel/PDF report letterheads) to Supabase Storage
+ * (bucket "branding") and returns its public URL — caller then PATCHes it onto outlets.logoUrl
+ * via /api/settings/outlet. */
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -26,12 +27,11 @@ export async function POST(req: NextRequest) {
     const ext = path.extname(file.name).toLowerCase() || ".png";
     if (!ALLOWED_EXT.has(ext)) return NextResponse.json({ error: "Format logo tidak didukung (gunakan PNG/JPG/WEBP/SVG)." }, { status: 400 });
 
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     const filename = `${crypto.randomUUID()}${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
+    const url = await uploadToSupabaseStorage("branding", filename, buffer, file.type || "image/*");
 
-    return NextResponse.json({ url: `/uploads/branding/${filename}` });
+    return NextResponse.json({ url });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }

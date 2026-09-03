@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
 import path from "path";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { uploadToSupabaseStorage } from "@/lib/storage/supabase-storage";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "expenses");
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB — receipts/photos, no need for more
 const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".pdf"]);
 
-/** Stores a bukti pembayaran/nota attachment to public/uploads/expenses and returns its URL to save on the expense row. Local-filesystem storage — fine for this self-hosted single-server app. */
+/** Stores a bukti pembayaran/nota attachment to Supabase Storage (bucket "expenses") and returns
+ * its public URL to save on the expense row. */
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -22,12 +22,11 @@ export async function POST(req: NextRequest) {
     const ext = path.extname(file.name).toLowerCase() || ".bin";
     if (!ALLOWED_EXT.has(ext)) return NextResponse.json({ error: "Format file tidak didukung (gunakan JPG/PNG/WEBP/PDF)." }, { status: 400 });
 
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     const filename = `${crypto.randomUUID()}${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
+    const url = await uploadToSupabaseStorage("expenses", filename, buffer, file.type || "application/octet-stream");
 
-    return NextResponse.json({ url: `/uploads/expenses/${filename}` });
+    return NextResponse.json({ url });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }

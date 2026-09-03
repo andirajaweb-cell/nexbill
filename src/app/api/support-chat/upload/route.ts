@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
 import path from "path";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { uploadToSupabaseStorage } from "@/lib/storage/supabase-storage";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "support-chat");
 const MAX_BYTES = 15 * 1024 * 1024; // 15MB — covers a short screen-recording clip, not just a photo
 const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm", ".mov"]);
 
 /**
- * Stores an image/video attached to a support-chat message (outlet side) to
- * public/uploads/support-chat and returns its URL — same local-filesystem pattern as
- * /api/expenses/upload and the app's other upload routes. Note: on Vercel's serverless runtime
- * the filesystem is not persistent/shared across instances, same caveat every other upload route
- * in this app already has — see /api/platform-admin/support/upload for the mirrored admin-side
- * route (kept separate so outlet staff credentials can never touch the platform-admin path).
+ * Stores an image/video attached to a support-chat message (outlet side) to Supabase Storage
+ * (bucket "support-chat") and returns its public URL — real, persistent object storage, unlike
+ * the app's older public/uploads/... local-filesystem upload routes, which don't survive Vercel's
+ * serverless runtime. See /api/platform-admin/support/upload for the mirrored admin-side route
+ * (kept separate so outlet staff credentials can never touch the platform-admin path).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -31,16 +29,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Format file tidak didukung (gunakan gambar JPG/PNG/WEBP/GIF atau video MP4/WEBM/MOV)." }, { status: 400 });
     }
 
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     const filename = `${crypto.randomUUID()}${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
+    const contentType = file.type || (ext === ".mp4" || ext === ".webm" || ext === ".mov" ? "video/mp4" : "image/*");
+    const url = await uploadToSupabaseStorage("support-chat", filename, buffer, contentType);
 
-    return NextResponse.json({
-      url: `/uploads/support-chat/${filename}`,
-      type: file.type || (ext === ".mp4" || ext === ".webm" || ext === ".mov" ? "video/*" : "image/*"),
-      name: file.name,
-    });
+    return NextResponse.json({ url, type: contentType, name: file.name });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }

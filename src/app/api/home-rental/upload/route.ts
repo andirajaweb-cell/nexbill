@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
 import path from "path";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { uploadToSupabaseStorage } from "@/lib/storage/supabase-storage";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "home-rental");
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB — ID photos, no need for more
 const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
-/** Stores a KTP/Kartu Pelajar/KTP Orang Tua photo to public/uploads/home-rental and returns its URL to save on the rental row — same local-filesystem pattern as /api/expenses/upload. */
+/** Stores a KTP/Kartu Pelajar/KTP Orang Tua photo to Supabase Storage (bucket "home-rental") and
+ * returns its public URL to save on the rental row. */
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -26,12 +26,11 @@ export async function POST(req: NextRequest) {
     const ext = path.extname(file.name).toLowerCase() || ".jpg";
     if (!ALLOWED_EXT.has(ext)) return NextResponse.json({ error: "Format file tidak didukung (gunakan JPG/PNG/WEBP)." }, { status: 400 });
 
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     const filename = `${crypto.randomUUID()}${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
+    const url = await uploadToSupabaseStorage("home-rental", filename, buffer, file.type || "image/*");
 
-    return NextResponse.json({ url: `/uploads/home-rental/${filename}` });
+    return NextResponse.json({ url });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }
