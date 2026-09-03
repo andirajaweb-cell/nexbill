@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -96,6 +96,7 @@ function CategorySelect({ value, onChange, className }: { value: string; onChang
 
 type AdjustMode = "add" | "subtract" | "set";
 type AdjustReason = "normal" | "waste";
+type ProductSortOption = "name_asc" | "name_desc" | "price_asc" | "price_desc" | "stock_desc" | "stock_asc";
 
 function ProductTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
@@ -110,7 +111,7 @@ function ProductTab({ outletId }: { outletId: string }) {
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [form, setForm] = useState({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: "pcs", lowStockThreshold: 5, preferredSupplierId: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ category: string; price: number; costPrice: number; unit: string; lowStockThreshold: number; preferredSupplierId: string } | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; category: string; price: number; costPrice: number; unit: string; lowStockThreshold: number; preferredSupplierId: string } | null>(null);
 
   // "Penyesuaian Barang" — replaces the old costed Restock shortcut. Pure quantity tool (no
   // harga beli input): Tambah Unit / Kurangi Unit / Set ke Jumlah Tertentu, all posted via
@@ -123,12 +124,42 @@ function ProductTab({ outletId }: { outletId: string }) {
   const [adjustReason, setAdjustReason] = useState<AdjustReason>("normal");
   const [adjustNote, setAdjustNote] = useState("");
 
+  // Search + filter + sort for the product table — purely client-side over
+  // the already-loaded `products` list, no extra API calls.
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<ProductSortOption>("name_asc");
+
   const load = () => fetchJsonArray("/api/products").then(setProducts);
   useEffect(() => {
     load();
     fetchJsonArray<UnitOption>(`/api/units?outletId=${outletId}`).then((rows) => setUnits(rows.filter((u) => u.isActive)));
     fetchJsonArray<SupplierOption>(`/api/suppliers?outletId=${outletId}`).then(setSuppliers);
   }, [outletId]);
+
+  // Multi-keyword AND search on the product name (typing "kopi susu" matches
+  // "Es Kopi Susu Gula Aren" regardless of word order), plus category filter
+  // and sort — all client-side over the already-loaded list.
+  const filteredProducts = useMemo(() => {
+    const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const filtered = products.filter((p) => {
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      if (words.length === 0) return true;
+      const name = p.name.toLowerCase();
+      return words.every((w) => name.includes(w));
+    });
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "name_asc": return a.name.localeCompare(b.name, "id");
+        case "name_desc": return b.name.localeCompare(a.name, "id");
+        case "price_asc": return a.price - b.price;
+        case "price_desc": return b.price - a.price;
+        case "stock_desc": return b.stockQty - a.stockQty;
+        case "stock_asc": return a.stockQty - b.stockQty;
+        default: return 0;
+      }
+    });
+  }, [products, search, categoryFilter, sortBy]);
 
   const addProduct = async () => {
     if (!form.name) return;
@@ -167,13 +198,14 @@ function ProductTab({ outletId }: { outletId: string }) {
   const startEdit = (p: Product) => {
     setAdjustingId(null);
     setEditingId(p.id);
-    setEditForm({ category: p.category, price: p.price, costPrice: p.costPrice, unit: p.unit, lowStockThreshold: p.lowStockThreshold, preferredSupplierId: p.preferredSupplierId ?? "" });
+    setEditForm({ name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, unit: p.unit, lowStockThreshold: p.lowStockThreshold, preferredSupplierId: p.preferredSupplierId ?? "" });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
   const toggleEdit = (p: Product) => (editingId === p.id ? cancelEdit() : startEdit(p));
 
   const saveEdit = async (id: string) => {
     if (!editForm) return;
+    if (!editForm.name.trim()) return showAlert(t("inventory.product.nameRequired", "Nama produk wajib diisi."));
     const res = await fetch(`/api/products/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -248,10 +280,33 @@ function ProductTab({ outletId }: { outletId: string }) {
       </Card>
 
       <Card>
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+          <input
+            className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+            placeholder={t("inventory.product.searchPlaceholder", "Cari nama produk...")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="all">{t("inventory.product.filterAllCategories", "Semua Kategori")}</option>
+            {Object.entries(CATEGORY_LABEL_KEYS).map(([v, meta]) => <option key={v} value={v}>{t(meta.key, meta.fallback)}</option>)}
+          </select>
+          <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as ProductSortOption)}>
+            <option value="name_asc">{t("inventory.product.sortNameAsc", "Nama (A-Z)")}</option>
+            <option value="name_desc">{t("inventory.product.sortNameDesc", "Nama (Z-A)")}</option>
+            <option value="price_asc">{t("inventory.product.sortPriceAsc", "Harga Termurah")}</option>
+            <option value="price_desc">{t("inventory.product.sortPriceDesc", "Harga Termahal")}</option>
+            <option value="stock_desc">{t("inventory.product.sortStockDesc", "Stok Terbanyak")}</option>
+            <option value="stock_asc">{t("inventory.product.sortStockAsc", "Stok Tersedikit")}</option>
+          </select>
+        </div>
+        {filteredProducts.length === 0 && products.length > 0 && (
+          <p className="text-sm text-neutral-500 py-4 text-center">{t("inventory.product.noSearchResults", "Tidak ada produk yang cocok dengan pencarian/filter ini.")}</p>
+        )}
         <table className="w-full text-sm">
           <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("inventory.product.table.name", "Produk")}</th><th>{t("inventory.product.table.category", "Kategori")}</th><th>{t("inventory.product.table.price", "Harga")}</th><th>{t("inventory.product.table.cost", "Modal")}</th><th>{t("inventory.product.table.stock", "Stok")}</th><th>{t("inventory.product.table.supplier", "Supplier Utama")}</th><th></th></tr></thead>
           <tbody>
-            {products.map((p) => (
+            {filteredProducts.map((p) => (
               <Fragment key={p.id}>
                 <tr className={`border-b border-neutral-900 align-top ${p.isActive === false ? "opacity-50" : ""}`}>
                   <td className="py-2">
@@ -282,7 +337,8 @@ function ProductTab({ outletId }: { outletId: string }) {
                 {editingId === p.id && editForm && (
                   <tr className="border-b border-neutral-900 bg-neutral-900/40">
                     <td colSpan={7} className="py-3">
-                      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="col-span-2"><label className="text-xs text-neutral-500">{t("inventory.product.editForm.name", "Nama Produk")}</label><input className={smallInputCls} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.category", "Kategori")}</label><CategorySelect value={editForm.category} onChange={(v) => setEditForm({ ...editForm, category: v })} className={smallInputCls} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.sellPrice", "Harga Jual")}</label><input type="number" className={smallInputCls} value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.costPrice", "Harga Modal")}</label><input type="number" className={smallInputCls} value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: Number(e.target.value) })} /></div>
@@ -426,6 +482,26 @@ interface IngredientRow { ingredientProductId: string; qtyPerYield: number; unit
 const emptyIngredientRow: IngredientRow = { ingredientProductId: "", qtyPerYield: 0, unit: "pcs" };
 
 /**
+ * "Buat Resep / BOM Baru" create-form draft, kept in localStorage so a
+ * half-filled recipe (product info + ingredient rows) survives switching to
+ * another Inventaris tab or navigating to a different dashboard page before
+ * hitting submit — same pattern as POS_DRAFT_KEY in dashboard/pos/page.tsx.
+ * The inline edit form (editingId/editRows) is intentionally NOT persisted
+ * here since it's tied to a specific existing DB record, not a fresh draft.
+ */
+const RECIPE_DRAFT_KEY = "recipe_draft_v1";
+interface RecipeDraft {
+  mode: "new" | "existing";
+  newProductName: string;
+  newProductPrice: number;
+  newProductUnit: string;
+  existingProductId: string;
+  recipeName: string;
+  yieldQty: number;
+  rows: IngredientRow[];
+}
+
+/**
  * Recipe/BOM builder — the finished product a recipe produces is always forced into the "food"
  * category (per business decision: this feature is specifically for olahan/masakan like Mie
  * Goreng, not snack/merchandise which cost straight off the purchase price). Selling the
@@ -436,7 +512,13 @@ const emptyIngredientRow: IngredientRow = { ingredientProductId: "", qtyPerYield
 function RecipeTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { user } = useAuth();
-  const canManage = isSuperRole(user?.role);
+  // Was isSuperRole (Superuser-only) — editing/deleting your own outlet's recipe is a routine
+  // day-to-day inventory task, not something that should require NEXBILL's internal account.
+  // Same fix and same permission already applied to ProductTab's canDelete above:
+  // manage_inventory_purchasing (owner + manager get it by default — see DEFAULT_ROLE_PERMISSIONS
+  // in permissions.ts). "Simpan Resep" (create) was never gated in the first place, only Edit/Hapus
+  // were — so recipes could be added but never edited or deleted by a normal outlet account.
+  const canManage = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_inventory_purchasing");
   const [products, setProducts] = useState<Product[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
@@ -451,6 +533,7 @@ function RecipeTab({ outletId }: { outletId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editYieldQty, setEditYieldQty] = useState(1);
   const [editRows, setEditRows] = useState<IngredientRow[]>([]);
+  const isFirstRenderDraft = useRef(true);
 
   const load = () => fetchJsonArray("/api/recipes").then(setRecipes);
   useEffect(() => {
@@ -458,6 +541,39 @@ function RecipeTab({ outletId }: { outletId: string }) {
     fetchJsonArray("/api/products").then(setProducts);
     fetchJsonArray<UnitOption>(`/api/units?outletId=${outletId}`).then((rows) => setUnits(rows.filter((u) => u.isActive)));
   }, [outletId]);
+
+  // Restore any in-progress "Buat Resep / BOM Baru" draft left over from
+  // before navigating away.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(RECIPE_DRAFT_KEY);
+    if (!saved) return;
+    try {
+      const draft: Partial<RecipeDraft> = JSON.parse(saved);
+      if (draft.mode) setMode(draft.mode);
+      if (draft.newProductName) setNewProductName(draft.newProductName);
+      if (draft.newProductPrice) setNewProductPrice(draft.newProductPrice);
+      if (draft.newProductUnit) setNewProductUnit(draft.newProductUnit);
+      if (draft.existingProductId) setExistingProductId(draft.existingProductId);
+      if (draft.recipeName) setRecipeName(draft.recipeName);
+      if (draft.yieldQty) setYieldQty(draft.yieldQty);
+      if (draft.rows?.length) setRows(draft.rows);
+    } catch {
+      // corrupted draft — ignore, start fresh
+    }
+  }, []);
+
+  // Persist on every change, skipping the very first render (initial default
+  // state, before the restore effect above has had a chance to apply).
+  useEffect(() => {
+    if (isFirstRenderDraft.current) {
+      isFirstRenderDraft.current = false;
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const draft: RecipeDraft = { mode, newProductName, newProductPrice, newProductUnit, existingProductId, recipeName, yieldQty, rows };
+    window.localStorage.setItem(RECIPE_DRAFT_KEY, JSON.stringify(draft));
+  }, [mode, newProductName, newProductPrice, newProductUnit, existingProductId, recipeName, yieldQty, rows]);
 
   const recipeProductIds = new Set(recipes.map((r) => r.productId));
   const foodProductsNoRecipe = products.filter((p) => p.category === "food" && p.isActive && !recipeProductIds.has(p.id));
@@ -477,6 +593,7 @@ function RecipeTab({ outletId }: { outletId: string }) {
     setRecipeName("");
     setYieldQty(1);
     setRows([{ ...emptyIngredientRow }]);
+    if (typeof window !== "undefined") window.localStorage.removeItem(RECIPE_DRAFT_KEY);
   };
 
   const create = async () => {
