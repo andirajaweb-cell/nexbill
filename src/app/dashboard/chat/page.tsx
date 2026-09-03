@@ -1,9 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
+import { showAlert } from "@/lib/ui/dialog";
+import { Paperclip, Download, X, FileVideo } from "lucide-react";
 import "@/lib/i18n/dict-chat";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 
@@ -21,7 +23,46 @@ interface Message {
   sender: "outlet" | "platform_admin";
   senderName: string | null;
   body: string;
+  attachmentUrl?: string | null;
+  attachmentType?: string | null;
+  attachmentName?: string | null;
   createdAt: string;
+}
+
+interface PendingAttachment {
+  url: string;
+  type: string;
+  name: string;
+}
+
+const MAX_ATTACHMENT_MB = 15;
+
+/** Inline preview for one message's attachment — image renders directly, video gets a native
+ * player, anything else (or a type we don't recognize) falls back to just the download link. A
+ * plain download link is always shown alongside so the recipient can save the original file
+ * regardless of whether the browser can render it inline. */
+function AttachmentPreview({ url, type, name, t }: { url: string; type?: string | null; name?: string | null; t: (key: string, fallback: string) => string }) {
+  const isImage = (type || "").startsWith("image/");
+  const isVideo = (type || "").startsWith("video/");
+  const fallbackLabel = t("chat.attachmentFallback", "Lampiran");
+  return (
+    <div className="mt-1.5 space-y-1">
+      {isImage && (
+        <a href={url} target="_blank" rel="noreferrer">
+          <img src={url} alt={name || fallbackLabel} className="max-h-48 rounded-lg border border-white/10" />
+        </a>
+      )}
+      {isVideo && <video src={url} controls className="max-h-48 rounded-lg border border-white/10" />}
+      {!isImage && !isVideo && (
+        <div className="flex items-center gap-1.5 text-xs text-neutral-400">
+          <FileVideo size={12} /> <span className="truncate max-w-[160px]">{name || fallbackLabel}</span>
+        </div>
+      )}
+      <a href={url} download={name || undefined} className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition w-fit">
+        <Download size={11} /> {t("chat.download", "Unduh")}{name ? ` — ${name}` : ""}
+      </a>
+    </div>
+  );
 }
 
 export default function SupportChatPage() {
@@ -41,6 +82,28 @@ export default function SupportChatPage() {
   const [newMessage, setNewMessage] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [newAttachment, setNewAttachment] = useState<PendingAttachment | null>(null);
+  const [replyAttachment, setReplyAttachment] = useState<PendingAttachment | null>(null);
+  const [uploadingNew, setUploadingNew] = useState(false);
+  const [uploadingReply, setUploadingReply] = useState(false);
+  const newFileRef = useRef<HTMLInputElement>(null);
+  const replyFileRef = useRef<HTMLInputElement>(null);
+
+  const uploadAttachment = async (file: File): Promise<PendingAttachment | null> => {
+    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+      showAlert(t("chat.maxAttachmentSize", "File maksimal {n}MB.").replace("{n}", String(MAX_ATTACHMENT_MB)));
+      return null;
+    }
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/support-chat/upload", { method: "POST", body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showAlert(data?.error || t("chat.uploadFailed", "Gagal mengunggah file."));
+      return null;
+    }
+    return { url: data.url, type: data.type, name: data.name };
+  };
 
   const loadThreads = () => fetchJsonArray<Thread>("/api/support-chat").then(setThreads);
   useEffect(() => {
@@ -58,18 +121,26 @@ export default function SupportChatPage() {
   }, [selected]);
 
   const createTicket = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() && !newAttachment) return;
     setBusy(true);
     try {
       const res = await fetch("/api/support-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: newSubject || undefined, category: newCategory, message: newMessage }),
+        body: JSON.stringify({
+          subject: newSubject || undefined,
+          category: newCategory,
+          message: newMessage,
+          attachmentUrl: newAttachment?.url,
+          attachmentType: newAttachment?.type,
+          attachmentName: newAttachment?.name,
+        }),
       });
       const out = await res.json();
       if (!res.ok) return;
       setNewSubject("");
       setNewMessage("");
+      setNewAttachment(null);
       setShowNew(false);
       await loadThreads();
       setSelected(out.thread);
@@ -79,13 +150,15 @@ export default function SupportChatPage() {
   };
 
   const sendReply = async () => {
-    if (!selected || !reply.trim()) return;
+    if (!selected || (!reply.trim() && !replyAttachment)) return;
     const body = reply;
+    const attachment = replyAttachment;
     setReply("");
+    setReplyAttachment(null);
     await fetch(`/api/support-chat/${selected.id}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({ body, attachmentUrl: attachment?.url, attachmentType: attachment?.type, attachmentName: attachment?.name }),
     });
     const msgs = await fetchJsonArray<Message>(`/api/support-chat/${selected.id}/messages`);
     setMessages(msgs);
@@ -137,7 +210,41 @@ export default function SupportChatPage() {
               placeholder={t("chat.messagePlaceholder", "Jelaskan keluhan/saran/kendalanya...")}
             />
           </div>
-          <Button onClick={createTicket} disabled={busy}>{busy ? t("chat.sending", "Mengirim...") : t("chat.sendToCenter", "Kirim ke Pusat")}</Button>
+          {newAttachment && (
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-neutral-300 w-fit">
+              <Paperclip size={12} className="text-cyan-300" />
+              <span className="truncate max-w-[200px]">{newAttachment.name}</span>
+              <button type="button" onClick={() => setNewAttachment(null)} className="text-neutral-500 hover:text-rose-400 transition">
+                <X size={12} />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              ref={newFileRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setUploadingNew(true);
+                try {
+                  const uploaded = await uploadAttachment(file);
+                  if (uploaded) setNewAttachment(uploaded);
+                } finally {
+                  setUploadingNew(false);
+                }
+              }}
+            />
+            <Button variant="secondary" className="text-xs" onClick={() => newFileRef.current?.click()} disabled={uploadingNew}>
+              <Paperclip size={12} className="mr-1 inline" /> {uploadingNew ? t("chat.uploading", "Mengunggah...") : t("chat.attachButton", "Lampirkan gambar/video")}
+            </Button>
+            <Button onClick={createTicket} disabled={busy || uploadingNew || (!newMessage.trim() && !newAttachment)}>
+              {busy ? t("chat.sending", "Mengirim...") : t("chat.sendToCenter", "Kirim ke Pusat")}
+            </Button>
+          </div>
         </Card>
       )}
 
@@ -174,11 +281,48 @@ export default function SupportChatPage() {
                   <div key={m.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.sender === "platform_admin" ? "bg-white/5" : "bg-cyan-500/15 ml-auto"}`}>
                     <div className="text-[10px] text-neutral-500 mb-0.5">{m.sender === "platform_admin" ? m.senderName || t("chat.supportName", "NEXBILL Support") : m.senderName || t("chat.youLabel", "Kamu")}</div>
                     {m.body}
+                    {m.attachmentUrl && <AttachmentPreview url={m.attachmentUrl} type={m.attachmentType} name={m.attachmentName} t={t} />}
                   </div>
                 ))}
                 {messages.length === 0 && <p className="text-xs text-neutral-500 m-auto">{t("chat.noMessages", "Belum ada pesan.")}</p>}
               </div>
+              {replyAttachment && (
+                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 mt-2 text-xs text-neutral-300 w-fit">
+                  <Paperclip size={12} className="text-cyan-300" />
+                  <span className="truncate max-w-[200px]">{replyAttachment.name}</span>
+                  <button type="button" onClick={() => setReplyAttachment(null)} className="text-neutral-500 hover:text-rose-400 transition">
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
               <div className="flex gap-2 pt-2 border-t border-white/10 mt-2">
+                <input
+                  ref={replyFileRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    setUploadingReply(true);
+                    try {
+                      const uploaded = await uploadAttachment(file);
+                      if (uploaded) setReplyAttachment(uploaded);
+                    } finally {
+                      setUploadingReply(false);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => replyFileRef.current?.click()}
+                  disabled={uploadingReply}
+                  title={t("chat.attachButton", "Lampirkan gambar/video")}
+                  className="shrink-0 rounded-lg border border-white/10 px-2.5 text-neutral-400 hover:text-cyan-300 hover:border-cyan-400/30 transition disabled:opacity-50"
+                >
+                  <Paperclip size={14} />
+                </button>
                 <input
                   className="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm"
                   placeholder={t("chat.replyPlaceholder", "Balas...")}
@@ -186,7 +330,7 @@ export default function SupportChatPage() {
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendReply()}
                 />
-                <Button onClick={sendReply}>{t("chat.sendButton", "Kirim")}</Button>
+                <Button onClick={sendReply} disabled={!reply.trim() && !replyAttachment}>{t("chat.sendButton", "Kirim")}</Button>
               </div>
             </>
           ) : (

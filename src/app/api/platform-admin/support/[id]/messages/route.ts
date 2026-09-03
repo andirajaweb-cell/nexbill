@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
-/** Platform admin replies to an outlet's ticket. Body: { body }. */
+/** Platform admin replies to an outlet's ticket. Body: { body, attachmentUrl?, attachmentType?, attachmentName? } — body may be empty if an attachment is included. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await requirePlatformAdmin();
@@ -27,13 +27,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!thread) return NextResponse.json({ error: "Tiket tidak ditemukan." }, { status: 404 });
 
     const body = await req.json().catch(() => ({}));
-    if (!body.body || typeof body.body !== "string" || !body.body.trim()) {
+    const messageText = typeof body.body === "string" ? body.body.trim() : "";
+    const hasAttachment = typeof body.attachmentUrl === "string" && body.attachmentUrl.trim().length > 0;
+    if (!messageText && !hasAttachment) {
       return NextResponse.json({ error: "Pesan wajib diisi." }, { status: 400 });
     }
     const now = new Date().toISOString();
     const [message] = await db
       .insert(supportMessages)
-      .values({ threadId: id, sender: "platform_admin", senderName: session.name, body: body.body.trim() })
+      .values({
+        threadId: id,
+        sender: "platform_admin",
+        senderName: session.name,
+        body: messageText,
+        attachmentUrl: hasAttachment ? body.attachmentUrl : null,
+        attachmentType: hasAttachment ? body.attachmentType || null : null,
+        attachmentName: hasAttachment ? body.attachmentName || null : null,
+      })
       .returning();
     await db.update(supportThreads).set({ lastMessageAt: now }).where(eq(supportThreads.id, id));
 

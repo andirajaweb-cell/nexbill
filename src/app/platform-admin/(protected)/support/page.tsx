@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { LANG_OPTIONS, type LangCode } from "@/lib/i18n/registry";
+import { Paperclip, Download, X, FileVideo } from "lucide-react";
 
 interface Thread {
   id: string;
@@ -22,8 +23,19 @@ interface Message {
   sender: "outlet" | "platform_admin";
   senderName: string | null;
   body: string;
+  attachmentUrl?: string | null;
+  attachmentType?: string | null;
+  attachmentName?: string | null;
   createdAt: string;
 }
+
+interface PendingAttachment {
+  url: string;
+  type: string;
+  name: string;
+}
+
+const MAX_ATTACHMENT_MB = 15;
 
 const CATEGORY_LABEL: Record<string, string> = {
   keluhan: "Keluhan",
@@ -31,6 +43,32 @@ const CATEGORY_LABEL: Record<string, string> = {
   kendala_teknis: "Kendala Teknis",
   lainnya: "Lainnya",
 };
+
+/** Same inline-preview treatment as the outlet-side chat page (src/app/dashboard/chat/page.tsx) —
+ * image renders directly, video gets a native player, and a plain download link is always shown
+ * so the recipient can save the original file either way. */
+function AttachmentPreview({ url, type, name }: { url: string; type?: string | null; name?: string | null }) {
+  const isImage = (type || "").startsWith("image/");
+  const isVideo = (type || "").startsWith("video/");
+  return (
+    <div className="mt-1.5 space-y-1">
+      {isImage && (
+        <a href={url} target="_blank" rel="noreferrer">
+          <img src={url} alt={name || "Lampiran"} className="max-h-48 rounded-lg border border-white/10" />
+        </a>
+      )}
+      {isVideo && <video src={url} controls className="max-h-48 rounded-lg border border-white/10" />}
+      {!isImage && !isVideo && (
+        <div className="flex items-center gap-1.5 text-xs text-neutral-400">
+          <FileVideo size={12} /> <span className="truncate max-w-[160px]">{name || "Lampiran"}</span>
+        </div>
+      )}
+      <a href={url} download={name || undefined} className="flex items-center gap-1 text-[11px] text-amber-300 hover:text-amber-200 transition w-fit">
+        <Download size={11} /> Unduh{name ? ` — ${name}` : ""}
+      </a>
+    </div>
+  );
+}
 
 export default function PlatformSupportPage() {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -40,6 +78,25 @@ export default function PlatformSupportPage() {
   const [filter, setFilter] = useState<"open" | "resolved" | "all">("open");
   const [translating, setTranslating] = useState(false);
   const [translatedInto, setTranslatedInto] = useState<LangCode | null>(null);
+  const [replyAttachment, setReplyAttachment] = useState<PendingAttachment | null>(null);
+  const [uploadingReply, setUploadingReply] = useState(false);
+  const replyFileRef = useRef<HTMLInputElement>(null);
+
+  const uploadAttachment = async (file: File): Promise<PendingAttachment | null> => {
+    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+      alert(`File maksimal ${MAX_ATTACHMENT_MB}MB.`);
+      return null;
+    }
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/platform-admin/support/upload", { method: "POST", body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data?.error || "Gagal mengunggah file.");
+      return null;
+    }
+    return { url: data.url, type: data.type, name: data.name };
+  };
 
   const loadThreads = () => fetchJsonArray<Thread>("/api/platform-admin/support").then(setThreads);
   useEffect(() => {
@@ -57,14 +114,16 @@ export default function PlatformSupportPage() {
   }, [selected]);
 
   const sendReply = async () => {
-    if (!selected || !reply.trim()) return;
+    if (!selected || (!reply.trim() && !replyAttachment)) return;
     const body = reply;
+    const attachment = replyAttachment;
     setReply("");
+    setReplyAttachment(null);
     setTranslatedInto(null);
     await fetch(`/api/platform-admin/support/${selected.id}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({ body, attachmentUrl: attachment?.url, attachmentType: attachment?.type, attachmentName: attachment?.name }),
     });
     const msgs = await fetchJsonArray<Message>(`/api/platform-admin/support/${selected.id}/messages`);
     setMessages(msgs);
@@ -171,6 +230,7 @@ export default function PlatformSupportPage() {
                   <div key={m.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.sender === "outlet" ? "bg-white/5" : "bg-amber-400/10 ml-auto"}`}>
                     <div className="text-[10px] text-neutral-500 mb-0.5">{m.senderName || (m.sender === "outlet" ? selected.outletName : "NEXBILL Support")}</div>
                     {m.body}
+                    {m.attachmentUrl && <AttachmentPreview url={m.attachmentUrl} type={m.attachmentType} name={m.attachmentName} />}
                   </div>
                 ))}
                 {messages.length === 0 && <p className="text-xs text-neutral-500 m-auto">Belum ada pesan.</p>}
@@ -181,7 +241,43 @@ export default function PlatformSupportPage() {
                     Diterjemahkan ke {LANG_OPTIONS.find((l) => l.code === translatedInto)?.label} — cek dulu sebelum kirim.
                   </div>
                 )}
+                {replyAttachment && (
+                  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-neutral-300 w-fit">
+                    <Paperclip size={12} className="text-amber-300" />
+                    <span className="truncate max-w-[200px]">{replyAttachment.name}</span>
+                    <button type="button" onClick={() => setReplyAttachment(null)} className="text-neutral-500 hover:text-rose-400 transition">
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-2">
+                  <input
+                    ref={replyFileRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      setUploadingReply(true);
+                      try {
+                        const uploaded = await uploadAttachment(file);
+                        if (uploaded) setReplyAttachment(uploaded);
+                      } finally {
+                        setUploadingReply(false);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => replyFileRef.current?.click()}
+                    disabled={uploadingReply}
+                    title="Lampirkan gambar/video"
+                    className="shrink-0 self-start rounded-lg border border-neutral-700 px-2.5 py-2 text-neutral-400 hover:text-amber-300 hover:border-amber-400/30 transition disabled:opacity-50"
+                  >
+                    <Paperclip size={14} />
+                  </button>
                   <textarea
                     className="flex-1 rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm resize-none"
                     rows={2}
@@ -196,7 +292,7 @@ export default function PlatformSupportPage() {
                         {translating ? "Menerjemahkan..." : "Terjemahkan"}
                       </Button>
                     )}
-                    <Button onClick={sendReply} disabled={!reply.trim()}>Kirim</Button>
+                    <Button onClick={sendReply} disabled={!reply.trim() && !replyAttachment}>Kirim</Button>
                   </div>
                 </div>
               </div>

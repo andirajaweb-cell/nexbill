@@ -21,14 +21,16 @@ export async function GET() {
   }
 }
 
-/** Opens a new support ticket (thread + first message) for the caller's own outlet. Body: { subject?, category, message }. */
+/** Opens a new support ticket (thread + first message) for the caller's own outlet. Body: { subject?, category, message, attachmentUrl?, attachmentType?, attachmentName? } — message may be empty if an attachment is included. */
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    if (!body.message || typeof body.message !== "string" || !body.message.trim()) {
+    const messageText = typeof body.message === "string" ? body.message.trim() : "";
+    const hasAttachment = typeof body.attachmentUrl === "string" && body.attachmentUrl.trim().length > 0;
+    if (!messageText && !hasAttachment) {
       return NextResponse.json({ error: "Pesan wajib diisi." }, { status: 400 });
     }
     const category = ["keluhan", "saran", "kendala_teknis", "lainnya"].includes(body.category) ? body.category : "lainnya";
@@ -40,7 +42,15 @@ export async function POST(req: NextRequest) {
       .returning();
     const [message] = await db
       .insert(supportMessages)
-      .values({ threadId: thread.id, sender: "outlet", senderName: session.name, body: body.message.trim() })
+      .values({
+        threadId: thread.id,
+        sender: "outlet",
+        senderName: session.name,
+        body: messageText,
+        attachmentUrl: hasAttachment ? body.attachmentUrl : null,
+        attachmentType: hasAttachment ? body.attachmentType || null : null,
+        attachmentName: hasAttachment ? body.attachmentName || null : null,
+      })
       .returning();
 
     return NextResponse.json({ thread, message });

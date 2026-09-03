@@ -407,6 +407,13 @@ export const supportMessages = pgTable("support_messages", {
   sender: text("sender", { enum: ["outlet", "platform_admin"] }).notNull(),
   senderName: text("sender_name"),
   body: text("body").notNull(),
+  // Optional single image/video attachment — either side can send one with (or instead of) a
+  // text body. attachmentType stores the file's MIME type so the UI knows whether to render an
+  // <img>, a <video>, or just a generic download link; attachmentName is the original filename,
+  // used for the download link's filename (the stored file itself is renamed to a random id).
+  attachmentUrl: text("attachment_url"),
+  attachmentType: text("attachment_type"),
+  attachmentName: text("attachment_name"),
   ...timestamps,
 });
 
