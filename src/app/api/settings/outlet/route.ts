@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
-import { ensureOutletSlug } from "@/lib/outlets/slug";
+import { ensureOutletSlug, setOutletSlug } from "@/lib/outlets/slug";
 import { SEA_COUNTRY_TO_LANG } from "@/lib/data/sea-banks";
 
 /** Curated fields the Settings UI (Business/Tax/Printer/Notification tabs) is allowed to edit on the outlet row. */
@@ -56,6 +56,13 @@ export async function PATCH(req: NextRequest) {
     const patch: Record<string, unknown> = {};
     for (const key of EDITABLE_FIELDS) {
       if (body[key] !== undefined) patch[key] = body[key];
+    }
+    // "slug" is deliberately NOT in EDITABLE_FIELDS — it can't be passed through raw like the
+    // others, it needs slugify() normalization + a uniqueness check (see setOutletSlug's doc
+    // comment on why this is opt-in rather than auto-synced from name). Handled here, before the
+    // generic update below, so both land in the same PATCH response.
+    if (typeof body.slug === "string" && body.slug.trim()) {
+      patch.slug = await setOutletSlug(session.outletId, body.slug);
     }
     // Saving a country auto-derives preferredLang (support translation + billing currency both
     // read that column — see SEA_COUNTRY_TO_LANG's doc comment) — an outlet picks its country

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
  * separators into a single hyphen, trims leading/trailing hyphens. Empty/all-symbol names
  * (rare, but a merchant could technically name their outlet "!!!") fall back to "outlet" so
  * there's always something to slugify from. */
-function slugify(name: string): string {
+export function slugify(name: string): string {
   const base = name
     .toLowerCase()
     .normalize("NFKD")
@@ -48,4 +48,29 @@ export async function ensureOutletSlug(outletId: string): Promise<string> {
 
   await db.update(outlets).set({ slug: candidate }).where(eq(outlets.id, outletId));
   return candidate;
+}
+
+/**
+ * Deliberate manual slug change, triggered from Settings (see BookingLinkShare in
+ * dashboard/settings/page.tsx) — NOT auto-run whenever the outlet's name changes.
+ *
+ * Why not auto-sync on every name edit: the /book/[slug] link is meant to be shared publicly
+ * (printed on receipts, posted on social media — see the receiptFooterText field right next to
+ * it in Settings). Silently rewriting the slug every time an owner tweaks their business name in
+ * Settings would quietly 404 every link they'd already handed out, with no warning. So the slug
+ * only ever changes when someone explicitly asks for it here, after seeing a "old links stop
+ * working" confirmation client-side (see showConfirm() call in BookingLinkShare).
+ *
+ * This is also the fix for outlets whose slug got auto-generated from a placeholder/test name
+ * early on (e.g. "x") and never caught up after the real business name was set — previously the
+ * only way to fix that was a manual DB edit.
+ */
+export async function setOutletSlug(outletId: string, desiredRaw: string): Promise<string> {
+  const desired = slugify(desiredRaw);
+  const [taken] = await db.select({ id: outlets.id }).from(outlets).where(eq(outlets.slug, desired)).limit(1);
+  if (taken && taken.id !== outletId) {
+    throw new Error(`Link "/book/${desired}" sudah dipakai outlet lain — coba nama lain.`);
+  }
+  await db.update(outlets).set({ slug: desired }).where(eq(outlets.id, outletId));
+  return desired;
 }

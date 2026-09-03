@@ -102,14 +102,79 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls = "w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm disabled:opacity-60";
 
-function BookingLinkShare({ slug }: { slug: string | null | undefined }) {
+function BookingLinkShare({
+  slug,
+  outletId,
+  canManage,
+  onSlugChange,
+}: {
+  slug: string | null | undefined;
+  outletId: string;
+  canManage: boolean;
+  onSlugChange: (newSlug: string) => void;
+}) {
   const [copied, setCopied] = useState(false);
   const [url, setUrl] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
   const { t } = useDashboardLang();
   // Each outlet gets its own /book/[slug] link — never the bare /book route, which
   // (deliberately) no longer resolves to any specific outlet. See src/lib/outlets/slug.ts.
   useEffect(() => { if (slug) setUrl(`${window.location.origin}/book/${slug}`); }, [slug]);
   if (!url) return null;
+
+  const startEdit = () => {
+    setDraft(slug ?? "");
+    setEditing(true);
+  };
+
+  const saveSlug = async () => {
+    // Slug only ever changes here, deliberately — never auto-synced from the business name (see
+    // setOutletSlug's doc comment). This link may already be printed on receipts or shared on
+    // social media, so a manual, explicit confirmation is required before rewriting it.
+    const ok = await showConfirm(
+      `Ganti link booking jadi "/book/${draft}"? Link lama ("/book/${slug}") akan langsung berhenti berfungsi — pastikan belum dibagikan ke pelanggan, atau update dulu di tempat lain kamu memasangnya.`,
+      { tone: "danger" }
+    );
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/outlet", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outletId, slug: draft }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      onSlugChange(data.slug);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-neutral-500 shrink-0">{`${window.location.origin}/book/`}</span>
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            className={inputCls + " flex-1"}
+            placeholder="nama-outlet-kamu"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={saveSlug} disabled={saving || !draft.trim()}>{saving ? "Menyimpan..." : "Simpan Link Baru"}</Button>
+          <Button variant="ghost" onClick={() => setEditing(false)} disabled={saving}>{t("settings.common.cancel", "Batal")}</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2">
       <input readOnly value={url} className={inputCls + " flex-1"} onFocus={(e) => e.target.select()} />
@@ -122,6 +187,9 @@ function BookingLinkShare({ slug }: { slug: string | null | undefined }) {
       >
         {copied ? t("settings.bookingLink.copied", "Tersalin!") : t("settings.bookingLink.copyButton", "Salin Link")}
       </Button>
+      {canManage && (
+        <Button variant="ghost" onClick={startEdit}>Ganti</Button>
+      )}
     </div>
   );
 }
@@ -248,7 +316,12 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
             <input type="checkbox" disabled={!canManage} checked={form.acceptOnlineBooking ?? true} onChange={(e) => setForm({ ...form, acceptOnlineBooking: e.target.checked })} /> {t("settings.businessTax.acceptOnlineBooking", "Terima Booking Online (halaman publik outlet ini di bawah)")}
           </label>
           <p className="text-xs text-neutral-500">{t("settings.businessTax.acceptOnlineBookingDesc", "Kalau dimatikan, halaman booking outlet ini tetap menampilkan status ketersediaan unit tapi form booking disembunyikan — cocok saat tutup sementara atau acara privat.")}</p>
-          <BookingLinkShare slug={form.slug} />
+          <BookingLinkShare
+            slug={form.slug}
+            outletId={outletId}
+            canManage={canManage}
+            onSlugChange={(newSlug) => setForm((f: any) => ({ ...f, slug: newSlug }))}
+          />
         </div>
       </Card>
 
