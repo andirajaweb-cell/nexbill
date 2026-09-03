@@ -31,6 +31,7 @@ interface Copy {
   googleButtonBusy: string;
   googleErrorInactive: string;
   googleErrorGeneric: string;
+  googleErrorRetry: string;
   noAccount: string;
   signUpLink: string;
   forgotHint: string;
@@ -61,6 +62,7 @@ const COPY: Record<LangCode, Copy> = {
     googleButtonBusy: "Membuka Google...",
     googleErrorInactive: "Akun ini nonaktif — hubungi Superuser outlet kamu.",
     googleErrorGeneric: "Login dengan Google gagal. Coba lagi, atau pakai email & password.",
+    googleErrorRetry: "Sesi verifikasi Google terputus di tengah jalan (biasanya karena link-nya kepakai dua kali atau tab-nya sudah lama terbuka). Klik lagi tombol \"Masuk dengan Google\" dari tab baru, atau pakai email & password.",
     noAccount: "Belum punya outlet terdaftar?",
     signUpLink: "Daftar Sekarang",
     forgotHint: "Lupa password?",
@@ -89,6 +91,7 @@ const COPY: Record<LangCode, Copy> = {
     googleButtonBusy: "Opening Google...",
     googleErrorInactive: "This account is inactive — contact your outlet's Superuser.",
     googleErrorGeneric: "Google sign-in failed. Try again, or use email & password.",
+    googleErrorRetry: "Your Google verification session got interrupted (usually a reused link or an old tab). Click \"Sign in with Google\" again from a fresh tab, or use email & password.",
     noAccount: "Don't have an outlet yet?",
     signUpLink: "Sign Up Now",
     forgotHint: "Forgot your password?",
@@ -117,6 +120,7 @@ const COPY: Record<LangCode, Copy> = {
     googleButtonBusy: "Membuka Google...",
     googleErrorInactive: "Akaun ini tidak aktif — hubungi Superuser outlet anda.",
     googleErrorGeneric: "Log masuk Google gagal. Cuba lagi, atau guna emel & kata laluan.",
+    googleErrorRetry: "Sesi pengesahan Google terputus di tengah jalan (biasanya pautan digunakan dua kali atau tab lama). Klik \"Log Masuk dengan Google\" sekali lagi dari tab baharu, atau guna emel & kata laluan.",
     noAccount: "Belum ada outlet berdaftar?",
     signUpLink: "Daftar Sekarang",
     forgotHint: "Lupa kata laluan?",
@@ -145,6 +149,7 @@ const COPY: Record<LangCode, Copy> = {
     googleButtonBusy: "กำลังเปิด Google...",
     googleErrorInactive: "บัญชีนี้ไม่ได้ใช้งาน — ติดต่อ Superuser ของร้านคุณ",
     googleErrorGeneric: "เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองอีกครั้ง หรือใช้อีเมลและรหัสผ่าน",
+    googleErrorRetry: "เซสชันยืนยัน Google ถูกขัดจังหวะกลางทาง (มักเกิดจากลิงก์ถูกใช้ซ้ำหรือแท็บเก่า) กดปุ่ม \"เข้าสู่ระบบด้วย Google\" อีกครั้งจากแท็บใหม่ หรือใช้อีเมลและรหัสผ่าน",
     noAccount: "ยังไม่มีร้านที่ลงทะเบียน?",
     signUpLink: "สมัครตอนนี้",
     forgotHint: "ลืมรหัสผ่าน?",
@@ -173,6 +178,7 @@ const COPY: Record<LangCode, Copy> = {
     googleButtonBusy: "Binubuksan ang Google...",
     googleErrorInactive: "Hindi aktibo ang account na ito — makipag-ugnayan sa Superuser ng outlet mo.",
     googleErrorGeneric: "Nabigo ang pag-sign in gamit ang Google. Subukan ulit, o gamitin ang email at password.",
+    googleErrorRetry: "Naantala ang Google verification session sa gitna (kadalasan dahil na-reuse ang link o luma na ang tab). I-click ulit ang \"Mag-sign in gamit ang Google\" mula sa bagong tab, o gamitin ang email at password.",
     noAccount: "Wala ka pang naka-rehistrong outlet?",
     signUpLink: "Mag-sign Up Ngayon",
     forgotHint: "Nakalimutan ang password?",
@@ -201,6 +207,7 @@ const COPY: Record<LangCode, Copy> = {
     googleButtonBusy: "Đang mở Google...",
     googleErrorInactive: "Tài khoản này không hoạt động — liên hệ Superuser của cửa hàng bạn.",
     googleErrorGeneric: "Đăng nhập bằng Google thất bại. Thử lại, hoặc dùng email & mật khẩu.",
+    googleErrorRetry: "Phiên xác minh Google bị gián đoạn giữa chừng (thường do liên kết bị dùng lại hoặc tab đã cũ). Nhấn \"Đăng nhập với Google\" lại từ tab mới, hoặc dùng email & mật khẩu.",
     noAccount: "Chưa có cửa hàng đăng ký?",
     signUpLink: "Đăng Ký Ngay",
     forgotHint: "Quên mật khẩu?",
@@ -249,11 +256,21 @@ function LoginForm() {
   }, []);
 
   // Surfaces the redirect from /api/auth/google/callback when Google sign-in couldn't complete
-  // (?error=google_inactive|google_failed|google_no_code) — see that route for when each fires.
+  // (?error=google_inactive|google_exchange_failed|google_no_email|google_failed|google_no_code)
+  // — see that route for when each fires. google_exchange_failed/google_no_email get a more
+  // specific "try again from a fresh tab" message since those are almost always a stale/reused
+  // OAuth link rather than something actually broken; everything else falls back to the generic
+  // message. `reason` (Supabase's own short error code, e.g. bad_code_verifier) is logged to the
+  // console purely so it shows up if someone opens devtools while reporting the bug — never shown
+  // in the UI itself.
   useEffect(() => {
     const err = params.get("error");
     if (!err) return;
-    showAlert(err === "google_inactive" ? t.googleErrorInactive : t.googleErrorGeneric);
+    const reason = params.get("reason");
+    if (reason) console.warn("Google sign-in failed, reason:", reason);
+    if (err === "google_inactive") showAlert(t.googleErrorInactive);
+    else if (err === "google_exchange_failed" || err === "google_no_email") showAlert(t.googleErrorRetry);
+    else showAlert(t.googleErrorGeneric);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 

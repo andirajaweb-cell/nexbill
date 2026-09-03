@@ -33,12 +33,28 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    if (exchangeError) throw exchangeError;
+    if (exchangeError) {
+      // Distinguished from the generic catch below on purpose — this is the step that fails
+      // when the PKCE code_verifier cookie set on the browser during signInWithOAuth() didn't
+      // make it back (blocked/cleared cookie, ad-blocker, or the code being reused/expired —
+      // Supabase codes are single-use and short-lived), vs. an unexpected server-side error
+      // further down. `reason` carries Supabase's own short error code (e.g. "bad_code_verifier",
+      // "invalid_grant") — these are standard OAuth/PKCE codes, safe to expose in a redirect URL,
+      // and let us tell these apart from a screenshot without needing Vercel log access.
+      console.error("Google OAuth callback failed at exchangeCodeForSession:", describeError(exchangeError));
+      loginUrl.searchParams.set("error", "google_exchange_failed");
+      loginUrl.searchParams.set("reason", exchangeError.code || exchangeError.name || "unknown");
+      return NextResponse.redirect(loginUrl);
+    }
 
     // getUser() re-validates against Supabase Auth's server rather than trusting the local
     // session payload directly — this IS the "verified" identity everything downstream relies on.
     const { data, error: userError } = await supabase.auth.getUser();
-    if (userError || !data.user?.email) throw userError || new Error("Google tidak mengembalikan alamat email.");
+    if (userError || !data.user?.email) {
+      console.error("Google OAuth callback failed at getUser:", describeError(userError || new Error("no email")));
+      loginUrl.searchParams.set("error", "google_no_email");
+      return NextResponse.redirect(loginUrl);
+    }
 
     const email = data.user.email.toLowerCase().trim();
     const name = (data.user.user_metadata?.full_name as string) || (data.user.user_metadata?.name as string) || email.split("@")[0];
@@ -74,7 +90,10 @@ export async function GET(req: NextRequest) {
     res.cookies.set(GOOGLE_PENDING_COOKIE, pendingToken, { httpOnly: true, sameSite: "lax", path: "/", maxAge: GOOGLE_PENDING_MAX_AGE_SECONDS });
     return res;
   } catch (err: unknown) {
-    console.error("Google OAuth callback failed:", describeError(err));
+    // Reached only for the unexpected/downstream branch now (DB lookup, session signing, etc.) —
+    // the two more common failure points above (PKCE exchange, missing email) are caught and
+    // tagged separately so a screenshot of the URL alone tells us which stage broke.
+    console.error("Google OAuth callback failed (unexpected):", describeError(err));
     loginUrl.searchParams.set("error", "google_failed");
     return NextResponse.redirect(loginUrl);
   }
