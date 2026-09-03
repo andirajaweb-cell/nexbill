@@ -137,4 +137,5 @@ Modul-modul berikut sengaja ditunda ke fase berikutnya (sesuai kesepakatan penge
 - **AI Business Assistant** — analisis tren omzet/laba/biaya/utilisasi, deteksi anomali, prediksi pendapatan, rekomendasi unit mana yang perlu diperbaiki/diganti.
 - **Multi-cabang / multi-outlet penuh** — skema database sudah siap (`outletId` ada di semua tabel), tapi UI untuk switch antar cabang dan laporan konsolidasi lintas cabang belum dibuat (sistem saat ini fokus single-outlet).
 #   n e x b i l l  
+ #   n e x b i l l  
  
