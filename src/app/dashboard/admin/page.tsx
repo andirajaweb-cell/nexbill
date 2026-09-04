@@ -134,7 +134,7 @@ function ResetDataSection() {
         {t("admin.reset.desc1Pre", "Menghapus permanen, ")}<b>{t("admin.reset.desc1Bold", "hanya untuk outlet yang sedang aktif")}</b>{t("admin.reset.desc1Rest", ": semua transaksi POS, order, pembayaran, booking, sesi rental, jurnal & laporan akuntansi, produk & resep/BOM, stok & supplier, pelanggan & membership, promo/voucher, expense, aset, data Home Rental, notifikasi, audit log, chart of accounts, metode pembayaran, satuan, dan pengaturan lainnya. Data outlet/merchant lain di sistem ini sama sekali tidak tersentuh.")}
       </p>
       <p className="text-sm text-neutral-400">
-        {t("admin.reset.desc2Pre", "Yang ")}<b>{t("admin.reset.desc2Bold1", "tetap ada")}</b>{t("admin.reset.desc2Mid", " supaya sistem tidak terkunci total: data cabang/outlet itu sendiri, dan akun staf dengan role ")}<b>Superuser</b>/<b>Owner</b>{t("admin.reset.desc2Suffix", " (akun lain dengan role tersebut juga tetap ada). Semua akun staf non-Superuser/Owner (Manager, Kasir, dll) di outlet ini ikut terhapus.")}
+        {t("admin.reset.desc2Pre", "Yang ")}<b>{t("admin.reset.desc2Bold1", "tetap ada")}</b>{t("admin.reset.desc2Mid", " supaya sistem tidak terkunci total: data cabang/outlet itu sendiri, dan akun staf dengan role ")}<b>Owner</b>{t("admin.reset.desc2Suffix", " (akun Owner lain di outlet ini juga tetap ada). Kontrol Perangkat yang sudah kamu setting (device, TV, relay) juga tidak ikut terhapus. Semua akun staf non-Owner (Manager, Kasir, dll) di outlet ini ikut terhapus.")}
       </p>
 
       <div className="border-t border-neutral-800 pt-3 space-y-2">
@@ -230,7 +230,7 @@ export default function AdminDataPage() {
   if (!canManageTables && !canResetData) {
     return (
       <Card className="text-sm text-neutral-500">
-        {t("admin.accessDenied", "Halaman ini khusus Owner / Superuser.")}
+        {t("admin.accessDenied", "Halaman ini khusus Owner.")}
       </Card>
     );
   }
@@ -325,7 +325,7 @@ export default function AdminDataPage() {
         </>
       ) : (
         <Card className="text-sm text-neutral-500">
-          {t("admin.ownerOnlyNote", 'Akses penuh Admin Data (tambah/ubah/hapus tabel master) khusus Superuser. Kamu login sebagai Owner — bagian "Hapus Semua Data" di bawah tetap bisa kamu akses.')}
+          {t("admin.ownerOnlyNote", 'Akses penuh Admin Data (tambah/ubah/hapus tabel master) direservasi khusus untuk tim NEXBILL. Kamu login sebagai Owner — bagian "Hapus Semua Data" di bawah tetap bisa kamu akses.')}
         </Card>
       )}
 

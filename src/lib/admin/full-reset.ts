@@ -12,8 +12,18 @@ import { sql, type SQL } from "drizzle-orm";
  *    — so wiping every account, including the superuser/owner running this reset,
  *    would permanently lock everyone out with no way back in except direct
  *    database editing.
+ *  - devices / relay_agents: physical hardware pairing (Tasmota/Tuya/eWeLink bindings,
+ *    MQTT topics, Android TV relay agent registration) — not business data, and unlike
+ *    a product or customer row, re-doing this after a reset means physically re-touching
+ *    outlet hardware (see RELAY-HUB-SETUP.md), not just re-typing something into a form.
+ *    Wiping it on every "reset my data, start fresh" click would be actively hostile to an
+ *    owner who just wants a clean slate for products/transactions/customers, not a
+ *    hardware-repairing errand. Kept together deliberately: a `devices` row's `config`
+ *    JSON embeds a `relayAgentId` (no real FK, see dashboard/devices/page.tsx), so
+ *    preserving one without the other would leave devices pointing at a relay agent that
+ *    no longer exists.
  */
-const PRESERVE_TABLES = new Set(["outlets", "staff_users"]);
+const PRESERVE_TABLES = new Set(["outlets", "staff_users", "devices", "relay_agents"]);
 
 /**
  * Detail/child tables that hold outlet-scoped data but have NO direct outlet_id column of
@@ -190,6 +200,8 @@ export function scopeCondition(table: string, outletId: string, outletScoped: Se
  *  - the outlet record itself
  *  - staff accounts with role "superuser" or "owner" in this outlet (every other staff
  *    account belonging to this outlet is deleted)
+ *  - Device Control settings (devices + relay_agents) — physical hardware pairing, not
+ *    business data
  *
  * Everything else scoped to this outlet — including feature flags, payment
  * methods, units, chart of accounts, all customers/products/orders/bookings —
