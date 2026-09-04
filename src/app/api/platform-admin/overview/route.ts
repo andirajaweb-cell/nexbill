@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { gte } from "drizzle-orm";
 import { db } from "@/db/client";
-import { outlets, subscriptions, subscriptionPlans, subscriptionInvoices } from "@/db/schema";
+import { outlets, subscriptions, subscriptionPlans, subscriptionInvoices, orders } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
 
@@ -59,6 +60,15 @@ export async function GET() {
     const unpaidCount = allInvoices.filter((i) => i.status === "unpaid").length;
     const unpaidTotal = allInvoices.filter((i) => i.status === "unpaid").reduce((s, i) => s + i.amount, 0);
 
+    // "Active user" proxy: distinct staff accounts (any outlet) who actually created at least one
+    // order in the last 30 days. There's no login/session-activity tracking on staff_users to
+    // measure this more directly (lastSeenAt only exists on devices/relay_agents), and orders is
+    // the one table every day-to-day staff role (cashier/manager/owner) naturally touches — so it
+    // doubles as a reasonable "is this account actually being used" signal platform-wide.
+    const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const recentOrders = await db.select({ staffUserId: orders.staffUserId }).from(orders).where(gte(orders.createdAt, since30d));
+    const activeUsers30d = new Set(recentOrders.map((o) => o.staffUserId).filter(Boolean)).size;
+
     const body = {
       totalOutlets: allOutlets.length,
       statusBreakdown,
@@ -67,6 +77,7 @@ export async function GET() {
       recentPaid,
       unpaidCount,
       unpaidTotal,
+      activeUsers30d,
     };
     cached = { body, at: Date.now() };
     return NextResponse.json(body);
