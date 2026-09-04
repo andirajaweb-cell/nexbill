@@ -14,6 +14,12 @@ export async function POST(req: NextRequest) {
     const [user] = await db.select().from(staffUsers).where(eq(staffUsers.email, String(email).toLowerCase().trim())).limit(1);
     if (!user) return NextResponse.json({ error: "Email atau password salah." }, { status: 401 });
     if (!user.isActive) return NextResponse.json({ error: "Akun ini nonaktif — hubungi superuser." }, { status: 403 });
+    // "superuser" is NEXBILL-internal only and deliberately unreachable from this public login
+    // form, no matter how correct the password is — see /api/platform-admin/superuser/impersonate
+    // for the only supported way to open a superuser session (from inside platform-admin).
+    if (user.role === "superuser") {
+      return NextResponse.json({ error: "Email atau password salah." }, { status: 401 });
+    }
     // Google-only accounts (see lib/auth/google-pending.ts) have no passwordHash at all —
     // bcrypt.compare() would throw on null, so guard it with a message pointing at the real path.
     if (!user.passwordHash) {

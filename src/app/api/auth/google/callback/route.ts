@@ -71,6 +71,15 @@ export async function GET(req: NextRequest) {
         loginUrl.searchParams.set("error", "google_inactive");
         return NextResponse.redirect(loginUrl);
       }
+      // Same rule as /api/auth/login: "superuser" is NEXBILL-internal only, never reachable via
+      // the public login form — Google or password. Bounced back to /login with the generic
+      // "failed" message (not a distinct one) so this path doesn't reveal that the email belongs
+      // to a superuser account. See /api/platform-admin/superuser/impersonate for the only
+      // supported way in.
+      if (existing.role === "superuser") {
+        loginUrl.searchParams.set("error", "google_failed");
+        return NextResponse.redirect(loginUrl);
+      }
       // Auto-link by verified email on first Google sign-in for a pre-existing account —
       // authProvider is deliberately left untouched so a password account keeps working with
       // BOTH methods afterward, it isn't converted to Google-only.
