@@ -57,7 +57,7 @@ export default function ShiftPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editOpeningCash, setEditOpeningCash] = useState(0);
   const [editQtyByDenom, setEditQtyByDenom] = useState<Record<number, number>>({});
-  const [editBalanceChecks, setEditBalanceChecks] = useState<{ channelKey: string; label: string; actualBalance: number }[]>([]);
+  const [editBalanceChecks, setEditBalanceChecks] = useState<{ channelKey: string; label: string; actualBalance: number; expectedBalance: number }[]>([]);
   const [editNotes, setEditNotes] = useState("");
   // Plain-language walkthrough for outlet staff who find the shift-close form confusing — starts
   // open since that's exactly the audience that needs it, but collapsible so it doesn't get in
@@ -214,7 +214,7 @@ export default function ShiftPage() {
     setEditingShiftId(s.id);
     setEditLoading(true);
     try {
-      const detail = await fetchJsonObject<{ shift: any; cashCounts: { denomination: number; qty: number }[]; balanceChecks: { channelKey: string; label: string; actualBalance: number }[] }>(
+      const detail = await fetchJsonObject<{ shift: any; cashCounts: { denomination: number; qty: number }[]; balanceChecks: { channelKey: string; label: string; actualBalance: number; expectedBalance: number }[] }>(
         `/api/shifts/${s.id}`
       );
       if (!detail) {
@@ -225,7 +225,7 @@ export default function ShiftPage() {
       const qtyMap: Record<number, number> = {};
       for (const c of detail.cashCounts) qtyMap[c.denomination] = c.qty;
       setEditQtyByDenom(qtyMap);
-      setEditBalanceChecks(detail.balanceChecks.map((b) => ({ channelKey: b.channelKey, label: b.label, actualBalance: b.actualBalance })));
+      setEditBalanceChecks(detail.balanceChecks.map((b) => ({ channelKey: b.channelKey, label: b.label, actualBalance: b.actualBalance, expectedBalance: b.expectedBalance })));
       setEditNotes(detail.shift.notes || "");
     } finally {
       setEditLoading(false);
@@ -584,20 +584,39 @@ export default function ShiftPage() {
                           {editBalanceChecks.length > 0 && (
                             <div>
                               <h4 className="text-sm font-medium mb-2">{t("shift.verifyBalanceTitle", "Verifikasi Saldo Channel Non-Tunai")}</h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {editBalanceChecks.map((b, i) => (
-                                  <div key={b.channelKey} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2">
-                                    <span className="text-sm flex-1">{b.label}</span>
-                                    <input
-                                      type="number"
-                                      className="w-32 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm"
-                                      value={b.actualBalance}
-                                      onChange={(e) =>
-                                        setEditBalanceChecks((prev) => prev.map((row, idx) => (idx === i ? { ...row, actualBalance: Number(e.target.value) } : row)))
-                                      }
-                                    />
-                                  </div>
-                                ))}
+                              <p className="text-xs text-neutral-500 mb-2">
+                                {t(
+                                  "shift.editBalanceHint",
+                                  '"Ekspektasi" adalah saldo yang seharusnya ada menurut sistem (tidak ikut berubah kalau kamu edit) — kalau kamu ubah "Aktual", "Selisih" di sebelahnya otomatis dihitung ulang: Aktual dikurangi Ekspektasi.'
+                                )}
+                              </p>
+                              <div className="grid grid-cols-1 gap-2">
+                                {editBalanceChecks.map((b, i) => {
+                                  const variance = b.actualBalance - b.expectedBalance;
+                                  return (
+                                    <div key={b.channelKey} className="grid grid-cols-2 sm:grid-cols-4 items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2">
+                                      <span className="text-sm">{b.label}</span>
+                                      <div className="text-xs text-neutral-500">
+                                        {t("shift.colExpected", "Ekspektasi")}: <span className="text-neutral-300">{rupiah(b.expectedBalance)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs text-neutral-500">{t("shift.colActual", "Aktual")}:</span>
+                                        <input
+                                          type="number"
+                                          className="w-28 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm"
+                                          value={b.actualBalance}
+                                          onChange={(e) =>
+                                            setEditBalanceChecks((prev) => prev.map((row, idx) => (idx === i ? { ...row, actualBalance: Number(e.target.value) } : row)))
+                                          }
+                                        />
+                                      </div>
+                                      <div className={`text-xs font-medium ${Math.abs(variance) < 1 ? "text-emerald-400" : variance < 0 ? "text-red-400" : "text-amber-400"}`}>
+                                        {t("shift.colVariance", "Selisih")}: {rupiah(variance)}
+                                        {variance < 0 ? t("shift.shortSuffixLower", " (kurang)") : variance > 0 ? t("shift.overSuffixLower", " (lebih)") : ""}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
