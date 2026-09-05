@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { rentalSessions, rentalUnits, devices, promos, outlets, bookings, orders } from "@/db/schema";
 import { eq, and, inArray, lte, gt } from "drizzle-orm";
 import { turnDeviceOn, turnDeviceOff } from "@/lib/devices";
+import { describeError } from "@/lib/api/error";
 
 /**
  * Turns a device on/off as part of starting/stopping/transferring a session, tolerating failure
@@ -20,12 +21,21 @@ import { turnDeviceOn, turnDeviceOff } from "@/lib/devices";
  * android-tv-relay.ts) for the real fix for slowness — a bounded timeout on the underlying network
  * call, so a slow/offline device fails fast instead of hanging, without needing to background
  * anything.
+ *
+ * Returns the error message on failure (or null on success) instead of only console.error'ing it —
+ * a silent server-side-only log was undiagnosable for a cashier watching "Mulai Sesi"/"End
+ * Session" appear to work while the TV just never turned on/off (e.g. the unit isn't actually
+ * linked to a device on the Kontrol Perangkat page, or the device itself is unreachable). Callers
+ * surface this as a non-blocking "session succeeded, but device failed" warning instead of the
+ * session action ever actually failing because of it.
  */
-async function runDeviceCommand(promise: Promise<unknown>, errorLabel: string) {
+async function runDeviceCommand(promise: Promise<unknown>, errorLabel: string): Promise<string | null> {
   try {
     await promise;
+    return null;
   } catch (err) {
     console.error(errorLabel, err);
+    return `${errorLabel} ${describeError(err)}`;
   }
 }
 import { computeEffectiveHourlyRate, roundUpMinutes } from "./pricing";
@@ -126,9 +136,21 @@ export async function startRentalSession(input: StartSessionInput) {
 
   await db.update(rentalUnits).set({ status: "occupied" }).where(eq(rentalUnits.id, input.rentalUnitId));
 
+  // deviceWarning surfaces back to the API response (and from there, a non-blocking toast in the
+  // UI) whenever the session itself starts fine but the TV/console didn't actually turn on — either
+  // because this unit was never linked to a device on the Kontrol Perangkat page (previously this
+  // silently did nothing, which was undiagnosable from the cashier's side) or because the linked
+  // device's own command failed (offline, wrong credentials, etc — see runDeviceCommand above).
+  let deviceWarning: string | null = null;
   if (unit.deviceId) {
     const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
-    if (device) await runDeviceCommand(turnDeviceOn(device as any), `Gagal menyalakan device untuk unit ${unit.name}:`);
+    if (device) {
+      deviceWarning = await runDeviceCommand(turnDeviceOn(device as any), `Gagal menyalakan device untuk unit ${unit.name}:`);
+    } else {
+      deviceWarning = `Unit ${unit.name} terhubung ke device yang sudah tidak ada (mungkin terhapus) — atur ulang di halaman Kontrol Perangkat.`;
+    }
+  } else {
+    deviceWarning = `Unit ${unit.name} belum terhubung ke smart plug/TV — sesi tetap dimulai, tapi device tidak otomatis menyala. Atur di halaman Kontrol Perangkat.`;
   }
 
   if (input.bookingId) {
@@ -171,7 +193,7 @@ export async function startRentalSession(input: StartSessionInput) {
     // the QR/"Tandai Diterima" flow once the customer actually pays.
   }
 
-  return { session, rate, unit, bill, prepayment };
+  return { session, rate, unit, bill, prepayment, deviceWarning };
 }
 
 export async function pauseRentalSession(sessionId: string) {
@@ -276,12 +298,21 @@ export async function stopRentalSession(sessionId: string) {
     .where(eq(rentalSessions.id, sessionId))
     .returning();
 
+  let deviceWarning: string | null = null;
   if (unit) {
     await db.update(rentalUnits).set({ status: "available" }).where(eq(rentalUnits.id, unit.id));
     if (unit.deviceId) {
       const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
-      if (device) await runDeviceCommand(turnDeviceOff(device as any), `Gagal mematikan device untuk unit ${unit.name}:`);
+      if (device) {
+        deviceWarning = await runDeviceCommand(turnDeviceOff(device as any), `Gagal mematikan device untuk unit ${unit.name}:`);
+      } else {
+        deviceWarning = `Unit ${unit.name} terhubung ke device yang sudah tidak ada (mungkin terhapus) — atur ulang di halaman Kontrol Perangkat.`;
+      }
     }
+    // Deliberately no warning when unit.deviceId is unset — plenty of outlets run units with no
+    // smart plug at all (manual on/off by staff), so that's an expected, silent no-op here, unlike
+    // startRentalSession's warning which exists specifically to catch a unit that WAS meant to be
+    // automated but never got linked.
   }
 
   let bill = await getOpenBillForSession(session.id);
@@ -324,7 +355,7 @@ export async function stopRentalSession(sessionId: string) {
   const [settledOrder] = await db.select().from(orders).where(eq(orders.id, bill.id)).limit(1);
   order = settledOrder ?? order;
 
-  return { session: updatedSession, order, elapsedMinutesRaw, billingNote };
+  return { session: updatedSession, order, elapsedMinutesRaw, billingNote, deviceWarning };
 }
 
 /**
@@ -359,21 +390,33 @@ export async function transferRentalSession(sessionId: string, newRentalUnitId: 
     .where(eq(rentalSessions.id, sessionId))
     .returning();
 
+  const deviceWarnings: string[] = [];
+
   if (oldUnit) {
     await db.update(rentalUnits).set({ status: "available" }).where(eq(rentalUnits.id, oldUnit.id));
     if (oldUnit.deviceId) {
       const [device] = await db.select().from(devices).where(eq(devices.id, oldUnit.deviceId)).limit(1);
-      if (device) await runDeviceCommand(turnDeviceOff(device as any), `Gagal mematikan device untuk unit ${oldUnit.name}:`);
+      if (device) {
+        const warning = await runDeviceCommand(turnDeviceOff(device as any), `Gagal mematikan device untuk unit ${oldUnit.name}:`);
+        if (warning) deviceWarnings.push(warning);
+      }
     }
   }
 
   await db.update(rentalUnits).set({ status: "occupied" }).where(eq(rentalUnits.id, newRentalUnitId));
   if (newUnit.deviceId) {
     const [device] = await db.select().from(devices).where(eq(devices.id, newUnit.deviceId)).limit(1);
-    if (device) await runDeviceCommand(turnDeviceOn(device as any), `Gagal menyalakan device untuk unit ${newUnit.name}:`);
+    if (device) {
+      const warning = await runDeviceCommand(turnDeviceOn(device as any), `Gagal menyalakan device untuk unit ${newUnit.name}:`);
+      if (warning) deviceWarnings.push(warning);
+    } else {
+      deviceWarnings.push(`Unit ${newUnit.name} terhubung ke device yang sudah tidak ada (mungkin terhapus) — atur ulang di halaman Kontrol Perangkat.`);
+    }
+  } else {
+    deviceWarnings.push(`Unit ${newUnit.name} belum terhubung ke smart plug/TV — sesi tetap dipindah, tapi device tidak otomatis menyala. Atur di halaman Kontrol Perangkat.`);
   }
 
-  return { session: updated, oldUnit, newUnit, rate };
+  return { session: updated, oldUnit, newUnit, rate, deviceWarning: deviceWarnings.length ? deviceWarnings.join(" ") : null };
 }
 
 /** Change the customer attached to a still-open bill/session — updates both the session (for the live billing board) and the linked order. */

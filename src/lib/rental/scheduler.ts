@@ -261,7 +261,12 @@ export async function runSessionAutoStop(outletId?: string) {
       if (remainingMinutes > 0) continue;
 
       try {
-        await stopRentalSession(session.id);
+        const result = await stopRentalSession(session.id);
+        if (result.deviceWarning) {
+          // Nobody's watching this run in real time, so at least get it into the server logs —
+          // same message a cashier stopping manually would see as a toast.
+          console.warn(`[runSessionAutoStop] Sesi ${session.id} berhenti otomatis, tapi: ${result.deviceWarning}`);
+        }
         stopped.push({ sessionId: session.id, rentalUnitId: session.rentalUnitId });
       } catch (err: any) {
         if (err?.message !== "Sesi sudah selesai.") {

@@ -556,6 +556,11 @@ export default function RentalPage() {
         return bill.order.id;
       });
     }
+    // Session/bill finalize fine either way — this only flags that the TV/console itself may not
+    // have powered off (unit not linked to a device, or the off-command failed). Fires from both
+    // the manual Stop button and the client-side/server-side auto-stop sweeps, so it's the same
+    // heads-up regardless of who/what triggered the stop.
+    if (data.deviceWarning) showAlert(data.deviceWarning);
     load();
   };
 
@@ -608,7 +613,7 @@ export default function RentalPage() {
     const data = await res.json();
     if (data.prepayment) {
       if (data.prepayment.status === "success") {
-        showAlert(
+        await showAlert(
           t("rental.dpReceivedToast", "DP {amount} ({method}) diterima.")
             .replace("{amount}", rupiah(prepayAmount))
             .replace("{method}", prepayMethod.toUpperCase())
@@ -618,6 +623,13 @@ export default function RentalPage() {
         // the customer, same "Tandai Diterima" pattern as end-of-session checkout.
         setPendingPrepay({ paymentId: data.prepayment.id, qrImageUrl: data.prepayment.qrImageUrl ?? null, amount: prepayAmount });
       }
+    }
+    // Session itself always starts fine even if the TV/console failed to turn on (unit not linked
+    // to a device, or the device command itself failed) — surface that as a non-blocking heads-up
+    // rather than the cashier only discovering it later when the customer says the TV is off.
+    // Awaited after the prepayment dialog (if any) since showAlert only shows one dialog at a time.
+    if (data.deviceWarning) {
+      await showAlert(data.deviceWarning);
     }
     setCustomerName("");
     setGameName("");
@@ -788,6 +800,7 @@ export default function RentalPage() {
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
     setTransferUnitFor(null);
+    if (data.deviceWarning) showAlert(data.deviceWarning);
     load();
   };
 
