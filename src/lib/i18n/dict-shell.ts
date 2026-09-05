@@ -65,6 +65,9 @@ registerDict({
   "topbar.noNotificationsTooltip": { id: "Tidak ada notifikasi", en: "No notifications", ms: "Tiada notifikasi", th: "ไม่มีการแจ้งเตือน", fil: "Walang notification", vi: "Không có thông báo" },
   "topbar.themeToggleToDark": { id: "Ganti ke mode gelap", en: "Switch to dark mode", ms: "Tukar ke mod gelap", th: "เปลี่ยนเป็นโหมดมืด", fil: "Lumipat sa dark mode", vi: "Chuyển sang chế độ tối" },
   "topbar.themeToggleToLight": { id: "Ganti ke mode terang", en: "Switch to light mode", ms: "Tukar ke mod terang", th: "เปลี่ยนเป็นโหมดสว่าง", fil: "Lumipat sa light mode", vi: "Chuyển sang chế độ sáng" },
+  "notifSound.mute": { id: "Bisukan", en: "Mute", ms: "Bisukan", th: "ปิดเสียง", fil: "I-mute", vi: "Tắt tiếng" },
+  "notifSound.unmute": { id: "Bunyikan lagi", en: "Unmute", ms: "Bunyikan semula", th: "เปิดเสียง", fil: "I-unmute", vi: "Bật tiếng" },
+  "notifSound.volumeLabel": { id: "Volume notifikasi suara", en: "Notification sound volume", ms: "Kelantangan bunyi notifikasi", th: "ระดับเสียงการแจ้งเตือน", fil: "Lakas ng tunog ng notification", vi: "Âm lượng thông báo" },
 
   // --- /dashboard overview page ---
   "dash.subtitle": { id: "Status bisnis real-time — Ringkasan Hari Ini, refresh otomatis setiap 30 detik.", en: "Real-time business status — Today's Overview, auto-refreshes every 30 seconds.", ms: "Status perniagaan masa nyata — Ringkasan Hari Ini, muat semula automatik setiap 30 saat.", th: "สถานะธุรกิจแบบเรียลไทม์ — ภาพรวมวันนี้ รีเฟรชอัตโนมัติทุก 30 วินาที", fil: "Real-time na status ng negosyo — Buod Ngayong Araw, awtomatikong nagre-refresh bawat 30 segundo.", vi: "Trạng thái kinh doanh thời gian thực — Tổng quan hôm nay, tự động làm mới mỗi 30 giây." },

@@ -12,6 +12,8 @@ import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { describeError } from "@/lib/api/error";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-rental";
+import { scaledGain } from "@/lib/ui/notification-sound";
+import { NotificationVolumeControl } from "@/components/dashboard/NotificationVolumeControl";
 
 // recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
 const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
@@ -69,8 +71,11 @@ const DURATION_OPTIONS = [
 const TIME_WARNING_THRESHOLD_MIN = 5;
 const EXTEND_OPTIONS = [10, 20, 30, 40, 50, 60, 90, 120];
 
-/** Short double-beep via Web Audio API — no external audio asset needed. */
-function playAlertBeep() {
+/** Short double-beep via Web Audio API — no external audio asset needed. peakGain defaults to the
+ * original hardcoded 0.3 scaled by the user's notification-volume preference (shared with Kitchen
+ * Display — see notification-sound.ts), so 100% volume matches how loud this always used to be. */
+function playAlertBeep(peakGain = scaledGain(0.3)) {
+  if (peakGain <= 0) return; // volume dragged to 0 — treat as mute
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     const ctx = new AudioCtx();
@@ -80,7 +85,7 @@ function playAlertBeep() {
       osc.type = "sine";
       osc.frequency.value = 880;
       gain.gain.setValueAtTime(0.0001, ctx.currentTime + startAt);
-      gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + startAt + 0.02);
+      gain.gain.exponentialRampToValueAtTime(peakGain, ctx.currentTime + startAt + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startAt + 0.3);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -972,9 +977,12 @@ export default function RentalPage() {
             )}
           </p>
         </div>
-        <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowUnitManager((v) => !v)}>
-          <Settings size={14} /> {showUnitManager ? t("rental.toggleCloseUnitManager", "Tutup Kelola Unit") : t("rental.toggleOpenUnitManager", "Kelola Unit")}
-        </Button>
+        <div className="flex items-center gap-3">
+          <NotificationVolumeControl onPreview={() => playAlertBeep()} />
+          <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowUnitManager((v) => !v)}>
+            <Settings size={14} /> {showUnitManager ? t("rental.toggleCloseUnitManager", "Tutup Kelola Unit") : t("rental.toggleOpenUnitManager", "Kelola Unit")}
+          </Button>
+        </div>
       </div>
 
       {showUnitManager && (

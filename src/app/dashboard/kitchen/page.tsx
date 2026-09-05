@@ -7,6 +7,8 @@ import { useApi } from "@/lib/api/use-api";
 import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-kitchen";
+import { scaledGain } from "@/lib/ui/notification-sound";
+import { NotificationVolumeControl } from "@/components/dashboard/NotificationVolumeControl";
 
 interface QueueItem {
   itemId: string;
@@ -57,7 +59,10 @@ function playReadyBeep() {
   ]);
 }
 
-function playTones(notes: { freq: number; at: number; duration: number }[]) {
+/** peakGain defaults to the original hardcoded 0.35 scaled by the user's notification-volume
+ * preference (see notification-sound.ts) — 100% volume matches how loud this always used to be. */
+function playTones(notes: { freq: number; at: number; duration: number }[], peakGain = scaledGain(0.35)) {
+  if (peakGain <= 0) return; // volume dragged to 0 — treat as mute, skip creating an AudioContext at all
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     const ctx = new AudioCtx();
@@ -67,7 +72,7 @@ function playTones(notes: { freq: number; at: number; duration: number }[]) {
       osc.type = "sine";
       osc.frequency.value = note.freq;
       gain.gain.setValueAtTime(0.0001, ctx.currentTime + note.at);
-      gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + note.at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(peakGain, ctx.currentTime + note.at + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + note.at + note.duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -236,6 +241,7 @@ export default function KitchenDisplayPage() {
           >
             {soundOn ? `🔊 ${t("kitchen.soundOn", "Suara Aktif")}` : `🔇 ${t("kitchen.soundOff", "Suara Mati")}`}
           </button>
+          {soundOn && <NotificationVolumeControl onPreview={playReadyBeep} />}
           {notifPermission !== "unsupported" && notifPermission !== "granted" && (
             <Button variant="ghost" className="text-xs" onClick={requestNotifPermission}>
               {t("kitchen.enableBrowserNotif", "Aktifkan Notifikasi Browser")}
