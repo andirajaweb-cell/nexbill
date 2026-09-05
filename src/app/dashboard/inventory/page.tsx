@@ -195,6 +195,25 @@ function ProductTab({ outletId }: { outletId: string }) {
     load();
   };
 
+  // Permanent delete — only ever offered for a product that's already inactive (see the
+  // isActive-gated button below). The API re-checks the same history-blocker rules server-side,
+  // so this can't actually corrupt past sales/purchasing/recipe data even if someone races it.
+  const deleteProductPermanently = async (p: Product) => {
+    if (
+      !(await showConfirm(
+        t(
+          "inventory.product.confirmPermanentDelete",
+          'Hapus produk "{name}" secara PERMANEN? Ini tidak bisa dibatalkan — bukan sekadar nonaktifkan.'
+        ).replace("{name}", p.name)
+      ))
+    )
+      return;
+    const res = await fetch(`/api/products/${p.id}?permanent=true`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) return showAlert(data.error);
+    load();
+  };
+
   const startEdit = (p: Product) => {
     setAdjustingId(null);
     setEditingId(p.id);
@@ -323,7 +342,19 @@ function ProductTab({ outletId }: { outletId: string }) {
                   <td className="text-xs text-neutral-500">{suppliers.find((s) => s.id === p.preferredSupplierId)?.name ?? "-"}</td>
                   <td className="text-right whitespace-nowrap">
                     {p.isActive === false ? (
-                      canDelete && <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => reactivateProduct(p)}>{t("inventory.product.reactivateButton", "Aktifkan")}</Button>
+                      canDelete && (
+                        <>
+                          <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => reactivateProduct(p)}>{t("inventory.product.reactivateButton", "Aktifkan")}</Button>
+                          <Button
+                            variant="ghost"
+                            className="text-xs px-2 py-1 text-red-400"
+                            title={t("inventory.product.permanentDeleteTooltip", "Hapus permanen — hanya bisa jika produk ini belum pernah dipakai di transaksi/pembelian/resep apa pun.")}
+                            onClick={() => deleteProductPermanently(p)}
+                          >
+                            {t("inventory.product.permanentDeleteButton", "Hapus Permanen")}
+                          </Button>
+                        </>
+                      )
                     ) : (
                       <>
                         <Button variant="secondary" className="text-xs px-2 py-1 mr-1" onClick={() => toggleAdjust(p)}>{t("inventory.product.adjustButton", "Penyesuaian")}</Button>
@@ -850,8 +881,15 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
     fetchJsonArray("/api/recipes").then((rows) => setRecipeProductIds(new Set(rows.map((r: any) => r.productId))));
   }, [outletId]);
 
-  // "Produk bukan olahan": F&B/retail products bought ready-to-sell, i.e. no recipe/BOM attached.
-  const resaleProducts = products.filter((p) => ["food", "drink", "coffee", "snack", "dessert", "merchandise", "accessory"].includes(p.category) && !recipeProductIds.has(p.id) && p.isActive);
+  // Any active product NOT made via a recipe/BOM is fair game to "buy" here — this used to be
+  // hardcoded to a 7-category whitelist (food/drink/coffee/snack/dessert/merchandise/accessory),
+  // silently excluding raw_material/device_rental/other and any future category, which is why
+  // e.g. Bahan Baku (raw_material) never showed up in this dropdown even though outlets legitimately
+  // buy raw ingredients from suppliers too. The ONLY thing that still has to stay excluded is a
+  // product that IS a recipe/BOM's finished output — its cost is meant to come from the recipe's
+  // ingredient costs, not a manually-entered purchase price, so letting a supplier purchase
+  // overwrite its costPrice here would silently fight with the recipe-costing system elsewhere.
+  const resaleProducts = products.filter((p) => !recipeProductIds.has(p.id) && p.isActive);
 
   const itemsSubtotal = cart.reduce((s, c) => s + c.qty * c.unitCost, 0);
   const grandTotal = itemsSubtotal + transportCost + parkingCost + otherCost;
@@ -885,8 +923,13 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   return (
     <div className="space-y-4">
       <Card className="space-y-3">
-        <h2 className="font-medium">{t("inventory.supplierPurchase.title", "Belanja Supplier — Makanan & Minuman (Produk Bukan Olahan)")}</h2>
-        <p className="text-xs text-neutral-500">{t("inventory.supplierPurchase.description", "Untuk produk siap jual yang dibeli langsung dari supplier/toko (bukan bahan baku resep). Ongkos transport, parkir, dan lain-lain otomatis dibagi rata ke harga modal (HPP) tiap item.")}</p>
+        <h2 className="font-medium">{t("inventory.supplierPurchase.title", "Belanja Supplier")}</h2>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "inventory.supplierPurchase.description",
+            "Catat pembelian produk apa pun dari supplier/toko — makanan, minuman, snack, bahan baku, aksesoris, dll (kecuali produk hasil resep/BOM, yang biaya modalnya otomatis dari bahan-bahannya). Ongkos transport, parkir, dan lain-lain otomatis dibagi rata ke harga modal (HPP) tiap item."
+          )}
+        </p>
 
         <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
           <option value="">{t("inventory.option.chooseSupplier", "Pilih supplier")}</option>
