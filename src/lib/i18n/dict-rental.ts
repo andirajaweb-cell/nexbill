@@ -99,6 +99,7 @@ registerDict({
   "rental.addFnbToggle": { id: "+ F&B", en: "+ F&B", ms: "+ F&B", th: "+ F&B", fil: "+ F&B", vi: "+ F&B" },
   "rental.addToBill": { id: "Tambah ke Bill", en: "Add to Bill", ms: "Tambah ke Bil", th: "เพิ่มเข้าบิล", fil: "Idagdag sa Bill", vi: "Thêm vào hóa đơn" },
   "rental.endSessionAndPay": { id: "End Session & Bayar", en: "End Session & Pay", ms: "Tamatkan Sesi & Bayar", th: "จบเซสชันและชำระเงิน", fil: "Tapusin ang Session & Magbayad", vi: "Kết thúc phiên & Thanh toán" },
+  "rental.endingSession": { id: "Memproses...", en: "Processing...", ms: "Memproses...", th: "กำลังดำเนินการ...", fil: "Pinoproseso...", vi: "Đang xử lý..." },
   "rental.selectedForNewSession": { id: "Dipilih di Sesi Baru →", en: "Selected in New Session →", ms: "Dipilih dalam Sesi Baharu →", th: "เลือกไว้ในเซสชันใหม่ →", fil: "Napili sa Bagong Session →", vi: "Đã chọn trong phiên mới →" },
   "rental.selectThisStation": { id: "Pilih Stasiun Ini", en: "Select This Station", ms: "Pilih Stesen Ini", th: "เลือกเครื่องนี้", fil: "Piliin ang Station na Ito", vi: "Chọn máy này" },
   "rental.tvOn": { id: "TV On", en: "TV On", ms: "TV Hidup", th: "เปิดทีวี", fil: "Buksan ang TV", vi: "Bật TV" },

@@ -1,7 +1,25 @@
 import { db } from "@/db/client";
 import { rentalSessions, rentalUnits, devices, promos, outlets, bookings, orders } from "@/db/schema";
 import { eq, and, inArray, lte, gt } from "drizzle-orm";
+import { after } from "next/server";
 import { turnDeviceOn, turnDeviceOff } from "@/lib/devices";
+
+/**
+ * Fire the smart-plug/TV on/off command AFTER this request's response has already been sent,
+ * instead of awaiting it inline. Some device protocols are genuinely slow — Tuya goes through a
+ * shared cloud API, and Android TV via Relay Agent round-trips through a hub + WebSocket + the
+ * outlet's own relay process running a live `adb` command — anywhere from a few hundred ms to
+ * several seconds, sometimes longer if the TV/agent is briefly unreachable. None of that has
+ * anything to do with whether the session started/stopped/transferred correctly, so it must never
+ * block "End Session & Bayar" (or Start/Pindah Unit) from returning to the cashier. Next.js's
+ * after() schedules the callback to run once the response is flushed — the device still gets its
+ * command, just without making the checkout wait for it. Errors are only logged (same
+ * best-effort behavior as before this existed), never surfaced to the client, since a device
+ * that's offline/slow was never something the cashier could act on anyway.
+ */
+function fireDeviceCommand(promise: Promise<unknown>, errorLabel: string) {
+  after(() => promise.catch((err) => console.error(errorLabel, err)));
+}
 import { computeEffectiveHourlyRate, roundUpMinutes } from "./pricing";
 import { openBillForSession, getOpenBillForSession, upsertRentalLineItem } from "@/lib/pos/bill";
 import { finalizeAccessoryCharges } from "./accessories";
@@ -102,13 +120,7 @@ export async function startRentalSession(input: StartSessionInput) {
 
   if (unit.deviceId) {
     const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
-    if (device) {
-      try {
-        await turnDeviceOn(device as any);
-      } catch (err) {
-        console.error(`Gagal menyalakan device untuk unit ${unit.name}:`, err);
-      }
-    }
+    if (device) fireDeviceCommand(turnDeviceOn(device as any), `Gagal menyalakan device untuk unit ${unit.name}:`);
   }
 
   if (input.bookingId) {
@@ -260,13 +272,7 @@ export async function stopRentalSession(sessionId: string) {
     await db.update(rentalUnits).set({ status: "available" }).where(eq(rentalUnits.id, unit.id));
     if (unit.deviceId) {
       const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
-      if (device) {
-        try {
-          await turnDeviceOff(device as any);
-        } catch (err) {
-          console.error(`Gagal mematikan device untuk unit ${unit.name}:`, err);
-        }
-      }
+      if (device) fireDeviceCommand(turnDeviceOff(device as any), `Gagal mematikan device untuk unit ${unit.name}:`);
     }
   }
 
@@ -349,26 +355,14 @@ export async function transferRentalSession(sessionId: string, newRentalUnitId: 
     await db.update(rentalUnits).set({ status: "available" }).where(eq(rentalUnits.id, oldUnit.id));
     if (oldUnit.deviceId) {
       const [device] = await db.select().from(devices).where(eq(devices.id, oldUnit.deviceId)).limit(1);
-      if (device) {
-        try {
-          await turnDeviceOff(device as any);
-        } catch (err) {
-          console.error(`Gagal mematikan device untuk unit ${oldUnit.name}:`, err);
-        }
-      }
+      if (device) fireDeviceCommand(turnDeviceOff(device as any), `Gagal mematikan device untuk unit ${oldUnit.name}:`);
     }
   }
 
   await db.update(rentalUnits).set({ status: "occupied" }).where(eq(rentalUnits.id, newRentalUnitId));
   if (newUnit.deviceId) {
     const [device] = await db.select().from(devices).where(eq(devices.id, newUnit.deviceId)).limit(1);
-    if (device) {
-      try {
-        await turnDeviceOn(device as any);
-      } catch (err) {
-        console.error(`Gagal menyalakan device untuk unit ${newUnit.name}:`, err);
-      }
-    }
+    if (device) fireDeviceCommand(turnDeviceOn(device as any), `Gagal menyalakan device untuk unit ${newUnit.name}:`);
   }
 
   return { session: updated, oldUnit, newUnit, rate };

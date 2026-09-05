@@ -353,6 +353,13 @@ export default function RentalPage() {
   // on the next tick before the first call finishes). Cleared on failure so a transient network
   // error gets retried on the next poll instead of leaving the session stuck forever.
   const autoStoppingSessionsRef = useState(() => new Set<string>())[0];
+  // Guards the manual "End Session & Bayar" button — real React state (not a ref like the
+  // auto-stop guard above) so the button visibly disables the instant it's clicked. Without this,
+  // a slightly slow /stop round-trip (e.g. a smart-plug/TV that's briefly unreachable) invited a
+  // second click, firing a second /stop call for a session the first call had already finished —
+  // the server rejects it ("Sesi sudah selesai"), so the cashier just saw a confusing error toast
+  // instead of the payment screen they were waiting for.
+  const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(() => new Set());
 
   // Additive control-center widgets (recent transactions + hourly activity chart) — read-only,
   // don't touch the session/checkout logic above at all.
@@ -631,10 +638,18 @@ export default function RentalPage() {
   };
 
   const stop = async (sessionId: string) => {
+    if (stoppingSessionIds.has(sessionId)) return; // already in flight — ignore the extra click
+    setStoppingSessionIds((prev) => new Set(prev).add(sessionId));
     try {
       await finalizeSession(sessionId);
     } catch (err: unknown) {
       showAlert(describeError(err) || t("rental.stopSessionFailed", "Gagal menghentikan sesi."));
+    } finally {
+      setStoppingSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
     }
   };
 
@@ -1416,8 +1431,14 @@ export default function RentalPage() {
                       </div>
                     )}
 
-                    <Button variant="danger" className="w-full flex items-center justify-center gap-2" onClick={() => stop(session.id)}>
-                      <Square size={14} /> {t("rental.endSessionAndPay", "End Session & Bayar")}
+                    <Button
+                      variant="danger"
+                      className="w-full flex items-center justify-center gap-2"
+                      disabled={stoppingSessionIds.has(session.id)}
+                      onClick={() => stop(session.id)}
+                    >
+                      <Square size={14} />
+                      {stoppingSessionIds.has(session.id) ? t("rental.endingSession", "Memproses...") : t("rental.endSessionAndPay", "End Session & Bayar")}
                     </Button>
                   </div>
                 ) : (
