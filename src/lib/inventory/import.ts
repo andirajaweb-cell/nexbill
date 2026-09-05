@@ -3,38 +3,37 @@ import { db } from "@/db/client";
 import { products } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { describeError } from "@/lib/api/error";
+import { getActiveProductCategories } from "@/lib/inventory/categories";
 
-export type ProductCategory = "food" | "drink" | "snack" | "device_rental" | "raw_material" | "other";
-
-/** Indonesian label <-> the enum value actually stored in products.category. Import accepts either the Indonesian label or the raw English enum value, case-insensitively, so a re-exported file round-trips cleanly. */
-const CATEGORY_LABELS: Record<ProductCategory, string> = {
-  food: "Makanan",
-  drink: "Minuman",
-  snack: "Snack",
-  device_rental: "Sewa Perangkat",
-  raw_material: "Bahan Baku",
-  other: "Lainnya",
-};
-
-function resolveCategory(raw: string): ProductCategory | null {
+/**
+ * Categories used to be a fixed 6-value enum subset hardcoded here. They're now the outlet's own
+ * editable list (Pengaturan > Kategori Produk — see lib/inventory/categories.ts), so both the
+ * template legend and the resolver below work off whatever that outlet actually has configured.
+ * Import still accepts either the category's label or its raw code, case-insensitively, so a
+ * re-exported file round-trips cleanly.
+ */
+function resolveCategory(raw: string, categories: { code: string; label: string }[]): string | null {
   const needle = raw.trim().toLowerCase();
-  for (const [value, label] of Object.entries(CATEGORY_LABELS)) {
-    if (value === needle || label.toLowerCase() === needle) return value as ProductCategory;
-  }
-  return null;
+  const match = categories.find((c) => c.code.toLowerCase() === needle || c.label.toLowerCase() === needle);
+  return match ? match.code : null;
 }
 
 const TEMPLATE_HEADERS = [
   "Nama Produk", "Kategori", "SKU", "Barcode", "Harga Jual", "Harga Modal", "Stok Awal", "Stok Minimum", "Satuan",
 ] as const;
 
-/** Builds the downloadable .xlsx template: a header row, one filled example, and a legend sheet listing valid category labels so the owner doesn't have to guess. */
-export function generateImportTemplate(): Buffer {
+/** Builds the downloadable .xlsx template: a header row, one filled example, and a legend sheet listing the outlet's actual configured category labels so the owner doesn't have to guess. */
+export async function generateImportTemplate(outletId: string): Promise<Buffer> {
+  const categories = await getActiveProductCategories(outletId);
+  const categoryLabels = categories.map((c) => c.label);
+  const exampleCategory1 = categoryLabels[0] ?? "Makanan";
+  const exampleCategory2 = categoryLabels[1] ?? categoryLabels[0] ?? "Minuman";
+
   const wb = XLSX.utils.book_new();
 
   const exampleRows = [
-    ["Mie Goreng", "Makanan", "MIE-001", "8991234567890", 15000, 8000, 20, 5, "pcs"],
-    ["Es Teh Manis", "Minuman", "TEH-001", "", 5000, 1500, 50, 10, "pcs"],
+    ["Mie Goreng", exampleCategory1, "MIE-001", "8991234567890", 15000, 8000, 20, 5, "pcs"],
+    ["Es Teh Manis", exampleCategory2, "TEH-001", "", 5000, 1500, 50, 10, "pcs"],
   ];
   const sheetData = [TEMPLATE_HEADERS as unknown as string[], ...exampleRows];
   const sheet = XLSX.utils.aoa_to_sheet(sheetData);
@@ -44,7 +43,7 @@ export function generateImportTemplate(): Buffer {
   const legendRows = [
     ["Kolom", "Wajib?", "Keterangan"],
     ["Nama Produk", "Ya", "Nama produk."],
-    ["Kategori", "Ya", "Salah satu: " + Object.values(CATEGORY_LABELS).join(", ")],
+    ["Kategori", "Ya", "Salah satu: " + categoryLabels.join(", ") + " (bisa ditambah/diedit di Pengaturan > Kategori Produk)"],
     ["SKU", "Tidak", "Jika SKU sudah ada di sistem, produk akan DIUPDATE (bukan dobel). Kosongkan untuk selalu buat produk baru."],
     ["Barcode", "Tidak", "Kode barcode, opsional."],
     ["Harga Jual", "Ya", "Angka, harus lebih dari 0."],
@@ -90,6 +89,8 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
   const dataRows = rows.slice(1);
   const existingProducts = await db.select().from(products).where(eq(products.outletId, outletId));
   const bySku = new Map(existingProducts.filter((p) => p.sku).map((p) => [p.sku!.trim().toLowerCase(), p]));
+  const categories = await getActiveProductCategories(outletId);
+  const categoryLabelList = categories.map((c) => c.label).join(", ");
 
   const details: ImportRowResult[] = [];
   // Pass 1: validate every row in memory (no DB calls) and split into inserts vs. updates —
@@ -111,8 +112,8 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
 
     try {
       if (!name) throw new Error("Nama produk kosong.");
-      const category = resolveCategory(String(categoryRaw ?? ""));
-      if (!category) throw new Error(`Kategori "${categoryRaw ?? ""}" tidak dikenali. Gunakan salah satu: ${Object.values(CATEGORY_LABELS).join(", ")}.`);
+      const category = resolveCategory(String(categoryRaw ?? ""), categories);
+      if (!category) throw new Error(`Kategori "${categoryRaw ?? ""}" tidak dikenali. Gunakan salah satu: ${categoryLabelList}.`);
       const price = Number(priceRaw);
       if (!(price > 0)) throw new Error("Harga Jual harus angka lebih dari 0.");
       const costPrice = costRaw !== undefined && costRaw !== "" ? Number(costRaw) : 0;

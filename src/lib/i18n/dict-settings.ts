@@ -13,6 +13,7 @@ registerDict({
   "settings.tab.businessTax": { id: "Business & Tax", en: "Business & Tax", ms: "Perniagaan & Cukai", th: "ธุรกิจและภาษี", fil: "Negosyo at Buwis", vi: "Doanh nghiệp & Thuế" },
   "settings.tab.branch": { id: "Cabang", en: "Branch", ms: "Cawangan", th: "สาขา", fil: "Sangay", vi: "Chi nhánh" },
   "settings.tab.unit": { id: "Satuan", en: "Units", ms: "Unit", th: "หน่วย", fil: "Unit", vi: "Đơn vị tính" },
+  "settings.tab.productCategory": { id: "Kategori Produk", en: "Product Categories", ms: "Kategori Produk", th: "หมวดหมู่สินค้า", fil: "Kategorya ng Produkto", vi: "Danh mục sản phẩm" },
   "settings.tab.banner": { id: "Banner Iklan", en: "Ad Banners", ms: "Sepanduk Iklan", th: "แบนเนอร์โฆษณา", fil: "Banner Ad", vi: "Banner quảng cáo" },
   "settings.tab.notification": { id: "Notifikasi", en: "Notifications", ms: "Notifikasi", th: "การแจ้งเตือน", fil: "Notification", vi: "Thông báo" },
   "settings.tab.featureManagement": { id: "Feature Management", en: "Feature Management", ms: "Pengurusan Ciri", th: "การจัดการฟีเจอร์", fil: "Feature Management", vi: "Quản lý tính năng" },
@@ -226,6 +227,31 @@ registerDict({
   },
   "settings.unit.namePlaceholder": { id: "Nama satuan (mis. Sachet, Botol)", en: "Unit name (e.g. Sachet, Bottle)", ms: "Nama unit (cth. Sachet, Botol)", th: "ชื่อหน่วย (เช่น ซอง, ขวด)", fil: "Pangalan ng unit (hal. Sachet, Bote)", vi: "Tên đơn vị tính (vd. Gói, Chai)" },
   "settings.unit.addButton": { id: "Tambah Satuan", en: "Add Unit", ms: "Tambah Unit", th: "เพิ่มหน่วย", fil: "Magdagdag ng Unit", vi: "Thêm đơn vị tính" },
+
+  // --- ProductCategoryTab ---
+  "settings.productCategory.explainer": {
+    id: "Kategori produk (makanan, minuman, snack, dll) — dipakai di dropdown halaman Inventory: tambah produk, edit produk, dan filter kategori.",
+    en: "Product categories (food, drinks, snacks, etc) — used in the Inventory page's dropdowns: add product, edit product, and category filter.",
+    ms: "Kategori produk (makanan, minuman, snek, dll) — digunakan dalam dropdown halaman Inventori: tambah produk, edit produk, dan penapis kategori.",
+    th: "หมวดหมู่สินค้า (อาหาร เครื่องดื่ม ขนม ฯลฯ) — ใช้ในดรอปดาวน์ของหน้าคลังสินค้า: เพิ่มสินค้า แก้ไขสินค้า และตัวกรองหมวดหมู่",
+    fil: "Kategorya ng produkto (pagkain, inumin, snack, atbp) — ginagamit sa dropdown ng Inventory page: magdagdag ng produkto, i-edit ang produkto, at category filter.",
+    vi: "Danh mục sản phẩm (đồ ăn, đồ uống, snack, v.v) — dùng trong danh sách chọn của trang Kho hàng: thêm sản phẩm, sửa sản phẩm, và bộ lọc danh mục.",
+  },
+  "settings.productCategory.table.name": { id: "Nama", en: "Name", ms: "Nama", th: "ชื่อ", fil: "Pangalan", vi: "Tên" },
+  "settings.productCategory.table.code": { id: "Kode", en: "Code", ms: "Kod", th: "รหัส", fil: "Code", vi: "Mã" },
+  "settings.productCategory.table.status": { id: "Status", en: "Status", ms: "Status", th: "สถานะ", fil: "Status", vi: "Trạng thái" },
+  "settings.productCategory.loadingRow": { id: "Memuat kategori…", en: "Loading categories…", ms: "Memuatkan kategori…", th: "กำลังโหลดหมวดหมู่…", fil: "Nilo-load ang kategorya…", vi: "Đang tải danh mục…" },
+  "settings.productCategory.nameRequiredAlert": { id: "Isi nama kategori.", en: "Enter the category name.", ms: "Isi nama kategori.", th: "กรอกชื่อหมวดหมู่", fil: "Ilagay ang pangalan ng kategorya.", vi: "Nhập tên danh mục." },
+  "settings.productCategory.deleteConfirm": {
+    id: 'Hapus kategori "{label}"? Kalau masih dipakai produk, kategori hanya akan dinonaktifkan (data lama tetap tampil).',
+    en: 'Delete the category "{label}"? If it\'s still used by a product, it will only be deactivated (old data still shows).',
+    ms: 'Padam kategori "{label}"? Jika masih digunakan oleh produk, kategori hanya akan dinyahaktifkan (data lama tetap dipaparkan).',
+    th: 'ลบหมวดหมู่ "{label}" หรือไม่? หากยังใช้อยู่ในสินค้า หมวดหมู่จะถูกปิดใช้งานเท่านั้น (ข้อมูลเก่ายังคงแสดงอยู่)',
+    fil: 'Burahin ang kategoryang "{label}"? Kung ginagamit pa ng produkto, ide-deactivate lang ang kategorya (nananatiling nakikita ang lumang data).',
+    vi: 'Xóa danh mục "{label}"? Nếu vẫn được sản phẩm sử dụng, danh mục chỉ bị ngừng hoạt động (dữ liệu cũ vẫn hiển thị).',
+  },
+  "settings.productCategory.namePlaceholder": { id: "Nama kategori (mis. Frozen Food, Mainan)", en: "Category name (e.g. Frozen Food, Toys)", ms: "Nama kategori (cth. Frozen Food, Mainan)", th: "ชื่อหมวดหมู่ (เช่น อาหารแช่แข็ง, ของเล่น)", fil: "Pangalan ng kategorya (hal. Frozen Food, Laruan)", vi: "Tên danh mục (vd. Đồ đông lạnh, Đồ chơi)" },
+  "settings.productCategory.addButton": { id: "Tambah Kategori", en: "Add Category", ms: "Tambah Kategori", th: "เพิ่มหมวดหมู่", fil: "Magdagdag ng Kategorya", vi: "Thêm danh mục" },
 
   // --- NotificationTab ---
   "settings.notification.savedAlert": { id: "Pengaturan notifikasi disimpan.", en: "Notification settings saved.", ms: "Tetapan notifikasi disimpan.", th: "บันทึกการตั้งค่าการแจ้งเตือนแล้ว", fil: "Na-save ang notification setting.", vi: "Đã lưu cài đặt thông báo." },

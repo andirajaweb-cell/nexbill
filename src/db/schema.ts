@@ -254,15 +254,32 @@ export const sessionAccessories = pgTable("session_accessories", {
 
 /** ---------------- PRODUCTS (F&B, device rental items) ---------------- */
 
+export const productCategories = pgTable(
+  "product_categories",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    code: text("code").notNull(),
+    label: text("label").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("product_categories_outlet_code_idx").on(t.outletId, t.code)]
+);
+
 export const products = pgTable(
   "products",
   {
     id: id(),
     outletId: text("outlet_id").notNull().references(() => outlets.id),
     name: text("name").notNull(),
-    category: text("category", {
-      enum: ["food", "drink", "coffee", "snack", "dessert", "merchandise", "accessory", "device_rental", "raw_material", "other"],
-    }).notNull(),
+    // Used to be a fixed 10-value Postgres enum. Product categories are now an editable,
+    // per-outlet list (see productCategories + src/lib/inventory/categories.ts) managed from
+    // Pengaturan > Kategori Produk, so this just stores whatever category `code` the outlet has
+    // defined — free text, no DB-level enum constraint, same pattern as products.unit (which
+    // similarly stores a `units.code` by convention rather than a real FK).
+    category: text("category").notNull(),
     sku: text("sku"),
     barcode: text("barcode"),
     warehouseId: text("warehouse_id"),

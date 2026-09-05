@@ -21,6 +21,8 @@ interface SupplierOption { id: string; name: string }
 
 interface UnitOption { id: string; code: string; label: string; isActive: boolean }
 
+interface CategoryOption { id: string; code: string; label: string; isActive: boolean }
+
 /** Shared unit-of-measure dropdown, sourced from Settings > Satuan. Used by Produk and Resep/BOM so both draw from the same option list instead of free-typed text. */
 function UnitSelect({ units, value, onChange, className }: { units: UnitOption[]; value: string; onChange: (code: string) => void; className?: string }) {
   return (
@@ -72,26 +74,24 @@ export default function InventoryPage() {
   );
 }
 
-const CATEGORY_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
-  food: { key: "inventory.category.food", fallback: "Makanan" },
-  drink: { key: "inventory.category.drink", fallback: "Minuman" },
-  coffee: { key: "inventory.category.coffee", fallback: "Kopi" },
-  snack: { key: "inventory.category.snack", fallback: "Snack" },
-  dessert: { key: "inventory.category.dessert", fallback: "Dessert" },
-  merchandise: { key: "inventory.category.merchandise", fallback: "Merchandise" },
-  accessory: { key: "inventory.category.accessory", fallback: "Aksesoris (Jual)" },
-  raw_material: { key: "inventory.category.rawMaterial", fallback: "Bahan Baku" },
-  device_rental: { key: "inventory.category.deviceRental", fallback: "Sewa Perangkat" },
-  other: { key: "inventory.category.other", fallback: "Lainnya" },
-};
-
-function CategorySelect({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
-  const { t } = useDashboardLang();
+/**
+ * Categories used to be a fixed 10-value list hardcoded here. They're now an editable,
+ * per-outlet list managed at Pengaturan > Kategori Produk (see /api/product-categories) — this
+ * just renders whatever the outlet has configured, same pattern as UnitSelect above. `categoryLabel`
+ * falls back to the raw code (underscore-to-space) for a product whose category was since
+ * deleted/renamed and no longer matches any row, so the table never shows a blank cell.
+ */
+function CategorySelect({ categories, value, onChange, className }: { categories: CategoryOption[]; value: string; onChange: (v: string) => void; className?: string }) {
   return (
     <select className={className ?? "rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"} value={value} onChange={(e) => onChange(e.target.value)}>
-      {Object.entries(CATEGORY_LABEL_KEYS).map(([v, meta]) => <option key={v} value={v}>{t(meta.key, meta.fallback)}</option>)}
+      {!categories.some((c) => c.code === value) && value && <option value={value}>{value.replace(/_/g, " ")}</option>}
+      {categories.map((c) => <option key={c.id} value={c.code}>{c.label}</option>)}
     </select>
   );
+}
+
+function categoryLabel(categories: CategoryOption[], code: string): string {
+  return categories.find((c) => c.code === code)?.label ?? code.replace(/_/g, " ");
 }
 
 type AdjustMode = "add" | "subtract" | "set";
@@ -108,6 +108,7 @@ function ProductTab({ outletId }: { outletId: string }) {
   const canDelete = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_inventory_purchasing");
   const [products, setProducts] = useState<Product[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [form, setForm] = useState({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: "pcs", lowStockThreshold: 5, preferredSupplierId: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -134,6 +135,7 @@ function ProductTab({ outletId }: { outletId: string }) {
   useEffect(() => {
     load();
     fetchJsonArray<UnitOption>(`/api/units?outletId=${outletId}`).then((rows) => setUnits(rows.filter((u) => u.isActive)));
+    fetchJsonArray<CategoryOption>(`/api/product-categories?outletId=${outletId}`).then(setCategories);
     fetchJsonArray<SupplierOption>(`/api/suppliers?outletId=${outletId}`).then(setSuppliers);
   }, [outletId]);
 
@@ -283,7 +285,7 @@ function ProductTab({ outletId }: { outletId: string }) {
         <h2 className="font-medium mb-3">{t("inventory.product.addNew", "Tambah Produk Baru")}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <input className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.product.namePlaceholder", "Nama produk")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <CategorySelect value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
+          <CategorySelect categories={categories.filter((c) => c.isActive)} value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
           <UnitSelect units={units} value={form.unit} onChange={(v) => setForm({ ...form, unit: v })} className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.product.sellPricePlaceholder", "Harga jual")} value={form.price || ""} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.product.costPricePlaceholder", "Harga modal (opsional, bisa otomatis dari Belanja Supplier)")} value={form.costPrice || ""} onChange={(e) => setForm({ ...form, costPrice: Number(e.target.value) })} />
@@ -295,7 +297,9 @@ function ProductTab({ outletId }: { outletId: string }) {
           </select>
           <Button onClick={addProduct}>{t("inventory.action.add", "Tambah")}</Button>
         </div>
-        <p className="text-xs text-neutral-600 mt-2">{t("inventory.product.unitSettingsPrefix", "Satuan bisa diatur di ")}<a href="/dashboard/settings" className="text-emerald-400 underline">{t("inventory.product.unitSettingsLinkLabel", "Pengaturan > Satuan")}</a>{t("inventory.product.unitSettingsSuffix", ". Harga modal produk resep (F&B olahan) diatur lewat tab Resep/BOM, bukan di sini. Supplier utama dipakai untuk auto-buat draft Purchase Order saat stok mencapai minimum (lihat tab Purchase Order).")}</p>
+        <p className="text-xs text-neutral-600 mt-2">
+          {t("inventory.product.unitSettingsPrefix", "Satuan bisa diatur di ")}<a href="/dashboard/settings" className="text-emerald-400 underline">{t("inventory.product.unitSettingsLinkLabel", "Pengaturan > Satuan")}</a>{t("inventory.product.categorySettingsMiddle", ", kategori bisa diatur di ")}<a href="/dashboard/settings" className="text-emerald-400 underline">{t("inventory.product.categorySettingsLinkLabel", "Pengaturan > Kategori Produk")}</a>{t("inventory.product.unitSettingsSuffix", ". Harga modal produk resep (F&B olahan) diatur lewat tab Resep/BOM, bukan di sini. Supplier utama dipakai untuk auto-buat draft Purchase Order saat stok mencapai minimum (lihat tab Purchase Order).")}
+        </p>
       </Card>
 
       <Card>
@@ -308,7 +312,7 @@ function ProductTab({ outletId }: { outletId: string }) {
           />
           <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
             <option value="all">{t("inventory.product.filterAllCategories", "Semua Kategori")}</option>
-            {Object.entries(CATEGORY_LABEL_KEYS).map(([v, meta]) => <option key={v} value={v}>{t(meta.key, meta.fallback)}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.code}>{c.label}</option>)}
           </select>
           <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as ProductSortOption)}>
             <option value="name_asc">{t("inventory.product.sortNameAsc", "Nama (A-Z)")}</option>
@@ -332,7 +336,7 @@ function ProductTab({ outletId }: { outletId: string }) {
                     {p.name}
                     {p.isActive === false && <span className="text-xs text-rose-400 ml-2">{t("inventory.product.inactiveTag", "(nonaktif)")}</span>}
                   </td>
-                  <td className="capitalize text-neutral-400">{CATEGORY_LABEL_KEYS[p.category] ? t(CATEGORY_LABEL_KEYS[p.category].key, CATEGORY_LABEL_KEYS[p.category].fallback) : p.category.replace("_", " ")}</td>
+                  <td className="capitalize text-neutral-400">{categoryLabel(categories, p.category)}</td>
                   <td>{rupiah(p.price)}</td>
                   <td className="text-neutral-500">{rupiah(p.costPrice)}</td>
                   <td className={p.stockQty <= p.lowStockThreshold ? "text-amber-400 font-medium" : ""}>
@@ -370,7 +374,7 @@ function ProductTab({ outletId }: { outletId: string }) {
                     <td colSpan={7} className="py-3">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <div className="col-span-2"><label className="text-xs text-neutral-500">{t("inventory.product.editForm.name", "Nama Produk")}</label><input className={smallInputCls} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
-                        <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.category", "Kategori")}</label><CategorySelect value={editForm.category} onChange={(v) => setEditForm({ ...editForm, category: v })} className={smallInputCls} /></div>
+                        <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.category", "Kategori")}</label><CategorySelect categories={categories.filter((c) => c.isActive)} value={editForm.category} onChange={(v) => setEditForm({ ...editForm, category: v })} className={smallInputCls} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.sellPrice", "Harga Jual")}</label><input type="number" className={smallInputCls} value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.costPrice", "Harga Modal")}</label><input type="number" className={smallInputCls} value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: Number(e.target.value) })} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.unit", "Satuan")}</label><UnitSelect units={units} value={editForm.unit} onChange={(v) => setEditForm({ ...editForm, unit: v })} className={smallInputCls} /></div>

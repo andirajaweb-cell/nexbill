@@ -15,13 +15,14 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { SEA_BANKS, findSeaBank } from "@/lib/data/sea-banks";
 import "@/lib/i18n/dict-settings";
 
-const TABS = ["Business & Tax", "Cabang", "Satuan", "Banner Iklan", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
+const TABS = ["Business & Tax", "Cabang", "Satuan", "Kategori Produk", "Banner Iklan", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Business & Tax": { key: "settings.tab.businessTax", fallback: "Business & Tax" },
   "Cabang": { key: "settings.tab.branch", fallback: "Cabang" },
   "Satuan": { key: "settings.tab.unit", fallback: "Satuan" },
+  "Kategori Produk": { key: "settings.tab.productCategory", fallback: "Kategori Produk" },
   "Banner Iklan": { key: "settings.tab.banner", fallback: "Banner Iklan" },
   "Notifikasi": { key: "settings.tab.notification", fallback: "Notifikasi" },
   "Feature Management": { key: "settings.tab.featureManagement", fallback: "Feature Management" },
@@ -78,6 +79,8 @@ export default function SettingsPage() {
         <BranchTab outletId={outletId} canManage={canManage} onSwitched={setOutletId} />
       ) : tab === "Satuan" ? (
         <UnitTab outletId={outletId} canManage={canManage} />
+      ) : tab === "Kategori Produk" ? (
+        <ProductCategoryTab outletId={outletId} canManage={canManage} />
       ) : tab === "Banner Iklan" ? (
         <BannerTab outletId={outletId} canManage={canManage} />
       ) : tab === "Notifikasi" ? (
@@ -654,6 +657,105 @@ function UnitTab({ outletId, canManage }: { outletId: string; canManage: boolean
             </label>
             <div className="flex gap-1">
               <Button className="text-xs" onClick={save}>{editingId ? t("settings.common.save", "Simpan") : t("settings.unit.addButton", "Tambah Satuan")}</Button>
+              {editingId && <Button variant="ghost" className="text-xs" onClick={resetForm}>{t("settings.common.cancel", "Batal")}</Button>}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+interface ProductCategoryRow {
+  id: string;
+  code: string;
+  label: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+/**
+ * Kategori Produk master list — same CRUD pattern as UnitTab/Satuan just above (upsert via
+ * POST /api/product-categories, delete via DELETE /api/product-categories/[id] which soft-hides
+ * instead of removing if any product still uses that category's code). This is the single
+ * source of truth for the category dropdowns on the Inventory page's Produk tab (add form, edit
+ * form, and filter) — replaces what used to be a fixed 10-value list hardcoded in the page.
+ */
+function ProductCategoryTab({ outletId, canManage }: { outletId: string; canManage: boolean }) {
+  const [rows, setRows] = useState<ProductCategoryRow[]>([]);
+  const [label, setLabel] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const { t } = useDashboardLang();
+
+  const load = () => fetchJsonArray<ProductCategoryRow>(`/api/product-categories?outletId=${outletId}`).then(setRows);
+  useEffect(() => { load(); }, [outletId]);
+
+  const startEdit = (c: ProductCategoryRow) => { setEditingId(c.id); setLabel(c.label); setIsActive(c.isActive); };
+  const resetForm = () => { setEditingId(null); setLabel(""); setIsActive(true); };
+
+  const save = async () => {
+    if (!label.trim()) return showAlert(t("settings.productCategory.nameRequiredAlert", "Isi nama kategori."));
+    const res = await fetch("/api/product-categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: editingId, outletId, label, isActive }),
+    });
+    const out = await res.json();
+    if (!res.ok) return showAlert(out.error);
+    resetForm();
+    load();
+  };
+
+  const remove = async (c: ProductCategoryRow) => {
+    if (!(await showConfirm(t("settings.productCategory.deleteConfirm", 'Hapus kategori "{label}"? Kalau masih dipakai produk, kategori hanya akan dinonaktifkan (data lama tetap tampil).').replace("{label}", c.label)))) return;
+    const res = await fetch(`/api/product-categories/${c.id}`, { method: "DELETE" });
+    const out = await res.json();
+    if (!res.ok) return showAlert(out.error);
+    load();
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-neutral-500">{t("settings.productCategory.explainer", "Kategori produk (makanan, minuman, snack, dll) — dipakai di dropdown halaman Inventory: tambah produk, edit produk, dan filter kategori.")}</p>
+      <Card className="space-y-3">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-neutral-500 border-b border-neutral-800">
+              <th className="py-2">{t("settings.productCategory.table.name", "Nama")}</th>
+              <th>{t("settings.productCategory.table.code", "Kode")}</th>
+              <th>{t("settings.productCategory.table.status", "Status")}</th>
+              {canManage && <th></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr key={c.id} className="border-b border-neutral-900 align-top">
+                <td className="py-2 font-medium">{c.label}</td>
+                <td className="text-xs text-neutral-500 font-mono">{c.code}</td>
+                <td><Badge status={c.isActive ? "on" : "off"}>{c.isActive ? t("settings.common.active", "Aktif") : t("settings.common.inactive", "Nonaktif")}</Badge></td>
+                {canManage && (
+                  <td className="flex gap-1 py-2 whitespace-nowrap">
+                    <Button variant="ghost" className="text-xs" onClick={() => startEdit(c)}>{t("settings.common.edit", "Edit")}</Button>
+                    <Button variant="ghost" className="text-xs text-red-400" onClick={() => remove(c)}>{t("settings.common.delete", "Hapus")}</Button>
+                  </td>
+                )}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={canManage ? 4 : 3} className="py-4 text-center text-neutral-500 text-xs">{t("settings.productCategory.loadingRow", "Memuat kategori…")}</td></tr>
+            )}
+          </tbody>
+        </table>
+
+        {canManage && (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-neutral-800 items-end">
+            <input className={inputCls + " sm:col-span-2"} placeholder={t("settings.productCategory.namePlaceholder", "Nama kategori (mis. Frozen Food, Mainan)")} value={label} onChange={(e) => setLabel(e.target.value)} />
+            <label className="flex items-center gap-2 text-xs text-neutral-400">
+              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> {t("settings.common.active", "Aktif")}
+            </label>
+            <div className="flex gap-1">
+              <Button className="text-xs" onClick={save}>{editingId ? t("settings.common.save", "Simpan") : t("settings.productCategory.addButton", "Tambah Kategori")}</Button>
               {editingId && <Button variant="ghost" className="text-xs" onClick={resetForm}>{t("settings.common.cancel", "Batal")}</Button>}
             </div>
           </div>

@@ -8,7 +8,7 @@ export async function GET() {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
 
-    const buffer = generateImportTemplate();
+    const buffer = await generateImportTemplate(session.outletId);
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
