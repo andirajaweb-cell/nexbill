@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
 import { rentalSessions, rentalUnits, devices, promos, outlets, bookings, orders } from "@/db/schema";
-import { eq, and, inArray, lte, gt } from "drizzle-orm";
+import { eq, and, inArray, lte, gt, ne } from "drizzle-orm";
 import { turnDeviceOn, turnDeviceOff } from "@/lib/devices";
 import { describeError } from "@/lib/api/error";
 
@@ -80,6 +80,9 @@ export async function startRentalSession(input: StartSessionInput) {
   const [unit] = await db.select().from(rentalUnits).where(eq(rentalUnits.id, input.rentalUnitId)).limit(1);
   if (!unit) throw new Error("Unit tidak ditemukan.");
   if (input.expectedOutletId && unit.outletId !== input.expectedOutletId) throw new Error("Unit tidak ditemukan."); // different tenant — don't confirm it exists
+  // Cheap, non-atomic fast-fail — the real guard against a race is the atomic claim further down,
+  // right before the session is inserted. This one just avoids wasting a rate lookup/booking-
+  // conflict query on a request that's obviously going to fail anyway.
   if (unit.status === "occupied") throw new Error("Unit sedang dipakai.");
 
   // Walk-in guard: a unit reserved by a confirmed/pending booking whose window
@@ -116,25 +119,48 @@ export async function startRentalSession(input: StartSessionInput) {
     if (promo?.durationMinutes) plannedMinutes = promo.durationMinutes;
   }
 
-  const [session] = await db
-    .insert(rentalSessions)
-    .values({
-      outletId,
-      rentalUnitId: input.rentalUnitId,
-      customerId: input.customerId,
-      customerName: input.customerName,
-      plannedMinutes,
-      ratePerHour,
-      status: "running",
-      promoId: input.promoId,
-      bookingId: input.bookingId,
-      staffUserId: input.staffUserId,
-      shiftId: input.shiftId,
-      gameName: input.gameName || null,
-    })
+  // Atomic claim — this, not the early check above, is what actually prevents two sessions
+  // landing on the same unit. A plain read-then-write left a race window: two "Mulai Sesi"
+  // clicks fired close enough together (a double-click, an impatient retry on a slow network, two
+  // staff opening the same unit's panel at once) could both read status="available" before either
+  // finished, both pass, and both insert a session row for the same unit — which is exactly what
+  // produced two simultaneously-running sessions (and two identical cards on the Live Billing
+  // Board, one physical TV showing as two) reported in production. Postgres only lets one
+  // concurrent UPDATE...WHERE win against the same row; the loser gets 0 rows back here and
+  // throws instead of silently also succeeding.
+  const [claimed] = await db
+    .update(rentalUnits)
+    .set({ status: "occupied" })
+    .where(and(eq(rentalUnits.id, input.rentalUnitId), ne(rentalUnits.status, "occupied")))
     .returning();
+  if (!claimed) throw new Error("Unit sedang dipakai.");
 
-  await db.update(rentalUnits).set({ status: "occupied" }).where(eq(rentalUnits.id, input.rentalUnitId));
+  let session: typeof rentalSessions.$inferSelect;
+  try {
+    [session] = await db
+      .insert(rentalSessions)
+      .values({
+        outletId,
+        rentalUnitId: input.rentalUnitId,
+        customerId: input.customerId,
+        customerName: input.customerName,
+        plannedMinutes,
+        ratePerHour,
+        status: "running",
+        promoId: input.promoId,
+        bookingId: input.bookingId,
+        staffUserId: input.staffUserId,
+        shiftId: input.shiftId,
+        gameName: input.gameName || null,
+      })
+      .returning();
+  } catch (err) {
+    // Insert failed after the claim above already flipped the unit to "occupied" — release it
+    // back to its pre-claim state so the unit doesn't get stuck permanently "occupied" with no
+    // session behind it.
+    await db.update(rentalUnits).set({ status: unit.status }).where(eq(rentalUnits.id, input.rentalUnitId));
+    throw err;
+  }
 
   // deviceWarning surfaces back to the API response (and from there, a non-blocking toast in the
   // UI) whenever the session itself starts fine but the TV/console didn't actually turn on — either

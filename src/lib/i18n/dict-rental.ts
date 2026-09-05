@@ -134,6 +134,7 @@ registerDict({
   "rental.cash": { id: "Cash", en: "Cash", ms: "Tunai", th: "เงินสด", fil: "Cash", vi: "Tiền mặt" },
   "rental.prepayEstimateNote": { id: "Estimasi dari paket/durasi: {amount}", en: "Estimated from package/duration: {amount}", ms: "Anggaran daripada pakej/tempoh: {amount}", th: "ประมาณจากแพ็กเกจ/ระยะเวลา: {amount}", fil: "Tinatayang halaga mula sa package/tagal: {amount}", vi: "Ước tính từ gói/thời lượng: {amount}" },
   "rental.startSessionButton": { id: "MULAI SESI", en: "START SESSION", ms: "MULAKAN SESI", th: "เริ่มเซสชัน", fil: "SIMULAN ANG SESSION", vi: "BẮT ĐẦU PHIÊN" },
+  "rental.startingSession": { id: "MEMPROSES...", en: "PROCESSING...", ms: "MEMPROSES...", th: "กำลังดำเนินการ...", fil: "PINOPROSESO...", vi: "ĐANG XỬ LÝ..." },
   "rental.allStationsBusy": { id: "Semua stasiun sedang terpakai.", en: "All stations are currently in use.", ms: "Semua stesen sedang digunakan.", th: "เครื่องทั้งหมดกำลังถูกใช้งาน", fil: "Ginagamit lahat ng station ngayon.", vi: "Tất cả các máy đang được sử dụng." },
 
   // --- Right-column widgets ---

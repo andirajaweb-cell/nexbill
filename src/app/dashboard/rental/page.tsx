@@ -365,6 +365,7 @@ export default function RentalPage() {
   // the server rejects it ("Sesi sudah selesai"), so the cashier just saw a confusing error toast
   // instead of the payment screen they were waiting for.
   const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(() => new Set());
+  const [startingSession, setStartingSession] = useState(false);
 
   // Additive control-center widgets (recent transactions + hourly activity chart) — read-only,
   // don't touch the session/checkout logic above at all.
@@ -589,6 +590,16 @@ export default function RentalPage() {
   };
 
   const start = async (unitId: string) => {
+    if (startingSession) return; // already in flight — ignore a double-click/impatient retry
+    setStartingSession(true);
+    try {
+      await doStart(unitId);
+    } finally {
+      setStartingSession(false);
+    }
+  };
+
+  const doStart = async (unitId: string) => {
     const res = await fetch("/api/rental-sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1703,8 +1714,8 @@ export default function RentalPage() {
                   )}
                 </div>
 
-                <Button className="w-full flex items-center justify-center gap-2 py-2.5 gm-heading tracking-wide" onClick={() => start(selectedUnit.id)}>
-                  <Play size={16} /> {t("rental.startSessionButton", "MULAI SESI")}
+                <Button className="w-full flex items-center justify-center gap-2 py-2.5 gm-heading tracking-wide" onClick={() => start(selectedUnit.id)} disabled={startingSession}>
+                  <Play size={16} /> {startingSession ? t("rental.startingSession", "MEMPROSES...") : t("rental.startSessionButton", "MULAI SESI")}
                 </Button>
               </>
             )}
