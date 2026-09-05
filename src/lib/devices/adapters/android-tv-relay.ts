@@ -68,10 +68,14 @@ async function dispatch(device: DeviceRecord, action: "turnOn" | "turnOff" | "ge
 
   let res: Response;
   try {
+    // Bounded to 8s (the hub -> WebSocket -> relay agent -> live `adb` command -> reply round-trip
+    // legitimately takes longer than a plain HTTP call) so an unreachable hub/agent fails fast
+    // instead of hanging the whole start/stop/transfer session request.
     res = await fetch(dispatchUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
     });
   } catch {
     throw new Error(

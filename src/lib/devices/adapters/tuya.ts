@@ -35,6 +35,11 @@ interface TuyaCreds {
   baseUrl: string;
 }
 
+// Bounded so a Tuya API hiccup fails fast instead of hanging the whole start/stop/transfer
+// session request — this shared cloud account is used by every outlet, so a slow response here
+// used to directly delay every cashier's checkout, not just this one outlet's.
+const TUYA_TIMEOUT_MS = 5000;
+
 interface TuyaDeviceConfig {
   deviceId?: string;
   switchCode?: string;
@@ -99,6 +104,7 @@ async function getAccessToken(creds: TuyaCreds): Promise<string> {
       t,
       sign_method: "HMAC-SHA256",
     },
+    signal: AbortSignal.timeout(TUYA_TIMEOUT_MS),
   });
   const data = await res.json();
   if (!data.success) {
@@ -128,6 +134,7 @@ async function tuyaRequest(creds: TuyaCreds, method: "GET" | "POST", urlPath: st
       "Content-Type": "application/json",
     },
     body: bodyStr || undefined,
+    signal: AbortSignal.timeout(TUYA_TIMEOUT_MS),
   });
   const data = await res.json();
   if (!data.success) {
