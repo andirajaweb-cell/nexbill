@@ -61,8 +61,228 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       "Setiap outlet punya Chart of Accounts (COA) sendiri yang otomatis dibuatkan (seed) saat outlet pertama kali dipakai — kamu tidak perlu setup akuntansi dari nol.",
     ],
   },
+  {
+    id: "setup-outlet-baru",
+    group: "Mulai Cepat",
+    label: "Cara Setup Outlet Baru (Checklist Lengkap)",
+    summary:
+      "Urutan langkah yang disarankan untuk Owner/Manager sebelum outlet mulai beroperasi — dari melengkapi profil bisnis sampai transaksi uji coba pertama. Tidak semua langkah wajib (yang opsional ditandai), dan urutan boleh disesuaikan, tapi mengikuti urutan ini meminimalkan bolak-balik.",
+    subsections: [
+      {
+        title: "Langkah 1 — Lengkapi Profil Bisnis & Pajak",
+        navHint: "Pengaturan → Business & Tax",
+        steps: [
+          "Isi nama bisnis, logo, telepon, alamat lengkap, dan Negara — Negara menentukan mata uang tampilan halaman Langganan NEXBILL dan bahasa otomatis balasan Customer Service, jadi isi ini di awal supaya tidak perlu diubah belakangan.",
+          "Isi WiFi SSID/password kalau ingin ditampilkan ke customer (mis. di struk atau halaman booking publik).",
+          "Atur persen Pajak, persen Service Charge, dan pembulatan billing sesuai kebijakan outletmu — ini berlaku otomatis ke semua transaksi Rental PS & POS berikutnya.",
+          "Atur Target Penjualan (BEP) bulanan supaya widget Ringkasan langsung menampilkan progres harian sejak hari pertama.",
+          "Atur batas nominal approval expense otomatis (default Rp500.000) sesuai kebijakan pengeluaran outletmu.",
+        ],
+      },
+      {
+        title: "Langkah 2 — Tambah Unit PlayStation & Tarif",
+        navHint: "Rental PS → tombol \"Kelola Unit\"",
+        steps: [
+          "Tambahkan setiap unit/station satu per satu: nama unit (mis. \"PS5 - Bilik 1\"), jenis konsol (PS2 s/d PS5 Slim), tipe TV, dan tarif sewa per jam.",
+          "Kalau outletmu jual paket harga flat (mis. \"Paket 3 Jam PS4 Rp45.000\"), lanjut ke menu Promo & Paket untuk membuatnya — paket ini otomatis muncul sebagai pilihan saat mulai sesi di Rental PS.",
+          "Uji: pastikan semua unit yang baru ditambahkan muncul di grid halaman Rental PS dan tidak berstatus Maintenance secara tidak sengaja.",
+        ],
+      },
+      {
+        title: "Langkah 3 — Atur Metode Pembayaran",
+        navHint: "Menu \"Pembayaran\" di sidebar",
+        steps: [
+          "Metode \"Tunai (Cash)\" sudah otomatis ada sejak awal, tidak perlu ditambah.",
+          "Tambahkan metode non-tunai yang benar-benar dipakai outletmu (QRIS, GoPay, DANA, dll) — pilih jenis \"Saldo Terlacak\" untuk metode yang perlu dicek saldo appnya sendiri saat tutup shift (e-wallet), atau \"Info Saja\" untuk yang langsung masuk rekening bank tanpa perlu dicek (kartu debit/EDC, transfer).",
+          "Kalau pakai payment gateway Fastpay/BukuPay dengan kredensial live, daftarkan URL webhook yang tertera di bagian bawah halaman ini ke dashboard gateway masing-masing supaya konfirmasi pembayaran QRIS otomatis (bukan manual \"Tandai Diterima\" terus).",
+        ],
+      },
+      {
+        title: "Langkah 4 — Tambah Staf & Atur Role",
+        navHint: "Staf & Hak Akses",
+        steps: [
+          "Buat akun untuk setiap staf yang akan bekerja: nama, email, password, dan Role (Manager/Accountant/Supervisor/Cashier/Kitchen sesuai tanggung jawabnya).",
+          "Kalau perlu menyesuaikan siapa boleh apa lebih detail dari role bawaan (khusus akun Superuser), buka tab Role & Izin untuk mencentang/menghilangkan izin per role — perubahan berlaku seketika ke semua staf dengan role itu.",
+          "Pastikan setiap staf tahu cara login dan sudah dites bisa masuk sebelum hari operasional pertama.",
+        ],
+      },
+      {
+        title: "Langkah 5 (Opsional) — Hubungkan Kontrol TV/Perangkat",
+        navHint: "Kontrol Perangkat",
+        steps: [
+          "Kalau punya smart plug/TV yang mau dikendalikan nyala-mati dari dashboard, tambahkan perangkatnya sesuai protokolnya (Tasmota/Tuya Smart Life/Sonoff/Android TV), lalu hubungkan ke unit rental yang sesuai di tabel \"Hubungkan Perangkat ke Unit Rental\".",
+          "Selama masa trial langganan, smart plug belum bisa ditambah sama sekali (harus beli/aktif dulu lewat halaman Langganan NEXBILL) dan kontrol Android TV dibatasi maksimal 1 unit — jangan kaget kalau belum bisa nambah banyak perangkat saat masih trial.",
+          "Langkah ini boleh dilewati dulu kalau mau jalan manual (nyalakan TV pakai remote seperti biasa) — bisa dihubungkan belakangan kapan saja.",
+        ],
+      },
+      {
+        title: "Langkah 6 — Atur Printer Struk",
+        navHint: "Pengaturan → Printer",
+        steps: [
+          "Di komputer kasir, coba cetak satu struk contoh dulu (dari transaksi uji coba di Langkah 10) untuk pastikan dialog print browser mendeteksi printer fisiknya.",
+          "Kalau lebar struknya tidak pas dengan kertas thermal (58mm/80mm), isi Nama Printer & Lebar Kertas di halaman ini dan klik \"Simpan untuk Komputer Ini\" — pengaturan ini per-komputer, ulangi di tiap komputer kasir yang dipakai outlet.",
+        ],
+      },
+      {
+        title: "Langkah 7 (Opsional) — Setup Produk F&B & Inventory",
+        navHint: "Inventory Control",
+        steps: [
+          "Kalau outlet jual makanan/minuman, tambahkan produk satu per satu atau import massal lewat template Excel di tab Produk (isi kategori, harga jual, stok awal, satuan).",
+          "Untuk makanan olahan (bukan barang jadi beli-langsung-jual), buat Resep/BOM supaya stok BAHAN yang berkurang otomatis saat produk jadi terjual, bukan stok produk jadi.",
+          "Tambahkan Supplier kalau nanti mau input Purchase Order/Belanja Supplier untuk restock.",
+        ],
+      },
+      {
+        title: "Langkah 8 (Opsional) — Aktifkan Modul Tambahan Sesuai Model Bisnis",
+        navHint: "Pengaturan → Feature Management (khusus akun Superuser)",
+        steps: [
+          "Kalau outlet juga menyewakan unit PS untuk DIBAWA PULANG customer (bukan cuma dimainkan di tempat), nyalakan modul Home Rental — setelah aktif, lengkapi Kebijakan-nya dulu (deposit, denda, biaya antar-jemput) sebelum transaksi pertama.",
+          "Kalau outlet juga jual PPOB (top up e-wallet, token listrik, pulsa), pastikan modul PPOB aktif dan isi Kelola Harga Provider & Margin dulu sebelum staf mulai transaksi.",
+          "Modul yang tidak relevan dengan model bisnis outletmu boleh dibiarkan mati — tidak akan muncul di sidebar staf dan tidak membingungkan mereka dengan menu yang tidak dipakai.",
+        ],
+      },
+      {
+        title: "Langkah 9 — Cek Chart of Accounts (dan Saldo Awal kalau pindahan dari sistem lain)",
+        navHint: "Accounting",
+        steps: [
+          "COA standar sudah otomatis tersedia sejak outlet dibuat — untuk outlet BARU MURNI (belum pernah operasi sebelumnya), langkah ini bisa dilewati, langsung ke Langkah 10.",
+          "Kalau outletmu SUDAH beroperasi sebelumnya (pindah dari sistem manual/aplikasi lain) dan ingin Neraca-nya benar sejak hari pertama pakai NEXBILL, isi Saldo Awal di tab Migrasi Data (kas, piutang, hutang, aset, modal per tanggal cutover) sebelum mulai transaksi baru.",
+          "Opsional lanjut Impor Data Historis (Excel) kalau ingin tren Laba Rugi bulan-bulan sebelumnya tetap muncul di laporan.",
+        ],
+      },
+      {
+        title: "Langkah 10 — Buka Shift Pertama & Transaksi Uji Coba",
+        navHint: "Shift & Kasir, lalu Rental PS",
+        steps: [
+          "Buka shift pertama: isi modal awal kas yang sebenarnya ada di laci.",
+          "Lakukan SATU transaksi uji coba end-to-end: mulai sesi Rental PS di salah satu unit, tambahkan 1 item F&B (kalau modul F&B dipakai), akhiri sesi, coba bayar pakai tunai DAN salah satu metode non-tunai yang baru ditambahkan di Langkah 3, lalu cetak struknya.",
+          "Cek hasilnya muncul benar di halaman Transaksi (detail jurnal akuntansinya) dan di Kitchen Display (kalau ada item F&B) — kalau semua muncul sesuai harapan, outlet siap dipakai transaksi sungguhan.",
+          "Batalkan/void transaksi uji coba ini setelah dicek supaya tidak mengotori laporan penjualan hari pertama yang sebenarnya.",
+        ],
+      },
+    ],
+    notes: [
+      "Urutan di atas adalah rekomendasi, bukan wajib baku — beberapa outlet lebih nyaman menambah staf duluan sebelum atur tarif, misalnya. Yang penting semua langkah wajib (1-4, 6, 9-10) selesai sebelum outlet buka ke customer sungguhan.",
+      "Untuk memahami bagaimana semua bagian ini terhubung jadi satu alur transaksi, lanjut baca topik \"Alur Kerja Sewa PlayStation (End-to-End)\" tepat di bawah topik ini.",
+    ],
+  },
+  {
+    id: "alur-kerja-rental",
+    group: "Mulai Cepat",
+    label: "Alur Kerja Sewa PlayStation (End-to-End)",
+    summary:
+      "Gambaran satu transaksi sewa PS dari customer datang sampai angkanya masuk laporan keuangan — supaya kamu paham bagaimana Booking, Rental PS, Kitchen, Shift, Transaksi, dan Accounting saling terhubung, bukan menu yang berdiri sendiri-sendiri.",
+    subsections: [
+      {
+        title: "1. Sebelum Customer Datang (Opsional — Booking)",
+        intro: "Lewati bagian ini kalau customer walk-in langsung tanpa reservasi.",
+        steps: [
+          "Customer reservasi lewat WhatsApp/telepon → kasir input manual di menu Booking, ATAU customer reservasi sendiri lewat link halaman booking publik outlet (dari Pengaturan → Business & Tax).",
+          "Kalau jadwal yang diminta bentrok, booking otomatis masuk Waiting List, bukan ditolak — sistem kirim reminder WhatsApp otomatis di H-24 jam, H-2 jam, dan H-15 menit sebelum jadwal.",
+          "Saat customer datang, kasir cukup ketik kode booking di kotak \"Cari Kode Booking\" untuk check-in cepat — unit otomatis ditandai terpakai.",
+        ],
+      },
+      {
+        title: "2. Customer Datang — Mulai Sesi",
+        steps: [
+          "Kalau tanpa booking: buka Rental PS, pilih unit yang tersedia, pilih Paket (harga flat) atau Per Jam, isi data customer (member/non-member).",
+          "Opsional tarik DP di awal kalau kebijakan outlet mengharuskan (cash/QRIS).",
+          "Klik Mulai Sesi — kalau unit itu terhubung ke smart plug/TV (lihat kategori Kontrol Perangkat), TV bisa dinyalakan langsung dari kartu sesi.",
+        ],
+      },
+      {
+        title: "3. Selama Bermain — Tambahan & Pemantauan",
+        steps: [
+          "Customer mau nambah makanan/minuman → kasir klik +F&B di kartu sesi (kalau modul F&B dipakai) — item otomatis masuk antrean Kitchen Display, dapur proses lewat 4 kolom status sampai \"Sudah Diantar\".",
+          "Customer mau pinjam controller ekstra/VR → +Aksesoris, dihitung per jam sejak ditambahkan.",
+          "Customer mau nambah waktu → Add Time dari preset, atau kalau mau pindah ke unit lain yang kosong → Pindah Unit (bill & timer ikut pindah).",
+          "Kalau outlet punya TV/monitor kedua di area kasir, tampilkan halaman Live Billing Board supaya semua station terpantau real-time tanpa bolak-balik ke Rental PS.",
+        ],
+      },
+      {
+        title: "4. Sesi Berakhir — Pembayaran",
+        steps: [
+          "Kasir klik \"End Session & Bayar\" — tagihan final (sewa + aksesoris + F&B) muncul otomatis.",
+          "Opsional terapkan diskon/voucher/pajak, lalu pilih metode pembayaran dan klik Bayar. Bisa split payment (sebagian cash, sisanya QRIS) atau \"Tutup (bayar nanti di POS)\" kalau customer belum bisa bayar penuh saat itu.",
+          "Struk bisa langsung dicetak dari sini.",
+        ],
+      },
+      {
+        title: "5. Setelah Bayar — Tercatat Otomatis, Tanpa Input Ulang",
+        steps: [
+          "Jurnal akuntansi (Dr Kas/Bank, Cr Pendapatan Rental/F&B) terposting otomatis begitu pembayaran diterima — bisa dilihat detailnya lewat menu Transaksi → klik Detail pada baris transaksi itu.",
+          "Kalau dibayar cash, nominalnya otomatis ikut dihitung dalam rekonsiliasi kas shift yang sedang berjalan (lihat Shift & Kasir).",
+          "Kalau customer-nya member, poin loyalty bertambah otomatis dan tier bisa naik kalau syarat belanja terpenuhi (lihat Membership & CRM).",
+          "Angka ini otomatis ikut ke widget Ringkasan hari itu dan ke halaman Laporan (tab Penjualan/Rental) serta Laba Rugi di Accounting — tanpa perlu rekap manual di Excel.",
+        ],
+      },
+      {
+        title: "6. Akhir Hari — Tutup Shift",
+        steps: [
+          "Kasir hitung fisik kas per pecahan dan verifikasi saldo tiap channel non-tunai yang dipakai hari itu, lalu Tutup Shift — sistem baru menampilkan selisih (kalau ada) setelah disubmit.",
+          "Riwayat shift & selisihnya bisa dicek kapan saja dari daftar Riwayat Shift.",
+        ],
+      },
+    ],
+    notes: [
+      "Ini alur \"happy path\" untuk satu sesi rental biasa — untuk kasus khusus (refund, void, transaksi lupa dibayar, dll) lihat topik Transaksi. Untuk sewa DIBAWA PULANG (bukan dimainkan di tempat), alurnya beda — lihat topik Home Rental.",
+      "Semua langkah di atas TIDAK butuh input dobel ke aplikasi lain — satu transaksi di Rental PS otomatis mengalir ke Kitchen, Shift, Transaksi, Laporan, dan Accounting.",
+    ],
+  },
 
   // ================= OPERASIONAL HARIAN =================
+  {
+    id: "sop-harian",
+    group: "Operasional Harian",
+    label: "SOP Operasional Harian (Working Instruction)",
+    summary:
+      "Checklist kerja harian untuk kasir/staf shift — dari buka toko sampai tutup — supaya semua staf, kapan pun jadwalnya, menjalankan operasional dengan standar yang sama.",
+    subsections: [
+      {
+        title: "Checklist Buka Toko",
+        steps: [
+          "Cek fisik semua unit PS menyala normal, controller lengkap dan berfungsi, TV/monitor menyala jernih.",
+          "Kalau ada Kontrol Perangkat terhubung, pastikan status perangkat di halaman itu \"online\" semua sebelum toko buka — perangkat offline berarti tidak bisa dinyalakan-matikan dari dashboard (tetap bisa manual pakai remote/tombol fisik).",
+          "Cek printer struk menyala dan tersambung (coba print test dari halaman mana saja yang ada tombol Cetak).",
+          "Buka Booking, lihat ada jadwal booking apa saja hari ini supaya unit yang sudah dipesan tidak diberikan ke walk-in lain.",
+          "Buka Notifikasi (ikon lonceng), cek ada stok F&B menipis atau expense pending approval yang perlu ditindaklanjuti dari kemarin.",
+          "Buka Shift baru di menu Shift & Kasir — isi modal awal kas SESUAI YANG BENAR-BENAR ADA di laci, jangan asal isi angka standar.",
+        ],
+      },
+      {
+        title: "Selama Jam Operasional",
+        steps: [
+          "Customer datang tanpa booking → mulai sesi baru langsung dari Rental PS. Customer dengan booking → check-in cepat pakai kode booking.",
+          "Pesanan F&B → tambahkan lewat +F&B di sesi rental (kalau nempel ke sesi yang jalan) atau lewat Kasir (POS) untuk penjualan berdiri sendiri (customer tidak sedang rental) — pastikan masuk ke kategori yang benar supaya Kitchen Display menerimanya.",
+          "Pantau Live Billing Board (kalau ditampilkan di layar kedua) untuk tahu sesi mana yang mendekati waktu habis, supaya bisa tawarkan perpanjangan waktu ke customer sebelum sesi berhenti otomatis.",
+          "Pengeluaran kecil dadakan (parkir, galon, dll) → catat langsung lewat Expense Management → Cash Out Cepat, jangan ditunda sampai tutup shift supaya tidak lupa.",
+          "Kalau ada permintaan void/refund yang di luar wewenangmu (role tidak punya izinnya), ajukan lewat Staf & Hak Akses → Approval — jangan mengakali dengan cara lain.",
+        ],
+      },
+      {
+        title: "Checklist Tutup Toko / Tutup Shift",
+        steps: [
+          "Pastikan semua sesi rental yang masih \"Running\"/\"Jeda\" di Rental PS sudah benar-benar selesai — kalau ada customer yang sudah pulang tapi sesinya lupa di-end, akhiri & catat statusnya (lunas atau \"bayar nanti\") sebelum tutup shift.",
+          "Hitung fisik kas di laci SATU PER SATU per pecahan uang (jangan intip laporan sistem dulu) di form Tutup Shift.",
+          "Buka app/dashboard tiap channel non-tunai (GoPay/DANA/BukuPay/Fastpay/dll) dan masukkan saldo yang benar-benar tertera di sana saat itu juga.",
+          "Submit Tutup Shift — kalau ada selisih (kas atau non-tunai), catat dugaan penyebabnya di kolom catatan sebelum lupa (mis. \"kembalian kurang di transaksi jam 3 sore\").",
+          "Matikan TV/unit yang sedang tidak dipakai (kalau tidak otomatis mati sendiri), rapikan controller & aksesoris kembali ke tempatnya.",
+          "Kunci laci kas dan area kasir sesuai SOP keamanan outlet masing-masing (di luar cakupan aplikasi ini).",
+        ],
+      },
+      {
+        title: "Serah Terima ke Shift Berikutnya / Manager",
+        steps: [
+          "Sampaikan lisan/tertulis: order \"bayar nanti\" yang masih outstanding (bisa dicek lagi dari Transaksi dengan filter status), stok F&B yang menipis, unit PS/perangkat yang bermasalah (kalau ada, buat tiket di Maintenance supaya tercatat resmi, jangan cuma pesan lisan yang gampang lupa), dan selisih kas/non-tunai (kalau ada) dari Tutup Shift barusan.",
+          "Kalau ada permintaan approval (void/refund/expense) yang masih pending, informasikan ke orang yang punya izin menyetujuinya supaya tidak mengendap.",
+        ],
+      },
+    ],
+    notes: [
+      "SOP ini adalah urutan kerja yang disarankan berdasarkan alur fitur yang tersedia — outlet tetap bebas menyesuaikan detail kebijakan internal (mis. siapa pegang kunci, jam pasti buka/tutup) di luar aplikasi.",
+      "Untuk penjelasan detail tiap fitur yang disebut di atas, buka topik masing-masing (Rental PS, Kasir (POS), Kitchen Display, Shift & Kasir, dll) di daftar sebelah kiri.",
+    ],
+  },
   {
     id: "rental-ps",
     group: "Operasional Harian",
