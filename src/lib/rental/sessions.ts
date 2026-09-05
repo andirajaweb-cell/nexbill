@@ -1,7 +1,7 @@
 import { db } from "@/db/client";
 import { rentalSessions, rentalUnits, devices, promos, outlets, bookings, orders } from "@/db/schema";
 import { eq, and, inArray, lte, gt, ne } from "drizzle-orm";
-import { turnDeviceOn, turnDeviceOff } from "@/lib/devices";
+import { turnDeviceOn, turnDeviceOff, getDeviceState } from "@/lib/devices";
 import { describeError } from "@/lib/api/error";
 
 /**
@@ -37,6 +37,44 @@ async function runDeviceCommand(promise: Promise<unknown>, errorLabel: string): 
     console.error(errorLabel, err);
     return `${errorLabel} ${describeError(err)}`;
   }
+}
+
+/**
+ * Turn-on-specific variant that double-checks the device's own reported state after the command
+ * returns success — reported production symptom: clicking "Mulai Sesi" never turns the TV on
+ * (the smart plug itself doesn't even react — no click, no LED), the manual toggle on Kontrol
+ * Perangkat for the exact same device works every time, and NO warning ever surfaced even after
+ * runDeviceCommand started returning error messages. That combination only makes sense if the
+ * underlying API call is reporting success without the command actually reaching the physical
+ * device — a known Tuya Cloud quirk: the "issue command" endpoint returns `success: true` as soon
+ * as Tuya's cloud accepts the request, NOT once the device confirms it applied it, so a device
+ * that's momentarily offline/reconnecting to WiFi at that exact instant can silently swallow an
+ * "on" command while the API still reports success. Turning OFF doesn't appear to hit this in
+ * practice (cutting power seems to deliver more reliably than restoring it), so this extra
+ * round-trip is only spent on the flakier "turn on" direction rather than slowing down the
+ * already-reliable stop path too.
+ *
+ * Waits briefly before reading state back — Tuya's own status endpoint can lag a moment behind
+ * a command it just accepted, so checking instantly risks a false "still off" read on a command
+ * that actually did land.
+ */
+async function runDeviceOnCommand(device: Parameters<typeof turnDeviceOn>[0], errorLabel: string): Promise<string | null> {
+  const failure = await runDeviceCommand(turnDeviceOn(device), errorLabel);
+  if (failure) return failure;
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const state = await getDeviceState(device);
+    if (state === "off") {
+      return `${errorLabel} Perintah nyala terkirim tanpa error, tapi device masih melaporkan status mati — kemungkinan device sedang offline/putus WiFi saat itu. Coba nyalakan manual dari Kontrol Perangkat, dan cek koneksi WiFi device tersebut.`;
+    }
+    // "unknown" isn't treated as a failure — some protocols (e.g. generic HTTP with no status URL
+    // configured) simply can't report state at all, which shouldn't turn a real success into a
+    // false warning.
+  } catch {
+    // The state-check call itself failing (network hiccup on the GET, not the original command)
+    // shouldn't retroactively turn a reported success into a warning.
+  }
+  return null;
 }
 import { computeEffectiveHourlyRate, roundUpMinutes } from "./pricing";
 import { openBillForSession, getOpenBillForSession, upsertRentalLineItem } from "@/lib/pos/bill";
@@ -171,7 +209,7 @@ export async function startRentalSession(input: StartSessionInput) {
   if (unit.deviceId) {
     const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
     if (device) {
-      deviceWarning = await runDeviceCommand(turnDeviceOn(device as any), `Gagal menyalakan device untuk unit ${unit.name}:`);
+      deviceWarning = await runDeviceOnCommand(device as any, `Gagal menyalakan device untuk unit ${unit.name}:`);
     } else {
       deviceWarning = `Unit ${unit.name} terhubung ke device yang sudah tidak ada (mungkin terhapus) — atur ulang di halaman Kontrol Perangkat.`;
     }
@@ -433,7 +471,7 @@ export async function transferRentalSession(sessionId: string, newRentalUnitId: 
   if (newUnit.deviceId) {
     const [device] = await db.select().from(devices).where(eq(devices.id, newUnit.deviceId)).limit(1);
     if (device) {
-      const warning = await runDeviceCommand(turnDeviceOn(device as any), `Gagal menyalakan device untuk unit ${newUnit.name}:`);
+      const warning = await runDeviceOnCommand(device as any, `Gagal menyalakan device untuk unit ${newUnit.name}:`);
       if (warning) deviceWarnings.push(warning);
     } else {
       deviceWarnings.push(`Unit ${newUnit.name} terhubung ke device yang sudah tidak ada (mungkin terhapus) — atur ulang di halaman Kontrol Perangkat.`);
