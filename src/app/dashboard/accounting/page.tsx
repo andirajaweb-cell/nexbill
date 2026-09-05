@@ -9,7 +9,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { PeriodBar, PeriodPreset, resolvePeriodPreset, describePeriod } from "@/components/reports/PeriodPicker";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
-import { coaAccountName } from "@/lib/accounting/coa";
+import { coaAccountName } from "@/lib/accounting/coa-data";
 import "@/lib/i18n/dict-accounting";
 import "@/lib/i18n/dict-coa";
 

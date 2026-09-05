@@ -10,7 +10,7 @@ import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { Wrench, PlayCircle, CheckCircle2, Pencil, Trash2 } from "lucide-react";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
-import { coaAccountName } from "@/lib/accounting/coa";
+import { coaAccountName } from "@/lib/accounting/coa-data";
 import "@/lib/i18n/dict-maintenance";
 import "@/lib/i18n/dict-coa";
 

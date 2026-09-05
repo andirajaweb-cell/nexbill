@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
-import { coaAccountName } from "@/lib/accounting/coa";
+import { coaAccountName } from "@/lib/accounting/coa-data";
 import "@/lib/i18n/dict-expenses";
 import "@/lib/i18n/dict-coa";
 
