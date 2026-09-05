@@ -10,6 +10,7 @@ import { LogOut, Bell, ShieldCheck, Building2, Check, ChevronDown } from "lucide
 import type { NotificationItem } from "@/lib/notifications";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { LanguageSwitcher } from "@/components/dashboard/LanguageSwitcher";
+import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 
 /**
  * Role -> Badge status mapping. Superuser (the sole top-level role) is
@@ -207,6 +208,7 @@ export function TopBar() {
           <span className="text-xs text-amber-400">{t("topbar.invalidSession")}</span>
         )}
         <LanguageSwitcher />
+        <ThemeToggle />
         <div className="relative" ref={panelRef}>
           <button
             className="relative rounded-lg p-1.5 text-neutral-400 hover:text-cyan-300 hover:bg-white/5 transition"

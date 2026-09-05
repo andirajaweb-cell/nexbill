@@ -1,0 +1,262 @@
+/*
+ * Light ("blue White") theme override for /dashboard only.
+ *
+ * The dashboard's ~30 pages were built with Tailwind color utilities hardcoded directly in JSX
+ * (bg-neutral-800, border-neutral-700, text-neutral-500, bg-white/5, text-emerald-400, etc.) — not
+ * semantic tokens — so there is no `dark:`/`light:` variant wiring to flip. Rewriting every one of
+ * those class strings across every page would be a huge, error-prone change touching dozens of
+ * files. Instead, this file re-targets the EXACT utility classes actually used across the
+ * dashboard (audited via grep) with an attribute selector — `[class~="bg-neutral-800"]` matches
+ * any element whose `class` attribute contains that exact whitespace-separated token — scoped
+ * under the `.theme-light` class that DashboardThemeProvider (src/lib/ui/dashboard-theme.tsx)
+ * toggles on <html>. Zero page files need to change; this is purely additive and only takes
+ * effect when a user has switched to light mode.
+ *
+ * `~=` (not a substring selector) is what makes this safe for hover variants: an element carrying
+ * only `hover:bg-neutral-700` (no plain `bg-neutral-700` token) is untouched by the plain-token
+ * rule below and only affected by its own `hover:bg-neutral-700` rule — so a hover-only background
+ * doesn't leak into the resting state.
+ *
+ * Scope of what's remapped: the neutral scale (backgrounds/text/borders — the vast majority of
+ * occurrences), the white/black opacity "glass" overlays used for subtle borders/tints against
+ * the dark backdrop (flipped to black-tinted equivalents for a light backdrop), the handful of
+ * bespoke near-black bg-[#hex] panel colors (topbar/sidebar/dropdowns), and light-shade accent
+ * text colors (emerald-400, red-400, amber-400, cyan-300, etc.) that read fine on a dark
+ * background but need darkening to stay legible on white. Left untouched: solid colored CTA
+ * buttons (e.g. bg-emerald-600 text-white — already high-contrast on any background), translucent
+ * mid-tone accent chips/borders (bg-emerald-500/15, border-cyan-400/30 — read fine as a pale tint
+ * on white too), and modal backdrop dimmers (bg-black/60 etc. — meant to stay dark regardless of
+ * page theme).
+ */
+
+html.theme-light {
+  color-scheme: light;
+
+  --tl-bg: #f5f8fc;
+  --tl-surface: #ffffff;
+  --tl-surface-alt: #eef3fa;
+  --tl-surface-alt-hover: #e4ebf5;
+  --tl-border: #d7e0ee;
+  --tl-border-strong: #b9c6dc;
+  --tl-border-strong-hover: #8fa3c2;
+
+  --tl-text: #0f172a;
+  --tl-text-2: #1e293b;
+  --tl-text-muted: #47536b;
+  --tl-text-faint: #64748b;
+  --tl-text-faint-2: #94a3b8;
+  --tl-text-faint-3: #b7c2d4;
+
+  --tl-amber: #b45309;
+  --tl-amber-2: #92400e;
+  --tl-amber-3: #78350f;
+  --tl-emerald: #047857;
+  --tl-emerald-2: #065f46;
+  --tl-red: #b91c1c;
+  --tl-red-2: #7f1d1d;
+  --tl-rose: #be123c;
+  --tl-rose-2: #9f1239;
+  --tl-cyan: #0e7490;
+  --tl-cyan-2: #155e75;
+  --tl-cyan-3: #164e63;
+  --tl-blue: #1d4ed8;
+  --tl-purple: #7e22ce;
+  --tl-violet: #6d28d9;
+  --tl-sky: #0369a1;
+  --tl-sky-2: #075985;
+}
+
+/* Ambient dark neon glow/grid backdrop (globals.css .gm-body::before/::after) — hide in light
+   mode and give the body a plain light page background instead. */
+html.theme-light .gm-body {
+  background: var(--tl-bg);
+}
+html.theme-light .gm-body::before,
+html.theme-light .gm-body::after {
+  opacity: 0;
+}
+
+/* Native form-control chrome (select popups, etc.) — see globals.css for the dark-mode version this overrides. */
+html.theme-light select {
+  color-scheme: light;
+}
+html.theme-light select option,
+html.theme-light select optgroup {
+  background-color: var(--tl-surface);
+  color: var(--tl-text);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Bespoke near-black panel colors (topbar/sidebar/dropdown backgrounds — not part of Tailwind's
+   named palette, written as arbitrary bg-[#hex] values in JSX).
+   --------------------------------------------------------------------------------------------- */
+html.theme-light [class~="bg-[#0a0f1e]"],
+html.theme-light [class~="bg-[#0b0f1e]"],
+html.theme-light [class~="bg-[#0f1426]"],
+html.theme-light [class~="bg-[#0e0d09]"],
+html.theme-light [class~="bg-[#0a1020]"],
+html.theme-light [class~="bg-[#07080f]"] {
+  background-color: var(--tl-surface);
+}
+html.theme-light [class~="bg-[#050810]"],
+html.theme-light [class~="bg-[#05060a]"] {
+  background-color: var(--tl-bg);
+}
+html.theme-light [class~="bg-[#0f1426]/80"] { background-color: rgba(255, 255, 255, 0.9); }
+html.theme-light [class~="bg-[#0f1426]/70"] { background-color: rgba(255, 255, 255, 0.85); }
+html.theme-light [class~="bg-[#070b18]/90"] { background-color: rgba(255, 255, 255, 0.94); }
+html.theme-light [class~="bg-[#070b18]/80"] { background-color: rgba(255, 255, 255, 0.9); }
+
+/* ---------------------------------------------------------------------------------------------
+   Neutral scale — backgrounds
+   --------------------------------------------------------------------------------------------- */
+html.theme-light [class~="bg-neutral-900"],
+html.theme-light [class~="bg-neutral-950"] { background-color: var(--tl-bg); }
+html.theme-light [class~="bg-neutral-900/40"] { background-color: rgba(245, 248, 252, 0.6); }
+html.theme-light [class~="bg-neutral-900/50"] { background-color: rgba(245, 248, 252, 0.7); }
+html.theme-light [class~="bg-neutral-900/60"] { background-color: rgba(245, 248, 252, 0.8); }
+html.theme-light [class~="hover:bg-neutral-900"]:hover { background-color: var(--tl-surface-alt); }
+
+html.theme-light [class~="bg-neutral-800"] { background-color: var(--tl-surface); }
+html.theme-light [class~="bg-neutral-800/60"] { background-color: rgba(255, 255, 255, 0.75); }
+
+html.theme-light [class~="bg-neutral-700"] { background-color: var(--tl-surface-alt); }
+html.theme-light [class~="bg-neutral-700/40"] { background-color: rgba(238, 243, 250, 0.6); }
+html.theme-light [class~="hover:bg-neutral-700"]:hover { background-color: var(--tl-surface-alt-hover); }
+
+html.theme-light [class~="bg-neutral-500"],
+html.theme-light [class~="bg-neutral-400"] { background-color: var(--tl-border-strong); }
+
+/* ---------------------------------------------------------------------------------------------
+   Neutral scale — borders / divide
+   --------------------------------------------------------------------------------------------- */
+html.theme-light [class~="border-neutral-900"] { border-color: var(--tl-border-strong); }
+html.theme-light [class~="divide-neutral-900"] { border-color: var(--tl-border); }
+html.theme-light [class~="border-neutral-800"],
+html.theme-light [class~="border-neutral-700"] { border-color: var(--tl-border); }
+html.theme-light [class~="border-neutral-600/60"] { border-color: rgba(185, 198, 220, 0.6); }
+html.theme-light [class~="border-neutral-500"] { border-color: var(--tl-border-strong); }
+html.theme-light [class~="hover:border-neutral-500"]:hover { border-color: var(--tl-border-strong-hover); }
+
+/* ---------------------------------------------------------------------------------------------
+   Neutral scale — text
+   --------------------------------------------------------------------------------------------- */
+html.theme-light [class~="text-neutral-50"],
+html.theme-light [class~="text-neutral-100"],
+html.theme-light [class~="text-neutral-200"] { color: var(--tl-text); }
+html.theme-light [class~="hover:text-neutral-100"]:hover,
+html.theme-light [class~="hover:text-neutral-200"]:hover { color: var(--tl-text); }
+
+html.theme-light [class~="text-neutral-300"] { color: var(--tl-text-2); }
+html.theme-light [class~="hover:text-neutral-300"]:hover { color: var(--tl-text); }
+
+html.theme-light [class~="text-neutral-400"] { color: var(--tl-text-muted); }
+
+html.theme-light [class~="text-neutral-500"] { color: var(--tl-text-faint); }
+
+html.theme-light [class~="text-neutral-600"] { color: var(--tl-text-faint-2); }
+
+html.theme-light [class~="text-neutral-700"] { color: var(--tl-text-faint-3); }
+
+/* text-neutral-950 deliberately NOT remapped — every use is text sitting on top of a solidly
+   colored chip/bubble (e.g. bg-emerald-500 text-neutral-950), whose contrast depends on that
+   chip's own color, not the page theme. */
+
+/* ---------------------------------------------------------------------------------------------
+   White/black opacity "glass" overlays — assume a dark backdrop (bg-white/5 etc. = a faint LIGHT
+   tint used as a border/highlight against dark surfaces). On a light backdrop the same trick
+   needs a faint DARK tint instead, or it's invisible.
+   --------------------------------------------------------------------------------------------- */
+html.theme-light [class~="bg-white/5"] { background-color: rgba(15, 23, 42, 0.045); }
+html.theme-light [class~="bg-white/10"] { background-color: rgba(15, 23, 42, 0.07); }
+html.theme-light [class~="hover:bg-white/5"]:hover { background-color: rgba(15, 23, 42, 0.06); }
+html.theme-light [class~="hover:bg-white/10"]:hover { background-color: rgba(15, 23, 42, 0.09); }
+
+html.theme-light [class~="border-white/5"] { border-color: rgba(15, 23, 42, 0.06); }
+html.theme-light [class~="border-white/10"] { border-color: rgba(15, 23, 42, 0.1); }
+html.theme-light [class~="border-white/15"] { border-color: rgba(15, 23, 42, 0.14); }
+html.theme-light [class~="border-white/30"] { border-color: rgba(15, 23, 42, 0.24); }
+html.theme-light [class~="hover:border-white/30"]:hover { border-color: rgba(15, 23, 42, 0.32); }
+html.theme-light [class~="divide-white/5"] { border-color: rgba(15, 23, 42, 0.06); }
+
+html.theme-light [class~="hover:text-white"]:hover { color: var(--tl-text); }
+/* Plain text-white / bg-white (no opacity) and bg-black/20|60|70 (modal backdrop dimmers) are
+   deliberately left alone — the former sits on solid colored buttons or is a genuine white
+   surface (e.g. a QR code box) that's correct in any theme; the latter is a page-agnostic
+   dimming overlay. */
+
+/* ---------------------------------------------------------------------------------------------
+   Accent text colors — light/mid shades (200-500) chosen for legibility on a dark background;
+   darkened here so status pills, links and icons stay readable on white. Translucent accent
+   BACKGROUNDS and BORDERS (bg-emerald-500/15, border-cyan-400/30, etc.) are intentionally left
+   alone — a pale tint of a mid-tone color reads fine on white without adjustment.
+   --------------------------------------------------------------------------------------------- */
+html.theme-light [class~="text-amber-100"],
+html.theme-light [class~="text-amber-200"] { color: var(--tl-amber-3); }
+html.theme-light [class~="text-amber-200/80"] { color: rgba(120, 53, 15, 0.85); }
+html.theme-light [class~="hover:text-amber-200"]:hover,
+html.theme-light [class~="group-hover:text-amber-200"] { color: var(--tl-amber-3); }
+html.theme-light [class~="hover:text-amber-200/80"]:hover { color: rgba(120, 53, 15, 0.85); }
+html.theme-light [class~="text-amber-300"] { color: var(--tl-amber-2); }
+html.theme-light [class~="text-amber-300/70"] { color: rgba(146, 64, 14, 0.75); }
+html.theme-light [class~="text-amber-300/80"] { color: rgba(146, 64, 14, 0.85); }
+html.theme-light [class~="text-amber-300/90"] { color: rgba(146, 64, 14, 0.9); }
+html.theme-light [class~="hover:text-amber-300"]:hover { color: var(--tl-amber-2); }
+html.theme-light [class~="text-amber-400"] { color: var(--tl-amber); }
+html.theme-light [class~="text-amber-400/70"] { color: rgba(180, 83, 9, 0.75); }
+html.theme-light [class~="text-amber-400/80"] { color: rgba(180, 83, 9, 0.85); }
+html.theme-light [class~="text-amber-400/90"] { color: rgba(180, 83, 9, 0.9); }
+
+html.theme-light [class~="text-blue-300"] { color: var(--tl-blue); }
+
+html.theme-light [class~="text-cyan-200"] { color: var(--tl-cyan-3); }
+html.theme-light [class~="hover:text-cyan-200"]:hover { color: var(--tl-cyan-3); }
+html.theme-light [class~="text-cyan-300"] { color: var(--tl-cyan-2); }
+html.theme-light [class~="text-cyan-300/80"] { color: rgba(21, 94, 117, 0.85); }
+html.theme-light [class~="hover:text-cyan-300"]:hover { color: var(--tl-cyan-2); }
+html.theme-light [class~="text-cyan-400"] { color: var(--tl-cyan); }
+html.theme-light [class~="text-cyan-400/90"] { color: rgba(14, 116, 144, 0.92); }
+html.theme-light [class~="hover:text-cyan-400"]:hover { color: var(--tl-cyan); }
+html.theme-light [class~="text-cyan-500"] { color: var(--tl-cyan); }
+
+html.theme-light [class~="text-emerald-200"] { color: var(--tl-emerald-2); }
+html.theme-light [class~="group-hover:text-emerald-200"] { color: var(--tl-emerald-2); }
+html.theme-light [class~="text-emerald-300"] { color: var(--tl-emerald); }
+html.theme-light [class~="text-emerald-300/80"] { color: rgba(4, 120, 87, 0.85); }
+html.theme-light [class~="text-emerald-400"] { color: var(--tl-emerald); }
+html.theme-light [class~="hover:text-emerald-400"]:hover { color: var(--tl-emerald); }
+
+html.theme-light [class~="text-purple-300"] { color: var(--tl-purple); }
+
+html.theme-light [class~="text-red-200"] { color: var(--tl-red-2); }
+html.theme-light [class~="text-red-400"] { color: var(--tl-red); }
+html.theme-light [class~="text-red-400/80"] { color: rgba(185, 28, 28, 0.85); }
+html.theme-light [class~="hover:text-red-400"]:hover { color: var(--tl-red); }
+html.theme-light [class~="text-red-500"] { color: var(--tl-red); }
+
+html.theme-light [class~="text-rose-300"] { color: var(--tl-rose-2); }
+html.theme-light [class~="text-rose-400"] { color: var(--tl-rose); }
+html.theme-light [class~="hover:text-rose-400"]:hover { color: var(--tl-rose); }
+
+html.theme-light [class~="text-sky-300"] { color: var(--tl-sky-2); }
+html.theme-light [class~="text-sky-400"] { color: var(--tl-sky); }
+
+html.theme-light [class~="text-violet-300"] { color: var(--tl-violet); }
+
+/* ---------------------------------------------------------------------------------------------
+   The few accent backgrounds/borders built on a DARK base shade (900/950) rather than a mid-tone
+   — those assume a dark backdrop too (a near-black tint blended into a dark page still reads as
+   "tinted"; blended into white it reads as a muddy grey smear), so they get a pale tint of the
+   same hue's 500 shade instead, at a similar visual weight.
+   --------------------------------------------------------------------------------------------- */
+html.theme-light [class~="bg-amber-950/30"] { background-color: rgba(245, 158, 11, 0.14); }
+html.theme-light [class~="bg-emerald-950"] { background-color: #d1fae5; }
+html.theme-light [class~="bg-emerald-950/20"] { background-color: rgba(16, 185, 129, 0.14); }
+html.theme-light [class~="bg-emerald-950/30"] { background-color: rgba(16, 185, 129, 0.18); }
+html.theme-light [class~="bg-emerald-950/90"] { background-color: rgba(16, 185, 129, 0.24); }
+html.theme-light [class~="bg-red-900/40"] { background-color: rgba(239, 68, 68, 0.16); }
+html.theme-light [class~="bg-red-950/90"] { background-color: rgba(239, 68, 68, 0.85); }
+html.theme-light [class~="bg-rose-900/20"] { background-color: rgba(244, 63, 94, 0.14); }
+html.theme-light [class~="bg-sky-950"] { background-color: #e0f2fe; }
+html.theme-light [class~="border-amber-800/50"] { border-color: rgba(180, 83, 9, 0.45); }
+html.theme-light [class~="border-rose-900/40"] { border-color: rgba(244, 63, 94, 0.3); }
