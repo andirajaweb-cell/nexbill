@@ -261,6 +261,109 @@ export async function getShiftDetail(shiftId: string) {
 }
 
 /**
+ * Owner/Superuser correction for an already-closed shift's history — lets them fix a miscounted
+ * denomination, a mistyped non-cash channel balance, an opening float that was entered wrong, or
+ * add/amend notes, AFTER the shift is closed (closeShift itself stays a one-way blind count; this
+ * is the deliberate "we found a mistake afterward" escape hatch, gated to Owner/Superuser only by
+ * the caller). Only a closed shift has cash counts/balance checks to correct in the first place —
+ * an open shift's numbers aren't final yet, so this refuses those (use closeShift normally).
+ *
+ * Recompute rules, chosen to only touch what actually changed rather than re-deriving everything
+ * from scratch (which would require re-running closeShift's whole cashIn/cashOut/trial-balance
+ * query set against "as of now" data that may have moved on since the original close):
+ *  - cashCounts replaced wholesale when provided → actualCash recomputed as their sum, variance
+ *    recomputed against the (possibly also-updated) expectedCash below.
+ *  - openingCash, if changed, shifts expectedCash by the same delta (expectedCash was
+ *    openingCash + cashIn − cashOut at close time; cashIn/cashOut for a closed shift don't change
+ *    after the fact, so adding the same delta keeps it correct without re-deriving them).
+ *  - balanceChecks: only actualBalance is editable per channel — expectedBalance stays exactly
+ *    what it was at close time (a historical snapshot of the account's balance then, which by
+ *    definition can't be "corrected" after the fact), so only that row's variance (and the
+ *    shift-wide nonCashVarianceTotal) recomputes.
+ */
+export async function updateShiftDetail(
+  shiftId: string,
+  input: {
+    openingCash?: number;
+    notes?: string;
+    cashCounts?: CashCountInput[];
+    balanceChecks?: BalanceCheckInput[];
+  }
+) {
+  const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
+  if (!shift) throw new Error("Shift tidak ditemukan.");
+  if (shift.status !== "closed") throw new Error("Hanya shift yang sudah ditutup yang bisa dikoreksi di sini.");
+
+  const before = { ...shift };
+  const patch: Partial<typeof shifts.$inferInsert> = {};
+
+  let actualCash = shift.actualCash;
+  if (input.cashCounts) {
+    const countByDenom = new Map(input.cashCounts.map((c) => [c.denomination, Math.max(0, Math.floor(c.qty || 0))]));
+    for (const denom of countByDenom.keys()) {
+      if (!(CASH_DENOMINATIONS as readonly number[]).includes(denom)) {
+        throw new Error(`Pecahan Rp${denom} tidak dikenal.`);
+      }
+    }
+    const cashRows = CASH_DENOMINATIONS.map((denomination) => {
+      const qty = countByDenom.get(denomination) ?? 0;
+      return { denomination, qty, subtotal: denomination * qty };
+    });
+    actualCash = cashRows.reduce((s, r) => s + r.subtotal, 0);
+    await db.delete(shiftCashCounts).where(eq(shiftCashCounts.shiftId, shiftId));
+    await db.insert(shiftCashCounts).values(cashRows.map((r) => ({ shiftId, ...r })));
+    patch.actualCash = actualCash;
+  }
+
+  let expectedCash = shift.expectedCash;
+  if (input.openingCash !== undefined && input.openingCash !== shift.openingCash) {
+    const delta = input.openingCash - shift.openingCash;
+    expectedCash = (shift.expectedCash ?? 0) + delta;
+    patch.openingCash = input.openingCash;
+    patch.expectedCash = expectedCash;
+  }
+
+  if ((input.cashCounts && actualCash !== null) || (input.openingCash !== undefined && expectedCash !== null)) {
+    patch.variance = (actualCash ?? 0) - (expectedCash ?? 0);
+  }
+
+  let balanceCheckRows: (typeof shiftBalanceChecks.$inferSelect)[] | null = null;
+  if (input.balanceChecks && input.balanceChecks.length) {
+    const existing = await db.select().from(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));
+    const updates = new Map(input.balanceChecks.map((b) => [b.channelKey, b.actualBalance]));
+    for (const row of existing) {
+      if (!updates.has(row.channelKey)) continue;
+      const actualBalance = updates.get(row.channelKey)!;
+      await db
+        .update(shiftBalanceChecks)
+        .set({ actualBalance, variance: actualBalance - row.expectedBalance })
+        .where(eq(shiftBalanceChecks.id, row.id));
+    }
+    balanceCheckRows = await db.select().from(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));
+    patch.nonCashVarianceTotal = balanceCheckRows.reduce((s, r) => s + Math.abs(r.variance), 0);
+  }
+
+  if (input.notes !== undefined) patch.notes = input.notes;
+
+  const [updated] = Object.keys(patch).length
+    ? await db.update(shifts).set(patch).where(eq(shifts.id, shiftId)).returning()
+    : [shift];
+
+  await logAudit({
+    outletId: shift.outletId,
+    staffUserId: shift.staffUserId,
+    action: "edit_shift",
+    entityType: "shift",
+    entityId: shiftId,
+    before,
+    after: updated,
+  });
+
+  const cashCounts = await db.select().from(shiftCashCounts).where(eq(shiftCashCounts.shiftId, shiftId));
+  return { shift: updated, cashCounts, balanceChecks: balanceCheckRows ?? (await db.select().from(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId))) };
+}
+
+/**
  * Permanently deletes one shift record from history — "Riwayat Shift" on the Shift & Kasir page.
  * Caller (API route) is responsible for the Owner/Superuser role gate; this only handles the
  * data/FK side.

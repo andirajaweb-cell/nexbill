@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -47,8 +47,17 @@ export default function ShiftPage() {
   const { user } = useAuth();
   const staffUserId = user?.id ?? "";
   const canManageChannels = hasPermission((user?.role ?? "cashier") as any, "manage_coa");
-  const canDeleteShift = user?.role === "owner" || user?.role === "superuser";
+  // Owner/Superuser can both delete AND correct ("Edit") a shift's history — same gate for both,
+  // since editing an already-closed shift's figures is just as sensitive as deleting it outright.
+  const canManageShiftHistory = user?.role === "owner" || user?.role === "superuser";
   const [deletingShiftId, setDeletingShiftId] = useState<string | null>(null);
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editOpeningCash, setEditOpeningCash] = useState(0);
+  const [editQtyByDenom, setEditQtyByDenom] = useState<Record<number, number>>({});
+  const [editBalanceChecks, setEditBalanceChecks] = useState<{ channelKey: string; label: string; actualBalance: number }[]>([]);
+  const [editNotes, setEditNotes] = useState("");
   const [outletId, setOutletId] = useState<string | null>(null);
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -186,6 +195,59 @@ export default function ShiftPage() {
       if (outletId) fetchJsonArray(`/api/shifts?outletId=${outletId}`).then(setHistory);
     } finally {
       setDeletingShiftId(null);
+    }
+  };
+
+  /** Owner/Superuser correction panel — toggles an inline edit row under the clicked shift,
+   * fetching its full denomination/balance-check breakdown (the history table itself only shows
+   * summary columns) the first time it's opened. */
+  const startEditShift = async (s: any) => {
+    if (editingShiftId === s.id) {
+      setEditingShiftId(null);
+      return;
+    }
+    setEditingShiftId(s.id);
+    setEditLoading(true);
+    try {
+      const detail = await fetchJsonObject<{ shift: any; cashCounts: { denomination: number; qty: number }[]; balanceChecks: { channelKey: string; label: string; actualBalance: number }[] }>(
+        `/api/shifts/${s.id}`
+      );
+      if (!detail) {
+        setEditingShiftId(null);
+        return;
+      }
+      setEditOpeningCash(detail.shift.openingCash || 0);
+      const qtyMap: Record<number, number> = {};
+      for (const c of detail.cashCounts) qtyMap[c.denomination] = c.qty;
+      setEditQtyByDenom(qtyMap);
+      setEditBalanceChecks(detail.balanceChecks.map((b) => ({ channelKey: b.channelKey, label: b.label, actualBalance: b.actualBalance })));
+      setEditNotes(detail.shift.notes || "");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const cancelEditShift = () => setEditingShiftId(null);
+
+  const saveEditShift = async (shiftId: string) => {
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/shifts/${shiftId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          openingCash: editOpeningCash,
+          notes: editNotes,
+          cashCounts: CASH_DENOMINATIONS.map((d) => ({ denomination: d, qty: editQtyByDenom[d] || 0 })),
+          balanceChecks: editBalanceChecks.map((b) => ({ channelKey: b.channelKey, actualBalance: b.actualBalance })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setEditingShiftId(null);
+      if (outletId) fetchJsonArray(`/api/shifts?outletId=${outletId}`).then(setHistory);
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -408,7 +470,8 @@ export default function ShiftPage() {
               const cashV = varianceBadge(s.variance, t);
               const nonCashV = varianceBadge(s.nonCashVarianceTotal, t);
               return (
-                <tr key={s.id} className="border-b border-neutral-900">
+                <Fragment key={s.id}>
+                <tr className="border-b border-neutral-900">
                   <td className="py-2">{new Date(s.openedAt).toLocaleString("id-ID")}</td>
                   <td>{s.closedAt ? new Date(s.closedAt).toLocaleString("id-ID") : "-"}</td>
                   <td>{s.staffName ?? "-"}</td>
@@ -421,7 +484,16 @@ export default function ShiftPage() {
                     {s.status === "closed" && (
                       <a href={`/api/shifts/${s.id}/export?format=pdf`} target="_blank" rel="noreferrer" className="text-xs text-emerald-400 hover:underline">{t("shift.pdfLink", "PDF")}</a>
                     )}
-                    {canDeleteShift && (
+                    {canManageShiftHistory && s.status === "closed" && (
+                      <button
+                        onClick={() => startEditShift(s)}
+                        className="text-xs text-cyan-400 hover:underline ml-2"
+                        title={t("shift.editTooltip", "Koreksi hitungan/saldo/catatan shift ini")}
+                      >
+                        {editingShiftId === s.id ? t("shift.editClose", "Tutup") : t("shift.edit", "Edit")}
+                      </button>
+                    )}
+                    {canManageShiftHistory && (
                       <button
                         onClick={() => deleteShiftAction(s)}
                         disabled={deletingShiftId === s.id}
@@ -433,6 +505,92 @@ export default function ShiftPage() {
                     )}
                   </td>
                 </tr>
+                {editingShiftId === s.id && (
+                  <tr className="border-b border-neutral-900 bg-neutral-900/40">
+                    <td colSpan={9} className="p-4">
+                      {editLoading ? (
+                        <div className="text-xs text-neutral-500">{t("shift.editLoading", "Memuat detail shift...")}</div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="text-xs text-amber-400">
+                            {t("shift.editWarning", "Koreksi ini akan mengubah angka final shift yang sudah ditutup — aktual kas & selisih dihitung ulang otomatis. Gunakan hanya untuk memperbaiki kesalahan input, bukan untuk sengaja menutupi selisih.")}
+                          </div>
+
+                          <div>
+                            <label className="text-xs text-neutral-500">{t("shift.openingCashLabel", "Modal awal:")}</label>
+                            <input
+                              type="number"
+                              className="w-40 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm mt-1 block"
+                              value={editOpeningCash || ""}
+                              onChange={(e) => setEditOpeningCash(Number(e.target.value))}
+                            />
+                          </div>
+
+                          <div>
+                            <h4 className="text-sm font-medium mb-2">{t("shift.cashCountTitle", "Hitung Fisik Kas (Per Pecahan)")}</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {CASH_DENOMINATIONS.map((d) => (
+                                <div key={d} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2">
+                                  <span className="text-sm w-28 shrink-0">{denominationLabel(d)}</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    className="w-20 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm"
+                                    value={editQtyByDenom[d] || ""}
+                                    onChange={(e) => setEditQtyByDenom((prev) => ({ ...prev, [d]: Math.max(0, Number(e.target.value)) }))}
+                                    placeholder="0"
+                                  />
+                                  <span className="text-xs text-neutral-500 ml-auto">{rupiah(d * (editQtyByDenom[d] || 0))}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {editBalanceChecks.length > 0 && (
+                            <div>
+                              <h4 className="text-sm font-medium mb-2">{t("shift.verifyBalanceTitle", "Verifikasi Saldo Channel Non-Tunai")}</h4>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {editBalanceChecks.map((b, i) => (
+                                  <div key={b.channelKey} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2">
+                                    <span className="text-sm flex-1">{b.label}</span>
+                                    <input
+                                      type="number"
+                                      className="w-32 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm"
+                                      value={b.actualBalance}
+                                      onChange={(e) =>
+                                        setEditBalanceChecks((prev) => prev.map((row, idx) => (idx === i ? { ...row, actualBalance: Number(e.target.value) } : row)))
+                                      }
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="text-xs text-neutral-500">{t("shift.notesLabel", "Catatan (opsional)")}</label>
+                            <textarea
+                              className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm mt-1"
+                              rows={2}
+                              value={editNotes}
+                              onChange={(e) => setEditNotes(e.target.value)}
+                            />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button className="text-xs" disabled={editSaving} onClick={() => saveEditShift(s.id)}>
+                              {editSaving ? t("shift.savingEdit", "Menyimpan...") : t("shift.saveEdit", "Simpan Koreksi")}
+                            </Button>
+                            <Button variant="secondary" className="text-xs" disabled={editSaving} onClick={cancelEditShift}>
+                              {t("shift.cancel", "Batal")}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>
