@@ -508,7 +508,7 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" placeholder={t("expenses.placeholderNameRecurring", "Nama (mis. Listrik Bulanan)")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })}>
               <option value="">{t("expenses.optionAccountCoa", "Akun Beban (COA)")}</option>
-              {accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+              {accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
             </select>
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderCategoryPlain", "Kategori")} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.amountLabel", "Nominal")} value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
