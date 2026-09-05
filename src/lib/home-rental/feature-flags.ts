@@ -183,7 +183,18 @@ async function isFeatureEnabledUncached(outletId: string, key: string): Promise<
   const def = FLAG_DEF_BY_KEY.get(key);
   if (!def) return false;
   const [row] = await db.select().from(featureFlags).where(and(eq(featureFlags.outletId, outletId), eq(featureFlags.key, key))).limit(1);
-  if (!row || !row.enabled) return false;
+  // BUG FIX: this used to hard-code `false` whenever no row existed yet for this outlet+key —
+  // which silently contradicted defaultEnabled:true flags like PPOB_ENABLED (see its doc comment:
+  // "seeding this flag for an existing outlet never silently turns off a feature they already
+  // had"). A row only gets created by seedFeatureFlagsIfMissing(), which is ONLY called from
+  // listFeatureFlags()/setFeatureFlag() — i.e. only once someone has actually opened Settings >
+  // Feature Management for that outlet. Any outlet that never opened that page had NO row at all
+  // for PPOB_ENABLED, so every PPOB transaction save failed with "Modul PPOB sedang
+  // dinonaktifkan" even though nobody ever turned it off. Falling back to the flag's own
+  // `defaultEnabled` (not a blanket `false`) when the row doesn't exist yet fixes that — an
+  // explicitly stored `enabled: false` row (someone really did turn it off) is still respected.
+  const enabled = row ? row.enabled : (def.defaultEnabled ?? false);
+  if (!enabled) return false;
   if (!def.parentKey) return true;
   return isFeatureEnabledUncached(outletId, def.parentKey);
 }
