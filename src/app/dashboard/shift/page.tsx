@@ -186,12 +186,23 @@ export default function ShiftPage() {
   };
 
   const deleteShiftAction = async (shift: any) => {
-    if (!(await showConfirm(
-      t("shift.confirmDeleteShift", "Hapus riwayat shift ini (dibuka {openedAt}, kasir {staffName})? Tidak bisa dibatalkan.")
-        .replace("{openedAt}", new Date(shift.openedAt).toLocaleString("id-ID"))
-        .replace("{staffName}", shift.staffName ?? "-"),
-      { tone: "danger" }
-    ))) return;
+    // Deleting a still-open shift is allowed (Owner/Superuser) for cleaning up a stuck/orphaned
+    // row, but it has a real side effect a closed shift's deletion doesn't: whoever "owns" that
+    // open shift will just find it gone and get prompted to open a new one, and any transactions
+    // already tagged with it lose that link before ever being reconciled by a close. Extra-strong
+    // wording specifically for that case instead of the normal delete confirm.
+    const confirmMessage =
+      shift.status !== "closed"
+        ? t(
+            "shift.confirmDeleteOpenShift",
+            'PERHATIAN: shift ini MASIH BERJALAN (dibuka {openedAt}, kasir {staffName}), belum ditutup. Menghapusnya akan langsung menghilangkannya dari sistem — kasir yang memakainya akan diminta buka shift baru, dan transaksi yang sudah tercatat di shift ini kehilangan tautannya. Hanya lakukan ini untuk shift yang memang error/tidak akan pernah ditutup normal. Lanjutkan hapus?'
+          )
+            .replace("{openedAt}", new Date(shift.openedAt).toLocaleString("id-ID"))
+            .replace("{staffName}", shift.staffName ?? "-")
+        : t("shift.confirmDeleteShift", "Hapus riwayat shift ini (dibuka {openedAt}, kasir {staffName})? Tidak bisa dibatalkan.")
+            .replace("{openedAt}", new Date(shift.openedAt).toLocaleString("id-ID"))
+            .replace("{staffName}", shift.staffName ?? "-");
+    if (!(await showConfirm(confirmMessage, { tone: "danger" }))) return;
     setDeletingShiftId(shift.id);
     try {
       const res = await fetch(`/api/shifts/${shift.id}`, { method: "DELETE" });
@@ -533,7 +544,7 @@ export default function ShiftPage() {
                         onClick={() => deleteShiftAction(s)}
                         disabled={deletingShiftId === s.id}
                         className="text-xs text-red-400 hover:underline ml-2 disabled:opacity-60"
-                        title={s.status !== "closed" ? t("shift.deleteTooltipNotClosed", "Tutup shift ini dulu sebelum bisa dihapus") : t("shift.deleteTooltipReady", "Hapus riwayat shift ini")}
+                        title={s.status !== "closed" ? t("shift.deleteTooltipStillOpen", "Shift ini masih berjalan — hapus hanya kalau memang shift error/tidak akan ditutup normal") : t("shift.deleteTooltipReady", "Hapus riwayat shift ini")}
                       >
                         {deletingShiftId === s.id ? t("shift.deleting", "Menghapus...") : t("shift.delete", "Hapus")}
                       </button>

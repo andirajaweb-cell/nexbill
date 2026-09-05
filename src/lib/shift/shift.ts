@@ -368,23 +368,27 @@ export async function updateShiftDetail(
  * Caller (API route) is responsible for the Owner/Superuser role gate; this only handles the
  * data/FK side.
  *
- * Refuses to delete a still-open shift: that row is the cashier's live active session (read by
- * getCurrentShift/openShift's "kamu masih punya shift yang belum ditutup" check) — deleting it
- * out from under them would let them open a second shift without ever closing the first, or
- * leave the register in an inconsistent state. Close it first, then delete from history if needed.
+ * Deleting a still-open shift IS allowed (Owner/Superuser only, per the caller's role gate) —
+ * this used to be refused unconditionally, but an outlet can end up with a stuck/orphaned open
+ * shift (a cashier's device died mid-shift, a duplicate/erroneous row, staff who left without
+ * ever closing out) that can never legitimately be closed, and Owner/Superuser needs a way to
+ * clean it up from history regardless. The frontend shows an extra-strong confirmation
+ * specifically for this case (see deleteShiftAction in shift/page.tsx) since it has real
+ * side effects: the cashier who "owns" that open shift (if anyone still does) will see it vanish
+ * and simply be prompted to open a new one next time they load the page (getCurrentShift just
+ * finds nothing), and any orders/expenses/etc. already tagged with this shiftId lose that
+ * association — same as deleting a closed shift (see below), just for transactions that haven't
+ * been reconciled by a close yet.
  *
  * shiftCashCounts/shiftBalanceChecks both carry a real FK to shifts.id (NO ACTION, no cascade —
  * see schema.ts) so they're cleared first. orders/expenses/otherIncomes/homeRentalRentals.shiftId
  * are plain text columns with no FK constraint (loosely tagged, per closeShift's own comments) —
  * deleting the shift just leaves their shiftId pointing at nothing, which is harmless for those
- * already-settled historical rows.
+ * already-settled historical rows (and tolerated, if slightly messier, for a still-open one).
  */
 export async function deleteShift(shiftId: string): Promise<{ deletedId: string }> {
   const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
   if (!shift) throw new Error("Shift tidak ditemukan.");
-  if (shift.status !== "closed") {
-    throw new Error("Tidak bisa menghapus shift yang masih berjalan — tutup shift ini dulu, baru bisa dihapus dari riwayat.");
-  }
 
   await db.delete(shiftCashCounts).where(eq(shiftCashCounts.shiftId, shiftId));
   await db.delete(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));
