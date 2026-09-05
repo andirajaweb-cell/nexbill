@@ -81,6 +81,7 @@ registerDict({
   "rental.plannedSuffix": { id: "(rencana {duration})", en: "(planned {duration})", ms: "(rancangan {duration})", th: "(วางแผน {duration})", fil: "(planado {duration})", vi: "(dự kiến {duration})" },
   "rental.costAccrued": { id: "Cost Accrued", en: "Cost Accrued", ms: "Kos Terkumpul", th: "ค่าใช้จ่ายที่เกิดขึ้น", fil: "Naipong Gastos", vi: "Chi phí phát sinh" },
   "rental.fnbItemCount": { id: "F&B ({n} item)", en: "F&B ({n} item)", ms: "F&B ({n} item)", th: "F&B ({n} รายการ)", fil: "F&B ({n} item)", vi: "F&B ({n} món)" },
+  "rental.fnbOrderedSoFar": { id: "Sudah Dipesan Sesi Ini", en: "Ordered So Far This Session", ms: "Sudah Ditempah Sesi Ini", th: "สั่งไปแล้วในเซสชันนี้", fil: "Na-order Na Sa Session na Ito", vi: "Đã gọi trong phiên này" },
   "rental.runningBill": { id: "Bill Berjalan", en: "Running Bill", ms: "Bil Semasa", th: "บิลที่กำลังคำนวณ", fil: "Kasalukuyang Bill", vi: "Hóa đơn hiện tại" },
   "rental.pause": { id: "Jeda", en: "Pause", ms: "Jeda", th: "หยุดชั่วคราว", fil: "I-pause", vi: "Tạm dừng" },
   "rental.resume": { id: "Lanjut", en: "Resume", ms: "Sambung", th: "เล่นต่อ", fil: "Ituloy", vi: "Tiếp tục" },

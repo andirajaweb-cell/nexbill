@@ -794,8 +794,13 @@ export default function RentalPage() {
       const err = await res.json();
       return showAlert(err.error);
     }
+    // Deliberately does NOT close the panel (no setFnbSessionId(null)) — staff often add F&B in
+    // several rounds during one visit (drinks now, snacks later), and closing it after every
+    // single "Tambah ke Bill" click meant re-opening the menu from scratch each time with no
+    // trace of what was already ordered. Only the qty steppers reset to 0, ready for the next
+    // round; the itemized list below them (sourced from bill.items, refreshed by load() here)
+    // is what keeps showing everything ordered so far for this session.
     setFnbCart({});
-    setFnbSessionId(null);
     load();
   };
 
@@ -1379,6 +1384,20 @@ export default function RentalPage() {
 
                     {fnbSessionId === session.id && (
                       <div className="rounded-lg border border-white/10 p-2 space-y-2 max-h-56 overflow-y-auto">
+                        {/* Jejak pembelian: semua F&B yang sudah masuk bill sesi ini sejauh ini —
+                            tetap tampil di sini walau steppernya sudah balik ke 0 sesudah "Tambah
+                            ke Bill", supaya tidak hilang jejak sudah pesan apa saja. */}
+                        {(bill?.items ?? []).filter((i) => i.itemType === "product").length > 0 && (
+                          <div className="rounded-lg bg-white/5 border border-white/5 px-2 py-1.5 space-y-1">
+                            <div className="text-[10px] uppercase tracking-wide text-neutral-500">{t("rental.fnbOrderedSoFar", "Sudah Dipesan Sesi Ini")}</div>
+                            {(bill?.items ?? []).filter((i) => i.itemType === "product").map((i) => (
+                              <div key={i.id} className="flex justify-between text-xs">
+                                <span className="text-neutral-300">{i.qty}× {i.description}</span>
+                                <span className="text-neutral-400">{rupiah(i.lineTotal)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {products.map((p) => (
                           <div key={p.id} className="flex items-center justify-between text-xs">
                             <span className="flex-1">{p.name} <span className="text-neutral-500">({rupiah(p.price)})</span></span>
