@@ -1,5 +1,5 @@
 /**
- * Standalone Booking Reservation Engine scheduler — polls every 60 seconds
+ * Standalone Booking Reservation Engine scheduler — polls every 15 seconds
  * and runs one pass of auto-release (expire/no-show stale bookings),
  * waitlist promotion, reminder queuing, and rental-session auto-stop
  * (ensures every session whose plannedMinutes ran out gets stopped — and its
@@ -21,7 +21,11 @@
 import "dotenv/config";
 import { runBookingScheduler } from "../src/lib/rental/scheduler";
 
-const POLL_INTERVAL_MS = 60_000;
+// Lowered from 60s to 15s specifically so rental-session auto-stop (runSessionAutoStop) reacts
+// within ~15s of time running out instead of up to a minute — auto-release/waitlist/reminders
+// piggyback on the same faster tick, which is harmless since they're all cheap idempotent
+// queries against a small number of active outlets.
+const POLL_INTERVAL_MS = 15_000;
 
 async function tick() {
   try {

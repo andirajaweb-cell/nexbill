@@ -131,7 +131,7 @@ const REMINDER_WINDOWS: { type: BookingNotificationType; minutesBefore: number; 
   { type: "reminder_15m", minutesBefore: 15, toleranceMinutes: 5, render: bookingMessages.reminderM15 },
 ];
 
-/** Queues H-24/H-2/15-minute reminders for upcoming pending/confirmed bookings — each window only fires once per booking (dedup lives in queueBookingNotification) within a tolerance wide enough that a ~1-minute poll interval never misses it. */
+/** Queues H-24/H-2/15-minute reminders for upcoming pending/confirmed bookings — each window only fires once per booking (dedup lives in queueBookingNotification) within a tolerance wide enough that a ~15s poll interval never misses it. */
 export async function runReminders(outletId?: string) {
   const queued: string[] = [];
   const outletRows = await listOutlets(outletId);
@@ -155,7 +155,7 @@ export async function runReminders(outletId?: string) {
 }
 
 // Warning band for "your play time is almost up" — mirrors REMINDER_WINDOWS' tolerance-band
-// trick: only fires once because a ~60s poll interval only catches remainingMinutes passing
+// trick: only fires once because a ~15s poll interval only catches remainingMinutes passing
 // through this narrow band once per session, not because of any "already sent" bookkeeping.
 const SESSION_WARNING_MINUTES_BEFORE = 15;
 const SESSION_WARNING_TOLERANCE_MINUTES = 3;
@@ -219,7 +219,7 @@ export async function runSessionTimeWarning(outletId?: string) {
  * a session with nobody's browser open to that one page — e.g. staff only watching the Live
  * Billing Board, or the PC monitor turned off overnight — never auto-stopped at all. This sweep
  * is the backstop: it runs via whichever of the two existing pollers the outlet already has
- * wired up (scripts/booking-scheduler.ts every 60s, or an external cron hitting
+ * wired up (scripts/booking-scheduler.ts every 15s, or an external cron hitting
  * POST /api/bookings/scheduler/run), so it works regardless of any page being open.
  *
  * Deliberately NOT restricted to bookingId-linked sessions (unlike runSessionTimeWarning, which
