@@ -67,9 +67,16 @@ html.theme-light {
 }
 
 /* Ambient dark neon glow/grid backdrop (globals.css .gm-body::before/::after) — hide in light
-   mode and give the body a plain light page background instead. */
+   mode and give the body a plain light page background instead. `color` here is the important
+   part: Tailwind's preflight sets `input, button, select, textarea, etc. { color: inherit }`, so
+   any element that DOESN'T carry its own explicit text-* class (very common — plain <input>s,
+   buttons, headings written with no color utility at all) was inheriting `--gm-text` (#eef2f9,
+   near-white) straight from .gm-body regardless of the text-neutral-* overrides above, which only
+   catch elements that DO have an explicit class. That's what made input fields and other
+   unstyled-by-default text look blank/invisible once their background flipped to white. */
 html.theme-light .gm-body {
   background: var(--tl-bg);
+  color: var(--tl-text);
 }
 html.theme-light .gm-body::before,
 html.theme-light .gm-body::after {
@@ -84,6 +91,14 @@ html.theme-light select option,
 html.theme-light select optgroup {
   background-color: var(--tl-surface);
   color: var(--tl-text);
+}
+
+/* Placeholder text — browsers derive a default placeholder color from `color-scheme`, but Firefox
+   also dims it via opacity, and we'd rather it consistently match our own muted-text shade. */
+html.theme-light input::placeholder,
+html.theme-light textarea::placeholder {
+  color: var(--tl-text-faint-2);
+  opacity: 1;
 }
 
 /* ---------------------------------------------------------------------------------------------
