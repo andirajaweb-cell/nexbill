@@ -1,19 +1,22 @@
 /**
  * Standalone Booking Reservation Engine scheduler — polls every 60 seconds
  * and runs one pass of auto-release (expire/no-show stale bookings),
- * waitlist promotion, and reminder queuing. This codebase has no built-in
- * server-side cron (Next.js runs single-process via `next start`), so this
- * mirrors the existing scripts/whatsapp-bot.ts pattern: a small long-running
- * Node process you start alongside the web app.
+ * waitlist promotion, reminder queuing, and rental-session auto-stop
+ * (ensures every session whose plannedMinutes ran out gets stopped — and its
+ * device powered off — even if nobody has the Rental PS page open). This
+ * codebase has no built-in server-side cron (Next.js runs single-process via
+ * `next start`), so this mirrors the existing scripts/whatsapp-bot.ts
+ * pattern: a small long-running Node process you start alongside the web app.
  *
  * Run with:  npm run scheduler
  *
  * Purely data-side (marks bookings expired/no_show, promotes waitlist,
- * inserts booking_notifications rows) — it never depends on WhatsApp being
- * connected. Actual message delivery for whatever it queues happens
- * separately in scripts/whatsapp-bot.ts, which polls booking_notifications
- * on its own live socket. Run both processes for the full reminder loop; run
- * just this one if you only care about auto-release/waitlist correctness.
+ * inserts booking_notifications rows, stops timed-out rental sessions) — it
+ * never depends on WhatsApp being connected. Actual message delivery for
+ * whatever it queues happens separately in scripts/whatsapp-bot.ts, which
+ * polls booking_notifications on its own live socket. Run both processes for
+ * the full reminder loop; run just this one if you only care about
+ * auto-release/waitlist/session-auto-stop correctness.
  */
 import "dotenv/config";
 import { runBookingScheduler } from "../src/lib/rental/scheduler";
@@ -27,11 +30,12 @@ async function tick() {
       result.released.length ||
       result.promoted.length ||
       result.remindersQueued.length ||
+      result.sessionsAutoStopped.length ||
       result.homeRentalPickupRemindersQueued.length ||
       result.homeRentalReturnRemindersQueued.length
     ) {
       console.log(
-        `[booking-scheduler] ${result.ranAt} — released ${result.released.length}, promoted ${result.promoted.length}, reminders queued ${result.remindersQueued.length}, home rental pickup reminders ${result.homeRentalPickupRemindersQueued.length}, home rental return reminders ${result.homeRentalReturnRemindersQueued.length}`
+        `[booking-scheduler] ${result.ranAt} — released ${result.released.length}, promoted ${result.promoted.length}, reminders queued ${result.remindersQueued.length}, sessions auto-stopped ${result.sessionsAutoStopped.length}, home rental pickup reminders ${result.homeRentalPickupRemindersQueued.length}, home rental return reminders ${result.homeRentalReturnRemindersQueued.length}`
       );
     }
   } catch (err) {

@@ -5,6 +5,7 @@ import { logAudit } from "@/lib/audit/log";
 import { hasConflict } from "./bookings";
 import { queueBookingNotification, bookingMessages, outletName, BookingNotificationType } from "./notifications";
 import { runHomeRentalScheduler } from "@/lib/home-rental/scheduler";
+import { stopRentalSession } from "./sessions";
 
 /**
  * Background sweep for the Reservation Engine — auto-release, waitlist
@@ -212,6 +213,68 @@ export async function runSessionTimeWarning(outletId?: string) {
 }
 
 /**
+ * Server-side guarantee that a running/paused rental session actually stops (and its device
+ * powers off) once its time is up — independent of any browser tab. Previously this ONLY
+ * happened client-side (a useEffect on the Rental PS page itself, polling every 5s) which meant
+ * a session with nobody's browser open to that one page — e.g. staff only watching the Live
+ * Billing Board, or the PC monitor turned off overnight — never auto-stopped at all. This sweep
+ * is the backstop: it runs via whichever of the two existing pollers the outlet already has
+ * wired up (scripts/booking-scheduler.ts every 60s, or an external cron hitting
+ * POST /api/bookings/scheduler/run), so it works regardless of any page being open.
+ *
+ * Deliberately NOT restricted to bookingId-linked sessions (unlike runSessionTimeWarning, which
+ * only ever WARNS a customer by WhatsApp and therefore needs a phone number on file) — a walk-in
+ * session with plannedMinutes set must auto-stop too, since that's exactly the scenario the
+ * client-side-only mechanism could silently miss.
+ *
+ * Each session is stopped independently inside its own try/catch so one bad session (e.g. a
+ * device that's offline — stopRentalSession already tolerates that internally, but just in
+ * case) never aborts the sweep for every other session. "Sesi sudah selesai" errors are expected
+ * races (the client-side check or a cashier's manual click already beat this sweep to it) and are
+ * swallowed silently; anything else is logged.
+ */
+export async function runSessionAutoStop(outletId?: string) {
+  const stopped: { sessionId: string; rentalUnitId: string }[] = [];
+  const outletRows = await listOutlets(outletId);
+
+  for (const outlet of outletRows) {
+    const active = await db
+      .select()
+      .from(rentalSessions)
+      .where(and(eq(rentalSessions.outletId, outlet.id), inArray(rentalSessions.status, ["running", "paused"] as any)));
+    if (active.length === 0) continue;
+
+    const promoIds = [...new Set(active.map((s) => s.promoId).filter((id): id is string => !!id))];
+    const promoRows = promoIds.length ? await db.select().from(promos).where(inArray(promos.id, promoIds)) : [];
+    const promoById = new Map(promoRows.map((p) => [p.id, p]));
+
+    for (const session of active) {
+      const promo = session.promoId ? promoById.get(session.promoId) : null;
+      const allowedMinutes = promo?.durationMinutes ?? session.plannedMinutes;
+      if (allowedMinutes === null || allowedMinutes === undefined) continue; // open-ended session — never auto-stops
+
+      let effectivePauseMs = session.accumulatedPauseMs;
+      if (session.status === "paused" && session.pausedAt) effectivePauseMs += Date.now() - new Date(session.pausedAt).getTime();
+      const elapsedMinutes = Math.max(0, (Date.now() - new Date(session.startedAt).getTime() - effectivePauseMs) / MINUTE);
+      const remainingMinutes = allowedMinutes + session.extendedMinutes - elapsedMinutes;
+
+      if (remainingMinutes > 0) continue;
+
+      try {
+        await stopRentalSession(session.id);
+        stopped.push({ sessionId: session.id, rentalUnitId: session.rentalUnitId });
+      } catch (err: any) {
+        if (err?.message !== "Sesi sudah selesai.") {
+          console.error(`[runSessionAutoStop] Gagal menghentikan sesi ${session.id} otomatis:`, err);
+        }
+      }
+    }
+  }
+
+  return stopped;
+}
+
+/**
  * Runs the full sweep in order — release-then-promote-then-remind — once per poll tick. Also
  * chains the Home Rental reminder sweep (pickup H-24/H-2, due-today, repeating overdue) here
  * rather than standing up a second external poller process — both scripts/booking-scheduler.ts
@@ -222,12 +285,14 @@ export async function runBookingScheduler(outletId?: string) {
   const promoted = await runWaitlistSweep(outletId);
   const remindersQueued = await runReminders(outletId);
   const sessionWarningsQueued = await runSessionTimeWarning(outletId);
+  const sessionsAutoStopped = await runSessionAutoStop(outletId);
   const homeRental = await runHomeRentalScheduler(outletId);
   return {
     released,
     promoted,
     remindersQueued,
     sessionWarningsQueued,
+    sessionsAutoStopped,
     homeRentalPickupRemindersQueued: homeRental.pickupRemindersQueued,
     homeRentalReturnRemindersQueued: homeRental.returnRemindersQueued,
     ranAt: new Date().toISOString(),
