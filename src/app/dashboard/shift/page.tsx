@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -58,6 +59,10 @@ export default function ShiftPage() {
   const [editQtyByDenom, setEditQtyByDenom] = useState<Record<number, number>>({});
   const [editBalanceChecks, setEditBalanceChecks] = useState<{ channelKey: string; label: string; actualBalance: number }[]>([]);
   const [editNotes, setEditNotes] = useState("");
+  // Plain-language walkthrough for outlet staff who find the shift-close form confusing — starts
+  // open since that's exactly the audience that needs it, but collapsible so it doesn't get in
+  // the way once someone's done this a hundred times.
+  const [showGuide, setShowGuide] = useState(true);
   const [outletId, setOutletId] = useState<string | null>(null);
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -289,6 +294,25 @@ export default function ShiftPage() {
         <p className="text-sm text-neutral-500">{t("shift.pageSubtitle", "Buka shift dengan modal awal, tutup dengan hitung fisik kas per pecahan — selisih terdeteksi otomatis, baru ditampilkan setelah hitungan disubmit.")}</p>
       </div>
 
+      <Card className="border-cyan-500/30">
+        <button className="w-full flex items-center justify-between text-left" onClick={() => setShowGuide((v) => !v)}>
+          <span className="font-medium flex items-center gap-2">
+            <HelpCircle size={16} className="text-cyan-400" /> {t("shift.guideTitle", "Panduan Singkat: Cara Kerja Shift")}
+          </span>
+          {showGuide ? <ChevronUp size={16} className="text-neutral-500" /> : <ChevronDown size={16} className="text-neutral-500" />}
+        </button>
+        {showGuide && (
+          <ol className="mt-3 space-y-2 text-sm text-neutral-300 list-decimal list-inside">
+            <li>{t("shift.guideStep1", "Di awal kerja, klik \"Buka Shift\" dan isi Modal Awal — jumlah uang tunai yang sudah ada di laci saat kamu mulai.")}</li>
+            <li>{t("shift.guideStep2", "Selama shift berjalan, lakukan transaksi seperti biasa (rental, F&B, dll) — tidak perlu buka halaman ini lagi sampai mau pulang/gantian.")}</li>
+            <li>{t("shift.guideStep3", "Saat mau pulang atau gantian shift, buka halaman ini lagi dan klik \"Tutup Shift\".")}</li>
+            <li>{t("shift.guideStep4", "Hitung UANG TUNAI di laci satu per satu sesuai pecahannya (lembar Rp100.000, Rp50.000, dst), lalu isi jumlah lembarnya di kolom masing-masing — bukan totalnya, tapi JUMLAH LEMBAR/KEPINGnya.")}</li>
+            <li>{t("shift.guideStep5", "Kalau ada channel non-tunai (GoPay, DANA, saldo Fastpay, dll), buka aplikasinya di HP, lihat angka saldo yang tertera di layar, lalu ketik angka itu apa adanya — jangan dikira-kira.")}</li>
+            <li>{t("shift.guideStep6", "Klik \"Tutup Shift\". Sistem otomatis membandingkan hitunganmu dengan catatan transaksi, dan langsung menunjukkan kalau ada selisih (uang kurang atau lebih).")}</li>
+          </ol>
+        )}
+      </Card>
+
       {user && (
         <Card>
           <div className="text-xs text-neutral-500">{t("shift.staffLabel", "Staf")}</div>
@@ -351,7 +375,12 @@ export default function ShiftPage() {
 
           <div>
             <h3 className="text-sm font-medium mb-2">{t("shift.cashCountTitle", "Hitung Fisik Kas (Per Pecahan)")}</h3>
-            <p className="text-xs text-neutral-500 mb-2">{t("shift.cashCountDesc", "Hitung uang di laci satu per satu sesuai pecahan — jangan lihat laporan sistem dulu. Total akan muncul otomatis saat kamu mengisi.")}</p>
+            <p className="text-xs text-neutral-500 mb-2">
+              {t(
+                "shift.cashCountDesc",
+                'Ambil semua uang tunai dari laci, pisahkan per jenis lembar/koin, lalu isi JUMLAH LEMBARNYA (bukan nilai rupiahnya) di kolom "Jumlah" masing-masing. Contoh: kalau ada 3 lembar Rp50.000, ketik "3" — bukan "150000". Sistem yang otomatis mengalikan dan menjumlahkan totalnya.'
+              )}
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {CASH_DENOMINATIONS.map((d) => (
                 <div key={d} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2">
@@ -362,9 +391,10 @@ export default function ShiftPage() {
                     className="w-20 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm"
                     value={qtyByDenom[d] || ""}
                     onChange={(e) => setQtyByDenom((prev) => ({ ...prev, [d]: Math.max(0, Number(e.target.value)) }))}
-                    placeholder="0"
+                    placeholder={t("shift.qtyPlaceholder", "Jumlah lembar")}
                   />
-                  <span className="text-xs text-neutral-500 ml-auto">{rupiah(d * (qtyByDenom[d] || 0))}</span>
+                  <span className="text-[10px] text-neutral-500">{t("shift.qtyUnit", "lbr")}</span>
+                  <span className="text-xs text-neutral-500 ml-auto">= {rupiah(d * (qtyByDenom[d] || 0))}</span>
                 </div>
               ))}
             </div>
@@ -377,7 +407,12 @@ export default function ShiftPage() {
           {requiredChannels.length > 0 && (
             <div>
               <h3 className="text-sm font-medium mb-2">{t("shift.verifyBalanceTitle", "Verifikasi Saldo Channel Non-Tunai")}</h3>
-              <p className="text-xs text-neutral-500 mb-2">{t("shift.verifyBalanceDesc", "Buka app/dashboard masing-masing channel dan masukkan saldo yang tertera di sana saat ini.")}</p>
+              <p className="text-xs text-neutral-500 mb-2">
+                {t(
+                  "shift.verifyBalanceDesc",
+                  'Buka aplikasi/HP masing-masing channel di bawah ini (GoPay Merchant, DANA Bisnis, dsb), lihat ANGKA SALDO yang tertera di layar utamanya saat ini, lalu ketik persis angka itu. Contoh: kalau di aplikasi GoPay tertulis saldo Rp350.000, ketik "350000". Jangan dikira-kira atau dibulatkan.'
+                )}
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {requiredChannels.map((c) => (
                   <div key={c.channelKey} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2">
@@ -388,7 +423,7 @@ export default function ShiftPage() {
                       className="w-32 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm"
                       value={actualByChannel[c.channelKey] ?? ""}
                       onChange={(e) => setActualByChannel((prev) => ({ ...prev, [c.channelKey]: Number(e.target.value) }))}
-                      placeholder={t("shift.balancePlaceholder", "Saldo di app")}
+                      placeholder={t("shift.balancePlaceholder", "Saldo di app saat ini")}
                     />
                   </div>
                 ))}
@@ -433,8 +468,8 @@ export default function ShiftPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm mb-3">
             <div><div className="text-xs text-neutral-500">{t("shift.cashInLabel", "Kas Masuk")}</div>{rupiah(closeResult.cashIn)}</div>
             <div><div className="text-xs text-neutral-500">{t("shift.cashOutLabel", "Kas Keluar")}</div>{rupiah(closeResult.cashOut)}</div>
-            <div><div className="text-xs text-neutral-500">{t("shift.expectedCashLabel", "Ekspektasi Kas")}</div>{rupiah(closeResult.shift.expectedCash)}</div>
-            <div><div className="text-xs text-neutral-500">{t("shift.cashVarianceLabel", "Selisih Kas")}</div>
+            <div><div className="text-xs text-neutral-500" title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.expectedCashLabel", "Ekspektasi Kas")} <HelpCircle size={10} className="inline text-neutral-600" /></div>{rupiah(closeResult.shift.expectedCash)}</div>
+            <div><div className="text-xs text-neutral-500" title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")} <HelpCircle size={10} className="inline text-neutral-600" /></div>
               <span className={Math.abs(closeResult.shift.variance) < 1 ? "text-emerald-400" : closeResult.shift.variance < 0 ? "text-red-400" : "text-amber-400"}>
                 {rupiah(closeResult.shift.variance)}{closeResult.shift.variance < 0 ? t("shift.shortSuffixLower", " (kurang)") : closeResult.shift.variance > 0 ? t("shift.overSuffixLower", " (lebih)") : ""}
               </span>
@@ -442,7 +477,7 @@ export default function ShiftPage() {
           </div>
           {closeResult.balanceCheckRows?.length > 0 && (
             <table className="w-full text-sm">
-              <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colChannel", "Channel")}</th><th className="text-right">{t("shift.colExpected", "Ekspektasi")}</th><th className="text-right">{t("shift.colActual", "Aktual")}</th><th className="text-right">{t("shift.colVariance", "Selisih")}</th></tr></thead>
+              <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colChannel", "Channel")}</th><th className="text-right" title={t("shift.colExpectedHint", "Saldo yang seharusnya ada menurut sistem")}>{t("shift.colExpected", "Ekspektasi")}</th><th className="text-right" title={t("shift.colActualHint", "Saldo yang kamu lihat di aplikasi channel tersebut")}>{t("shift.colActual", "Aktual")}</th><th className="text-right" title={t("shift.colVarianceHint", "Aktual dikurangi Ekspektasi")}>{t("shift.colVariance", "Selisih")}</th></tr></thead>
               <tbody>
                 {closeResult.balanceCheckRows.map((b: any) => (
                   <tr key={b.channelKey} className="border-b border-neutral-900">
@@ -464,7 +499,7 @@ export default function ShiftPage() {
           {t("shift.historyDescPrefix", "Setiap pergantian shift otomatis dicek selisih kas (fisik vs ekspektasi sistem) dan selisih saldo channel non-tunai — ditandai")} <span className="text-red-400">{t("shift.historyDescRedLabel", 'merah "Kurang"')}</span> {t("shift.historyDescMiddle", "untuk kekurangan dan")} <span className="text-amber-400">{t("shift.historyDescAmberLabel", 'kuning "Lebih"')}</span> {t("shift.historyDescSuffix", "untuk kelebihan, supaya keduanya sama-sama kelihatan, bukan cuma yang kurang.")}
         </p>
         <table className="w-full text-sm">
-          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colOpen", "Buka")}</th><th>{t("shift.colClose", "Tutup")}</th><th>{t("shift.colStaff", "Karyawan")}</th><th>{t("shift.colOpeningCapital", "Modal")}</th><th>{t("shift.colExpected", "Ekspektasi")}</th><th>{t("shift.colActual", "Aktual")}</th><th>{t("shift.cashVarianceLabel", "Selisih Kas")}</th><th>{t("shift.colNonCashVariance", "Selisih Non-Tunai")}</th><th></th></tr></thead>
+          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colOpen", "Buka")}</th><th>{t("shift.colClose", "Tutup")}</th><th>{t("shift.colStaff", "Karyawan")}</th><th>{t("shift.colOpeningCapital", "Modal")}</th><th title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.colExpected", "Ekspektasi")}</th><th title={t("shift.colActualCashHint", "Total uang tunai hasil hitungan fisik saat tutup shift")}>{t("shift.colActual", "Aktual")}</th><th title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")}</th><th title={t("shift.colNonCashVarianceHint", "Total selisih (aktual vs ekspektasi) untuk semua channel non-tunai seperti GoPay/DANA/Fastpay pada shift ini")}>{t("shift.colNonCashVariance", "Selisih Non-Tunai")}</th><th></th></tr></thead>
           <tbody>
             {history.map((s) => {
               const cashV = varianceBadge(s.variance, t);
