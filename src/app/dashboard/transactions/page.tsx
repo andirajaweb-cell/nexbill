@@ -126,7 +126,7 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("transactions.pageTitle", "Transaction Center")}</h1>
-        <p className="text-sm text-neutral-500">{t("transactions.pageSubtitle", "Seluruh transaksi Rental, F&B, dan Produk yang diinput kasir — PPOB akan muncul di sini setelah modulnya dibangun. Hapus permanen hanya bisa dilakukan akun Superuser.")}</p>
+        <p className="text-sm text-neutral-500">{t("transactions.pageSubtitle", "Seluruh transaksi Rental, F&B, dan Produk yang diinput kasir — PPOB akan muncul di sini setelah modulnya dibangun. Hapus permanen hanya bisa dilakukan akun Owner/Superuser.")}</p>
       </div>
 
       <div className="flex gap-1 border-b border-neutral-800">
@@ -148,8 +148,12 @@ function TransactionListTab({ outletId }: { outletId: string }) {
   const role = (user?.role ?? "cashier") as any;
   const canRefund = hasPermission(role, "refund_order");
   const canVoid = hasPermission(role, "void_order_direct");
-  // Exact-role check, not hasPermission() — hapus transaksi sengaja
-  // dibatasi hanya Superuser, beda dengan void/refund yang bisa diberikan ke role lain.
+  // Exact-role check, not hasPermission() — hard-delete (and "Tandai Lunas") are deliberately
+  // restricted to just Owner/Superuser, never grantable to other roles via the per-outlet
+  // permission table, unlike void/refund below which route through hasPermission(). Naming kept
+  // as "isSuperuser" for historical reasons even though it also covers "owner" — see the matching
+  // check in /api/orders/[id]/route.ts (DELETE) and /api/orders/[id]/settle/route.ts, which must
+  // stay in sync with this.
   const isSuperuser = role === "superuser" || role === "owner";
 
   const [preset, setPreset] = useState<PeriodPreset>("today");
