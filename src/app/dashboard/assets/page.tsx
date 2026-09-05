@@ -9,7 +9,9 @@ import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { coaAccountName } from "@/lib/accounting/coa";
 import "@/lib/i18n/dict-assets";
+import "@/lib/i18n/dict-coa";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 
@@ -205,7 +207,7 @@ function AssetListTab({ outletId, role }: { outletId: string; role: StaffRole })
               <>
                 <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={maintFor.accountId} onChange={(e) => setMaintFor({ ...maintFor, accountId: e.target.value })}>
                   <option value="">{t("assets.optionExpenseAccount", "Akun Beban (COA)")}</option>
-                  {expenseAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                  {expenseAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
                 </select>
                 <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={maintFor.cashBankAccountId} onChange={(e) => setMaintFor({ ...maintFor, cashBankAccountId: e.target.value })}>
                   <option value="">{t("assets.optionCashBankAccountOrPayable", "Akun Kas/Bank (kosongkan = hutang)")}</option>

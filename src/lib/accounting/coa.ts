@@ -411,6 +411,26 @@ function normalBalanceFor(type: AccountType): "debit" | "credit" {
   return type === "asset" || type === "expense" ? "debit" : "credit";
 }
 
+/** code -> default (English) name, built once from DEFAULT_COA — see coaAccountName() below. */
+const DEFAULT_COA_NAME_BY_CODE: Record<string, string> = Object.fromEntries(DEFAULT_COA.map((d) => [d.code, d.name]));
+
+/**
+ * Localizes a Chart of Accounts row's display name for the dashboard UI. accounts.name in the
+ * database is always a single plain string (see schema.ts) — never per-language — so this is a
+ * display-time lookup, not a stored translation: it swaps in the matching entry from
+ * lib/i18n/dict-coa.ts ("coa.<code>") ONLY when the account's stored name is still exactly the
+ * untouched default from DEFAULT_COA above. If an owner has renamed a default account, or this is
+ * a custom account they created themselves (no entry in dict-coa.ts for its code), the condition
+ * below is false and the raw stored name is returned as-is in every language — a rename must
+ * never be silently overridden by a translation. Callers pass their own useDashboardLang() `t`.
+ */
+export function coaAccountName(t: (key: string, fallback: string) => string, account: { code: string; name: string }): string {
+  if (DEFAULT_COA_NAME_BY_CODE[account.code] === account.name) {
+    return t(`coa.${account.code}`, account.name);
+  }
+  return account.name;
+}
+
 /** Idempotent — safe to call repeatedly. Migrates any old flat-COA codes, inserts every missing account from DEFAULT_COA, then wires parentId for the whole tree. */
 export async function seedChartOfAccounts(outletId: string) {
   const existing = await db.select().from(accounts).where(eq(accounts.outletId, outletId));

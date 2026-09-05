@@ -9,7 +9,9 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { PeriodBar, PeriodPreset, resolvePeriodPreset, describePeriod } from "@/components/reports/PeriodPicker";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { coaAccountName } from "@/lib/accounting/coa";
 import "@/lib/i18n/dict-accounting";
+import "@/lib/i18n/dict-coa";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const inputClsSm = "w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs";
@@ -166,18 +168,18 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
     load();
   };
   const deleteAccount = async (a: AccountRow) => {
-    if (!await showConfirm(t("accounting.coa.confirmDelete", 'Hapus akun "{account}"?').replace("{account}", `${a.code} — ${a.name}`))) return;
+    if (!await showConfirm(t("accounting.coa.confirmDelete", 'Hapus akun "{account}"?').replace("{account}", `${a.code} — ${coaAccountName(t, a)}`))) return;
     const res = await fetch(`/api/accounting/coa/${a.id}`, { method: "DELETE" });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
-    if (data.softDeleted) showAlert(t("accounting.coa.archivedNotice", '"{name}" sudah pernah dipakai di jurnal, jadi diarsipkan (bukan dihapus permanen) agar riwayat jurnal tetap aman.').replace("{name}", a.name));
+    if (data.softDeleted) showAlert(t("accounting.coa.archivedNotice", '"{name}" sudah pernah dipakai di jurnal, jadi diarsipkan (bukan dihapus permanen) agar riwayat jurnal tetap aman.').replace("{name}", coaAccountName(t, a)));
     load();
   };
 
   const matchesFilter = (a: AccountRow) => {
     if (!showInactive && !a.isActive) return false;
     if (typeFilter !== "all" && a.type !== typeFilter) return false;
-    if (search && !`${a.code} ${a.name}`.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !`${a.code} ${a.name} ${coaAccountName(t, a)}`.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   };
 
@@ -206,7 +208,7 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <select className="col-span-2 rounded bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={editForm.parentId} onChange={(e) => setEditForm({ ...editForm, parentId: e.target.value })}>
               <option value="">{t("accounting.coa.noParentOption", "(Tanpa induk / top-level)")}</option>
-              {potentialParents.filter((p) => p.id !== a.id).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+              {potentialParents.filter((p) => p.id !== a.id).map((p) => <option key={p.id} value={p.id}>{p.code} — {coaAccountName(t, p)}</option>)}
             </select>
             <label className="flex items-center gap-1 text-xs text-neutral-400"><input type="checkbox" checked={editForm.isPostingAllowed} onChange={(e) => setEditForm({ ...editForm, isPostingAllowed: e.target.checked })} /> {t("accounting.coa.postingAccountLabel", "Posting Account")}</label>
             <input className="rounded bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={editForm.costCenter} onChange={(e) => setEditForm({ ...editForm, costCenter: e.target.value })} placeholder={t("accounting.coa.placeholderCostCenter", "Cost Center")} />
@@ -220,7 +222,7 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
         <div className={`flex items-center justify-between py-1.5 border-b border-neutral-900 text-sm gap-2 ${!a.isActive ? "opacity-40" : ""}`} style={{ paddingLeft: depth * 16 }}>
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-mono text-xs text-neutral-500 w-14 shrink-0">{a.code}</span>
-            <span className={`truncate ${!a.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}>{a.name}</span>
+            <span className={`truncate ${!a.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}>{coaAccountName(t, a)}</span>
             {!a.isPostingAllowed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 shrink-0">{t("accounting.coa.headerBadge", "Header")}</span>}
             {!a.isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-900/40 text-red-400 shrink-0">{t("accounting.coa.inactiveBadge", "Nonaktif")}</span>}
           </div>
@@ -268,7 +270,7 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <select className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })}>
               <option value="">{t("accounting.coa.noParentOption", "(Tanpa induk / top-level)")}</option>
-              {potentialParents.map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+              {potentialParents.map((p) => <option key={p.id} value={p.id}>{p.code} — {coaAccountName(t, p)}</option>)}
             </select>
             <label className="flex items-center gap-1 text-xs text-neutral-400"><input type="checkbox" checked={form.isPostingAllowed} onChange={(e) => setForm({ ...form, isPostingAllowed: e.target.checked })} /> {t("accounting.coa.postingAccountLabel", "Posting Account")}</label>
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("accounting.coa.placeholderCostCenterOptional", "Cost Center (opsional)")} value={form.costCenter} onChange={(e) => setForm({ ...form, costCenter: e.target.value })} />
@@ -380,7 +382,7 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("accounting.mapping.placeholderTransactionKey", "Transaction key (mis. ps5, food, pulsa)")} value={form.transactionKey} onChange={(e) => setForm({ ...form, transactionKey: e.target.value })} />
             <select className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })}>
               <option value="">{t("accounting.mapping.chooseTargetAccount", "Pilih akun tujuan...")}</option>
-              {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+              {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {coaAccountName(t, a)}</option>)}
             </select>
           </div>
           <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("accounting.mapping.placeholderLabel", "Label (opsional, mis. Rental PS5)")} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
@@ -405,12 +407,12 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
                   <td className="text-xs">
                     {editingId === m.id ? (
                       <select className="rounded bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={editAccountId} onChange={(e) => setEditAccountId(e.target.value)}>
-                        {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                        {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {coaAccountName(t, a)}</option>)}
                       </select>
                     ) : (
                       <span className="font-mono">{m.accountCode}</span>
                     )}{" "}
-                    {editingId !== m.id && <span className="text-neutral-500">{m.accountName}</span>}
+                    {editingId !== m.id && <span className="text-neutral-500">{coaAccountName(t, { code: m.accountCode, name: m.accountName })}</span>}
                   </td>
                   <td className="text-right whitespace-nowrap">
                     {editingId === m.id ? (
@@ -541,7 +543,7 @@ function JournalTab({ outletId }: { outletId: string }) {
               <div key={i} className="grid grid-cols-12 gap-2 items-center">
                 <select className={`${inputClsSm} col-span-4`} value={line.accountId} onChange={(e) => updateLine(i, { accountId: e.target.value })}>
                   <option value="">{t("accounting.common.chooseAccount", "Pilih akun...")}</option>
-                  {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                  {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {coaAccountName(t, a)}</option>)}
                 </select>
                 <input className={`${inputClsSm} col-span-2`} placeholder={t("accounting.journal.placeholderKeterangan", "Keterangan")} value={line.description} onChange={(e) => updateLine(i, { description: e.target.value })} />
                 <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={line.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: e.target.value ? "" : line.credit })} />
@@ -667,7 +669,7 @@ function TrialBalanceTab({ outletId }: { outletId: string }) {
       <Fragment key={r.accountId}>
         <tr className={`border-b border-neutral-900 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}>
           <td className="py-1.5 font-mono text-xs" style={{ paddingLeft: depth * 16 }}>{r.code}</td>
-          <td className="text-sm">{r.name}</td>
+          <td className="text-sm">{coaAccountName(t, r)}</td>
           <td className="text-right text-sm">{amounts.debit ? rupiah(amounts.debit) : ""}</td>
           <td className="text-right text-sm">{amounts.credit ? rupiah(amounts.credit) : ""}</td>
           <td className="text-right text-sm font-medium">{amounts.balance ? rupiah(amounts.balance) : ""}</td>
@@ -1029,14 +1031,14 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
               <tr className="border-b border-neutral-900"><td colSpan={compareData.length + 1} className="py-1 text-xs font-semibold text-neutral-400">{t("accounting.type.revenue", "Pendapatan")}</td></tr>
               {[...new Set(compareData.flatMap((c) => c.data.revenue.filter((r: any) => r.balance !== 0).map((r: any) => r.name)))].map((name) => (
                 <tr key={String(name)} className="border-b border-neutral-900">
-                  <td className="py-1">{name}</td>
+                  <td className="py-1">{(() => { const r = compareData.map((c) => c.data.revenue.find((x: any) => x.name === name)).find(Boolean); return r ? coaAccountName(t, r) : name; })()}</td>
                   {compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.revenue.find((r: any) => r.name === name)?.balance ?? 0)}</td>)}
                 </tr>
               ))}
               <tr className="border-b border-neutral-900"><td colSpan={compareData.length + 1} className="py-1 text-xs font-semibold text-neutral-400 pt-3">{t("accounting.type.expense", "Beban")}</td></tr>
               {[...new Set(compareData.flatMap((c) => c.data.expense.filter((r: any) => r.balance !== 0).map((r: any) => r.name)))].map((name) => (
                 <tr key={String(name)} className="border-b border-neutral-900">
-                  <td className="py-1">{name}</td>
+                  <td className="py-1">{(() => { const r = compareData.map((c) => c.data.expense.find((x: any) => x.name === name)).find(Boolean); return r ? coaAccountName(t, r) : name; })()}</td>
                   {compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.expense.find((r: any) => r.name === name)?.balance ?? 0)}</td>)}
                 </tr>
               ))}
@@ -1072,11 +1074,11 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
 
             <h2 className="font-medium mb-2 text-sm text-neutral-400">{t("accounting.type.revenue", "Pendapatan")}</h2>
             {pl.revenue.filter((r: any) => r.balance !== 0).map((r: any) => (
-              <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{r.name}</span><span>{rupiah(r.balance)}</span></div>
+              <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
             ))}
             <h2 className="font-medium mb-2 mt-4 text-sm text-neutral-400">{t("accounting.type.expense", "Beban")}</h2>
             {pl.expense.filter((r: any) => r.balance !== 0).map((r: any) => (
-              <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{r.name}</span><span>{rupiah(r.balance)}</span></div>
+              <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
             ))}
           </Card>
         </div>
@@ -1105,17 +1107,17 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
       <Card>
         <h2 className="font-medium mb-2">{t("accounting.bs.assetsHeading", "Aset")}</h2>
         {bs.assets.filter((r: any) => r.balance !== 0).map((r: any) => (
-          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{r.name}</span><span>{rupiah(r.balance)}</span></div>
+          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
         ))}
         <div className="flex justify-between text-sm py-2 border-t border-neutral-800 font-semibold mt-2"><span>{t("accounting.bs.totalAssets", "Total Aset")}</span><span>{rupiah(bs.totalAssets)}</span></div>
       </Card>
       <Card>
         <h2 className="font-medium mb-2">{t("accounting.bs.liabilitiesEquityHeading", "Liabilitas & Ekuitas")}</h2>
         {bs.liabilities.filter((r: any) => r.balance !== 0).map((r: any) => (
-          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{r.name}</span><span>{rupiah(r.balance)}</span></div>
+          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
         ))}
         {bs.equity.filter((r: any) => r.balance !== 0).map((r: any) => (
-          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{r.name}</span><span>{rupiah(r.balance)}</span></div>
+          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
         ))}
         <div className="flex justify-between text-sm py-1"><span>{t("accounting.bs.currentPeriodProfit", "Laba Berjalan (belum ditutup)")}</span><span>{rupiah(bs.currentPeriodNetProfit)}</span></div>
         <div className="flex justify-between text-sm py-2 border-t border-neutral-800 font-semibold mt-2">
@@ -1337,7 +1339,7 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
               <div key={i} className="grid grid-cols-12 gap-1 items-center">
                 <select className={`${inputClsSm} col-span-6`} value={l.accountId} onChange={(e) => updateLine(i, { accountId: e.target.value })}>
                   <option value="">{t("accounting.common.chooseAccount", "Pilih akun...")}</option>
-                  {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                  {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {coaAccountName(t, a)}</option>)}
                 </select>
                 <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: "" })} />
                 <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.credit", "Kredit")} value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: "" })} />

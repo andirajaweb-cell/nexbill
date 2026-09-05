@@ -10,7 +10,9 @@ import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { Wrench, PlayCircle, CheckCircle2, Pencil, Trash2 } from "lucide-react";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { coaAccountName } from "@/lib/accounting/coa";
 import "@/lib/i18n/dict-maintenance";
+import "@/lib/i18n/dict-coa";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 
@@ -215,7 +217,7 @@ export default function MaintenancePage() {
               <>
                 <select className={inputCls} value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })}>
                   <option value="">{t("maintenance.expenseAccountPlaceholder", "Akun Beban (COA)")}</option>
-                  {expenseAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                  {expenseAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
                 </select>
                 <select className={inputCls} value={form.cashBankAccountId} onChange={(e) => setForm({ ...form, cashBankAccountId: e.target.value })}>
                   <option value="">{t("maintenance.cashBankAccountPlaceholder", "Akun Kas/Bank (kosongkan = hutang)")}</option>

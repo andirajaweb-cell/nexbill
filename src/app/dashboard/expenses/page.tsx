@@ -9,7 +9,9 @@ import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { coaAccountName } from "@/lib/accounting/coa";
 import "@/lib/i18n/dict-expenses";
+import "@/lib/i18n/dict-coa";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const TABS = ["Dashboard", "Daftar Expense", "Cost Center", "Recurring"] as const;
@@ -176,7 +178,8 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
     if (!defaultCashAccount) return showAlert(t("expenses.alert.noCashAccount", "Belum ada akun Kas — atur dulu di halaman Pembayaran."));
     setCashOutBusy(true);
     try {
-      const accountLabel = bundle.accounts.find((a: any) => a.id === cashOutForm.accountId)?.name ?? "Cash Out";
+      const accountRow = bundle.accounts.find((a: any) => a.id === cashOutForm.accountId);
+      const accountLabel = accountRow ? coaAccountName(t, accountRow) : "Cash Out";
       const res = await fetch("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -211,7 +214,10 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   };
   useEffect(() => { load(); }, [outletId, statusFilter]);
 
-  const accountName = (id: string) => bundle.accounts.find((a: any) => a.id === id)?.name ?? bundle.accounts.find((a: any) => a.id === id)?.code ?? "-";
+  const accountName = (id: string) => {
+    const a = bundle.accounts.find((x: any) => x.id === id);
+    return a ? coaAccountName(t, a) : "-";
+  };
 
   const uploadAttachment = async (file: File) => {
     setUploading(true);
@@ -269,7 +275,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" value={cashOutForm.accountId} onChange={(e) => setCashOutForm({ ...cashOutForm, accountId: e.target.value })}>
               <option value="">{t("expenses.optionCategoryAccount", "Kategori (Akun Beban)")}</option>
-              {bundle.accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+              {bundle.accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
             </select>
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderAmountRp", "Nominal (Rp)")} value={cashOutForm.amount} onChange={(e) => setCashOutForm({ ...cashOutForm, amount: e.target.value })} />
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderNote", "Catatan (opsional)")} value={cashOutForm.note} onChange={(e) => setCashOutForm({ ...cashOutForm, note: e.target.value })} />
@@ -292,7 +298,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })}>
               <option value="">{t("expenses.optionAccountCoa", "Akun Beban (COA)")}</option>
-              {bundle.accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+              {bundle.accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
             </select>
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderCategoryExample", "Kategori (mis. Listrik)")} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             <input type="date" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} title={t("expenses.dueDateTooltip", "Jatuh tempo (jika hutang)")} />
