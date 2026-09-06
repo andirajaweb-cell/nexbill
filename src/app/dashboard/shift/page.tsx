@@ -65,6 +65,10 @@ export default function ShiftPage() {
   // Owner/Superuser can both delete AND correct ("Edit") a shift's history — same gate for both,
   // since editing an already-closed shift's figures is just as sensitive as deleting it outright.
   const canManageShiftHistory = user?.role === "owner" || user?.role === "superuser";
+  // Anti-fraud shift review (see lib/shift/fraud-detection.ts) — same approve_requests permission
+  // gate as the void/refund approval queue on the Staff page, since this is the same mechanism.
+  const canReviewShifts = hasPermission((user?.role ?? "cashier") as any, "approve_requests");
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [deletingShiftId, setDeletingShiftId] = useState<string | null>(null);
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [editLoading, setEditLoading] = useState(false);
@@ -225,6 +229,20 @@ export default function ShiftPage() {
       if (outletId) fetchJsonArray(`/api/shifts?outletId=${outletId}`).then(setHistory);
     } finally {
       setDeletingShiftId(null);
+    }
+  };
+
+  /** Owner/Manager sign-off on a shift auto-flagged by the anti-fraud check (see fraud-detection.ts) — approving/rejecting here doesn't undo anything on the shift itself, it's a review acknowledgment, same approval_requests mechanism as void/refund. */
+  const decideReview = async (reviewId: string, action: "approve" | "reject") => {
+    const note = action === "reject" ? (prompt(t("shift.review.rejectNotePrompt", "Catatan penolakan (opsional)?")) ?? undefined) : undefined;
+    setReviewingId(reviewId);
+    try {
+      const res = await fetch(`/api/approvals/${reviewId}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      if (outletId) fetchJsonArray(`/api/shifts?outletId=${outletId}`).then(setHistory);
+    } finally {
+      setReviewingId(null);
     }
   };
 
@@ -524,11 +542,14 @@ export default function ShiftPage() {
           {t("shift.historyDescPrefix", "Setiap pergantian shift otomatis dicek selisih kas (fisik vs ekspektasi sistem) dan selisih saldo channel non-tunai — ditandai")} <span className="text-red-400">{t("shift.historyDescRedLabel", 'merah "Kurang"')}</span> {t("shift.historyDescMiddle", "untuk kekurangan dan")} <span className="text-amber-400">{t("shift.historyDescAmberLabel", 'kuning "Lebih"')}</span> {t("shift.historyDescSuffix", "untuk kelebihan, supaya keduanya sama-sama kelihatan, bukan cuma yang kurang.")}
         </p>
         <table className="w-full text-sm">
-          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colOpen", "Buka")}</th><th>{t("shift.colClose", "Tutup")}</th><th>{t("shift.colStaff", "Karyawan")}</th><th>{t("shift.colOpeningCapital", "Modal")}</th><th title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.colExpected", "Ekspektasi")}</th><th title={t("shift.colActualCashHint", "Total uang tunai hasil hitungan fisik saat tutup shift")}>{t("shift.colActual", "Aktual")}</th><th title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")}</th><th title={t("shift.colNonCashVarianceHint", "Total selisih (aktual vs ekspektasi) untuk semua channel non-tunai seperti GoPay/DANA/Fastpay pada shift ini")}>{t("shift.colNonCashVariance", "Selisih Non-Tunai")}</th><th></th></tr></thead>
+          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colOpen", "Buka")}</th><th>{t("shift.colClose", "Tutup")}</th><th>{t("shift.colStaff", "Karyawan")}</th><th>{t("shift.colOpeningCapital", "Modal")}</th><th title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.colExpected", "Ekspektasi")}</th><th title={t("shift.colActualCashHint", "Total uang tunai hasil hitungan fisik saat tutup shift")}>{t("shift.colActual", "Aktual")}</th><th title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")}</th><th title={t("shift.colNonCashVarianceHint", "Total selisih (aktual vs ekspektasi) untuk semua channel non-tunai seperti GoPay/DANA/Fastpay pada shift ini")}>{t("shift.colNonCashVariance", "Selisih Non-Tunai")}</th><th title={t("shift.colFraudHint", "Ditandai otomatis kalau selisih atau jumlah void/refund/hapus pada shift ini melebihi ambang batas di Pengaturan > Preferensi")}>{t("shift.colFraud", "Anti-Fraud")}</th><th></th></tr></thead>
           <tbody>
             {history.map((s) => {
               const cashV = varianceBadge(s.variance, t, rupiah);
               const nonCashV = varianceBadge(s.nonCashVarianceTotal, t, rupiah);
+              const riskFlags: { code: string; label: string; severity: "warn" | "high" }[] = (() => {
+                try { return s.riskFlags ? JSON.parse(s.riskFlags) : []; } catch { return []; }
+              })();
               return (
                 <Fragment key={s.id}>
                 <tr className="border-b border-neutral-900">
@@ -540,6 +561,33 @@ export default function ShiftPage() {
                   <td>{s.actualCash != null ? rupiah(s.actualCash) : "-"}</td>
                   <td className={cashV.className}>{cashV.text}</td>
                   <td className={nonCashV.className}>{nonCashV.text}</td>
+                  <td className="whitespace-nowrap">
+                    {riskFlags.length === 0 ? (
+                      <span className="text-xs text-neutral-600">{t("shift.fraud.clean", "Bersih")}</span>
+                    ) : (
+                      <div className="space-y-1">
+                        <span
+                          className={`text-xs font-medium ${riskFlags.some((f) => f.severity === "high") ? "text-red-400" : "text-amber-400"}`}
+                          title={riskFlags.map((f) => f.label).join("\n")}
+                        >
+                          🚩 {t("shift.fraud.flaggedCount", "{count} ditandai").replace("{count}", String(riskFlags.length))}
+                        </span>
+                        {s.review?.status === "pending" && (
+                          <div className="text-xs">
+                            <span className="text-amber-400">{t("shift.fraud.pendingReview", "Menunggu review")}</span>
+                            {canReviewShifts && (
+                              <div className="flex gap-1 mt-1">
+                                <button disabled={reviewingId === s.review.id} onClick={() => decideReview(s.review.id, "approve")} className="text-emerald-400 hover:underline disabled:opacity-60">{t("shift.fraud.approveBtn", "Setujui")}</button>
+                                <button disabled={reviewingId === s.review.id} onClick={() => decideReview(s.review.id, "reject")} className="text-red-400 hover:underline disabled:opacity-60">{t("shift.fraud.rejectBtn", "Tolak")}</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {s.review?.status === "approved" && <div className="text-xs text-emerald-400">{t("shift.fraud.reviewed", "Sudah ditinjau")}</div>}
+                        {s.review?.status === "rejected" && <div className="text-xs text-red-400">{t("shift.fraud.reviewRejected", "Ditolak reviewer")}</div>}
+                      </div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap">
                     {s.status === "closed" && (
                       <a href={`/api/shifts/${s.id}/export?format=pdf`} target="_blank" rel="noreferrer" className="text-xs text-emerald-400 hover:underline">{t("shift.pdfLink", "PDF")}</a>
@@ -567,7 +615,7 @@ export default function ShiftPage() {
                 </tr>
                 {editingShiftId === s.id && (
                   <tr className="border-b border-neutral-900 bg-neutral-900/40">
-                    <td colSpan={9} className="p-4">
+                    <td colSpan={10} className="p-4">
                       {editLoading ? (
                         <div className="text-xs text-neutral-500">{t("shift.editLoading", "Memuat detail shift...")}</div>
                       ) : (

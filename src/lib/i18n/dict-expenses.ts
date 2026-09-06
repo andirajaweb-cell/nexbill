@@ -83,7 +83,7 @@ registerDict({
   // --- Prompts / confirms ---
   "expenses.promptCancelReason": { id: "Alasan cancel?", en: "Reason for cancelling?", ms: "Sebab pembatalan?", th: "เหตุผลในการยกเลิก?", fil: "Dahilan ng pagkansela?", vi: "Lý do hủy?" },
   "expenses.promptRejectReason": { id: "Alasan reject?", en: "Reason for rejecting?", ms: "Sebab penolakan?", th: "เหตุผลในการปฏิเสธ?", fil: "Dahilan ng pagtanggi?", vi: "Lý do từ chối?" },
-  "expenses.promptVoidReason": { id: "Alasan void (akan membalik jurnal)?", en: "Reason for voiding (this will reverse the journal entry)?", ms: "Sebab void (akan membalikkan jurnal)?", th: "เหตุผลในการยกเลิกรายการ (จะกลับรายการบัญชี)?", fil: "Dahilan ng pag-void (mababaligtad ang journal entry)?", vi: "Lý do hủy bỏ (sẽ đảo bút toán)?" },
+  "expenses.promptVoidReason": { id: "Alasan pembatalan (akan membalik jurnal)?", en: "Reason for voiding (this will reverse the journal entry)?", ms: "Sebab pembatalan (akan membalikkan jurnal)?", th: "เหตุผลในการยกเลิกรายการ (จะกลับรายการบัญชี)?", fil: "Dahilan ng pag-void (mababaligtad ang journal entry)?", vi: "Lý do hủy bỏ (sẽ đảo bút toán)?" },
   "expenses.confirmDeactivateRecurring": { id: "Nonaktifkan recurring expense ini?", en: "Deactivate this recurring expense?", ms: "Nyahaktifkan perbelanjaan berulang ini?", th: "ปิดใช้งานค่าใช้จ่ายประจำนี้หรือไม่?", fil: "I-deactivate ang recurring expense na ito?", vi: "Ngừng hoạt động khoản chi định kỳ này?" },
 
   // --- List controls ---
@@ -133,7 +133,7 @@ registerDict({
   "expenses.action.cancel": { id: "Cancel", en: "Cancel", ms: "Batal", th: "ยกเลิก", fil: "Kanselahin", vi: "Hủy" },
   "expenses.action.approve": { id: "Approve", en: "Approve", ms: "Luluskan", th: "อนุมัติ", fil: "I-approve", vi: "Duyệt" },
   "expenses.action.reject": { id: "Reject", en: "Reject", ms: "Tolak", th: "ปฏิเสธ", fil: "Tanggihan", vi: "Từ chối" },
-  "expenses.action.void": { id: "Void", en: "Void", ms: "Void", th: "ยกเลิกรายการ", fil: "I-void", vi: "Hủy bỏ" },
+  "expenses.action.void": { id: "Batalkan", en: "Void", ms: "Batalkan", th: "ยกเลิกรายการ", fil: "I-void", vi: "Hủy bỏ" },
   "expenses.proofLink": { id: "bukti", en: "receipt", ms: "bukti", th: "หลักฐาน", fil: "resibo", vi: "chứng từ" },
   "expenses.emptyList": { id: "Belum ada expense.", en: "No expenses recorded yet.", ms: "Belum ada perbelanjaan.", th: "ยังไม่มีค่าใช้จ่าย", fil: "Wala pang gastos.", vi: "Chưa có khoản chi nào." },
 

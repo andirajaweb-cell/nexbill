@@ -202,7 +202,7 @@ function TransactionListTab({ outletId }: { outletId: string }) {
     });
     const out = await res.json();
     if (!res.ok) return showAlert(out.error);
-    const actionLabel = kind === "refund" ? t("transactions.action.refund", "Refund") : t("transactions.action.void", "Void");
+    const actionLabel = kind === "refund" ? t("transactions.action.refund", "Refund") : t("transactions.action.void", "Batalkan");
     showAlert(out.pending ? t("transactions.alert.pendingApproval", "Diajukan untuk approval.") : t("transactions.alert.actionSuccess", "{action} berhasil diproses.").replace("{action}", actionLabel));
     load();
   };
@@ -319,7 +319,7 @@ function TransactionListTab({ outletId }: { outletId: string }) {
                         <Button variant="ghost" className="text-xs text-amber-400" onClick={() => doAction(row.id, "refund")}>{t("transactions.action.refund", "Refund")}</Button>
                       )}
                       {canVoid && row.status !== "cancelled" && row.status !== "paid" && (
-                        <Button variant="ghost" className="text-xs text-red-400" onClick={() => doAction(row.id, "void")}>{t("transactions.action.void", "Void")}</Button>
+                        <Button variant="ghost" className="text-xs text-red-400" onClick={() => doAction(row.id, "void")}>{t("transactions.action.void", "Batalkan")}</Button>
                       )}
                       {isSuperuser && (row.status === "awaiting_payment" || row.status === "partial" || row.status === "open") && (
                         <Button variant="ghost" className="text-xs text-emerald-400" onClick={() => settleTransaction(row.id)}>{t("transactions.action.markPaid", "Tandai Lunas")}</Button>
@@ -449,7 +449,7 @@ function CashierPerformanceTab({ outletId }: { outletId: string }) {
           <thead>
             <tr className="text-left text-neutral-500 border-b border-neutral-800">
               <th className="py-2">{t("transactions.col.rank", "Rank")}</th><th>{t("transactions.col.cashier", "Kasir")}</th><th>{t("transactions.col.transactionCount", "Transaksi")}</th><th>{t("transactions.col.totalSales", "Total Penjualan")}</th><th>{t("transactions.col.average", "Rata-rata")}</th>
-              <th>{typeLabel(t, "rental")}</th><th>{typeLabel(t, "fnb")}</th><th>{typeLabel(t, "product")}</th><th>{t("transactions.stat.discount", "Diskon")}</th><th>{t("transactions.action.void", "Void")}</th><th>{t("transactions.col.shift", "Shift")}</th><th>{t("transactions.col.cashVariance", "Cash Variance")}</th>
+              <th>{typeLabel(t, "rental")}</th><th>{typeLabel(t, "fnb")}</th><th>{typeLabel(t, "product")}</th><th>{t("transactions.stat.discount", "Diskon")}</th><th>{t("transactions.action.void", "Batalkan")}</th><th>{t("transactions.col.shift", "Shift")}</th><th>{t("transactions.col.cashVariance", "Cash Variance")}</th>
             </tr>
           </thead>
           <tbody>

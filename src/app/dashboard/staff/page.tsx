@@ -19,6 +19,19 @@ const ROLES: StaffRole[] = ["superuser", "owner", "manager", "cashier", "account
 // a merchant picks for full control of its own outlet.
 const ASSIGNABLE_ROLES: StaffRole[] = ROLES.filter((r) => r !== "superuser");
 
+function approvalTypeLabel(type: string, t: (key: string, fallback?: string) => string): string {
+  const map: Record<string, [string, string]> = {
+    void_order: ["staff.approvalType.voidOrder", "Batalkan Order"],
+    void_item: ["staff.approvalType.voidItem", "Batalkan Item"],
+    refund: ["staff.approvalType.refund", "Refund"],
+    discount_override: ["staff.approvalType.discountOverride", "Override Diskon"],
+    cancel_session: ["staff.approvalType.cancelSession", "Batalkan Sesi"],
+    shift_close_review: ["staff.approvalType.shiftCloseReview", "Review Tutup Shift (Anti-Fraud)"],
+  };
+  const entry = map[type];
+  return entry ? t(entry[0], entry[1]) : type;
+}
+
 interface MatrixCell { role: StaffRole; permission: Permission; granted: boolean }
 
 export default function StaffPage() {
@@ -273,7 +286,7 @@ export default function StaffPage() {
               <tbody>
                 {approvals.map((a) => (
                   <tr key={a.id} className="border-b border-neutral-900">
-                    <td className="py-2">{a.type}</td>
+                    <td className="py-2">{approvalTypeLabel(a.type, t)}</td>
                     <td>{a.refLabel}</td>
                     <td>{a.requesterName}</td>
                     <td className="text-neutral-400">{a.reason}</td>

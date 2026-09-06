@@ -396,7 +396,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                       <Button className="text-xs px-2 py-1" onClick={() => setPayFor({ id: e.id, method: "cash", cashBankAccountId: "" })}>{t("expenses.action.pay", "Bayar")}</Button>
                     )}
                     {["approved", "paid"].includes(e.status) && canVoid && (
-                      <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => { const r = prompt(t("expenses.promptVoidReason", "Alasan void (akan membalik jurnal)?")); if (r) act(e.id, "void", { reason: r }); }}>{t("expenses.action.void", "Void")}</Button>
+                      <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => { const r = prompt(t("expenses.promptVoidReason", "Alasan pembatalan (akan membalik jurnal)?")); if (r) act(e.id, "void", { reason: r }); }}>{t("expenses.action.void", "Batalkan")}</Button>
                     )}
                     {e.attachmentUrl && <a href={e.attachmentUrl} target="_blank" className="text-[10px] text-neutral-500 underline">{t("expenses.proofLink", "bukti")}</a>}
                   </div>

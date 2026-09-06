@@ -154,6 +154,12 @@ registerDict({
   "staff.approvalsList.reason": { id: "Alasan", en: "Reason", ms: "Sebab", th: "เหตุผล", fil: "Dahilan", vi: "Lý do" },
   "staff.approvalsList.status": { id: "Status", en: "Status", ms: "Status", th: "สถานะ", fil: "Status", vi: "Trạng thái" },
   "staff.approvalsList.approveBtn": { id: "Setujui", en: "Approve", ms: "Luluskan", th: "อนุมัติ", fil: "Aprubahan", vi: "Duyệt" },
+  "staff.approvalType.voidOrder": { id: "Batalkan Order", en: "Void Order", ms: "Batalkan Pesanan", th: "ยกเลิกออเดอร์", fil: "I-void ang Order", vi: "Hủy đơn hàng" },
+  "staff.approvalType.voidItem": { id: "Batalkan Item", en: "Void Item", ms: "Batalkan Item", th: "ยกเลิกรายการ", fil: "I-void ang Item", vi: "Hủy mặt hàng" },
+  "staff.approvalType.refund": { id: "Refund", en: "Refund", ms: "Bayaran Balik", th: "คืนเงิน", fil: "Refund", vi: "Hoàn tiền" },
+  "staff.approvalType.discountOverride": { id: "Override Diskon", en: "Discount Override", ms: "Override Diskaun", th: "แก้ไขส่วนลดพิเศษ", fil: "Discount Override", vi: "Ghi đè giảm giá" },
+  "staff.approvalType.cancelSession": { id: "Batalkan Sesi", en: "Cancel Session", ms: "Batalkan Sesi", th: "ยกเลิกเซสชัน", fil: "Kanselahin ang Session", vi: "Hủy phiên" },
+  "staff.approvalType.shiftCloseReview": { id: "Review Tutup Shift (Anti-Fraud)", en: "Shift Close Review (Anti-Fraud)", ms: "Semakan Tutup Syif (Anti-Fraud)", th: "ตรวจสอบการปิดกะ (ป้องกันทุจริต)", fil: "Review sa Pagsara ng Shift (Anti-Fraud)", vi: "Xem xét đóng ca (chống gian lận)" },
   "staff.approvalsList.rejectBtn": { id: "Tolak", en: "Reject", ms: "Tolak", th: "ปฏิเสธ", fil: "Tanggihan", vi: "Từ chối" },
 
   // --- Audit tab ---

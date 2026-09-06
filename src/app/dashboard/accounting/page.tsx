@@ -1320,7 +1320,7 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
               ))}
             </tbody>
           </table>
-          <Button variant="ghost" className="text-xs text-red-400" onClick={voidExisting}>{t("accounting.openingBalance.voidButton", "Void Saldo Awal Ini (untuk ganti)")}</Button>
+          <Button variant="ghost" className="text-xs text-red-400" onClick={voidExisting}>{t("accounting.openingBalance.voidButton", "Batalkan Saldo Awal Ini (untuk ganti)")}</Button>
         </div>
       ) : (
         <div className="space-y-2">

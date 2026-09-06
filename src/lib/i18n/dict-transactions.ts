@@ -92,7 +92,7 @@ registerDict({
   "transactions.action.detail": { id: "Detail", en: "Details", ms: "Butiran", th: "รายละเอียด", fil: "Detalye", vi: "Chi tiết" },
   "transactions.action.receipt": { id: "Struk", en: "Receipt", ms: "Resit", th: "ใบเสร็จ", fil: "Resibo", vi: "Hóa đơn" },
   "transactions.action.refund": { id: "Refund", en: "Refund", ms: "Bayaran Balik", th: "คืนเงิน", fil: "Refund", vi: "Hoàn tiền" },
-  "transactions.action.void": { id: "Void", en: "Void", ms: "Batal", th: "ยกเลิกรายการ", fil: "Void", vi: "Hủy giao dịch" },
+  "transactions.action.void": { id: "Batalkan", en: "Void", ms: "Batal", th: "ยกเลิกรายการ", fil: "Void", vi: "Hủy giao dịch" },
   "transactions.action.markPaid": { id: "Tandai Lunas", en: "Mark as Paid", ms: "Tanda Selesai Bayar", th: "ทำเครื่องหมายว่าชำระแล้ว", fil: "Markahan na Bayad", vi: "Đánh dấu đã thanh toán" },
   "transactions.action.delete": { id: "Hapus", en: "Delete", ms: "Padam", th: "ลบ", fil: "Burahin", vi: "Xóa" },
 

@@ -497,6 +497,24 @@ function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: 
         </div>
       </Card>
 
+      <Card className="space-y-3">
+        <h2 className="font-medium">{t("settings.preferences.fraudHeading", "Ambang Batas Anti-Fraud Shift")}</h2>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "settings.preferences.fraudDesc",
+            "Shift yang selisihnya atau jumlah void/refund/hapus-nya melebihi ambang ini otomatis ditandai untuk ditinjau Owner/Manager — lihat tab Approval di halaman Staf, atau langsung di halaman Shift. Tidak menghalangi kasir menutup shift, hanya menandai untuk ditinjau."
+          )}
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Field label={t("settings.preferences.fraudVarianceLabel", "Ambang Selisih ({symbol})").replace("{symbol}", currency.symbol)}>
+            <input type="number" min={0} className={inputCls} disabled={!canManage} value={form.fraudVarianceThreshold ?? 50000} onChange={(e) => setForm({ ...form, fraudVarianceThreshold: Math.max(0, Number(e.target.value) || 0) })} />
+          </Field>
+          <Field label={t("settings.preferences.fraudVoidCountLabel", "Ambang Jumlah Void/Refund per Shift")}>
+            <input type="number" min={1} className={inputCls} disabled={!canManage} value={form.fraudVoidCountThreshold ?? 3} onChange={(e) => setForm({ ...form, fraudVoidCountThreshold: Math.max(1, Number(e.target.value) || 1) })} />
+          </Field>
+        </div>
+      </Card>
+
       {canManage && <Button onClick={save} disabled={saving}>{saving ? t("settings.common.saving", "Menyimpan...") : t("settings.preferences.saveButton", "Simpan Preferensi")}</Button>}
     </div>
   );

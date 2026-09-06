@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { approvalRequests, staffUsers, orders } from "@/db/schema";
+import { approvalRequests, staffUsers, orders, shifts } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
@@ -27,6 +27,12 @@ export async function GET(req: NextRequest) {
         if (r.refType === "order") {
           const [order] = await db.select({ total: orders.total }).from(orders).where(eq(orders.id, r.refId)).limit(1);
           if (order) refLabel = `Order — Rp${order.total.toLocaleString("id-ID")}`;
+        } else if (r.refType === "shift") {
+          const [shift] = await db.select({ closedAt: shifts.closedAt, variance: shifts.variance, nonCashVarianceTotal: shifts.nonCashVarianceTotal }).from(shifts).where(eq(shifts.id, r.refId)).limit(1);
+          if (shift) {
+            const when = shift.closedAt ? new Date(shift.closedAt).toLocaleString("id-ID") : "-";
+            refLabel = `Shift ditutup ${when}`;
+          }
         }
         return { ...r, requesterName: requester?.name ?? "-", refLabel };
       })

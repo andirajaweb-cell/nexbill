@@ -149,10 +149,10 @@ export default function OtherIncomePage() {
                     <td className="text-xs">{r.payerName ?? "-"}</td>
                     <td className="text-xs font-medium text-emerald-400">{rupiah(r.amount)}</td>
                     <td className="text-xs">{methodLabel[r.paymentMethod] ?? r.paymentMethod}</td>
-                    <td><Badge status={r.status === "posted" ? "success" : "failed"}>{r.status === "posted" ? t("otherIncome.statusPosted", "Posted") : t("otherIncome.statusVoid", "Void")}</Badge></td>
+                    <td><Badge status={r.status === "posted" ? "success" : "failed"}>{r.status === "posted" ? t("otherIncome.statusPosted", "Posted") : t("otherIncome.statusVoid", "Dibatalkan")}</Badge></td>
                     <td>
                       {canManage && r.status === "posted" && (
-                        <Button variant="ghost" className="text-xs text-red-400" onClick={() => doVoid(r.id)}>{t("otherIncome.voidAction", "Void")}</Button>
+                        <Button variant="ghost" className="text-xs text-red-400" onClick={() => doVoid(r.id)}>{t("otherIncome.voidAction", "Batalkan")}</Button>
                       )}
                     </td>
                   </tr>

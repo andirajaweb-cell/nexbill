@@ -75,6 +75,13 @@ export const outlets = pgTable("outlets", {
   decimalStyle: text("decimal_style", { enum: ["id", "us"] }).notNull().default("id"),
   decimalPlaces: integer("decimal_places").notNull().default(0),
   dateFormat: text("date_format", { enum: ["dmy", "mdy", "iso"] }).notNull().default("dmy"),
+  // Anti-fraud shift-review thresholds (see lib/shift/fraud-detection.ts) — a shift whose cash or
+  // non-cash variance exceeds fraudVarianceThreshold (in the outlet's own currency major unit), or
+  // whose cashier racked up fraudVoidThreshold or more void/refund/discount-override actions during
+  // that shift, gets auto-flagged for Owner/Manager sign-off (an approval_requests row of type
+  // "shift_close_review") rather than blocking the cashier from closing out — see closeShift().
+  fraudVarianceThreshold: doublePrecision("fraud_variance_threshold").notNull().default(50000),
+  fraudVoidCountThreshold: integer("fraud_void_count_threshold").notNull().default(3),
   ...timestamps,
 });
 
@@ -1159,6 +1166,10 @@ export const shifts = pgTable("shifts", {
   nonCashVarianceTotal: doublePrecision("non_cash_variance_total"),
   status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
   notes: text("notes"),
+  // JSON-encoded array of { code, label, severity } from computeShiftRiskFlags (see
+  // lib/shift/fraud-detection.ts) — snapshotted once at close time so the shift's history view
+  // never has to recompute (and can't silently change) why it was flagged. Null/empty = clean close.
+  riskFlags: text("risk_flags"),
 });
 
 export const shiftCashCounts = pgTable("shift_cash_counts", {
@@ -1185,7 +1196,7 @@ export const shiftBalanceChecks = pgTable("shift_balance_checks", {
 export const approvalRequests = pgTable("approval_requests", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),
-  type: text("type", { enum: ["void_order", "void_item", "refund", "discount_override", "cancel_session"] }).notNull(),
+  type: text("type", { enum: ["void_order", "void_item", "refund", "discount_override", "cancel_session", "shift_close_review"] }).notNull(),
   refType: text("ref_type").notNull(),
   refId: text("ref_id").notNull(),
   requestedBy: text("requested_by").references(() => staffUsers.id),

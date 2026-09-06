@@ -1,11 +1,12 @@
 import { db } from "@/db/client";
-import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets } from "@/db/schema";
+import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { logAudit } from "@/lib/audit/log";
 import { computeTrialBalance } from "@/lib/accounting/reports";
 import { getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
 import { getCashDenominations, BALANCE_TRACKED_METHODS, CHANNEL_LABEL } from "./denominations";
 import { currencyForCountry } from "@/lib/currency/format";
+import { computeShiftRiskFlags } from "./fraud-detection";
 
 /** Resolves which set of physical note/coin denominations a shift's own outlet counts in — see denominations.ts's DENOMINATIONS_BY_CURRENCY doc comment. */
 async function getOutletCashDenominations(outletId: string): Promise<readonly number[]> {
@@ -226,6 +227,21 @@ export async function closeShift(
   }
   const nonCashVarianceTotal = balanceCheckRows.reduce((s, r) => s + Math.abs(r.variance), 0);
 
+  // --- Anti-fraud review check (see lib/shift/fraud-detection.ts) — computed BEFORE persisting so
+  // the flags can be snapshotted onto the same row in one write, using the outlet's own configured
+  // thresholds (Pengaturan > Preferensi). Never blocks the close itself — a cashier can always end
+  // their shift; a flagged shift instead gets an approval_requests row for Owner/Manager sign-off,
+  // same review mechanism already used for void/refund approvals.
+  const risk = await computeShiftRiskFlags({
+    shiftId,
+    outletId: shift.outletId,
+    staffUserId: shift.staffUserId,
+    openedAt: shift.openedAt,
+    closedAt,
+    cashVariance: variance,
+    nonCashVarianceTotal,
+  });
+
   // --- Persist everything ---
   if (cashRows.length) {
     await db.insert(shiftCashCounts).values(cashRows.map((r) => ({ shiftId, ...r })));
@@ -236,7 +252,16 @@ export async function closeShift(
 
   const [updated] = await db
     .update(shifts)
-    .set({ status: "closed", closedAt, expectedCash, actualCash, variance, nonCashVarianceTotal, notes: input.notes ?? shift.notes })
+    .set({
+      status: "closed",
+      closedAt,
+      expectedCash,
+      actualCash,
+      variance,
+      nonCashVarianceTotal,
+      notes: input.notes ?? shift.notes,
+      riskFlags: JSON.stringify(risk.flags),
+    })
     .where(eq(shifts.id, shiftId))
     .returning();
 
@@ -246,10 +271,21 @@ export async function closeShift(
     action: "close_shift",
     entityType: "shift",
     entityId: shiftId,
-    after: { expectedCash, actualCash, variance, cashRows, balanceCheckRows, nonCashVarianceTotal },
+    after: { expectedCash, actualCash, variance, cashRows, balanceCheckRows, nonCashVarianceTotal, riskFlags: risk.flags },
   });
 
-  return { shift: updated, cashIn, cashOut, ordersCount: shiftOrders.length, cashRows, balanceCheckRows };
+  if (risk.flags.length > 0) {
+    await db.insert(approvalRequests).values({
+      outletId: shift.outletId,
+      type: "shift_close_review",
+      refType: "shift",
+      refId: shiftId,
+      requestedBy: shift.staffUserId,
+      reason: risk.flags.map((f) => f.label).join(" | "),
+    });
+  }
+
+  return { shift: updated, cashIn, cashOut, ordersCount: shiftOrders.length, cashRows, balanceCheckRows, riskFlags: risk.flags };
 }
 
 export async function getCurrentShift(outletId: string, staffUserId: string) {

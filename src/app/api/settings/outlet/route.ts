@@ -25,6 +25,8 @@ const EDITABLE_FIELDS = [
   // Preferences tab (Settings > Preferensi) — accounting calendar + display-format preferences.
   "accountingStartMonth", "accountingStartDay", "accountingPeriodType",
   "decimalStyle", "decimalPlaces", "dateFormat",
+  // Anti-fraud shift-review thresholds — see lib/shift/fraud-detection.ts.
+  "fraudVarianceThreshold", "fraudVoidCountThreshold",
 ] as const;
 
 export async function GET(_req: NextRequest) {

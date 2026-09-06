@@ -62,10 +62,10 @@ registerDict({
 
   // --- Status badges ---
   "otherIncome.statusPosted": { id: "Posted", en: "Posted", ms: "Posted", th: "บันทึกแล้ว", fil: "Posted", vi: "Đã ghi sổ" },
-  "otherIncome.statusVoid": { id: "Void", en: "Void", ms: "Void", th: "ยกเลิก", fil: "Void", vi: "Đã hủy" },
+  "otherIncome.statusVoid": { id: "Dibatalkan", en: "Void", ms: "Dibatalkan", th: "ยกเลิก", fil: "Void", vi: "Đã hủy" },
 
   // --- Actions ---
-  "otherIncome.voidAction": { id: "Void", en: "Void", ms: "Void", th: "ยกเลิกรายการ", fil: "I-void", vi: "Hủy" },
+  "otherIncome.voidAction": { id: "Batalkan", en: "Void", ms: "Batalkan", th: "ยกเลิกรายการ", fil: "I-void", vi: "Hủy" },
   "otherIncome.voidPrompt": {
     id: "Alasan void entri pendapatan lain-lain ini?",
     en: "Reason for voiding this other income entry?",
