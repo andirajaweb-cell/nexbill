@@ -2,14 +2,15 @@ import { db } from "@/db/client";
 import { loyaltyPlayPointRates } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
-export type ConsoleType = "ps2" | "ps3" | "ps4" | "ps4_pro" | "ps5" | "ps5_slim";
+export type ConsoleType = "ps2" | "ps3" | "ps4" | "ps4_pro" | "ps5" | "ps5_slim" | "ps6";
 
 /**
  * Default play-point rates (points awarded per finished, fully-paid rental session), keyed by
  * console type. Explicit rates from the business spec: PS4 = 1, PS3 = 3, PS5 = 1.5. ps4_pro/ps5_slim
  * are variants of ps4/ps5 so they inherit the same rate; ps2 is treated like ps3 (oldest tier,
  * same "reward playing on older consoles" incentive) — these three weren't specified explicitly
- * and can be overridden per outlet via loyaltyPlayPointRates (Admin Data > Rate Poin Main).
+ * and can be overridden per outlet via loyaltyPlayPointRates (Admin Data > Rate Poin Main). ps6 is
+ * newer than ps5, so it gets a slightly richer default rate — also overridable per outlet.
  */
 export const DEFAULT_PLAY_POINTS: Record<ConsoleType, number> = {
   ps2: 3,
@@ -18,6 +19,7 @@ export const DEFAULT_PLAY_POINTS: Record<ConsoleType, number> = {
   ps4_pro: 1,
   ps5: 1.5,
   ps5_slim: 1.5,
+  ps6: 2,
 };
 
 export async function getPlayPoints(outletId: string, consoleType: string): Promise<number> {

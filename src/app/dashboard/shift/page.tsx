@@ -90,7 +90,7 @@ export default function ShiftPage() {
   // with their live trial-balance-derived balance, used both for the "Modal Awal" quick-fill below
   // and the Setoran Kas tab's source/destination pickers.
   const [cashAccounts, setCashAccounts] = useState<{ id: string; name: string; type: string; isDefault: boolean; includeInShiftFloat: boolean; balance: number }[]>([]);
-  const [pageTab, setPageTab] = useState<"shift" | "deposit">("shift");
+  const [pageTab, setPageTab] = useState<"shift" | "deposit" | "transfer">("shift");
 
   // Closing form state — the cashier fills this in blind (no expected figures shown
   // anywhere on this screen until after they submit; closeResult below is the reveal).
@@ -364,10 +364,17 @@ export default function ShiftPage() {
             {t("shift.tab.cashDeposit", "Setoran Kas")}
           </button>
         )}
+        {hasPermission((user?.role ?? "cashier") as any, "manage_cash_deposit") && (
+          <button onClick={() => setPageTab("transfer")} className={`px-3 py-2 text-sm ${pageTab === "transfer" ? "border-b-2 border-emerald-500 text-emerald-400" : "text-neutral-500 hover:text-neutral-300"}`}>
+            {t("shift.tab.cashTransfer", "Pindah Kas")}
+          </button>
+        )}
       </div>
 
       {pageTab === "deposit" ? (
         <CashDepositTab outletId={outletId} currentShiftId={currentShift?.id ?? null} cashAccounts={cashAccounts} rupiah={rupiah} />
+      ) : pageTab === "transfer" ? (
+        <CashTransferTab outletId={outletId} currentShiftId={currentShift?.id ?? null} cashAccounts={cashAccounts} rupiah={rupiah} />
       ) : (
       <>
       <Card className="border-cyan-500/30">
@@ -982,6 +989,194 @@ function CashDepositTab({
             ))}
             {history.length === 0 && (
               <tr><td colSpan={8} className="text-center text-neutral-500 py-6">{t("cashDeposit.noHistory", "Belum ada setoran kas tercatat.")}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * "Pindah Kas" — pure internal transfer between two of the outlet's own cash pools (e.g. Kas
+ * Kecil -> Kas Besar). Unlike Setoran Kas above, there's no "receiver" concept (nobody takes cash
+ * out of the recorded system) but every request ALWAYS needs Owner/Manager sign-off before its
+ * journal posts — see lib/cash/transfers.ts + the "cash_transfer" branch in approveRequest
+ * (lib/pos/void.ts), reusing the exact same approvalRequests queue as void/refund/shift-close.
+ */
+function CashTransferTab({
+  outletId,
+  currentShiftId,
+  cashAccounts,
+  rupiah,
+}: {
+  outletId: string | null;
+  currentShiftId: string | null;
+  cashAccounts: { id: string; name: string; type: string; isDefault: boolean; balance: number }[];
+  rupiah: (n: number) => string;
+}) {
+  const { t } = useDashboardLang();
+  const { user } = useAuth();
+  const role = (user?.role ?? "cashier") as any;
+  const canReview = hasPermission(role, "approve_requests");
+  const canVoid = hasPermission(role, "void_cash_deposit");
+
+  const [history, setHistory] = useState<any[]>([]);
+  const [amount, setAmount] = useState<number>(0);
+  const [sourceId, setSourceId] = useState("");
+  const [destinationId, setDestinationId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+
+  const load = () => {
+    if (!outletId) return;
+    fetchJsonArray("/api/cash-transfers").then(setHistory);
+  };
+  useEffect(load, [outletId]);
+
+  useEffect(() => {
+    if (!sourceId) {
+      const def = cashAccounts.find((a) => a.isDefault) ?? cashAccounts[0];
+      if (def) setSourceId(def.id);
+    }
+  }, [cashAccounts, sourceId]);
+
+  const destinationOptions = cashAccounts.filter((a) => a.id !== sourceId);
+
+  const submit = async () => {
+    if (!(amount > 0)) return showAlert(t("cashTransfer.errAmount", "Jumlah pindah kas harus lebih dari 0."));
+    if (!sourceId) return showAlert(t("cashTransfer.errSource", "Pilih akun kas sumber."));
+    if (!destinationId) return showAlert(t("cashTransfer.errDestination", "Pilih akun kas tujuan."));
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/cash-transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shiftId: currentShiftId, amount, sourceCashBankAccountId: sourceId, destinationCashBankAccountId: destinationId, notes: notes || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setAmount(0);
+      setDestinationId("");
+      setNotes("");
+      load();
+      showAlert(t("cashTransfer.submitted", "Permintaan pindah kas diajukan — menunggu persetujuan Owner/Manager sebelum tercatat ke jurnal."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const decide = async (approvalRequestId: string, action: "approve" | "reject") => {
+    const note = action === "reject" ? (prompt(t("cashTransfer.rejectNotePrompt", "Catatan penolakan (opsional)?")) ?? undefined) : undefined;
+    setDecidingId(approvalRequestId);
+    try {
+      const res = await fetch(`/api/approvals/${approvalRequestId}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      load();
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
+  const voidTransfer = async (id: string) => {
+    const reason = prompt(t("cashTransfer.promptVoidReason", "Alasan pembatalan pindah kas ini?")) ?? "";
+    if (!reason) return;
+    const res = await fetch(`/api/cash-transfers/${id}/void`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
+    const data = await res.json();
+    if (!res.ok) return showAlert(data.error);
+    load();
+  };
+
+  const statusBadge = (status: string) => {
+    if (status === "posted") return <Badge status="success">{t("cashTransfer.statusPosted", "Posted")}</Badge>;
+    if (status === "pending_approval") return <Badge status="pending">{t("cashTransfer.statusPending", "Menunggu Persetujuan")}</Badge>;
+    if (status === "rejected") return <Badge status="failed">{t("cashTransfer.statusRejected", "Ditolak")}</Badge>;
+    return <Badge status="failed">{t("cashTransfer.statusVoid", "Dibatalkan")}</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="space-y-3">
+        <h2 className="font-medium">{t("cashTransfer.formTitle", "Ajukan Pindah Kas")}</h2>
+        <p className="text-xs text-neutral-500">
+          {t("cashTransfer.formDesc", "Untuk memindahkan saldo antar kas outlet sendiri (mis. Kas Kecil ke Kas Besar) — bukan diambil keluar seperti Setoran Kas. Setiap permintaan butuh persetujuan Owner/Manager dulu sebelum tercatat ke jurnal.")}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-neutral-500">{t("cashTransfer.amountLabel", "Jumlah")}</label>
+            <input type="number" className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} />
+          </div>
+          <div />
+          <div>
+            <label className="text-xs text-neutral-500">{t("cashTransfer.sourceLabel", "Dari Akun Kas")}</label>
+            <select className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
+              <option value="">{t("cashDeposit.selectPlaceholder", "Pilih")}</option>
+              {cashAccounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name} ({rupiah(a.balance)})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-neutral-500">{t("cashTransfer.destinationLabel", "Ke Akun Kas Tujuan")}</label>
+            <select className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={destinationId} onChange={(e) => setDestinationId(e.target.value)}>
+              <option value="">{t("cashDeposit.selectPlaceholder", "Pilih")}</option>
+              {destinationOptions.map((a) => (
+                <option key={a.id} value={a.id}>{a.name} ({rupiah(a.balance)})</option>
+              ))}
+            </select>
+            {destinationOptions.length === 0 && (
+              <p className="text-xs text-amber-400 mt-1">{t("cashDeposit.noDestinationHint", "Belum ada akun kas lain — tambahkan dulu di Admin Data > Akun Kas/Bank (mis. \"Kas Besar\").")}</p>
+            )}
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs text-neutral-500">{t("cashDeposit.notesLabel", "Catatan (opsional)")}</label>
+            <textarea className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <Button onClick={submit} disabled={submitting}>{submitting ? t("cashDeposit.saving", "Menyimpan...") : t("cashTransfer.submitBtn", "Ajukan Pindah Kas")}</Button>
+      </Card>
+
+      <Card>
+        <h2 className="font-medium mb-3">{t("cashTransfer.historyTitle", "Riwayat Pindah Kas")}</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-neutral-500 border-b border-neutral-800">
+              <th className="py-2">{t("cashDeposit.col.time", "Waktu")}</th>
+              <th>{t("cashDeposit.col.amount", "Jumlah")}</th>
+              <th>{t("cashDeposit.col.fromTo", "Dari → Ke")}</th>
+              <th>{t("cashTransfer.col.requestedBy", "Diajukan Oleh")}</th>
+              <th>{t("cashDeposit.col.status", "Status")}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.map((r) => (
+              <tr key={r.id} className="border-b border-neutral-900">
+                <td className="py-2 text-xs whitespace-nowrap">{new Date(r.createdAt).toLocaleString("id-ID")}</td>
+                <td className="text-xs font-medium">{rupiah(r.amount)}</td>
+                <td className="text-xs text-neutral-400">{r.sourceAccountName} → {r.destinationAccountName}</td>
+                <td className="text-xs">{r.requestedByName}</td>
+                <td>
+                  {statusBadge(r.status)}
+                  {r.status === "pending_approval" && canReview && r.approvalRequestId && (
+                    <div className="flex gap-2 mt-1">
+                      <button disabled={decidingId === r.approvalRequestId} onClick={() => decide(r.approvalRequestId, "approve")} className="text-xs text-emerald-400 hover:underline disabled:opacity-60">{t("cashTransfer.approveBtn", "Setujui")}</button>
+                      <button disabled={decidingId === r.approvalRequestId} onClick={() => decide(r.approvalRequestId, "reject")} className="text-xs text-red-400 hover:underline disabled:opacity-60">{t("cashTransfer.rejectBtn", "Tolak")}</button>
+                    </div>
+                  )}
+                </td>
+                <td>
+                  {canVoid && r.status === "posted" && (
+                    <Button variant="ghost" className="text-xs text-red-400" onClick={() => voidTransfer(r.id)}>{t("cashDeposit.voidBtn", "Batalkan")}</Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {history.length === 0 && (
+              <tr><td colSpan={6} className="text-center text-neutral-500 py-6">{t("cashTransfer.noHistory", "Belum ada pindah kas tercatat.")}</td></tr>
             )}
           </tbody>
         </table>

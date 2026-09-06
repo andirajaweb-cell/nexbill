@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { showAlert } from "@/lib/ui/dialog";
 
 const CONSOLE_LABEL: Record<string, string> = {
-  ps2: "PS2", ps3: "PS3", ps4: "PS4", ps4_pro: "PS4 Pro", ps5: "PS5", ps5_slim: "PS5 Slim",
+  ps2: "PS2", ps3: "PS3", ps4: "PS4", ps4_pro: "PS4 Pro", ps5: "PS5", ps5_slim: "PS5 Slim", ps6: "PS6",
 };
 const DURATION_OPTIONS = [
   { minutes: 60, label: "1 jam" },

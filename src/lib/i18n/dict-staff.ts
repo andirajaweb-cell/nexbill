@@ -160,6 +160,7 @@ registerDict({
   "staff.approvalType.discountOverride": { id: "Override Diskon", en: "Discount Override", ms: "Override Diskaun", th: "แก้ไขส่วนลดพิเศษ", fil: "Discount Override", vi: "Ghi đè giảm giá" },
   "staff.approvalType.cancelSession": { id: "Batalkan Sesi", en: "Cancel Session", ms: "Batalkan Sesi", th: "ยกเลิกเซสชัน", fil: "Kanselahin ang Session", vi: "Hủy phiên" },
   "staff.approvalType.shiftCloseReview": { id: "Review Tutup Shift (Anti-Fraud)", en: "Shift Close Review (Anti-Fraud)", ms: "Semakan Tutup Syif (Anti-Fraud)", th: "ตรวจสอบการปิดกะ (ป้องกันทุจริต)", fil: "Review sa Pagsara ng Shift (Anti-Fraud)", vi: "Xem xét đóng ca (chống gian lận)" },
+  "staff.approvalType.cashTransfer": { id: "Pindah Kas", en: "Cash Transfer", ms: "Pindahan Tunai", th: "โอนเงินสด", fil: "Paglipat ng Cash", vi: "Chuyển quỹ tiền mặt" },
   "staff.approvalsList.rejectBtn": { id: "Tolak", en: "Reject", ms: "Tolak", th: "ปฏิเสธ", fil: "Tanggihan", vi: "Từ chối" },
 
   // --- Audit tab ---

@@ -132,8 +132,10 @@ registerDict({
   // ---------------- 4. REVENUE ----------------
   "coa.4000": { id: "PENDAPATAN", en: "REVENUE", ms: "HASIL", th: "รายได้", fil: "REVENUE", vi: "DOANH THU" },
   "coa.4100": { id: "PENDAPATAN RENTAL", en: "RENTAL REVENUE", ms: "HASIL SEWAAN", th: "รายได้ค่าเช่า", fil: "RENTAL REVENUE", vi: "DOANH THU CHO THUÊ" },
+  "coa.4105": { id: "Rental PS3", en: "PS3 Rental", ms: "Sewaan PS3", th: "ค่าเช่า PS3", fil: "PS3 Rental", vi: "Cho thuê PS3" },
   "coa.4110": { id: "Rental PS4", en: "PS4 Rental", ms: "Sewaan PS4", th: "ค่าเช่า PS4", fil: "PS4 Rental", vi: "Cho thuê PS4" },
   "coa.4120": { id: "Rental PS5", en: "PS5 Rental", ms: "Sewaan PS5", th: "ค่าเช่า PS5", fil: "PS5 Rental", vi: "Cho thuê PS5" },
+  "coa.4125": { id: "Rental PS6", en: "PS6 Rental", ms: "Sewaan PS6", th: "ค่าเช่า PS6", fil: "PS6 Rental", vi: "Cho thuê PS6" },
   "coa.4130": { id: "Rental Ruang VIP", en: "VIP Room Rental", ms: "Sewaan Bilik VIP", th: "ค่าเช่าห้อง VIP", fil: "VIP Room Rental", vi: "Cho thuê phòng VIP" },
   "coa.4140": { id: "Rental Turnamen", en: "Tournament Rental", ms: "Sewaan Kejohanan", th: "ค่าเช่าทัวร์นาเมนต์", fil: "Tournament Rental", vi: "Cho thuê giải đấu" },
   "coa.4150": { id: "Rental Paket", en: "Package Rental", ms: "Sewaan Pakej", th: "ค่าเช่าแพ็กเกจ", fil: "Package Rental", vi: "Cho thuê theo gói" },
@@ -155,7 +157,12 @@ registerDict({
   "coa.4351": { id: "Rental Kontroler Tambahan", en: "Extra Controller Rental", ms: "Sewaan Kawalan Tambahan", th: "ค่าเช่าจอยเพิ่ม", fil: "Extra Controller Rental", vi: "Cho thuê tay cầm thêm" },
   "coa.4352": { id: "Rental Headset", en: "Headset Rental", ms: "Sewaan Headset", th: "ค่าเช่าเฮดเซ็ต", fil: "Headset Rental", vi: "Cho thuê tai nghe" },
   "coa.4353": { id: "Rental VR", en: "VR Rental", ms: "Sewaan VR", th: "ค่าเช่า VR", fil: "VR Rental", vi: "Cho thuê VR" },
-  "coa.4354": { id: "Rental Add-on Lainnya", en: "Other Add-on Rental", ms: "Sewaan Add-on Lain", th: "ค่าเช่าอุปกรณ์เสริมอื่น", fil: "Ibang Add-on Rental", vi: "Cho thuê add-on khác" },
+  // 4354 is now the single default account every accessory rental (controller/headset/VR/other)
+  // posts to — see addonMappingKey() in lib/accounting/postings.ts — instead of being split
+  // across 4351-4354 by item name. Those three still exist in the COA (and outlets can still
+  // route specific items to them via Account Mapping) but no longer receive new postings by
+  // default, so the label here reflects its new role as the catch-all default.
+  "coa.4354": { id: "Sewa Aksesoris (Default)", en: "Accessory Rental (Default)", ms: "Sewaan Aksesori (Lalai)", th: "ค่าเช่าอุปกรณ์เสริม (ค่าเริ่มต้น)", fil: "Accessory Rental (Default)", vi: "Cho thuê phụ kiện (Mặc định)" },
   "coa.4400": { id: "PENDAPATAN PPOB", en: "PPOB REVENUE", ms: "HASIL PPOB", th: "รายได้ PPOB", fil: "PPOB REVENUE", vi: "DOANH THU PPOB" },
   "coa.4410": { id: "Komisi Pulsa", en: "Airtime Commission", ms: "Komisen Pulsa", th: "ค่าคอมมิชชันเติมเงิน", fil: "Commission sa Load", vi: "Hoa hồng nạp tiền điện thoại" },
   "coa.4420": { id: "Komisi Paket Data", en: "Data Package Commission", ms: "Komisen Pakej Data", th: "ค่าคอมมิชชันแพ็กเกจอินเทอร์เน็ต", fil: "Commission sa Data Package", vi: "Hoa hồng gói data" },

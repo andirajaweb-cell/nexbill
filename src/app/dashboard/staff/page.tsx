@@ -27,6 +27,7 @@ function approvalTypeLabel(type: string, t: (key: string, fallback?: string) => 
     discount_override: ["staff.approvalType.discountOverride", "Override Diskon"],
     cancel_session: ["staff.approvalType.cancelSession", "Batalkan Sesi"],
     shift_close_review: ["staff.approvalType.shiftCloseReview", "Review Tutup Shift (Anti-Fraud)"],
+    cash_transfer: ["staff.approvalType.cashTransfer", "Pindah Kas"],
   };
   const entry = map[type];
   return entry ? t(entry[0], entry[1]) : type;

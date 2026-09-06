@@ -78,9 +78,11 @@ export interface DefaultMappingSeed {
 
 /** Mirrors the example table from the COA spec (Rental/PS5→4120, F&B/Food→4210, PPOB/Pulsa→4410, dst) so the Account Mapping screen shows real, editable rows out of the box instead of an empty table backed only by code-level fallbacks. */
 export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
+  { module: "rental", transactionKey: "ps3", accountCode: "4105", label: "Rental PS3" },
   { module: "rental", transactionKey: "ps4", accountCode: "4110", label: "Rental PS4" },
   { module: "rental", transactionKey: "ps5", accountCode: "4120", label: "Rental PS5" },
-  { module: "rental", transactionKey: "other", accountCode: "4170", label: "Rental Konsol Lain" },
+  { module: "rental", transactionKey: "ps6", accountCode: "4125", label: "Rental PS6" },
+  { module: "rental", transactionKey: "other", accountCode: "4170", label: "Rental Konsol Lain (PS2/lainnya)" },
   // Session-scoped: any rental session whose linked customer has an active membership
   // tier posts here instead of the console-based row above, regardless of console type
   // — see isMemberCustomer() in postings.ts. Simple two-way split (member/non-member),
@@ -108,12 +110,14 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "product_sale", transactionKey: "member", accountCode: "4520", label: "Produk — Member" },
   { module: "product_sale_cogs", transactionKey: "merchandise", accountCode: "5210", label: "HPP Merchandise" },
   { module: "product_sale_cogs", transactionKey: "accessory", accountCode: "5220", label: "HPP Gaming Accessories" },
-  // Extra controller/headset/VR rented alongside an active session (sessionAccessories),
-  // keyed off the accessory's name text — see addonMappingKey() in postings.ts.
-  { module: "addon", transactionKey: "controller", accountCode: "4351", label: "Add-on — Extra Controller" },
-  { module: "addon", transactionKey: "headset", accountCode: "4352", label: "Add-on — Headset" },
-  { module: "addon", transactionKey: "vr", accountCode: "4353", label: "Add-on — VR" },
-  { module: "addon", transactionKey: "other", accountCode: "4354", label: "Add-on — Lainnya" },
+  // Every accessory rented alongside an active session (sessionAccessories) now posts to this
+  // one default account — see addonMappingKey() in postings.ts. The controller/headset/vr rows
+  // below are kept only so an outlet can still add its own override pointing specific items at
+  // 4351-4353 if it wants a breakdown; nothing posts there by default anymore.
+  { module: "addon", transactionKey: "other", accountCode: "4354", label: "Add-on — Sewa Aksesoris (Default)" },
+  { module: "addon", transactionKey: "controller", accountCode: "4351", label: "Add-on — Extra Controller (opsional, tidak dipakai default)" },
+  { module: "addon", transactionKey: "headset", accountCode: "4352", label: "Add-on — Headset (opsional, tidak dipakai default)" },
+  { module: "addon", transactionKey: "vr", accountCode: "4353", label: "Add-on — VR (opsional, tidak dipakai default)" },
   { module: "addon", transactionKey: "member", accountCode: "4530", label: "Add-on — Member" },
   { module: "product", transactionKey: "inventory", accountCode: "1161", label: "Inventory F&B" },
   { module: "ppob", transactionKey: "pulsa", accountCode: "4410", label: "PPOB Pulsa" },

@@ -43,10 +43,15 @@ function expenseAccountCode(category: string): string {
   return EXPENSE_CATEGORY_TO_ACCOUNT[key] ?? "6900";
 }
 
-/** ps4/ps4_pro -> "ps4", ps5/ps5_slim -> "ps5", ps2/ps3 -> "other" (mapping module "rental"). Only used for non-member sessions — see isMemberCustomer(). */
+/** ps3 -> "ps3", ps4/ps4_pro -> "ps4", ps5/ps5_slim -> "ps5", ps6 -> "ps6", ps2/anything else ->
+ * "other" (mapping module "rental"). ps2 intentionally stays lumped into "other" (4170) — it
+ * wasn't asked to get its own account and is rare/legacy hardware. Only used for non-member
+ * sessions — see isMemberCustomer(). */
 function rentalMappingKey(consoleType?: string | null): string {
+  if (consoleType === "ps3") return "ps3";
   if (consoleType === "ps4" || consoleType === "ps4_pro") return "ps4";
   if (consoleType === "ps5" || consoleType === "ps5_slim") return "ps5";
+  if (consoleType === "ps6") return "ps6";
   return "other";
 }
 
@@ -72,15 +77,17 @@ function merchMappingKey(category?: string): string | null {
   return null;
 }
 
-/** Classifies an accessory-rental order item (itemType "accessory", description like "Rental: Kacamata VR x1
- * (2.00 jam)") by keyword so it routes to its own add-on account (module "addon") instead of lumping into
- * whichever console's rental account the base session charge uses. Falls back to "other" (4354) for any
- * custom accessory name staff types in that doesn't match a known preset. */
-function addonMappingKey(description: string): string {
-  const d = description.toLowerCase();
-  if (d.includes("controller") || d.includes("stick")) return "controller";
-  if (d.includes("headset")) return "headset";
-  if (d.includes("vr") || d.includes("kacamata")) return "vr";
+/**
+ * Every accessory-rental order item (itemType "accessory" — controller/headset/VR/anything else
+ * rented per-hour alongside a session) now routes to ONE default add-on revenue account (module
+ * "addon", key "other" -> 4354) instead of being split across 4351-4354 by keyword-sniffing the
+ * item's description. Simpler, and still fully captured under ADD-ON RENTAL REVENUE in Laba Rugi
+ * either way; outlets that still want a per-accessory-type breakdown can add their own Account
+ * Mapping override rows (module "addon", key "controller"/"headset"/"vr") pointing at 4351-4353,
+ * which still exist in the COA for that purpose. Kept as a function (not an inline constant) so
+ * that override point is obvious and easy to extend later without touching every call site.
+ */
+function addonMappingKey(_description: string): string {
   return "other";
 }
 
@@ -114,6 +121,7 @@ const FNB_COGS_FALLBACK: Record<string, string> = { food: "5110", drink: "5120",
 const MERCH_REVENUE_FALLBACK: Record<string, string> = { merchandise: "4310", accessory: "4320" };
 const MERCH_COGS_FALLBACK: Record<string, string> = { merchandise: "5210", accessory: "5220" };
 const ADDON_REVENUE_FALLBACK: Record<string, string> = { controller: "4351", headset: "4352", vr: "4353", other: "4354" };
+const RENTAL_REVENUE_FALLBACK: Record<string, string> = { ps3: "4105", ps4: "4110", ps5: "4120", ps6: "4125" };
 
 /**
  * Resolves the revenue account (as an accountId, ready to drop straight into a JournalLineInput)
@@ -121,10 +129,11 @@ const ADDON_REVENUE_FALLBACK: Record<string, string> = { controller: "4351", hea
  * sniffing the description text — itemType is the authoritative flag set at item-creation time
  * (see src/lib/pos/bill.ts upsertRentalLineItem and src/lib/rental/accessories.ts).
  *   - "rental": the base PS session time charge -> member account (4180) if the customer has a
- *     membership tier, else the existing console-type routing (PS4/PS5/Other).
+ *     membership tier, else console-type routing (PS3/PS4/PS5/PS6 each get their own account,
+ *     PS2/unknown fall back to the Other Rental catch-all — see rentalMappingKey()).
  *   - "accessory": a per-hour add-on rental (extra controller/headset/VR) attached to the
- *     session -> member account (4530) if the customer has a membership tier, else its own
- *     4351-4354 account keyed off the item's name text.
+ *     session -> member account (4530) if the customer has a membership tier, else the single
+ *     default add-on account (4354) — see addonMappingKey().
  *   - "product": a real product sold via POS/F&B -> member account (4510 F&B / 4520 retail) if
  *     the customer has a membership tier, else F&B (4200 series) or retail Product Sale (4300
  *     series) depending on products.category. Same "two-way split, no further breakdown"
@@ -143,7 +152,7 @@ async function revenueAccountIdForItem(
   if (itemType === "rental") {
     if (isMember) return getMappedAccountId(outletId, "rental", "member", "4180");
     const key = rentalMappingKey(rentalConsoleType);
-    const fallbackCode = key === "ps4" ? "4110" : key === "ps5" ? "4120" : "4170";
+    const fallbackCode = RENTAL_REVENUE_FALLBACK[key] ?? "4170";
     return getMappedAccountId(outletId, "rental", key, fallbackCode);
   }
   if (itemType === "accessory") {

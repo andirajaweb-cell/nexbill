@@ -7,6 +7,7 @@ import { recomputeBillTotals } from "@/lib/pos/bill";
 import { executeRefundOrder } from "@/lib/pos/refund";
 import { hasPermission, StaffRole, canApproveForRole, roleLabel } from "@/lib/auth/permissions";
 import { logAudit } from "@/lib/audit/log";
+import { executeCashTransfer, rejectCashTransferRecord } from "@/lib/cash/transfers";
 
 /**
  * Shared by approveRequest/rejectRequest: an approval-hierarchy check on top of the
@@ -173,6 +174,8 @@ export async function approveRequest(requestId: string, reviewerId: string, revi
     await executeVoidItem(request.refId, request.reason ?? "Disetujui approval", reviewerId);
   } else if (request.type === "refund") {
     await executeRefundOrder(request.refId, request.reason ?? "Disetujui approval", reviewerId);
+  } else if (request.type === "cash_transfer") {
+    await executeCashTransfer(request.refId, reviewerId);
   }
 
   const [updated] = await db
@@ -190,6 +193,10 @@ export async function rejectRequest(requestId: string, reviewerId: string, revie
   if (!request) throw new Error("Permintaan tidak ditemukan.");
   if (request.status !== "pending") throw new Error("Permintaan sudah diproses.");
   await assertCanReviewRequest(request, reviewerRole);
+
+  if (request.type === "cash_transfer") {
+    await rejectCashTransferRecord(request.refId, reviewerId, note);
+  }
 
   const [updated] = await db
     .update(approvalRequests)

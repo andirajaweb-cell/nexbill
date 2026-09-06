@@ -163,13 +163,13 @@ export const relayAgents = pgTable("relay_agents", {
   ...timestamps,
 });
 
-/** ---------------- RENTAL UNITS (PS3/PS4/PS5 + TV) ---------------- */
+/** ---------------- RENTAL UNITS (PS2/PS3/PS4/PS5/PS6 + TV) ---------------- */
 
 export const rentalUnits = pgTable("rental_units", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),
   name: text("name").notNull(),
-  consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim"] }).notNull(),
+  consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6"] }).notNull(),
   tvType: text("tv_type", { enum: ["android_tv", "smart_tv", "analog_tv"] }).notNull(),
   deviceId: text("device_id"),
   hourlyRate: doublePrecision("hourly_rate").notNull().default(0),
@@ -210,7 +210,7 @@ export const promos = pgTable("promos", {
   name: text("name").notNull(),
   type: text("type", { enum: ["rental_package", "bundle_discount", "happy_hour", "voucher_code"] }).notNull(),
   description: text("description"),
-  consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "any"] }),
+  consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6", "any"] }),
   durationMinutes: integer("duration_minutes"),
   packagePrice: doublePrecision("package_price"),
   discountPercent: doublePrecision("discount_percent"),
@@ -543,7 +543,7 @@ export const journalEntries = pgTable(
         "rental", "pos", "purchase_invoice", "purchase_payment", "purchase_return",
         "expense", "refund", "asset_purchase", "asset_disposal", "depreciation",
         "receivable_payment", "manual", "opening_balance", "ppob", "other_income",
-        "home_rental", "membership_fee", "cash_deposit",
+        "home_rental", "membership_fee", "cash_deposit", "cash_transfer",
       ],
     }).notNull(),
     sourceId: text("source_id"),
@@ -618,6 +618,33 @@ export const cashDeposits = pgTable("cash_deposits", {
   notes: text("notes"),
   journalEntryId: text("journal_entry_id").references(() => journalEntries.id),
   status: text("status", { enum: ["posted", "void"] }).notNull().default("posted"),
+  voidReason: text("void_reason"),
+  voidedAt: text("voided_at"),
+  ...timestamps,
+});
+
+/**
+ * "Pindah Kas" — pure internal transfer between two of the outlet's own cash/bank pools (e.g. Kas
+ * Kecil -> Kas Besar), with no owner/manager "receiver" concept like cashDeposits above (nobody is
+ * physically handed cash out of the recorded business system — it just moves between two pools
+ * that are both still on the books). Unlike cashDeposits, this always requires approval before the
+ * journal posts (per the user's explicit choice) — see requestCashTransfer/executeCashTransfer in
+ * lib/cash/transfers.ts and the "cash_transfer" branch in approveRequest/rejectRequest
+ * (lib/pos/void.ts), reusing the same approvalRequests/assertCanReviewRequest machinery as
+ * void/refund/shift-close-review. journalEntryId stays null until status flips to "posted".
+ */
+export const cashTransfers = pgTable("cash_transfers", {
+  id: id(),
+  outletId: text("outlet_id").notNull().references(() => outlets.id),
+  shiftId: text("shift_id").references(() => shifts.id),
+  amount: doublePrecision("amount").notNull(),
+  sourceCashBankAccountId: text("source_cash_bank_account_id").notNull().references(() => cashBankAccounts.id),
+  destinationCashBankAccountId: text("destination_cash_bank_account_id").notNull().references(() => cashBankAccounts.id),
+  notes: text("notes"),
+  requestedByStaffUserId: text("requested_by_staff_user_id").notNull().references(() => staffUsers.id),
+  journalEntryId: text("journal_entry_id").references(() => journalEntries.id),
+  status: text("status", { enum: ["pending_approval", "posted", "rejected", "void"] }).notNull().default("pending_approval"),
+  rejectReason: text("reject_reason"),
   voidReason: text("void_reason"),
   voidedAt: text("voided_at"),
   ...timestamps,
@@ -1066,7 +1093,7 @@ export const loyaltyPlayPointRates = pgTable(
   {
     id: id(),
     outletId: text("outlet_id").notNull().references(() => outlets.id),
-    consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim"] }).notNull(),
+    consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6"] }).notNull(),
     pointsPerSession: doublePrecision("points_per_session").notNull().default(0),
     ...timestamps,
   },
@@ -1239,7 +1266,7 @@ export const shiftBalanceChecks = pgTable("shift_balance_checks", {
 export const approvalRequests = pgTable("approval_requests", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),
-  type: text("type", { enum: ["void_order", "void_item", "refund", "discount_override", "cancel_session", "shift_close_review"] }).notNull(),
+  type: text("type", { enum: ["void_order", "void_item", "refund", "discount_override", "cancel_session", "shift_close_review", "cash_transfer"] }).notNull(),
   refType: text("ref_type").notNull(),
   refId: text("ref_id").notNull(),
   requestedBy: text("requested_by").references(() => staffUsers.id),

@@ -53,6 +53,7 @@ const CONSOLE_TYPES = [
   { value: "ps4_pro", label: "PS4 Pro" },
   { value: "ps5", label: "PS5" },
   { value: "ps5_slim", label: "PS5 Slim" },
+  { value: "ps6", label: "PS6" },
 ];
 const TV_TYPES = [
   { value: "android_tv", label: "Android TV" },

@@ -154,8 +154,10 @@ export const DEFAULT_COA: CoaDef[] = [
   // ---------------- 4. REVENUE ----------------
   { code: "4000", name: "REVENUE", type: "revenue", isPostingAllowed: false },
   { code: "4100", name: "RENTAL REVENUE", type: "revenue", parentCode: "4000", isPostingAllowed: false },
+  { code: "4105", name: "PS3 Rental", type: "revenue", parentCode: "4100" },
   { code: "4110", name: "PS4 Rental", type: "revenue", parentCode: "4100" },
   { code: "4120", name: "PS5 Rental", type: "revenue", parentCode: "4100" },
+  { code: "4125", name: "PS6 Rental", type: "revenue", parentCode: "4100" },
   { code: "4130", name: "VIP Room Rental", type: "revenue", parentCode: "4100" },
   { code: "4140", name: "Tournament Rental", type: "revenue", parentCode: "4100" },
   { code: "4150", name: "Package Rental", type: "revenue", parentCode: "4100" },

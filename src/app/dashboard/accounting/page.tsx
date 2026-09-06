@@ -497,6 +497,11 @@ const SOURCE_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }> 
   receivable_payment: { key: "accounting.journal.source.receivablePayment", fallback: "Pelunasan Piutang" },
   opening_balance: { key: "accounting.journal.source.openingBalance", fallback: "Saldo Awal" },
   ppob: { key: "accounting.journal.source.ppob", fallback: "PPOB" },
+  other_income: { key: "accounting.journal.source.otherIncome", fallback: "Pendapatan Lain-lain" },
+  home_rental: { key: "accounting.journal.source.homeRental", fallback: "Home Rental" },
+  membership_fee: { key: "accounting.journal.source.membershipFee", fallback: "Iuran Membership" },
+  cash_deposit: { key: "accounting.journal.source.cashDeposit", fallback: "Setoran Kas" },
+  cash_transfer: { key: "accounting.journal.source.cashTransfer", fallback: "Pindah Kas" },
 };
 
 const emptyJournalLine = () => ({ accountId: "", debit: "", credit: "", description: "" });
@@ -1380,7 +1385,7 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
             <tbody>
               {existing.lines.map((l: any) => (
                 <tr key={l.id} className="border-b border-neutral-900">
-                  <td className="py-1">{l.accountCode} — {l.accountName}</td>
+                  <td className="py-1">{l.accountCode} — {coaAccountName(t, { code: l.accountCode, name: l.accountName })}</td>
                   <td className="text-right text-emerald-400">{l.debit > 0 ? rupiah(l.debit) : ""}</td>
                   <td className="text-right text-amber-400">{l.credit > 0 ? rupiah(l.credit) : ""}</td>
                 </tr>
