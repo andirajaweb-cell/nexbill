@@ -33,6 +33,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { db } from "../src/db/client";
 import { relayAgents } from "../src/db/schema";
 import { eq } from "drizzle-orm";
+import { describeError } from "../src/lib/api/error";
 import {
   RELAY_WS_PORT,
   RELAY_WS_BIND_HOST,
@@ -67,14 +68,31 @@ function send(ws: WebSocket, msg: RelayHubToAgentMessage) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
+// Retries a few times with backoff before giving up — covers the transient case seen in
+// production where the VPS's DNS resolver briefly fails to resolve the Supabase pooler
+// hostname (EAI_AGAIN, "try again"), which would otherwise silently drop a single
+// online/offline transition instead of just being a passing blip. Not persisted or queued
+// across restarts — if the hub process itself dies mid-retry, the next connect/disconnect
+// naturally re-syncs status anyway, so this only needs to smooth over sub-second-to-few-second
+// DNS/network hiccups, not survive a real outage.
 async function markStatus(relayAgentId: string, status: "online" | "offline") {
-  try {
-    await db
-      .update(relayAgents)
-      .set({ status, lastSeenAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-      .where(eq(relayAgents.id, relayAgentId));
-  } catch (err) {
-    console.error("[relay-hub] Gagal update status agent di DB:", err);
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await db
+        .update(relayAgents)
+        .set({ status, lastSeenAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+        .where(eq(relayAgents.id, relayAgentId));
+      return;
+    } catch (err) {
+      if (attempt < maxAttempts) {
+        const delayMs = attempt * 1000;
+        console.warn(`[relay-hub] Gagal update status agent di DB (percobaan ${attempt}/${maxAttempts}), coba lagi dalam ${delayMs}ms: ${describeError(err)}`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        console.error(`[relay-hub] Gagal update status agent di DB setelah ${maxAttempts} percobaan: ${describeError(err)}`);
+      }
+    }
   }
 }
 
