@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions, cashDeposits } from "@/db/schema";
+import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions, cashDeposits, cashTransfers } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { logAudit } from "@/lib/audit/log";
 import { computeTrialBalance } from "@/lib/accounting/reports";
@@ -140,6 +140,39 @@ async function computeCashDropTotal(shiftId: string): Promise<number> {
   return shiftDeposits.reduce((s, d) => (sourceTypeById.get(d.sourceCashBankAccountId) === "cash" ? s + d.amount : s), 0);
 }
 
+/**
+ * "Pindah Kas" (lib/cash/transfers.ts, requires Owner/Manager approval before posting) — a pure
+ * transfer between two of the outlet's own cash/bank pools, tagged with shiftId at request time.
+ * Unlike Setoran Kas (always cash OUT of the till), this is genuinely bidirectional: replenishing
+ * a shift's till from Kas Utama mid-shift (destination = this till) is cash IN, while moving cash
+ * from the till to another pool (source = this till) is cash OUT — both were previously ignored by
+ * closeShift() the same way Setoran Kas was, for the same reason (never actually read here before
+ * this fix). Only "posted" transfers count — "pending_approval"/"rejected" never moved real cash,
+ * and "void" reversed it. Only the CASH-type leg of a transfer matters for the physical drawer; a
+ * transfer between two non-cash (bank/e-wallet) pools has no cash effect at all. Edge case: a
+ * transfer between two DIFFERENT cash-type pools (e.g. Kas Kecil -> Kas Besar, both physical
+ * tills) adds to both cashTransferIn and cashTransferOut, netting to zero — this app has no
+ * per-till/register concept (a shift is tied to a staffUserId, not a specific physical drawer; see
+ * the SEA shift-methodology audit), so there's no way to know which side is actually THIS shift's
+ * own till. Netting to zero is the safe default: it never manufactures a false variance either
+ * direction, it just can't attribute the movement to one specific till when an outlet runs more
+ * than one.
+ */
+async function computeCashTransferEffect(shiftId: string): Promise<{ cashTransferIn: number; cashTransferOut: number }> {
+  const shiftTransfers = await db.select().from(cashTransfers).where(and(eq(cashTransfers.shiftId, shiftId), eq(cashTransfers.status, "posted")));
+  if (!shiftTransfers.length) return { cashTransferIn: 0, cashTransferOut: 0 };
+  const accountIds = Array.from(new Set(shiftTransfers.flatMap((t) => [t.sourceCashBankAccountId, t.destinationCashBankAccountId])));
+  const accounts = await db.select().from(cashBankAccounts).where(inArray(cashBankAccounts.id, accountIds));
+  const typeById = new Map(accounts.map((a) => [a.id, a.type]));
+  let cashTransferIn = 0;
+  let cashTransferOut = 0;
+  for (const t of shiftTransfers) {
+    if (typeById.get(t.destinationCashBankAccountId) === "cash") cashTransferIn += t.amount;
+    if (typeById.get(t.sourceCashBankAccountId) === "cash") cashTransferOut += t.amount;
+  }
+  return { cashTransferIn, cashTransferOut };
+}
+
 export interface IncomeByMethodRow {
   method: string;
   label: string;
@@ -275,6 +308,7 @@ export async function closeShift(
 
   const { ppobCashIn, ppobCashOut } = await computePpobCashEffect(shiftId);
   const cashDropTotal = await computeCashDropTotal(shiftId);
+  const { cashTransferIn, cashTransferOut } = await computeCashTransferEffect(shiftId);
 
   const cashIn =
     cashPayments.reduce((s, p) => s + p.amount, 0) +
@@ -286,7 +320,8 @@ export async function closeShift(
     shiftCashMembershipPayments.reduce((s, m) => s + (m.amount - (m.feeAmount ?? 0)), 0) +
     homeRentalCashIn +
     homeRentalLateFeeCashIn +
-    ppobCashIn;
+    ppobCashIn +
+    cashTransferIn;
 
   // Only status="paid" actually moved cash out of the drawer — draft/pending/rejected/cancelled
   // (including voided-back-to-cancelled) expenses never posted a journal against this till.
@@ -297,7 +332,8 @@ export async function closeShift(
     shiftExpenses.filter((e) => e.cashBankAccountId && cashAccountIds.has(e.cashBankAccountId)).reduce((s, e) => s + e.amount + (e.taxAmount ?? 0), 0) +
     homeRentalDepositCashOut +
     ppobCashOut +
-    cashDropTotal;
+    cashDropTotal +
+    cashTransferOut;
 
   const expectedCash = shift.openingCash + cashIn - cashOut;
   const variance = actualCash - expectedCash;
@@ -396,7 +432,21 @@ export async function closeShift(
 
   const incomeByMethod = await computeIncomeByMethod(shiftId);
 
-  return { shift: updated, cashIn, cashOut, ppobCashIn, ppobCashOut, cashDropTotal, ordersCount: shiftOrders.length, cashRows, balanceCheckRows, riskFlags: risk.flags, incomeByMethod };
+  return {
+    shift: updated,
+    cashIn,
+    cashOut,
+    ppobCashIn,
+    ppobCashOut,
+    cashDropTotal,
+    cashTransferIn,
+    cashTransferOut,
+    ordersCount: shiftOrders.length,
+    cashRows,
+    balanceCheckRows,
+    riskFlags: risk.flags,
+    incomeByMethod,
+  };
 }
 
 export async function getCurrentShift(outletId: string, staffUserId: string) {
@@ -415,7 +465,8 @@ export async function getShiftDetail(shiftId: string) {
   const incomeByMethod = await computeIncomeByMethod(shiftId);
   const { ppobCashIn, ppobCashOut } = await computePpobCashEffect(shiftId);
   const cashDropTotal = await computeCashDropTotal(shiftId);
-  return { shift, cashCounts, balanceChecks, incomeByMethod, ppobCashIn, ppobCashOut, cashDropTotal };
+  const { cashTransferIn, cashTransferOut } = await computeCashTransferEffect(shiftId);
+  return { shift, cashCounts, balanceChecks, incomeByMethod, ppobCashIn, ppobCashOut, cashDropTotal, cashTransferIn, cashTransferOut };
 }
 
 /**

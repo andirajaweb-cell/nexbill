@@ -560,8 +560,8 @@ export default function ShiftPage() {
             </a>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm mb-1">
-            <div><div className="text-xs text-neutral-500" title={t("shift.cashInHint", "Semua uang tunai yang masuk ke laci shift ini — termasuk pembayaran tunai, dan uang masuk dari transaksi PPOB (mis. pembelian pulsa/token/tagihan yang dibayar tunai).")}>{t("shift.cashInLabel", "Kas Masuk")} <HelpCircle size={10} className="inline text-neutral-600" /></div>{rupiah(closeResult.cashIn)}</div>
-            <div><div className="text-xs text-neutral-500" title={t("shift.cashOutHint", "Semua uang tunai yang keluar dari laci shift ini — termasuk pengeluaran/beban, uang keluar dari transaksi PPOB (mis. tarik tunai), dan Setoran Kas (uang dipindahkan ke Kas Besar/Prive/dll).")}>{t("shift.cashOutLabel", "Kas Keluar")} <HelpCircle size={10} className="inline text-neutral-600" /></div>{rupiah(closeResult.cashOut)}</div>
+            <div><div className="text-xs text-neutral-500" title={t("shift.cashInHint", "Semua uang tunai yang masuk ke laci shift ini — termasuk pembayaran tunai, uang masuk dari transaksi PPOB (mis. pembelian pulsa/token/tagihan yang dibayar tunai), dan Pindah Kas masuk dari pool lain (mis. tambahan modal dari Kas Utama).")}>{t("shift.cashInLabel", "Kas Masuk")} <HelpCircle size={10} className="inline text-neutral-600" /></div>{rupiah(closeResult.cashIn)}</div>
+            <div><div className="text-xs text-neutral-500" title={t("shift.cashOutHint", "Semua uang tunai yang keluar dari laci shift ini — termasuk pengeluaran/beban, uang keluar dari transaksi PPOB (mis. tarik tunai), Setoran Kas (uang dipindahkan ke Kas Besar/Prive/dll), dan Pindah Kas keluar ke pool lain.")}>{t("shift.cashOutLabel", "Kas Keluar")} <HelpCircle size={10} className="inline text-neutral-600" /></div>{rupiah(closeResult.cashOut)}</div>
             <div><div className="text-xs text-neutral-500" title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.expectedCashLabel", "Ekspektasi Kas")} <HelpCircle size={10} className="inline text-neutral-600" /></div>{rupiah(closeResult.shift.expectedCash)}</div>
             <div><div className="text-xs text-neutral-500" title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")} <HelpCircle size={10} className="inline text-neutral-600" /></div>
               <span className={Math.abs(closeResult.shift.variance) < 1 ? "text-emerald-400" : closeResult.shift.variance < 0 ? "text-red-400" : "text-amber-400"}>
@@ -576,8 +576,14 @@ export default function ShiftPage() {
             </p>
           )}
           {(closeResult.cashDropTotal ?? 0) > 0 && (
-            <p className="text-xs text-neutral-500 mb-3">
+            <p className="text-xs text-neutral-500 mb-1">
               {t("shift.cashDropNote", "Termasuk Setoran Kas (dipindahkan ke Kas Besar/Prive/dll) sebesar")} {rupiah(closeResult.cashDropTotal ?? 0)}
+            </p>
+          )}
+          {((closeResult.cashTransferIn ?? 0) > 0 || (closeResult.cashTransferOut ?? 0) > 0) && (
+            <p className="text-xs text-neutral-500 mb-3">
+              {t("shift.cashTransferNote", "Termasuk Pindah Kas:")}{" "}
+              {t("shift.ppobCashInShort", "masuk")} {rupiah(closeResult.cashTransferIn ?? 0)}, {t("shift.ppobCashOutShort", "keluar")} {rupiah(closeResult.cashTransferOut ?? 0)}
             </p>
           )}
           {closeResult.incomeByMethod?.length > 0 && (
