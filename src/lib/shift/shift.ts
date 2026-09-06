@@ -5,6 +5,7 @@ import { logAudit } from "@/lib/audit/log";
 import { computeTrialBalance } from "@/lib/accounting/reports";
 import { getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
 import { getCashDenominations, BALANCE_TRACKED_METHODS, CHANNEL_LABEL } from "./denominations";
+import { PAYMENT_METHOD_LABEL } from "@/lib/payments/labels";
 import { currencyForCountry } from "@/lib/currency/format";
 import { computeShiftRiskFlags } from "./fraud-detection";
 
@@ -85,6 +86,56 @@ export async function getRequiredBalanceChannels(shiftId: string): Promise<{ cha
     channels.push({ channelKey: dc.channelKey, label: dc.label });
   }
   return channels;
+}
+
+export interface IncomeByMethodRow {
+  method: string;
+  label: string;
+  amount: number;
+}
+
+/**
+ * Breaks down all money received this shift by payment method — e.g. how much came in as cash
+ * vs QRIS vs GoPay, etc. — instead of the single lump "Kas Masuk" figure closeShift() has always
+ * computed (which only ever summed the "cash" method). Reuses the exact same income sources
+ * cashIn already reads (order payments, cash-drawer-affecting Other Income, membership payments,
+ * Home Rental checkout + deposit, Home Rental return late fees) but groups by method instead of
+ * filtering to "cash" only, so QRIS/GoPay/DANA/etc. each get their own total. Recomputed on read
+ * (not persisted on the shifts row) since the underlying rows are already permanently tagged with
+ * shiftId and don't change after the fact — same reasoning as why cashIn/cashOut themselves were
+ * never persisted as their own columns.
+ */
+export async function computeIncomeByMethod(shiftId: string): Promise<IncomeByMethodRow[]> {
+  const shiftOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.shiftId, shiftId));
+  const orderIds = shiftOrders.map((o) => o.id);
+  const allPayments = orderIds.length
+    ? await db.select().from(payments).where(and(inArray(payments.orderId, orderIds), eq(payments.status, "success")))
+    : [];
+  const shiftOtherIncomes = await db.select().from(otherIncomes).where(and(eq(otherIncomes.shiftId, shiftId), eq(otherIncomes.status, "posted")));
+  const shiftMembershipPayments = await db.select().from(membershipPayments).where(and(eq(membershipPayments.shiftId, shiftId), eq(membershipPayments.status, "posted")));
+  const shiftHomeRentals = await db.select().from(homeRentalRentals).where(eq(homeRentalRentals.shiftId, shiftId));
+  const shiftHomeRentalReturns = await db.select().from(homeRentalRentals).where(eq(homeRentalRentals.returnShiftId, shiftId));
+
+  const totals = new Map<string, number>();
+  const add = (method: string | null | undefined, amount: number) => {
+    if (!method || !amount) return;
+    totals.set(method, (totals.get(method) ?? 0) + amount);
+  };
+
+  for (const p of allPayments) add(p.method, p.amount);
+  for (const o of shiftOtherIncomes) add(o.paymentMethod, o.amount - (o.feeAmount ?? 0));
+  for (const m of shiftMembershipPayments) add(m.paymentMethod, m.amount - (m.feeAmount ?? 0));
+  for (const r of shiftHomeRentals) {
+    add(r.paymentMethod, r.paidAmount);
+    add(r.depositPaymentMethod, r.depositAmount);
+  }
+  for (const r of shiftHomeRentalReturns) {
+    add(r.lateFeePaymentMethod, r.lateFee);
+  }
+
+  return Array.from(totals.entries())
+    .map(([method, amount]) => ({ method, label: PAYMENT_METHOD_LABEL[method as keyof typeof PAYMENT_METHOD_LABEL] ?? method, amount }))
+    .sort((a, b) => b.amount - a.amount);
 }
 
 /**
@@ -285,7 +336,9 @@ export async function closeShift(
     });
   }
 
-  return { shift: updated, cashIn, cashOut, ordersCount: shiftOrders.length, cashRows, balanceCheckRows, riskFlags: risk.flags };
+  const incomeByMethod = await computeIncomeByMethod(shiftId);
+
+  return { shift: updated, cashIn, cashOut, ordersCount: shiftOrders.length, cashRows, balanceCheckRows, riskFlags: risk.flags, incomeByMethod };
 }
 
 export async function getCurrentShift(outletId: string, staffUserId: string) {
@@ -301,7 +354,8 @@ export async function getShiftDetail(shiftId: string) {
   if (!shift) return null;
   const cashCounts = await db.select().from(shiftCashCounts).where(eq(shiftCashCounts.shiftId, shiftId));
   const balanceChecks = await db.select().from(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));
-  return { shift, cashCounts, balanceChecks };
+  const incomeByMethod = await computeIncomeByMethod(shiftId);
+  return { shift, cashCounts, balanceChecks, incomeByMethod };
 }
 
 /**

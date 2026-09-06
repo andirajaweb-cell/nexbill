@@ -569,6 +569,22 @@ export default function ShiftPage() {
               </span>
             </div>
           </div>
+          {closeResult.incomeByMethod?.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs text-neutral-500 mb-1">{t("shift.incomeByMethodTitle", "Rincian Uang Masuk per Metode Pembayaran")}</div>
+              <table className="w-full text-sm">
+                <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-1.5">{t("shift.colMethod", "Metode")}</th><th className="text-right">{t("shift.colAmount", "Jumlah")}</th></tr></thead>
+                <tbody>
+                  {closeResult.incomeByMethod.map((row: { method: string; label: string; amount: number }) => (
+                    <tr key={row.method} className="border-b border-neutral-900">
+                      <td className="py-1.5">{row.label}</td>
+                      <td className="text-right">{rupiah(row.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {closeResult.balanceCheckRows?.length > 0 && (
             <table className="w-full text-sm">
               <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colChannel", "Channel")}</th><th className="text-right" title={t("shift.colExpectedHint", "Saldo yang seharusnya ada menurut sistem")}>{t("shift.colExpected", "Ekspektasi")}</th><th className="text-right" title={t("shift.colActualHint", "Saldo yang kamu lihat di aplikasi channel tersebut")}>{t("shift.colActual", "Aktual")}</th><th className="text-right" title={t("shift.colVarianceHint", "Aktual dikurangi Ekspektasi")}>{t("shift.colVariance", "Selisih")}</th></tr></thead>

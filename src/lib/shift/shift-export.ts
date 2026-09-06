@@ -89,7 +89,7 @@ function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (
  * fabricate after the fact than a number in a database alone.
  */
 export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnType<typeof getShiftDetail>>>, lang: LangCode = "id"): Promise<Buffer> {
-  const { shift, cashCounts, balanceChecks } = detail;
+  const { shift, cashCounts, balanceChecks, incomeByMethod } = detail;
   const t = (key: string, fallback: string) => translate(lang, key, fallback);
   const [staff] = await db.select().from(staffUsers).where(eq(staffUsers.id, shift.staffUserId)).limit(1);
   const [outlet] = await db.select({ outletCountry: outlets.outletCountry, dateFormat: outlets.dateFormat }).from(outlets).where(eq(outlets.id, shift.outletId)).limit(1);
@@ -175,6 +175,19 @@ export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnTyp
     doc.text(`${label}: ${value != null ? rupiah(value) : "-"}`, PAGE_MARGIN, y);
     doc.fillColor("#000");
     y = doc.y + 2;
+  }
+
+  if (incomeByMethod.length) {
+    y += 8;
+    doc.font("Helvetica-Bold").fontSize(11).text(t("shift.pdf.incomeByMethodHeading", "Rincian Uang Masuk per Metode Pembayaran"), PAGE_MARGIN, y);
+    y = doc.y + 4;
+    const incomeCols: Col[] = [
+      { label: t("shift.pdf.colMethod", "Metode"), width: 310 },
+      { label: t("shift.pdf.colAmount", "Jumlah"), width: 145, align: "right" },
+    ];
+    const incomeRows = incomeByMethod.map((r) => [r.label, r.amount]);
+    const totalIncome = incomeByMethod.reduce((s, r) => s + r.amount, 0);
+    y = drawTable(doc, y, incomeCols, incomeRows, currency, [t("shift.pdf.totalIncome", "Total Uang Masuk"), totalIncome]);
   }
 
   if (balanceChecks.length) {
