@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
 import { ppobTransactions, cashBankAccounts, journalEntries, journalLines } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { postJournal, voidJournal, JournalLineInput } from "@/lib/accounting/journal";
 import { computeTrialBalance } from "@/lib/accounting/reports";
 import { getMappedAccountId } from "@/lib/accounting/account-mapping";
@@ -277,15 +277,41 @@ export async function editPpobTransaction(id: string, input: EditPpobInput, staf
 }
 
 /**
- * Genuinely deletes a PPOB transaction and its journal entry — reserved for
- * Owner (enforced in the API route). Unlike voidPpobTransaction (reverses
- * and keeps the row for audit trail), this removes it completely.
+ * Genuinely deletes a PPOB transaction and every journal entry ever posted
+ * for it — reserved for Owner (enforced in the API route). Unlike
+ * voidPpobTransaction (reverses and keeps the row for audit trail), this
+ * removes it completely.
+ *
+ * Deliberately does NOT limit cleanup to row.journalEntryId — that column
+ * only ever points at the transaction's CURRENT entry. A transaction that
+ * was voided (voidJournal posts a separate reversing entry but never
+ * updates journalEntryId to point at it) or edited (editPpobTransaction
+ * voids the old entry and swaps journalEntryId to the new one) leaves
+ * earlier entries behind, orphaned but still fully live in the trial
+ * balance since nothing else references them. Deleting only the current
+ * entry — the previous behavior — could delete one half of an already-
+ * balanced void pair while leaving its reversal standing alone, uncancelled:
+ * exactly the "transaksi sudah dihapus tapi masih ada nilai yang tercantum"
+ * bug (a deleted PPOB transaction leaving a phantom balance behind).
+ * Every entry this transaction ever produced shares sourceType "ppob" +
+ * sourceId = this row's id (see postJournal calls in voidJournal/
+ * editPpobTransaction above), so querying by that pair catches all of them.
  */
 export async function hardDeletePpobTransaction(id: string, staffUserId?: string) {
   const [row] = await db.select().from(ppobTransactions).where(eq(ppobTransactions.id, id)).limit(1);
   if (!row) throw new Error("Transaksi PPOB tidak ditemukan.");
 
-  if (row.journalEntryId) {
+  const relatedEntries = await db
+    .select({ id: journalEntries.id })
+    .from(journalEntries)
+    .where(and(eq(journalEntries.sourceType, "ppob"), eq(journalEntries.sourceId, id)));
+  const relatedEntryIds = relatedEntries.map((e) => e.id);
+
+  if (relatedEntryIds.length > 0) {
+    await db.delete(journalLines).where(inArray(journalLines.journalEntryId, relatedEntryIds));
+    await db.delete(journalEntries).where(inArray(journalEntries.id, relatedEntryIds));
+  } else if (row.journalEntryId) {
+    // Fallback for the unlikely case sourceId wasn't set consistently on some legacy row.
     await db.delete(journalLines).where(eq(journalLines.journalEntryId, row.journalEntryId));
     await db.delete(journalEntries).where(eq(journalEntries.id, row.journalEntryId));
   }
