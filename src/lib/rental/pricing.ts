@@ -14,6 +14,32 @@ export interface RateBreakdown {
 }
 
 /**
+ * True if `nowTime` falls inside a rule's [startTime, endTime] window on the day it applies to.
+ * Handles overnight windows that cross midnight (e.g. "22:00"–"02:00" for a jam malam rate that
+ * runs past 12) as well as ordinary same-day windows:
+ *
+ *  - Same-day window (startTime <= endTime, e.g. "08:00"–"17:00"): matches when the rule's day is
+ *    today AND nowTime falls between start and end, same as before.
+ *  - Overnight window (startTime > endTime, e.g. "22:00"–"02:00"): the rule's daysOfWeek names the
+ *    day the window STARTS on (so "Jumat 22:00–02:00" naturally covers Friday night through
+ *    Saturday 2am, without also having to list Saturday). It matches in two situations: the
+ *    evening portion (rule's day is today, nowTime >= startTime), or the early-morning tail
+ *    portion (rule's day was YESTERDAY, nowTime <= endTime) — that second case is what the old
+ *    single `nowTime >= start && nowTime <= end` check could never satisfy, since no time string
+ *    is both >= "22:00" and <= "02:00".
+ */
+function ruleMatchesNow(rule: { daysOfWeek: string; startTime: string; endTime: string }, dayCode: string, prevDayCode: string, nowTime: string): boolean {
+  const days = rule.daysOfWeek.split(",").map((d) => d.trim());
+  const overnight = rule.startTime > rule.endTime;
+  if (!overnight) {
+    return days.includes(dayCode) && nowTime >= rule.startTime && nowTime <= rule.endTime;
+  }
+  const eveningPortion = days.includes(dayCode) && nowTime >= rule.startTime;
+  const morningPortion = days.includes(prevDayCode) && nowTime <= rule.endTime;
+  return eveningPortion || morningPortion;
+}
+
+/**
  * Resolve the effective hourly rate for a unit right now, applying the
  * highest-priority matching pricing rule (happy hour / weekend / jam malam)
  * then stacking the customer's membership discount on top.
@@ -26,8 +52,8 @@ export interface RateBreakdown {
  * app runs on a machine physically at (or in the same timezone as) the
  * outlet — true for the typical single-outlet self-hosted setup this
  * project targets. Overnight windows that cross midnight (e.g. 22:00–02:00)
- * are NOT supported yet — split them into two rules (22:00–23:59 and
- * 00:00–02:00) as a workaround.
+ * ARE supported — see ruleMatchesNow() above; a rule's daysOfWeek names the
+ * day the window starts on.
  */
 export async function computeEffectiveHourlyRate(
   outletId: string,
@@ -40,6 +66,7 @@ export async function computeEffectiveHourlyRate(
 
   const baseRate = unit.hourlyRate;
   const dayCode = DAY_CODES[at.getDay()];
+  const prevDayCode = DAY_CODES[(at.getDay() + 6) % 7];
   const hh = String(at.getHours()).padStart(2, "0");
   const mm = String(at.getMinutes()).padStart(2, "0");
   const nowTime = `${hh}:${mm}`;
@@ -50,9 +77,8 @@ export async function computeEffectiveHourlyRate(
     .where(and(eq(pricingRules.outletId, outletId), eq(pricingRules.isActive, true)));
 
   const matching = rules
-    .filter((r) => r.daysOfWeek.split(",").map((d) => d.trim()).includes(dayCode))
     .filter((r) => r.consoleType === "any" || r.consoleType === unit.consoleType)
-    .filter((r) => nowTime >= r.startTime && nowTime <= r.endTime)
+    .filter((r) => ruleMatchesNow(r, dayCode, prevDayCode, nowTime))
     .sort((a, b) => b.priority - a.priority);
 
   const bestRule = matching[0];
