@@ -577,6 +577,15 @@ export const cashBankAccounts = pgTable("cash_bank_accounts", {
   type: text("type", { enum: ["cash", "bank"] }).notNull().default("cash"),
   accountId: text("account_id").notNull().references(() => accounts.id),
   isDefault: boolean("is_default").notNull().default(false),
+  // Whether this pool's live balance counts toward a shift's suggested "Modal Awal" (opening
+  // float) quick-fill — checklist in Settings > Preferensi > "Komposisi Modal Awal Shift", summed
+  // client-side in dashboard/shift/page.tsx. Different outlets track physical cash across a
+  // different number of pools depending on their scale (a small rental might only have one till;
+  // a larger one might split Kas Toko/Kas Besar/Kas Kecil/Saldo Deposit separately), so this is a
+  // per-account opt-in rather than a fixed assumption. Defaults to false everywhere — if no
+  // account has this set for an outlet, the quick-fill falls back to the single designated
+  // default till (isDefault), so nothing changes until an outlet deliberately configures it.
+  includeInShiftFloat: boolean("include_in_shift_float").notNull().default(false),
   ...timestamps,
 });
 

@@ -380,11 +380,27 @@ function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: 
   const [form, setForm] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [accountCount, setAccountCount] = useState<number | null>(null);
+  const [cashPools, setCashPools] = useState<{ id: string; name: string; type: string; isDefault: boolean; includeInShiftFloat: boolean }[]>([]);
+  const [togglingPoolId, setTogglingPoolId] = useState<string | null>(null);
   const { t } = useDashboardLang();
 
   const load = () => fetchJsonObject(`/api/settings/outlet?outletId=${outletId}`).then(setForm);
+  const loadCashPools = () => fetchJsonArray("/api/cash-bank-accounts").then((rows: any[]) => setCashPools(rows.filter((r) => r.type === "cash")));
   useEffect(() => { load(); }, [outletId]);
   useEffect(() => { fetchJsonArray("/api/accounting/coa").then((rows) => setAccountCount(rows.length)); }, [outletId]);
+  useEffect(() => { loadCashPools(); }, [outletId]);
+
+  const toggleCashPool = async (id: string, checked: boolean) => {
+    setTogglingPoolId(id);
+    try {
+      const res = await fetch(`/api/cash-bank-accounts/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ includeInShiftFloat: checked }) });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      loadCashPools();
+    } finally {
+      setTogglingPoolId(null);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -484,6 +500,34 @@ function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: 
             <div className="text-sm font-mono">{previewDate}</div>
           </div>
         </div>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">{t("settings.preferences.shiftFloatHeading", "Komposisi Modal Awal Shift")}</h2>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "settings.preferences.shiftFloatDesc",
+            "Pilih akun kas mana saja yang dijumlahkan sebagai saran Modal Awal saat kasir buka shift baru — beda rental beda skala, jadi ini bisa disesuaikan: rental kecil mungkin cukup satu Kas Toko, rental besar bisa gabungkan Kas Toko + Kas Besar + Kas Kecil + Saldo Deposit sekaligus. Kalau tidak ada yang dicentang, saran Modal Awal memakai satu akun kas default outlet seperti biasa. Ini hanya SARAN angka — kasir tetap bisa mengubahnya sebelum submit."
+          )}
+        </p>
+        {cashPools.length === 0 ? (
+          <p className="text-xs text-neutral-600">{t("settings.preferences.shiftFloatEmpty", "Belum ada akun kas terdaftar — tambahkan dulu di Admin Data > Akun Kas/Bank.")}</p>
+        ) : (
+          <div className="space-y-1.5">
+            {cashPools.map((p) => (
+              <label key={p.id} className="flex items-center gap-2 text-sm rounded-lg border border-neutral-800 px-3 py-2">
+                <input
+                  type="checkbox"
+                  disabled={!canManage || togglingPoolId === p.id}
+                  checked={p.includeInShiftFloat}
+                  onChange={(e) => toggleCashPool(p.id, e.target.checked)}
+                />
+                <span>{p.name}</span>
+                {p.isDefault && <span className="text-xs text-neutral-500">({t("settings.preferences.shiftFloatDefaultTag", "default outlet")})</span>}
+              </label>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card className="space-y-3">

@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
         type: cashBankAccounts.type,
         accountId: cashBankAccounts.accountId,
         isDefault: cashBankAccounts.isDefault,
+        includeInShiftFloat: cashBankAccounts.includeInShiftFloat,
         code: accounts.code,
       })
       .from(cashBankAccounts)

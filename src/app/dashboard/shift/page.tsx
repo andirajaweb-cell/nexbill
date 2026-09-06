@@ -89,7 +89,7 @@ export default function ShiftPage() {
   // Cash pools (Kas Toko, Kas Besar, Kas Kecil, Saldo Deposit Virtual, dll — see lib/cash/deposits.ts)
   // with their live trial-balance-derived balance, used both for the "Modal Awal" quick-fill below
   // and the Setoran Kas tab's source/destination pickers.
-  const [cashAccounts, setCashAccounts] = useState<{ id: string; name: string; type: string; isDefault: boolean; balance: number }[]>([]);
+  const [cashAccounts, setCashAccounts] = useState<{ id: string; name: string; type: string; isDefault: boolean; includeInShiftFloat: boolean; balance: number }[]>([]);
   const [pageTab, setPageTab] = useState<"shift" | "deposit">("shift");
 
   // Closing form state — the cashier fills this in blind (no expected figures shown
@@ -180,6 +180,12 @@ export default function ShiftPage() {
   }, [outlet]);
 
   const defaultTillAccount = cashAccounts.find((a) => a.isDefault) ?? cashAccounts[0];
+  // If the outlet has checked off specific pools in Settings > Preferensi > "Komposisi Modal Awal
+  // Shift", the suggestion sums those; otherwise it falls back to the single default till, same
+  // as before that setting existed — see the schema doc comment on includeInShiftFloat.
+  const shiftFloatAccounts = cashAccounts.filter((a) => a.includeInShiftFloat);
+  const suggestedOpeningCash = shiftFloatAccounts.length > 0 ? shiftFloatAccounts.reduce((s, a) => s + a.balance, 0) : defaultTillAccount?.balance;
+  const suggestedOpeningCashLabel = shiftFloatAccounts.length > 0 ? shiftFloatAccounts.map((a) => a.name).join(" + ") : defaultTillAccount?.name;
 
   useEffect(() => {
     if (!outletId || !staffUserId) return;
@@ -524,13 +530,15 @@ export default function ShiftPage() {
               value={openingCash || ""} onChange={(e) => setOpeningCash(Number(e.target.value))} />
             <Button onClick={openShift}>{t("shift.openShiftBtn", "Buka Shift")}</Button>
           </div>
-          {defaultTillAccount && (
+          {suggestedOpeningCash != null && suggestedOpeningCashLabel && (
             <p className="text-xs text-neutral-500 mt-2">
               {t("shift.openingCashHint", "Modal Awal harus sesuai uang kas fisik yang sudah ada di laci — kalau kas ini dilacak sistem (Kas Toko/Kas Besar/Kas Kecil, dll di Pengaturan), gunakan angka itu, bukan perkiraan.")}
               {" "}
-              <button type="button" className="text-emerald-400 hover:underline" onClick={() => setOpeningCash(defaultTillAccount.balance)}>
-                {t("shift.useCurrentTillBalance", "Pakai saldo {name} saat ini: {amount}").replace("{name}", defaultTillAccount.name).replace("{amount}", rupiah(defaultTillAccount.balance))}
+              <button type="button" className="text-emerald-400 hover:underline" onClick={() => setOpeningCash(suggestedOpeningCash)}>
+                {t("shift.useCurrentTillBalance", "Pakai saldo {name} saat ini: {amount}").replace("{name}", suggestedOpeningCashLabel).replace("{amount}", rupiah(suggestedOpeningCash))}
               </button>
+              {" "}
+              <a href="/dashboard/settings" className="text-neutral-500 hover:underline">{t("shift.configureShiftFloatLink", "(atur komposisinya)")}</a>
             </p>
           )}
         </Card>
