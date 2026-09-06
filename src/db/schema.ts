@@ -60,6 +60,21 @@ export const outlets = pgTable("outlets", {
   taxpayerAddress: text("taxpayer_address"),
   businessEntityType: text("business_entity_type"),
   businessType: text("business_type"),
+  // Preferences tab (Settings > Preferensi) — accounting calendar, purely for how financial
+  // reports group/label periods (src/lib/accounting/reports.ts and friends). Recurs every year
+  // (month+day, not a specific year) — e.g. 1/1 for a calendar-year book, 4/1 for an
+  // April-start fiscal year. Does NOT lock or restrict transaction entry in any way; that's a
+  // separate, much bigger feature this does not attempt.
+  accountingStartMonth: integer("accounting_start_month").notNull().default(1),
+  accountingStartDay: integer("accounting_start_day").notNull().default(1),
+  accountingPeriodType: text("accounting_period_type", { enum: ["monthly", "quarterly", "annual"] }).notNull().default("monthly"),
+  // Display-only formatting preferences — see src/lib/format/{number,date}.ts. decimalStyle picks
+  // the thousands/decimal separator convention (id = "1.234,56", us = "1,234.56"); decimalPlaces
+  // is how many digits after the separator to show. Independent of currency (lib/currency/format.ts)
+  // since an outlet's number-formatting taste and its transaction currency are different questions.
+  decimalStyle: text("decimal_style", { enum: ["id", "us"] }).notNull().default("id"),
+  decimalPlaces: integer("decimal_places").notNull().default(0),
+  dateFormat: text("date_format", { enum: ["dmy", "mdy", "iso"] }).notNull().default("dmy"),
   ...timestamps,
 });
 

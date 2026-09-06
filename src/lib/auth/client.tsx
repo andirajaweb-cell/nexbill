@@ -19,6 +19,11 @@ export interface AuthUser {
   // display-currency symbol/format everywhere via useCurrency() in lib/currency/client.tsx. Null
   // for outlets that haven't set a country yet (falls back to IDR/Rp).
   outletCountry?: string | null;
+  // Settings > Preferensi > Format Lainnya — see lib/format/client.tsx's useOutletFormat(), which
+  // is the intended way to read these rather than reaching into `user` directly.
+  decimalStyle?: "id" | "us";
+  decimalPlaces?: number;
+  dateFormat?: "dmy" | "mdy" | "iso";
   // Email verification module — see /api/auth/verify-email + EmailVerificationBanner. Defaults
   // to true server-side (schema.ts's own default) whenever it can't be read for some reason, so
   // an undefined/missing value here should never be treated as "unverified" by UI code.

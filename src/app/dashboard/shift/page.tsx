@@ -12,6 +12,7 @@ import { getCashDenominations, denominationLabel } from "@/lib/shift/denominatio
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
+import { useOutletFormat } from "@/lib/format/client";
 import "@/lib/i18n/dict-shift";
 
 /**
@@ -49,6 +50,11 @@ export default function ShiftPage() {
   const { t } = useDashboardLang();
   const { user } = useAuth();
   const { currency, formatMoney: rupiah } = useCurrency();
+  // Outlet's own date-display preference (Settings > Preferensi > Format Lainnya) — applied here
+  // to the timestamps this page already shows (Dibuka/Ditutup) as this feature's first adopter;
+  // most other pages sitewide still use an inline toLocaleString("id-ID") and haven't been
+  // migrated yet (131 call sites across 67 files at last count — a larger follow-up sweep).
+  const { formatDateTime } = useOutletFormat();
   // Which physical notes/coins the cashier counts follows the outlet's own currency (Settings >
   // Business & Tax > Negara) instead of always assuming IDR — see denominations.ts's
   // DENOMINATIONS_BY_CURRENCY doc comment. Server-side validation in lib/shift/shift.ts resolves
@@ -205,10 +211,10 @@ export default function ShiftPage() {
             "shift.confirmDeleteOpenShift",
             'PERHATIAN: shift ini MASIH BERJALAN (dibuka {openedAt}, kasir {staffName}), belum ditutup. Menghapusnya akan langsung menghilangkannya dari sistem — kasir yang memakainya akan diminta buka shift baru, dan transaksi yang sudah tercatat di shift ini kehilangan tautannya. Hanya lakukan ini untuk shift yang memang error/tidak akan pernah ditutup normal. Lanjutkan hapus?'
           )
-            .replace("{openedAt}", new Date(shift.openedAt).toLocaleString("id-ID"))
+            .replace("{openedAt}", formatDateTime(shift.openedAt))
             .replace("{staffName}", shift.staffName ?? "-")
         : t("shift.confirmDeleteShift", "Hapus riwayat shift ini (dibuka {openedAt}, kasir {staffName})? Tidak bisa dibatalkan.")
-            .replace("{openedAt}", new Date(shift.openedAt).toLocaleString("id-ID"))
+            .replace("{openedAt}", formatDateTime(shift.openedAt))
             .replace("{staffName}", shift.staffName ?? "-");
     if (!(await showConfirm(confirmMessage, { tone: "danger" }))) return;
     setDeletingShiftId(shift.id);
@@ -526,8 +532,8 @@ export default function ShiftPage() {
               return (
                 <Fragment key={s.id}>
                 <tr className="border-b border-neutral-900">
-                  <td className="py-2">{new Date(s.openedAt).toLocaleString("id-ID")}</td>
-                  <td>{s.closedAt ? new Date(s.closedAt).toLocaleString("id-ID") : "-"}</td>
+                  <td className="py-2">{formatDateTime(s.openedAt)}</td>
+                  <td>{s.closedAt ? formatDateTime(s.closedAt) : "-"}</td>
                   <td>{s.staffName ?? "-"}</td>
                   <td>{rupiah(s.openingCash)}</td>
                   <td>{s.expectedCash != null ? rupiah(s.expectedCash) : "-"}</td>

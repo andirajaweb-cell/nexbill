@@ -41,6 +41,25 @@ export const COUNTRY_CURRENCY: Record<string, OutletCurrency> = {
 /** IDR — NEXBILL's own base assumption and the fallback for an outlet with no country set yet (the common case for existing outlets predating this setting). */
 export const DEFAULT_CURRENCY: OutletCurrency = COUNTRY_CURRENCY.ID;
 
+/** Flag emoji keyed by the same ISO 3166-1 alpha-2 codes as COUNTRY_CURRENCY/SEA_BANKS — purely decorative (Settings > Preferensi's currency summary), never used for logic. */
+export const COUNTRY_FLAG: Record<string, string> = {
+  ID: "🇮🇩",
+  MY: "🇲🇾",
+  SG: "🇸🇬",
+  TH: "🇹🇭",
+  PH: "🇵🇭",
+  VN: "🇻🇳",
+  BN: "🇧🇳",
+  KH: "🇰🇭",
+  LA: "🇱🇦",
+  MM: "🇲🇲",
+};
+
+export function flagForCountry(countryCode: string | null | undefined): string {
+  if (!countryCode) return COUNTRY_FLAG.ID;
+  return COUNTRY_FLAG[countryCode.toUpperCase()] ?? "🏳️";
+}
+
 export function currencyForCountry(countryCode: string | null | undefined): OutletCurrency {
   if (!countryCode) return DEFAULT_CURRENCY;
   return COUNTRY_CURRENCY[countryCode.toUpperCase()] ?? DEFAULT_CURRENCY;

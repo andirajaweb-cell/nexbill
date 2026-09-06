@@ -22,6 +22,9 @@ const EDITABLE_FIELDS = [
   "hasNpwp", "npwpNumber", "nitku", "taxpayerName", "taxpayerAddress", "businessEntityType", "businessType",
   // Deliberately NOT "preferredLang" anymore — see the doc comment on that column in schema.ts.
   // It's now derived server-side below from outletCountry, not a direct user-editable field.
+  // Preferences tab (Settings > Preferensi) — accounting calendar + display-format preferences.
+  "accountingStartMonth", "accountingStartDay", "accountingPeriodType",
+  "decimalStyle", "decimalPlaces", "dateFormat",
 ] as const;
 
 export async function GET(_req: NextRequest) {

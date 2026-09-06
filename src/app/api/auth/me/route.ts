@@ -38,7 +38,11 @@ export async function GET() {
     // Drives the outlet's display-currency symbol/format everywhere (see lib/currency/format.ts)
     // — read fresh from the DB rather than the JWT since it's editable in Settings > Business &
     // Tax and should reflect the latest value without forcing a re-login.
-    const [outletRow] = await db.select({ outletCountry: outlets.outletCountry }).from(outlets).where(eq(outlets.id, session.outletId)).limit(1);
+    const [outletRow] = await db
+      .select({ outletCountry: outlets.outletCountry, decimalStyle: outlets.decimalStyle, decimalPlaces: outlets.decimalPlaces, dateFormat: outlets.dateFormat })
+      .from(outlets)
+      .where(eq(outlets.id, session.outletId))
+      .limit(1);
     // Same "read fresh from DB, not the JWT" reasoning — emailVerified changes after a link
     // click, which shouldn't require re-login to reflect. Defaults true (see schema.ts) if the
     // row is somehow missing, so this never accidentally holds a stale account hostage.
@@ -51,6 +55,9 @@ export async function GET() {
       role: session.role,
       outletId: session.outletId,
       outletCountry: outletRow?.outletCountry ?? null,
+      decimalStyle: outletRow?.decimalStyle ?? "id",
+      decimalPlaces: outletRow?.decimalPlaces ?? 0,
+      dateFormat: outletRow?.dateFormat ?? "dmy",
       emailVerified: staffRow?.emailVerified ?? true,
       permissions,
       linkedOutlets,

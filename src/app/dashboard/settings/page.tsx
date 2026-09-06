@@ -13,13 +13,17 @@ import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { getDevicePrinterSettings, saveDevicePrinterSettings, clearDevicePrinterSettings, type DevicePrinterSettings } from "@/lib/printer/deviceSettings";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { SEA_BANKS, findSeaBank } from "@/lib/data/sea-banks";
+import { currencyForCountry, flagForCountry } from "@/lib/currency/format";
+import { formatNumber } from "@/lib/format/number";
+import { formatDate } from "@/lib/format/date";
 import "@/lib/i18n/dict-settings";
 
-const TABS = ["Business & Tax", "Cabang", "Satuan", "Kategori Produk", "Banner Iklan", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
+const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Banner Iklan", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Business & Tax": { key: "settings.tab.businessTax", fallback: "Business & Tax" },
+  "Preferensi": { key: "settings.tab.preferences", fallback: "Preferensi" },
   "Cabang": { key: "settings.tab.branch", fallback: "Cabang" },
   "Satuan": { key: "settings.tab.unit", fallback: "Satuan" },
   "Kategori Produk": { key: "settings.tab.productCategory", fallback: "Kategori Produk" },
@@ -75,6 +79,8 @@ export default function SettingsPage() {
 
       {!outletId ? null : tab === "Business & Tax" ? (
         <BusinessTaxTab outletId={outletId} canManage={canManage} />
+      ) : tab === "Preferensi" ? (
+        <PreferencesTab outletId={outletId} canManage={canManage} />
       ) : tab === "Cabang" ? (
         <BranchTab outletId={outletId} canManage={canManage} onSwitched={setOutletId} />
       ) : tab === "Satuan" ? (
@@ -339,6 +345,159 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
       {canManage && <Button onClick={save} disabled={saving}>{saving ? t("settings.common.saving", "Menyimpan...") : t("settings.businessTax.saveButton", "Simpan Pengaturan")}</Button>}
 
       <PrinterCard outletId={outletId} />
+    </div>
+  );
+}
+
+const MONTH_LABEL_KEYS = [
+  { key: "settings.month.jan", fallback: "Januari" }, { key: "settings.month.feb", fallback: "Februari" },
+  { key: "settings.month.mar", fallback: "Maret" }, { key: "settings.month.apr", fallback: "April" },
+  { key: "settings.month.may", fallback: "Mei" }, { key: "settings.month.jun", fallback: "Juni" },
+  { key: "settings.month.jul", fallback: "Juli" }, { key: "settings.month.aug", fallback: "Agustus" },
+  { key: "settings.month.sep", fallback: "September" }, { key: "settings.month.oct", fallback: "Oktober" },
+  { key: "settings.month.nov", fallback: "November" }, { key: "settings.month.dec", fallback: "Desember" },
+];
+
+/**
+ * Preferensi tab — four groups the outlet asked to be able to see/set in one place, none of
+ * which needed brand-new backend plumbing beyond a few outlets columns (see schema.ts):
+ *   1. Mata Uang — read-only summary of what the outlet's own Negara (same field as
+ *      Business & Tax's dropdown, editable from either tab) implies for currency code/symbol/flag.
+ *      There's deliberately no separate "pick your own currency" control — lib/currency/format.ts
+ *      derives currency FROM country everywhere else in the app (POS, Reports, Inventory, Shift),
+ *      so letting someone set a currency independent of country here would silently disagree with
+ *      every other page.
+ *   2. Accounting Period — accountingStartMonth/Day + accountingPeriodType. Purely a labeling/
+ *      grouping preference for financial reports; does NOT lock or restrict any transaction entry.
+ *   3. Format Lainnya — decimalStyle/decimalPlaces/dateFormat (see lib/format/{number,date}.ts +
+ *      lib/format/client.tsx's useOutletFormat()). Live preview so the outlet can see the effect
+ *      before saving, without needing to hunt for a real number/date somewhere else in the app.
+ *   4. Chart of Account — NOT rebuilt here. A full COA editor already exists at
+ *      /dashboard/accounting (tab "Chart of Accounts"); duplicating that CRUD inside Settings
+ *      would just create two places that can drift out of sync. This is a shortcut card only.
+ */
+function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: boolean }) {
+  const [form, setForm] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [accountCount, setAccountCount] = useState<number | null>(null);
+  const { t } = useDashboardLang();
+
+  const load = () => fetchJsonObject(`/api/settings/outlet?outletId=${outletId}`).then(setForm);
+  useEffect(() => { load(); }, [outletId]);
+  useEffect(() => { fetchJsonArray("/api/accounting/coa").then((rows) => setAccountCount(rows.length)); }, [outletId]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/outlet", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId }) });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setForm(data);
+      showAlert(t("settings.preferences.savedAlert", "Preferensi disimpan."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!form) return <div className="text-sm text-neutral-500">{t("settings.common.loading", "Memuat...")}</div>;
+
+  const currency = currencyForCountry(form.outletCountry);
+  const flag = flagForCountry(form.outletCountry);
+  const countryLabel = SEA_BANKS.find((c) => c.code === form.outletCountry)?.label ?? t("settings.preferences.currencyNoCountry", "Belum dipilih");
+
+  const previewNumber = formatNumber(1234567.5, { decimalStyle: (form.decimalStyle ?? "id") as "id" | "us", decimalPlaces: form.decimalPlaces ?? 0 });
+  const previewDate = formatDate(new Date(), (form.dateFormat ?? "dmy") as "dmy" | "mdy" | "iso");
+
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-3">
+        <h2 className="font-medium">{t("settings.preferences.currencyHeading", "Mata Uang")}</h2>
+        <p className="text-xs text-neutral-500">{t("settings.preferences.currencyDesc", "Mata uang mengikuti Negara outlet — ubah di sini atau di tab Business & Tax, keduanya field yang sama.")}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
+          <Field label={t("settings.field.outletCountry", "Negara")}>
+            <select className={inputCls} disabled={!canManage} value={form.outletCountry ?? ""} onChange={(e) => setForm({ ...form, outletCountry: e.target.value || null })}>
+              <option value="">{t("settings.field.outletCountryPlaceholder", "Pilih negara")}</option>
+              {SEA_BANKS.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+            </select>
+          </Field>
+          <div>
+            <div className="text-xs text-neutral-500 mb-1">{t("settings.preferences.currencyFlagLabel", "Bendera")}</div>
+            <div className="text-2xl">{flag}</div>
+          </div>
+          <div>
+            <div className="text-xs text-neutral-500 mb-1">{t("settings.preferences.currencyCodeLabel", "Kode Mata Uang")}</div>
+            <div className="text-sm font-mono">{currency.code}</div>
+          </div>
+          <div>
+            <div className="text-xs text-neutral-500 mb-1">{t("settings.preferences.currencySymbolLabel", "Simbol")}</div>
+            <div className="text-sm font-mono">{currency.symbol}</div>
+          </div>
+        </div>
+        <p className="text-xs text-neutral-600">{t("settings.preferences.currencyCountryPrefix", "Negara saat ini: ")}{countryLabel}</p>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">{t("settings.preferences.accountingPeriodHeading", "Periode Akuntansi")}</h2>
+        <p className="text-xs text-neutral-500">{t("settings.preferences.accountingPeriodDesc", "Tanggal mulai tahun buku dan panjang periode pelaporan — dipakai laporan keuangan untuk mengelompokkan/melabeli periode. Ini TIDAK mengunci input transaksi/jurnal di tanggal manapun.")}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Field label={t("settings.preferences.accountingStartDayLabel", "Tanggal Mulai")}>
+            <input type="number" min={1} max={31} className={inputCls} disabled={!canManage} value={form.accountingStartDay ?? 1} onChange={(e) => setForm({ ...form, accountingStartDay: Math.max(1, Math.min(31, Number(e.target.value) || 1)) })} />
+          </Field>
+          <Field label={t("settings.preferences.accountingStartMonthLabel", "Bulan Mulai")}>
+            <select className={inputCls} disabled={!canManage} value={form.accountingStartMonth ?? 1} onChange={(e) => setForm({ ...form, accountingStartMonth: Number(e.target.value) })}>
+              {MONTH_LABEL_KEYS.map((m, i) => <option key={i} value={i + 1}>{t(m.key, m.fallback)}</option>)}
+            </select>
+          </Field>
+          <Field label={t("settings.preferences.accountingPeriodTypeLabel", "Panjang Periode")}>
+            <select className={inputCls} disabled={!canManage} value={form.accountingPeriodType ?? "monthly"} onChange={(e) => setForm({ ...form, accountingPeriodType: e.target.value })}>
+              <option value="monthly">{t("settings.preferences.periodMonthly", "Bulanan")}</option>
+              <option value="quarterly">{t("settings.preferences.periodQuarterly", "Kuartalan")}</option>
+              <option value="annual">{t("settings.preferences.periodAnnual", "Tahunan")}</option>
+            </select>
+          </Field>
+        </div>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">{t("settings.preferences.formatHeading", "Format Lainnya")}</h2>
+        <p className="text-xs text-neutral-500">{t("settings.preferences.formatDesc", "Format angka dan tanggal untuk tampilan di layar/laporan. Berlaku bertahap — halaman yang sudah memakai format ini akan langsung ikut, halaman lain menyusul.")}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Field label={t("settings.preferences.decimalStyleLabel", "Gaya Angka")}>
+            <select className={inputCls} disabled={!canManage} value={form.decimalStyle ?? "id"} onChange={(e) => setForm({ ...form, decimalStyle: e.target.value })}>
+              <option value="id">{t("settings.preferences.decimalStyleId", "Indonesia/EU (1.234,56)")}</option>
+              <option value="us">{t("settings.preferences.decimalStyleUs", "US/UK (1,234.56)")}</option>
+            </select>
+          </Field>
+          <Field label={t("settings.preferences.decimalPlacesLabel", "Angka di Belakang Koma")}>
+            <input type="number" min={0} max={4} className={inputCls} disabled={!canManage} value={form.decimalPlaces ?? 0} onChange={(e) => setForm({ ...form, decimalPlaces: Math.max(0, Math.min(4, Number(e.target.value) || 0)) })} />
+          </Field>
+          <Field label={t("settings.preferences.dateFormatLabel", "Format Tanggal")}>
+            <select className={inputCls} disabled={!canManage} value={form.dateFormat ?? "dmy"} onChange={(e) => setForm({ ...form, dateFormat: e.target.value })}>
+              <option value="dmy">{t("settings.preferences.dateFormatDmy", "DD/MM/YYYY")}</option>
+              <option value="mdy">{t("settings.preferences.dateFormatMdy", "MM/DD/YYYY")}</option>
+              <option value="iso">{t("settings.preferences.dateFormatIso", "YYYY-MM-DD")}</option>
+            </select>
+          </Field>
+          <div>
+            <div className="text-xs text-neutral-500 mb-1">{t("settings.preferences.previewLabel", "Contoh Tampilan")}</div>
+            <div className="text-sm font-mono">{previewNumber}</div>
+            <div className="text-sm font-mono">{previewDate}</div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">{t("settings.preferences.coaHeading", "Chart of Account")}</h2>
+        <p className="text-xs text-neutral-500">{t("settings.preferences.coaDesc", "Kelola daftar akun (COA) lengkap — tambah, edit, arsip akun, dan pemetaan akun default per modul — di halaman Accounting.")}</p>
+        <div className="flex items-center justify-between rounded-lg border border-neutral-800 px-3 py-2">
+          <span className="text-sm text-neutral-300">
+            {accountCount == null ? t("settings.common.loading", "Memuat...") : t("settings.preferences.coaCount", "{count} akun terdaftar").replace("{count}", String(accountCount))}
+          </span>
+          <Link href="/dashboard/accounting"><Button variant="secondary" className="text-xs">{t("settings.preferences.coaButton", "Kelola Chart of Account")}</Button></Link>
+        </div>
+      </Card>
+
+      {canManage && <Button onClick={save} disabled={saving}>{saving ? t("settings.common.saving", "Menyimpan...") : t("settings.preferences.saveButton", "Simpan Preferensi")}</Button>}
     </div>
   );
 }
