@@ -89,7 +89,7 @@ function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (
  * fabricate after the fact than a number in a database alone.
  */
 export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnType<typeof getShiftDetail>>>, lang: LangCode = "id"): Promise<Buffer> {
-  const { shift, cashCounts, balanceChecks, incomeByMethod } = detail;
+  const { shift, cashCounts, balanceChecks, incomeByMethod, ppobCashIn, ppobCashOut } = detail;
   const t = (key: string, fallback: string) => translate(lang, key, fallback);
   const [staff] = await db.select().from(staffUsers).where(eq(staffUsers.id, shift.staffUserId)).limit(1);
   const [outlet] = await db.select({ outletCountry: outlets.outletCountry, dateFormat: outlets.dateFormat }).from(outlets).where(eq(outlets.id, shift.outletId)).limit(1);
@@ -175,6 +175,17 @@ export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnTyp
     doc.text(`${label}: ${value != null ? rupiah(value) : "-"}`, PAGE_MARGIN, y);
     doc.fillColor("#000");
     y = doc.y + 2;
+  }
+
+  if ((ppobCashIn ?? 0) > 0 || (ppobCashOut ?? 0) > 0) {
+    doc.font("Helvetica").fontSize(8).fillColor("#555").text(
+      `${t("shift.pdf.ppobCashNote", "Termasuk dari transaksi PPOB (tarik tunai/top up/bayar tagihan dll):")} ${t("shift.ppobCashInShort", "masuk")} ${rupiah(ppobCashIn ?? 0)}, ${t("shift.ppobCashOutShort", "keluar")} ${rupiah(ppobCashOut ?? 0)}`,
+      PAGE_MARGIN,
+      y,
+      { width: CONTENT_WIDTH }
+    );
+    doc.fillColor("#000");
+    y = doc.y + 4;
   }
 
   if (incomeByMethod.length) {

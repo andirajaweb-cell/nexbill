@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests } from "@/db/schema";
+import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { logAudit } from "@/lib/audit/log";
 import { computeTrialBalance } from "@/lib/accounting/reports";
@@ -86,6 +86,37 @@ export async function getRequiredBalanceChannels(shiftId: string): Promise<{ cha
     channels.push({ channelKey: dc.channelKey, label: dc.label });
   }
   return channels;
+}
+
+/**
+ * PPOB transactions (pulsa/token listrik/bayar tagihan/top up/tarik tunai — see
+ * lib/ppob/engine.ts) move physical cash too, in either direction, and were never factored into
+ * closeShift()'s cashIn/cashOut/expectedCash before this: a normal PPOB purchase pays for itself
+ * out of the outlet's Fastpay saldo while the customer's cash payment (uangMasuk) lands IN the
+ * drawer; "tarik tunai" (cash withdrawal) does the reverse — cash goes OUT to the customer
+ * (modal+providerFee, matching the journal in buildPpobJournalLines) while the Fastpay saldo is
+ * credited back. Funding/receiving accounts are freely chosen per-transaction (not fixed by
+ * category), so this checks each transaction's actual accounts rather than assuming "tarik
+ * tunai" always means cash-out. When funding and receiving are the SAME account, no cash
+ * physically moves (see engine.ts's collapsed-journal comment), so that case contributes to
+ * neither side. Shared by closeShift (live) and getShiftDetail (history/PDF, recomputed on read).
+ */
+async function computePpobCashEffect(shiftId: string): Promise<{ ppobCashIn: number; ppobCashOut: number }> {
+  const shiftPpobTransactions = await db
+    .select()
+    .from(ppobTransactions)
+    .where(and(eq(ppobTransactions.shiftId, shiftId), eq(ppobTransactions.status, "success")));
+  const ppobAccountIds = Array.from(new Set(shiftPpobTransactions.flatMap((p) => [p.fundingCashBankAccountId, p.receivingCashBankAccountId])));
+  const ppobAccounts = ppobAccountIds.length ? await db.select().from(cashBankAccounts).where(inArray(cashBankAccounts.id, ppobAccountIds)) : [];
+  const ppobAccountTypeById = new Map(ppobAccounts.map((a) => [a.id, a.type]));
+  let ppobCashIn = 0;
+  let ppobCashOut = 0;
+  for (const p of shiftPpobTransactions) {
+    if (p.fundingCashBankAccountId === p.receivingCashBankAccountId) continue;
+    if (ppobAccountTypeById.get(p.receivingCashBankAccountId) === "cash") ppobCashIn += p.uangMasuk;
+    if (ppobAccountTypeById.get(p.fundingCashBankAccountId) === "cash") ppobCashOut += p.modal + p.providerFee;
+  }
+  return { ppobCashIn, ppobCashOut };
 }
 
 export interface IncomeByMethodRow {
@@ -221,6 +252,8 @@ export async function closeShift(
     0
   );
 
+  const { ppobCashIn, ppobCashOut } = await computePpobCashEffect(shiftId);
+
   const cashIn =
     cashPayments.reduce((s, p) => s + p.amount, 0) +
     // Physical cash in the drawer is the NET amount (after any configured fee) — amount is the
@@ -230,7 +263,8 @@ export async function closeShift(
     shiftCashOtherIncomes.reduce((s, o) => s + (o.amount - (o.feeAmount ?? 0)), 0) +
     shiftCashMembershipPayments.reduce((s, m) => s + (m.amount - (m.feeAmount ?? 0)), 0) +
     homeRentalCashIn +
-    homeRentalLateFeeCashIn;
+    homeRentalLateFeeCashIn +
+    ppobCashIn;
 
   // Only status="paid" actually moved cash out of the drawer — draft/pending/rejected/cancelled
   // (including voided-back-to-cancelled) expenses never posted a journal against this till.
@@ -239,7 +273,8 @@ export async function closeShift(
   const cashAccountIds = new Set(cashExpenseAccounts.map((a) => a.id));
   const cashOut =
     shiftExpenses.filter((e) => e.cashBankAccountId && cashAccountIds.has(e.cashBankAccountId)).reduce((s, e) => s + e.amount + (e.taxAmount ?? 0), 0) +
-    homeRentalDepositCashOut;
+    homeRentalDepositCashOut +
+    ppobCashOut;
 
   const expectedCash = shift.openingCash + cashIn - cashOut;
   const variance = actualCash - expectedCash;
@@ -338,7 +373,7 @@ export async function closeShift(
 
   const incomeByMethod = await computeIncomeByMethod(shiftId);
 
-  return { shift: updated, cashIn, cashOut, ordersCount: shiftOrders.length, cashRows, balanceCheckRows, riskFlags: risk.flags, incomeByMethod };
+  return { shift: updated, cashIn, cashOut, ppobCashIn, ppobCashOut, ordersCount: shiftOrders.length, cashRows, balanceCheckRows, riskFlags: risk.flags, incomeByMethod };
 }
 
 export async function getCurrentShift(outletId: string, staffUserId: string) {
@@ -355,7 +390,8 @@ export async function getShiftDetail(shiftId: string) {
   const cashCounts = await db.select().from(shiftCashCounts).where(eq(shiftCashCounts.shiftId, shiftId));
   const balanceChecks = await db.select().from(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));
   const incomeByMethod = await computeIncomeByMethod(shiftId);
-  return { shift, cashCounts, balanceChecks, incomeByMethod };
+  const { ppobCashIn, ppobCashOut } = await computePpobCashEffect(shiftId);
+  return { shift, cashCounts, balanceChecks, incomeByMethod, ppobCashIn, ppobCashOut };
 }
 
 /**

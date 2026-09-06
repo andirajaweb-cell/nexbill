@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { postPpobTransaction } from "@/lib/ppob/engine";
 import { computePpobList } from "@/lib/ppob/reports";
+import { getCurrentShift } from "@/lib/shift/shift";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
@@ -47,6 +48,11 @@ export async function POST(req: NextRequest) {
 
     // Always the caller's own outlet — never trust a client-supplied outletId here, this posts
     // a real PPOB transaction that moves money.
+    // shiftId is resolved server-side from the cashier's own open shift (same pattern as
+    // /api/other-income and /api/membership-payments) rather than trusted from the client — the
+    // page never actually sent one, which meant every PPOB transaction's shiftId silently stayed
+    // null and shift close could never account for the cash tarik-tunai/top-up moved through it.
+    const currentShift = await getCurrentShift(session.outletId, session.sub);
     const result = await postPpobTransaction({
       outletId: session.outletId,
       category: body.category,
@@ -61,7 +67,7 @@ export async function POST(req: NextRequest) {
       fundingCashBankAccountId: body.fundingCashBankAccountId,
       receivingCashBankAccountId: body.receivingCashBankAccountId,
       staffUserId: session.sub,
-      shiftId: body.shiftId ?? null,
+      shiftId: currentShift?.id ?? null,
       notes: body.notes ?? null,
     });
     return NextResponse.json(result);
