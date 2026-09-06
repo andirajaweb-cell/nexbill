@@ -6,14 +6,16 @@ import { buildTrialBalanceXlsx, buildProfitLossXlsx, buildBalanceSheetXlsx, buil
 import { buildTrialBalancePdf, buildProfitLossPdf, buildBalanceSheetPdf, buildCashFlowPdf } from "@/lib/reports/pdf-export";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { LANG_OPTIONS, translate, type LangCode } from "@/lib/i18n/registry";
+import "@/lib/i18n/dict-report-export";
 
 type ReportType = "trial-balance" | "profit-loss" | "balance-sheet" | "cash-flow";
 
-const REPORT_TITLE: Record<ReportType, string> = {
-  "trial-balance": "Neraca Saldo",
-  "profit-loss": "Laporan Laba Rugi",
-  "balance-sheet": "Neraca (Balance Sheet)",
-  "cash-flow": "Laporan Arus Kas",
+const REPORT_TITLE_KEY: Record<ReportType, { key: string; fallback: string }> = {
+  "trial-balance": { key: "report.export.header.trialBalance", fallback: "Neraca Saldo" },
+  "profit-loss": { key: "report.export.header.profitLoss", fallback: "Laporan Laba Rugi" },
+  "balance-sheet": { key: "report.export.header.balanceSheet", fallback: "Neraca (Balance Sheet)" },
+  "cash-flow": { key: "report.export.header.cashFlow", fallback: "Laporan Arus Kas" },
 };
 
 const FILE_PREFIX: Record<ReportType, string> = {
@@ -41,12 +43,17 @@ export async function GET(req: NextRequest) {
     const from = req.nextUrl.searchParams.get("from") ?? undefined;
     const to = req.nextUrl.searchParams.get("to") ?? undefined;
     const showZero = req.nextUrl.searchParams.get("showZero") === "1";
+    // Report language — passed by the client from its own active dashboard language (see the PDF
+    // download links in the Accounting page), same pattern as /api/shifts/[id]/export.
+    const langParam = req.nextUrl.searchParams.get("lang");
+    const lang: LangCode = LANG_OPTIONS.some((o) => o.code === langParam) ? (langParam as LangCode) : "id";
 
-    if (!type || !REPORT_TITLE[type]) return NextResponse.json({ error: "type tidak valid." }, { status: 400 });
+    if (!type || !REPORT_TITLE_KEY[type]) return NextResponse.json({ error: "type tidak valid." }, { status: 400 });
     if (format !== "xlsx" && format !== "pdf") return NextResponse.json({ error: "format harus xlsx atau pdf." }, { status: 400 });
 
     const periodFrom = type === "balance-sheet" ? undefined : from;
-    const meta = await buildReportMeta(outletId, REPORT_TITLE[type], periodFrom, to);
+    const titleMeta = REPORT_TITLE_KEY[type];
+    const meta = await buildReportMeta(outletId, translate(lang, titleMeta.key, titleMeta.fallback), periodFrom, to, lang);
 
     let buffer: Buffer;
     if (type === "trial-balance") {

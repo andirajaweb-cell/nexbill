@@ -80,6 +80,8 @@ registerDict({
   "accounting.coa.placeholderCostCenter": { id: "Cost Center", en: "Cost Center", ms: "Pusat Kos", th: "ศูนย์ต้นทุน", fil: "Cost Center", vi: "Trung tâm chi phí" },
   "accounting.coa.headerBadge": { id: "Header", en: "Header", ms: "Header", th: "หัวข้อกลุ่ม", fil: "Header", vi: "Tiêu đề nhóm" },
   "accounting.coa.inactiveBadge": { id: "Nonaktif", en: "Inactive", ms: "Tidak Aktif", th: "ปิดใช้งาน", fil: "Hindi Aktibo", vi: "Ngừng hoạt động" },
+  "accounting.coa.ancestorBadge": { id: "induk", en: "parent", ms: "induk", th: "บัญชีแม่", fil: "magulang", vi: "tài khoản cha" },
+  "accounting.coa.noMatch": { id: "Tidak ada akun yang cocok.", en: "No matching accounts.", ms: "Tiada akaun yang sepadan.", th: "ไม่พบบัญชีที่ตรงกัน", fil: "Walang tugmang account.", vi: "Không có tài khoản phù hợp." },
   "accounting.coa.archiveButton": { id: "Arsipkan", en: "Archive", ms: "Arkibkan", th: "เก็บเข้าคลัง", fil: "I-archive", vi: "Lưu trữ" },
   "accounting.coa.activateButton": { id: "Aktifkan", en: "Activate", ms: "Aktifkan", th: "เปิดใช้งาน", fil: "I-activate", vi: "Kích hoạt" },
   "accounting.coa.searchPlaceholder": { id: "Cari kode/nama akun...", en: "Search account code/name...", ms: "Cari kod/nama akaun...", th: "ค้นหารหัส/ชื่อบัญชี...", fil: "Maghanap ng code/pangalan ng account...", vi: "Tìm mã/tên tài khoản..." },

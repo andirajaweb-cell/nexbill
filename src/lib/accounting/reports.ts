@@ -128,8 +128,19 @@ export function flattenTrialBalanceTree(rows: TrialBalanceRow[], showZero: boole
 export async function computeProfitLoss(outletId: string, from?: string, to?: string) {
   const trialBalance = await computeTrialBalance(outletId, from, to);
 
-  const revenue = trialBalance.filter((r) => r.type === "revenue");
-  const expense = trialBalance.filter((r) => r.type === "expense");
+  // Sorted by code (not raw DB/select order) so the line-item order always matches the Chart of
+  // Accounts' own numbering — previously this came back in whatever order the accounts table
+  // query happened to return, so e.g. "4170 Other Rental" could print before "4210 Food Sales"
+  // in one outlet and after in another, looking inconsistent with the COA tree.
+  const revenue = trialBalance.filter((r) => r.type === "revenue").sort((a, b) => a.code.localeCompare(b.code));
+  const expense = trialBalance.filter((r) => r.type === "expense").sort((a, b) => a.code.localeCompare(b.code));
+
+  // Hierarchical view mirroring the exact same Header→child grouping the Chart of Accounts tree
+  // and Trial Balance already use (flattenTrialBalanceTree), so the P&L visually groups accounts
+  // under their real COA parent categories (e.g. "RENTAL REVENUE" > "PS4 Rental") instead of a
+  // flat, ungrouped list that looks disconnected from the Chart of Accounts.
+  const revenueTree = flattenTrialBalanceTree(revenue, false);
+  const expenseTree = flattenTrialBalanceTree(expense, false);
 
   const totalRevenue = revenue.reduce((s, r) => s + r.balance, 0);
   const totalExpense = expense.reduce((s, r) => s + r.balance, 0);
@@ -155,6 +166,8 @@ export async function computeProfitLoss(outletId: string, from?: string, to?: st
     to,
     revenue,
     expense,
+    revenueTree,
+    expenseTree,
     totalRevenue,
     totalExpense,
     grossRevenue,
@@ -169,9 +182,15 @@ export async function computeProfitLoss(outletId: string, from?: string, to?: st
 export async function computeBalanceSheet(outletId: string, asOf?: string) {
   const trialBalance = await computeTrialBalance(outletId, undefined, asOf);
 
-  const assets = trialBalance.filter((r) => r.type === "asset");
-  const liabilities = trialBalance.filter((r) => r.type === "liability");
-  const equity = trialBalance.filter((r) => r.type === "equity");
+  // Sorted by code (see the same note in computeProfitLoss) so line order always matches the COA.
+  const assets = trialBalance.filter((r) => r.type === "asset").sort((a, b) => a.code.localeCompare(b.code));
+  const liabilities = trialBalance.filter((r) => r.type === "liability").sort((a, b) => a.code.localeCompare(b.code));
+  const equity = trialBalance.filter((r) => r.type === "equity").sort((a, b) => a.code.localeCompare(b.code));
+
+  // Same Header→child grouping as the COA tree / Trial Balance / P&L (see computeProfitLoss).
+  const assetsTree = flattenTrialBalanceTree(assets, false);
+  const liabilitiesTree = flattenTrialBalanceTree(liabilities, false);
+  const equityTree = flattenTrialBalanceTree(equity, false);
 
   // Retained earnings = cumulative net profit not yet closed to equity (computed live, not requiring period-close).
   const pl = await computeProfitLoss(outletId, undefined, asOf);
@@ -186,6 +205,9 @@ export async function computeBalanceSheet(outletId: string, asOf?: string) {
     assets,
     liabilities,
     equity,
+    assetsTree,
+    liabilitiesTree,
+    equityTree,
     totalAssets,
     totalLiabilities,
     totalEquityBooked,

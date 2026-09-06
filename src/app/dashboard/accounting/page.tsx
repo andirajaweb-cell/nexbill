@@ -10,10 +10,16 @@ import { PeriodBar, PeriodPreset, resolvePeriodPreset, describePeriod } from "@/
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
+import { useCurrency } from "@/lib/currency/client";
 import "@/lib/i18n/dict-accounting";
 import "@/lib/i18n/dict-coa";
 
-const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
+// Formerly a hardcoded `const rupiah = (n) => \`Rp${...toLocaleString("id-ID")}\`` — every account
+// balance on this page (Trial Balance, P&L, Neraca, Arus Kas, Piutang/Hutang, Jurnal, Saldo Awal)
+// was always shown in Rupiah/id-ID formatting regardless of the outlet's own country/currency
+// setting (see lib/currency/format.ts), unlike the Shift page which already reads it via
+// useCurrency(). Each tab component below now calls `const { formatMoney: rupiah } = useCurrency()`
+// so the same call sites automatically follow the outlet's configured currency.
 const inputClsSm = "w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs";
 function Field({ label, children }: { label: string; children: any }) {
   return <label className="space-y-1 block"><div className="text-xs text-neutral-500">{label}</div>{children}</label>;
@@ -192,6 +198,39 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
   }
   for (const list of byParent.values()) list.sort((x, y) => x.code.localeCompare(y.code));
 
+  // Tree mode used to ignore `search`/`typeFilter` entirely (only List mode applied them via
+  // `matchesFilter`), so typing e.g. "wallet" left every unrelated Liabilitas row visible in the
+  // tree. Fix: when a search term or type filter is active, only show accounts that themselves
+  // match, plus their ancestor chain (so the tree stays navigable instead of orphaning matches).
+  const searchActive = Boolean(search) || typeFilter !== "all";
+  const matchesSearchType = (a: AccountRow) => {
+    if (typeFilter !== "all" && a.type !== typeFilter) return false;
+    if (search && !`${a.code} ${a.name} ${coaAccountName(t, a)}`.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  };
+  const accountById = new Map(rows.map((a) => [a.id, a]));
+  let treeVisibleIds: Set<string> | null = null;
+  let treeMatchIds: Set<string> | null = null;
+  if (searchActive) {
+    treeVisibleIds = new Set<string>();
+    treeMatchIds = new Set<string>();
+    for (const a of rows) {
+      if (!showInactive && !a.isActive) continue;
+      if (!matchesSearchType(a)) continue;
+      treeMatchIds.add(a.id);
+      let cur: AccountRow | undefined = a;
+      while (cur) {
+        treeVisibleIds.add(cur.id);
+        cur = cur.parentId ? accountById.get(cur.parentId) : undefined;
+      }
+    }
+  }
+  const childrenFor = (id: string) => {
+    const list = byParent.get(id) ?? [];
+    return treeVisibleIds ? list.filter((c) => treeVisibleIds!.has(c.id)) : list;
+  };
+  const treeRootList = treeVisibleIds ? (byParent.get("__root__") ?? []).filter((a) => treeVisibleIds!.has(a.id)) : (byParent.get("__root__") ?? []);
+
   const potentialParents = rows.filter((a) => a.isActive).sort((x, y) => x.code.localeCompare(y.code));
 
   const renderRow = (a: AccountRow, depth: number, recurse: boolean): any => (
@@ -219,12 +258,13 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
           </div>
         </div>
       ) : (
-        <div className={`flex items-center justify-between py-1.5 border-b border-neutral-900 text-sm gap-2 ${!a.isActive ? "opacity-40" : ""}`} style={{ paddingLeft: depth * 16 }}>
+        <div className={`flex items-center justify-between py-1.5 border-b border-neutral-900 text-sm gap-2 ${!a.isActive ? "opacity-40" : ""} ${treeMatchIds && recurse && !treeMatchIds.has(a.id) ? "opacity-50" : ""}`} style={{ paddingLeft: depth * 16 }}>
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-mono text-xs text-neutral-500 w-14 shrink-0">{a.code}</span>
             <span className={`truncate ${!a.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}>{coaAccountName(t, a)}</span>
             {!a.isPostingAllowed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 shrink-0">{t("accounting.coa.headerBadge", "Header")}</span>}
             {!a.isActive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-900/40 text-red-400 shrink-0">{t("accounting.coa.inactiveBadge", "Nonaktif")}</span>}
+            {treeMatchIds && recurse && !treeMatchIds.has(a.id) && <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500 shrink-0">{t("accounting.coa.ancestorBadge", "induk")}</span>}
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <span className="text-xs text-neutral-500 mr-2 hidden sm:inline">{TYPE_LABEL_KEYS[a.type] ? t(TYPE_LABEL_KEYS[a.type].key, TYPE_LABEL_KEYS[a.type].fallback) : a.type}</span>
@@ -234,7 +274,7 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
           </div>
         </div>
       )}
-      {recurse && (byParent.get(a.id) ?? []).map((child) => renderRow(child, depth + 1, true))}
+      {recurse && childrenFor(a.id).map((child) => renderRow(child, depth + 1, true))}
     </div>
   );
 
@@ -283,9 +323,12 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
       <Card className="!p-0 overflow-hidden">
         <div className="max-h-[65vh] overflow-y-auto px-3">
           {view === "tree"
-            ? (byParent.get("__root__") ?? []).map((a) => renderRow(a, 0, true))
+            ? treeRootList.map((a) => renderRow(a, 0, true))
             : flatFiltered.map((a) => renderRow(a, 0, false))}
           {rows.length === 0 && <p className="text-sm text-neutral-500 py-6 text-center">{t("accounting.common.loading", "Memuat...")}</p>}
+          {rows.length > 0 && searchActive && treeRootList.length === 0 && view === "tree" && (
+            <p className="text-sm text-neutral-500 py-6 text-center">{t("accounting.coa.noMatch", "Tidak ada akun yang cocok.")}</p>
+          )}
         </div>
       </Card>
     </div>
@@ -460,6 +503,7 @@ const emptyJournalLine = () => ({ accountId: "", debit: "", credit: "", descript
 
 function JournalTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [entries, setEntries] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -586,7 +630,7 @@ function JournalTab({ outletId }: { outletId: string }) {
               {e.lines.map((l: any) => (
                 <tr key={l.id} className="border-t border-neutral-900">
                   <td className="py-1 font-mono">{l.accountCode}</td>
-                  <td>{l.accountName}</td>
+                  <td>{l.accountCode ? coaAccountName(t, { code: l.accountCode, name: l.accountName }) : l.accountName}</td>
                   <td className="text-right">{l.debit > 0 ? rupiah(l.debit) : ""}</td>
                   <td className="text-right">{l.credit > 0 ? rupiah(l.credit) : ""}</td>
                 </tr>
@@ -600,8 +644,8 @@ function JournalTab({ outletId }: { outletId: string }) {
 }
 
 function DownloadButtons({ outletId, reportType, from, to, showZero }: { outletId: string; reportType: string; from?: string; to?: string; showZero?: boolean }) {
-  const { t } = useDashboardLang();
-  const qs = new URLSearchParams({ outletId, type: reportType, ...(from ? { from } : {}), ...(to ? { to } : {}), ...(showZero ? { showZero: "1" } : {}) });
+  const { t, lang } = useDashboardLang();
+  const qs = new URLSearchParams({ outletId, type: reportType, lang, ...(from ? { from } : {}), ...(to ? { to } : {}), ...(showZero ? { showZero: "1" } : {}) });
   return (
     <div className="flex gap-2">
       <a href={`/api/accounting/reports/export?${qs}&format=xlsx`} target="_blank" rel="noreferrer">
@@ -624,6 +668,7 @@ function usePeriodState(defaultPreset: PeriodPreset = "this_month") {
 
 function TrialBalanceTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [rows, setRows] = useState<any[]>([]);
   const [showZero, setShowZero] = useState(false);
   const period = usePeriodState("this_month");
@@ -724,6 +769,7 @@ const AGING_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
 
 function AgingCards({ buckets }: { buckets: Record<string, number> }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {Object.entries(AGING_LABEL_KEYS).map(([key, meta]) => (
@@ -738,6 +784,7 @@ function AgingCards({ buckets }: { buckets: Record<string, number> }) {
 
 function ReceivablesTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [collectFor, setCollectFor] = useState<{ id: string; orderId: string | null; outstanding: number; method: string; amount: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -843,6 +890,7 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
 
 function PayablesTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [cashBankAccounts, setCashBankAccounts] = useState<any[]>([]);
   const [payFor, setPayFor] = useState<{ type: string; id: string; outstanding: number; method: string; amount: number; cashBankAccountId: string } | null>(null);
@@ -954,6 +1002,7 @@ const newPeriodEntry = () => ({ preset: "this_month" as PeriodPreset, customFrom
 
 function ProfitLossTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [pl, setPl] = useState<any>(null);
   const period = usePeriodState("this_month");
   const [compareMode, setCompareMode] = useState(false);
@@ -1073,12 +1122,18 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
             )}
 
             <h2 className="font-medium mb-2 text-sm text-neutral-400">{t("accounting.type.revenue", "Pendapatan")}</h2>
-            {pl.revenue.filter((r: any) => r.balance !== 0).map((r: any) => (
-              <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
+            {(pl.revenueTree ?? pl.revenue.filter((r: any) => r.balance !== 0)).map((r: any) => (
+              <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+                <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
+                <span>{rupiah(r.balance)}</span>
+              </div>
             ))}
             <h2 className="font-medium mb-2 mt-4 text-sm text-neutral-400">{t("accounting.type.expense", "Beban")}</h2>
-            {pl.expense.filter((r: any) => r.balance !== 0).map((r: any) => (
-              <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
+            {(pl.expenseTree ?? pl.expense.filter((r: any) => r.balance !== 0)).map((r: any) => (
+              <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+                <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
+                <span>{rupiah(r.balance)}</span>
+              </div>
             ))}
           </Card>
         </div>
@@ -1089,6 +1144,7 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
 
 function BalanceSheetTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [bs, setBs] = useState<any>(null);
   const [asOf, setAsOf] = useState("");
   useEffect(() => {
@@ -1106,18 +1162,27 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card>
         <h2 className="font-medium mb-2">{t("accounting.bs.assetsHeading", "Aset")}</h2>
-        {bs.assets.filter((r: any) => r.balance !== 0).map((r: any) => (
-          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
+        {(bs.assetsTree ?? bs.assets.filter((r: any) => r.balance !== 0)).map((r: any) => (
+          <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+            <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
+            <span>{rupiah(r.balance)}</span>
+          </div>
         ))}
         <div className="flex justify-between text-sm py-2 border-t border-neutral-800 font-semibold mt-2"><span>{t("accounting.bs.totalAssets", "Total Aset")}</span><span>{rupiah(bs.totalAssets)}</span></div>
       </Card>
       <Card>
         <h2 className="font-medium mb-2">{t("accounting.bs.liabilitiesEquityHeading", "Liabilitas & Ekuitas")}</h2>
-        {bs.liabilities.filter((r: any) => r.balance !== 0).map((r: any) => (
-          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
+        {(bs.liabilitiesTree ?? bs.liabilities.filter((r: any) => r.balance !== 0)).map((r: any) => (
+          <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+            <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
+            <span>{rupiah(r.balance)}</span>
+          </div>
         ))}
-        {bs.equity.filter((r: any) => r.balance !== 0).map((r: any) => (
-          <div key={r.accountId} className="flex justify-between text-sm py-1"><span>{coaAccountName(t, r)}</span><span>{rupiah(r.balance)}</span></div>
+        {(bs.equityTree ?? bs.equity.filter((r: any) => r.balance !== 0)).map((r: any) => (
+          <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+            <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
+            <span>{rupiah(r.balance)}</span>
+          </div>
         ))}
         <div className="flex justify-between text-sm py-1"><span>{t("accounting.bs.currentPeriodProfit", "Laba Berjalan (belum ditutup)")}</span><span>{rupiah(bs.currentPeriodNetProfit)}</span></div>
         <div className="flex justify-between text-sm py-2 border-t border-neutral-800 font-semibold mt-2">
@@ -1133,6 +1198,7 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
 
 function CashFlowTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [cf, setCf] = useState<any>(null);
   const period = usePeriodState("this_month");
 
@@ -1246,6 +1312,7 @@ function DataMigrationTab({ outletId }: { outletId: string }) {
 
 function OpeningBalanceCard({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [existing, setExisting] = useState<any>(null);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [cutoverDate, setCutoverDate] = useState(new Date().toISOString().slice(0, 10));

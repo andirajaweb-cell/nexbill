@@ -4,6 +4,10 @@
 // the browser bundle. See coa.ts, which owns everything that actually touches the database, for
 // the server-only counterpart. Do NOT add a "@/db/client" (or anything that transitively imports
 // it) import to this file.
+//
+// lib/i18n/registry.ts is likewise a pure, framework-agnostic module (no "use client", no
+// Node-only APIs) — safe to import here for coaAccountNameForLang() below.
+import { translate, type LangCode } from "@/lib/i18n/registry";
 
 export type AccountType = "asset" | "liability" | "equity" | "revenue" | "expense";
 
@@ -359,6 +363,20 @@ const DEFAULT_COA_NAME_BY_CODE: Record<string, string> = Object.fromEntries(DEFA
 export function coaAccountName(t: (key: string, fallback: string) => string, account: { code: string; name: string }): string {
   if (DEFAULT_COA_NAME_BY_CODE[account.code] === account.name) {
     return t(`coa.${account.code}`, account.name);
+  }
+  return account.name;
+}
+
+/**
+ * Server-side equivalent of coaAccountName() for code that runs outside a React component (PDF/
+ * xlsx report builders, background jobs) and therefore has no useDashboardLang() `t` to pass in.
+ * Takes a LangCode directly and resolves via the same pure, server-safe lib/i18n/registry.ts used
+ * by coaAccountName's caller — same untouched-default guard, so a renamed/custom account name is
+ * never silently overridden.
+ */
+export function coaAccountNameForLang(lang: LangCode, account: { code: string; name: string }): string {
+  if (DEFAULT_COA_NAME_BY_CODE[account.code] === account.name) {
+    return translate(lang, `coa.${account.code}`, account.name);
   }
   return account.name;
 }

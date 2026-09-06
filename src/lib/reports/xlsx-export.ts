@@ -1,17 +1,23 @@
 import * as XLSX from "xlsx";
-import { ReportMeta, rupiah } from "./meta";
+import { ReportMeta } from "./meta";
 import { flattenTrialBalanceTree, TrialBalanceRow } from "@/lib/accounting/reports";
 import { CashFlowResult } from "@/lib/accounting/cashflow";
+import { coaAccountNameForLang } from "@/lib/accounting/coa-data";
+import { translate } from "@/lib/i18n/registry";
+import "@/lib/i18n/dict-accounting";
+import "@/lib/i18n/dict-coa";
+import "@/lib/i18n/dict-report-export";
 
 /** Letterhead rows shared by every exported report sheet: company name, address, report title, period, generated-at. Excel embedding of the actual logo image isn't supported by the community `xlsx` (SheetJS) build used here — the PDF export carries the visual logo instead. */
 function letterheadRows(meta: ReportMeta): (string | number)[][] {
+  const t = (key: string, fallback: string) => translate(meta.lang, key, fallback);
   const rows: (string | number)[][] = [
     [meta.companyName],
   ];
   if (meta.companyAddress) rows.push([meta.companyAddress]);
   rows.push([meta.reportTitle]);
-  rows.push([`Periode: ${meta.periodLabel}`]);
-  rows.push([`Dicetak: ${meta.generatedAtLabel}`]);
+  rows.push([`${t("accounting.common.periodPrefix", "Periode:")} ${meta.periodLabel}`]);
+  rows.push([`${t("report.export.printedAt", "Dicetak")}: ${meta.generatedAtLabel}`]);
   rows.push([]);
   return rows;
 }
@@ -31,113 +37,119 @@ function autoWidth(rows: (string | number)[][], cols: number): { wch: number }[]
 }
 
 export function buildTrialBalanceXlsx(meta: ReportMeta, rawRows: TrialBalanceRow[], showZero: boolean): Buffer {
+  const t = (key: string, fallback: string) => translate(meta.lang, key, fallback);
   const tree = flattenTrialBalanceTree(rawRows, showZero);
-  const header = ["Kode", "Akun", "Debit", "Kredit", "Saldo"];
+  const header = [t("accounting.trialBalance.table.code", "Kode"), t("accounting.trialBalance.table.account", "Akun"), t("accounting.common.debit", "Debit"), t("accounting.common.credit", "Kredit"), t("accounting.trialBalance.table.balance", "Saldo")];
+  const headerBadge = t("accounting.coa.headerBadge", "Header");
   const dataRows = tree.map((r) => [
     r.code,
-    `${"    ".repeat(r.depth)}${r.name}${!r.isPostingAllowed ? " (Header)" : ""}`,
+    `${"    ".repeat(r.depth)}${coaAccountNameForLang(meta.lang, r)}${!r.isPostingAllowed ? ` (${headerBadge})` : ""}`,
     r.debit || "",
     r.credit || "",
     r.balance || "",
   ]);
   const totalDebit = tree.filter((r) => r.isPostingAllowed).reduce((s, r) => s + r.debit, 0);
   const totalCredit = tree.filter((r) => r.isPostingAllowed).reduce((s, r) => s + r.credit, 0);
-  const footer = ["", "Total", totalDebit, totalCredit, Math.abs(totalDebit - totalCredit) < 1 ? "Balance" : "TIDAK BALANCE"];
+  const footer = ["", t("accounting.trialBalance.table.total", "Total"), totalDebit, totalCredit, Math.abs(totalDebit - totalCredit) < 1 ? t("accounting.common.balanceOk", "Balance ✓") : t("accounting.trialBalance.notBalanced", "TIDAK BALANCE")];
 
   const sheetData = [...letterheadRows(meta), header, ...dataRows, footer];
   const sheet = XLSX.utils.aoa_to_sheet(sheetData);
   sheet["!cols"] = autoWidth([header, ...dataRows], 5);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, "Neraca Saldo");
+  XLSX.utils.book_append_sheet(wb, sheet, t("report.export.header.trialBalance", "Neraca Saldo").slice(0, 31));
   return finalize(wb);
 }
 
 export function buildProfitLossXlsx(meta: ReportMeta, pl: any): Buffer {
-  const header = ["Akun", "Jumlah"];
-  const revRows = pl.revenue.filter((r: any) => r.balance !== 0).map((r: any) => [r.name, r.balance]);
-  const expRows = pl.expense.filter((r: any) => r.balance !== 0).map((r: any) => [r.name, r.balance]);
+  const t = (key: string, fallback: string) => translate(meta.lang, key, fallback);
+  const header = [t("accounting.trialBalance.table.account", "Akun"), t("report.export.amountColumn", "Jumlah")];
+  const revRows = pl.revenue.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]);
+  const expRows = pl.expense.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]);
   const sheetData = [
     ...letterheadRows(meta),
-    ["Pendapatan"],
+    [t("accounting.type.revenue", "Pendapatan")],
     header,
     ...revRows,
-    ["Total Pendapatan", pl.totalRevenue],
+    [t("report.export.totalRevenue", "Total Pendapatan"), pl.totalRevenue],
     [],
-    ["Beban"],
+    [t("accounting.type.expense", "Beban")],
     header,
     ...expRows,
-    ["Total Beban", pl.totalExpense],
+    [t("report.export.totalExpense", "Total Beban"), pl.totalExpense],
     [],
-    ["Laba Kotor", pl.grossProfit],
-    ["Laba Bersih", pl.netProfit],
+    [t("accounting.pl.grossProfit", "Laba Kotor"), pl.grossProfit],
+    [t("accounting.pl.netProfit", "Laba Bersih"), pl.netProfit],
   ];
   const sheet = XLSX.utils.aoa_to_sheet(sheetData);
   sheet["!cols"] = autoWidth([header, ...revRows, ...expRows], 2);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, "Laba Rugi");
+  XLSX.utils.book_append_sheet(wb, sheet, t("report.export.header.profitLoss", "Laba Rugi").slice(0, 31));
   return finalize(wb);
 }
 
 export function buildBalanceSheetXlsx(meta: ReportMeta, bs: any): Buffer {
-  const header = ["Akun", "Jumlah"];
-  const assetRows = bs.assets.filter((r: any) => r.balance !== 0).map((r: any) => [r.name, r.balance]);
-  const liabRows = bs.liabilities.filter((r: any) => r.balance !== 0).map((r: any) => [r.name, r.balance]);
-  const equityRows = bs.equity.filter((r: any) => r.balance !== 0).map((r: any) => [r.name, r.balance]);
+  const t = (key: string, fallback: string) => translate(meta.lang, key, fallback);
+  const header = [t("accounting.trialBalance.table.account", "Akun"), t("report.export.amountColumn", "Jumlah")];
+  const assetRows = bs.assets.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]);
+  const liabRows = bs.liabilities.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]);
+  const equityRows = bs.equity.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]);
   const sheetData = [
     ...letterheadRows(meta),
-    ["Aset"],
+    [t("accounting.bs.assetsHeading", "Aset")],
     header,
     ...assetRows,
-    ["Total Aset", bs.totalAssets],
+    [t("accounting.bs.totalAssets", "Total Aset"), bs.totalAssets],
     [],
-    ["Liabilitas"],
+    [t("accounting.type.liability", "Liabilitas")],
     header,
     ...liabRows,
-    ["Total Liabilitas", bs.totalLiabilities],
+    [t("report.export.totalLiabilities", "Total Liabilitas"), bs.totalLiabilities],
     [],
-    ["Ekuitas"],
+    [t("accounting.type.equity", "Ekuitas")],
     header,
     ...equityRows,
-    ["Laba Berjalan (belum ditutup)", bs.currentPeriodNetProfit],
-    ["Total Liabilitas + Ekuitas", bs.totalLiabilities + bs.totalEquityWithRetainedEarnings],
+    [t("accounting.bs.currentPeriodProfit", "Laba Berjalan (belum ditutup)"), bs.currentPeriodNetProfit],
+    [t("accounting.bs.totalLiabilitiesEquity", "Total Liabilitas + Ekuitas"), bs.totalLiabilities + bs.totalEquityWithRetainedEarnings],
     [],
-    ["Status", bs.balances ? "Neraca Balance" : "TIDAK BALANCE — periksa jurnal"],
+    [t("report.export.status", "Status"), bs.balances ? t("accounting.bs.balanced", "Neraca Balance") : t("accounting.bs.notBalanced", "TIDAK BALANCE — periksa jurnal")],
   ];
   const sheet = XLSX.utils.aoa_to_sheet(sheetData);
   sheet["!cols"] = autoWidth([header, ...assetRows, ...liabRows, ...equityRows], 2);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, "Neraca");
+  XLSX.utils.book_append_sheet(wb, sheet, t("report.export.header.balanceSheet", "Neraca").slice(0, 31));
   return finalize(wb);
 }
 
 export function buildCashFlowXlsx(meta: ReportMeta, cf: CashFlowResult): Buffer {
-  const inHeader = ["Kategori", "Jumlah"];
+  const t = (key: string, fallback: string) => translate(meta.lang, key, fallback);
+  const locale = { id: "id-ID", en: "en-US", ms: "ms-MY", th: "th-TH", fil: "fil-PH", vi: "vi-VN" }[meta.lang] ?? "id-ID";
+  const inHeader = [t("report.export.category", "Kategori"), t("report.export.amountColumn", "Jumlah")];
   const inRows = cf.inByCategory.map((r) => [r.category, r.amount]);
   const outRows = cf.outByCategory.map((r) => [r.category, r.amount]);
-  const dayHeader = ["Tanggal", "Kas Masuk", "Kas Keluar", "Bersih"];
-  const dayRows = cf.byDay.map((d) => [new Date(d.date).toLocaleDateString("id-ID"), d.in, d.out, d.net]);
+  const dayHeader = [t("report.export.date", "Tanggal"), t("accounting.cf.cashIn", "Kas Masuk"), t("accounting.cf.cashOut", "Kas Keluar"), t("report.export.net", "Bersih")];
+  const dayRows = cf.byDay.map((d) => [new Date(d.date).toLocaleDateString(locale), d.in, d.out, d.net]);
   const sheetData = [
     ...letterheadRows(meta),
-    ["Ringkasan"],
-    ["Kas Masuk", cf.totalIn],
-    ["Kas Keluar", cf.totalOut],
-    ["Arus Kas Bersih", cf.netCashFlow],
+    [t("report.export.summary", "Ringkasan")],
+    [t("accounting.cf.cashIn", "Kas Masuk"), cf.totalIn],
+    [t("accounting.cf.cashOut", "Kas Keluar"), cf.totalOut],
+    [t("accounting.cf.netCashFlow", "Arus Kas Bersih"), cf.netCashFlow],
     [],
-    ["Rincian Kas Masuk"],
+    [t("accounting.cf.cashInDetail", "Rincian Kas Masuk")],
     inHeader,
     ...inRows,
     [],
-    ["Rincian Kas Keluar"],
+    [t("accounting.cf.cashOutDetail", "Rincian Kas Keluar")],
     inHeader,
     ...outRows,
     [],
-    ["Arus Kas Harian"],
+    [t("accounting.cf.dailyCashFlow", "Arus Kas Harian")],
     dayHeader,
     ...dayRows,
   ];
   const sheet = XLSX.utils.aoa_to_sheet(sheetData);
   sheet["!cols"] = autoWidth([dayHeader, ...dayRows, inHeader, ...inRows, ...outRows], 4);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet, "Arus Kas");
+  XLSX.utils.book_append_sheet(wb, sheet, t("report.export.header.cashFlow", "Arus Kas").slice(0, 31));
   return finalize(wb);
 }
