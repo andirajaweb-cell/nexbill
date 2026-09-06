@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions } from "@/db/schema";
+import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions, cashDeposits } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { logAudit } from "@/lib/audit/log";
 import { computeTrialBalance } from "@/lib/accounting/reports";
@@ -117,6 +117,27 @@ async function computePpobCashEffect(shiftId: string): Promise<{ ppobCashIn: num
     if (ppobAccountTypeById.get(p.fundingCashBankAccountId) === "cash") ppobCashOut += p.modal + p.providerFee;
   }
   return { ppobCashIn, ppobCashOut };
+}
+
+/**
+ * "Setoran Kas" / cash drop (lib/cash/deposits.ts, tab "Setoran Kas" on this page) — cash
+ * physically handed from the till to Owner/Manager/Supervisor/Accounting mid-shift (to Kas Besar,
+ * a virtual deposit pool, Kas Kecil, or drawn out entirely as Prive/Dividen) has always been
+ * tagged with shiftId correctly (unlike the PPOB bug fixed alongside this), but was never actually
+ * subtracted from closeShift()'s cashOut/expectedCash — meaning a legitimate, fully-recorded cash
+ * drop would still show up as a cash SHORTAGE at close, indistinguishable from a real loss. Only
+ * counts when the SOURCE account is a physical till (type "cash") — the whole point of a cash
+ * drop is reducing what's sitting in a physical drawer, regardless of what type of account it
+ * lands in (kas_besar could itself be cash or bank). Voided deposits (status "void") are excluded,
+ * same as void/reversed rows everywhere else in this file.
+ */
+async function computeCashDropTotal(shiftId: string): Promise<number> {
+  const shiftDeposits = await db.select().from(cashDeposits).where(and(eq(cashDeposits.shiftId, shiftId), eq(cashDeposits.status, "posted")));
+  if (!shiftDeposits.length) return 0;
+  const sourceAccountIds = Array.from(new Set(shiftDeposits.map((d) => d.sourceCashBankAccountId)));
+  const sourceAccounts = await db.select().from(cashBankAccounts).where(inArray(cashBankAccounts.id, sourceAccountIds));
+  const sourceTypeById = new Map(sourceAccounts.map((a) => [a.id, a.type]));
+  return shiftDeposits.reduce((s, d) => (sourceTypeById.get(d.sourceCashBankAccountId) === "cash" ? s + d.amount : s), 0);
 }
 
 export interface IncomeByMethodRow {
@@ -253,6 +274,7 @@ export async function closeShift(
   );
 
   const { ppobCashIn, ppobCashOut } = await computePpobCashEffect(shiftId);
+  const cashDropTotal = await computeCashDropTotal(shiftId);
 
   const cashIn =
     cashPayments.reduce((s, p) => s + p.amount, 0) +
@@ -274,7 +296,8 @@ export async function closeShift(
   const cashOut =
     shiftExpenses.filter((e) => e.cashBankAccountId && cashAccountIds.has(e.cashBankAccountId)).reduce((s, e) => s + e.amount + (e.taxAmount ?? 0), 0) +
     homeRentalDepositCashOut +
-    ppobCashOut;
+    ppobCashOut +
+    cashDropTotal;
 
   const expectedCash = shift.openingCash + cashIn - cashOut;
   const variance = actualCash - expectedCash;
@@ -373,7 +396,7 @@ export async function closeShift(
 
   const incomeByMethod = await computeIncomeByMethod(shiftId);
 
-  return { shift: updated, cashIn, cashOut, ppobCashIn, ppobCashOut, ordersCount: shiftOrders.length, cashRows, balanceCheckRows, riskFlags: risk.flags, incomeByMethod };
+  return { shift: updated, cashIn, cashOut, ppobCashIn, ppobCashOut, cashDropTotal, ordersCount: shiftOrders.length, cashRows, balanceCheckRows, riskFlags: risk.flags, incomeByMethod };
 }
 
 export async function getCurrentShift(outletId: string, staffUserId: string) {
@@ -391,7 +414,8 @@ export async function getShiftDetail(shiftId: string) {
   const balanceChecks = await db.select().from(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));
   const incomeByMethod = await computeIncomeByMethod(shiftId);
   const { ppobCashIn, ppobCashOut } = await computePpobCashEffect(shiftId);
-  return { shift, cashCounts, balanceChecks, incomeByMethod, ppobCashIn, ppobCashOut };
+  const cashDropTotal = await computeCashDropTotal(shiftId);
+  return { shift, cashCounts, balanceChecks, incomeByMethod, ppobCashIn, ppobCashOut, cashDropTotal };
 }
 
 /**
