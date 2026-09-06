@@ -238,6 +238,24 @@ export const promos = pgTable("promos", {
   ...timestamps,
 });
 
+/**
+ * Bundled F&B products included FREE (already paid for inside packagePrice) with a
+ * "rental_package" promo — e.g. "Paket Hemat: 2 Jam PS4 + 1 Kentang Goreng + 1 Es Teh" for one
+ * flat price. Each row is one product + quantity included; a promo with no rows here is just a
+ * plain rental-duration package like before (this table stays empty for those, fully backward
+ * compatible). Consumed in lib/rental/sessions.ts's startRentalSession — when a promo with bundle
+ * items is selected, each item is appended to the session's bill (lib/pos/bill.ts's
+ * addItemsToBill) at unitPrice 0, since the customer already paid for it as part of packagePrice;
+ * this still deducts stock and still routes to the kitchen normally, it just adds no extra charge
+ * to the bill.
+ */
+export const promoBundleItems = pgTable("promo_bundle_items", {
+  id: id(),
+  promoId: text("promo_id").notNull().references(() => promos.id),
+  productId: text("product_id").notNull().references(() => products.id),
+  qty: integer("qty").notNull().default(1),
+});
+
 export const banners = pgTable("banners", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { promos, orders, rentalSessions } from "@/db/schema";
+import { promos, promoBundleItems, products, orders, rentalSessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+
+async function getBundleItems(promoId: string) {
+  return db
+    .select({ id: promoBundleItems.id, promoId: promoBundleItems.promoId, productId: promoBundleItems.productId, qty: promoBundleItems.qty, productName: products.name, price: products.price })
+    .from(promoBundleItems)
+    .innerJoin(products, eq(products.id, promoBundleItems.productId))
+    .where(eq(promoBundleItems.promoId, promoId));
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,9 +28,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const body = await req.json();
     delete body.outletId;
-    const [row] = await db.update(promos).set({ ...body, updatedAt: new Date().toISOString() }).where(eq(promos.id, id)).returning();
+    // bundleItems is handled separately below (own table) — never let it fall through to
+    // promos.set(), which has no such column.
+    const { bundleItems, ...rest } = body;
+    const [row] = await db.update(promos).set({ ...rest, updatedAt: new Date().toISOString() }).where(eq(promos.id, id)).returning();
     if (!row) return NextResponse.json({ error: "Promo tidak ditemukan." }, { status: 404 });
-    return NextResponse.json(row);
+
+    // Only touches bundle items when the client actually sent the field — omitting it (e.g. a
+    // PATCH that only flips isActive) leaves the existing bundle untouched instead of wiping it.
+    if (Array.isArray(bundleItems)) {
+      await db.delete(promoBundleItems).where(eq(promoBundleItems.promoId, id));
+      const validItems: { productId: string; qty: number }[] = bundleItems
+        .filter((i: any) => i?.productId && Number(i.qty) > 0)
+        .map((i: any) => ({ productId: i.productId, qty: Math.floor(Number(i.qty)) }));
+      if (validItems.length) {
+        await db.insert(promoBundleItems).values(validItems.map((i) => ({ promoId: id, productId: i.productId, qty: i.qty })));
+      }
+    }
+
+    return NextResponse.json({ ...row, bundleItems: await getBundleItems(id) });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });
   }
@@ -50,6 +74,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ ok: true, softDeleted: true, row });
     }
 
+    // No FK cascade on promoBundleItems.promoId — clear its rows first or a hard-deleted promo
+    // would leave them orphaned, pointing at nothing.
+    await db.delete(promoBundleItems).where(eq(promoBundleItems.promoId, id));
     const [row] = await db.delete(promos).where(eq(promos.id, id)).returning();
     if (!row) return NextResponse.json({ error: "Promo tidak ditemukan." }, { status: 404 });
     return NextResponse.json({ ok: true, softDeleted: false, row });

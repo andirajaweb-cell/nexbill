@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { rentalSessions, rentalUnits, devices, promos, outlets, bookings, orders } from "@/db/schema";
+import { rentalSessions, rentalUnits, devices, promos, promoBundleItems, products, outlets, bookings, orders } from "@/db/schema";
 import { eq, and, inArray, lte, gt, ne } from "drizzle-orm";
 import { turnDeviceOn, turnDeviceOff, getDeviceState } from "@/lib/devices";
 import { describeError } from "@/lib/api/error";
@@ -77,7 +77,7 @@ async function runDeviceOnCommand(device: Parameters<typeof turnDeviceOn>[0], er
   return null;
 }
 import { computeEffectiveHourlyRate, roundUpMinutes } from "./pricing";
-import { openBillForSession, getOpenBillForSession, upsertRentalLineItem } from "@/lib/pos/bill";
+import { openBillForSession, getOpenBillForSession, upsertRentalLineItem, addItemsToBill } from "@/lib/pos/bill";
 import { finalizeAccessoryCharges } from "./accessories";
 import { recordDeposit, confirmDeposit, settleOrderAfterPayment } from "@/lib/payments";
 
@@ -152,9 +152,21 @@ export async function startRentalSession(input: StartSessionInput) {
   let plannedMinutes = input.plannedMinutes ?? null;
   let ratePerHour = rate.finalRate;
 
+  // Bundled F&B items (e.g. "Paket Hemat: 2 Jam PS4 + 1 Kentang Goreng + 1 Es Teh") — fetched here
+  // (before the unit's atomic claim below) so a bad bundle row can't leave the unit half-claimed;
+  // actually appended to the bill further down, once the bill itself exists.
+  let bundleItems: { productId: string; description: string; qty: number }[] = [];
   if (input.promoId) {
     const [promo] = await db.select().from(promos).where(eq(promos.id, input.promoId)).limit(1);
     if (promo?.durationMinutes) plannedMinutes = promo.durationMinutes;
+    if (promo) {
+      const rows = await db
+        .select({ productId: promoBundleItems.productId, qty: promoBundleItems.qty, name: products.name })
+        .from(promoBundleItems)
+        .innerJoin(products, eq(products.id, promoBundleItems.productId))
+        .where(eq(promoBundleItems.promoId, promo.id));
+      bundleItems = rows.map((r) => ({ productId: r.productId, description: r.name, qty: r.qty }));
+    }
   }
 
   // Atomic claim — this, not the early check above, is what actually prevents two sessions
@@ -232,6 +244,24 @@ export async function startRentalSession(input: StartSessionInput) {
     staffUserId: input.staffUserId,
     shiftId: input.shiftId,
   });
+
+  // Add the promo's bundled F&B items to the fresh bill at unitPrice 0 — the customer already
+  // paid for these as part of packagePrice, so they show on the receipt/kitchen ticket (stock
+  // still deducts, kitchen still gets notified) but add no extra charge. A bundle item that's
+  // gone out of stock/been deleted since the promo was set up shouldn't block the session itself
+  // from starting, so this tolerates failure the same way device-on-command does above — the
+  // cashier can always add it manually if this silently fails.
+  if (bundleItems.length) {
+    try {
+      await addItemsToBill(
+        bill.id,
+        bundleItems.map((b) => ({ productId: b.productId, description: `${b.description} (Paket Promo)`, qty: b.qty, unitPrice: 0 })),
+        input.staffUserId ?? undefined
+      );
+    } catch (err) {
+      console.error(`Gagal menambahkan item bundel promo ke bill sesi ${session.id}:`, err);
+    }
+  }
 
   let prepayment: Awaited<ReturnType<typeof recordDeposit>> | null = null;
   if (input.prepay && input.prepay.amount > 0) {

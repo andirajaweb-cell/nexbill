@@ -17,6 +17,14 @@ registerDict({
   "promo.pricePlaceholder": { id: "Harga paket", en: "Package price", ms: "Harga pakej", th: "ราคาแพ็กเกจ", fil: "Presyo ng package", vi: "Giá gói" },
   "promo.saveButton": { id: "Simpan Paket", en: "Save Package", ms: "Simpan Pakej", th: "บันทึกแพ็กเกจ", fil: "I-save ang Package", vi: "Lưu gói" },
 
+  "promo.bundleHeading": { id: "Bundel Makanan/Minuman (Opsional)", en: "Food/Drink Bundle (Optional)", ms: "Pakej Makanan/Minuman (Pilihan)", th: "แพ็กอาหาร/เครื่องดื่ม (ไม่บังคับ)", fil: "Bundle na Pagkain/Inumin (Opsyonal)", vi: "Gói kèm đồ ăn/thức uống (Tùy chọn)" },
+  "promo.bundleHint": { id: "Item di sini otomatis ditambahkan ke bill saat pelanggan pakai paket ini, dengan harga Rp0 (sudah termasuk Harga Paket di atas).", en: "Items here are automatically added to the bill when a customer uses this package, at Rp0 (already included in the Package Price above).", ms: "Item di sini akan ditambah secara automatik ke bil apabila pelanggan guna pakej ini, dengan harga Rp0 (sudah termasuk dalam Harga Pakej di atas).", th: "รายการที่นี่จะถูกเพิ่มเข้าบิลอัตโนมัติเมื่อลูกค้าใช้แพ็กเกจนี้ ในราคา Rp0 (รวมอยู่ในราคาแพ็กเกจด้านบนแล้ว)", fil: "Ang mga item dito ay awtomatikong idadagdag sa bill kapag ginamit ng customer ang package na ito, sa Rp0 (kasama na sa Presyo ng Package sa itaas).", vi: "Các mục ở đây tự động thêm vào hóa đơn khi khách dùng gói này, với giá Rp0 (đã bao gồm trong Giá Gói ở trên)." },
+  "promo.pickProductPlaceholder": { id: "Pilih produk F&B...", en: "Pick an F&B product...", ms: "Pilih produk F&B...", th: "เลือกสินค้าอาหาร/เครื่องดื่ม...", fil: "Pumili ng F&B na produkto...", vi: "Chọn sản phẩm F&B..." },
+  "promo.qtyPlaceholder": { id: "Qty", en: "Qty", ms: "Kuantiti", th: "จำนวน", fil: "Dami", vi: "SL" },
+  "promo.addItemButton": { id: "+ Tambah Item", en: "+ Add Item", ms: "+ Tambah Item", th: "+ เพิ่มรายการ", fil: "+ Magdagdag ng Item", vi: "+ Thêm mục" },
+  "promo.removeItem": { id: "Hapus", en: "Remove", ms: "Buang", th: "ลบ", fil: "Alisin", vi: "Xóa" },
+  "promo.bundleIncludesPrefix": { id: "+ Termasuk:", en: "+ Includes:", ms: "+ Termasuk:", th: "+ รวม:", fil: "+ Kasama:", vi: "+ Bao gồm:" },
+
   "promo.save": { id: "Simpan", en: "Save", ms: "Simpan", th: "บันทึก", fil: "I-save", vi: "Lưu" },
   "promo.cancel": { id: "Batal", en: "Cancel", ms: "Batal", th: "ยกเลิก", fil: "Kanselahin", vi: "Hủy" },
 
