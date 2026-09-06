@@ -142,6 +142,7 @@ export const DEFAULT_COA: CoaDef[] = [
   { code: "3110", name: "Owner Capital", type: "equity", parentCode: "3100" },
   { code: "3120", name: "Additional Capital", type: "equity", parentCode: "3100" },
   { code: "3130", name: "Owner Withdrawal / Prive", type: "equity", parentCode: "3100" },
+  { code: "3131", name: "Dividend Distribution", type: "equity", parentCode: "3100" },
   { code: "3200", name: "Retained Earnings", type: "equity", parentCode: "3000" },
   { code: "3300", name: "Current Year Earnings", type: "equity", parentCode: "3000" },
   { code: "3400", name: "Opening Balance Equity", type: "equity", parentCode: "3000" },

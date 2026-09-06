@@ -20,7 +20,8 @@ export type JournalSourceType =
   | "ppob"
   | "other_income"
   | "home_rental"
-  | "membership_fee";
+  | "membership_fee"
+  | "cash_deposit";
 
 export interface JournalLineInput {
   /** Either accountCode (COA code, resolved automatically) or a raw accountId. */

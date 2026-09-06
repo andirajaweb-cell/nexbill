@@ -36,7 +36,9 @@ export type Permission =
   | "manage_other_income" // record/void Pendapatan Lain-lain (income outside core products: komisi, sewa aset, dst.)
   | "manage_home_rental" // operate Home Rental (Sewa Dibawa Pulang): booking, checkout, return, katalog produk/aset/paket
   | "manage_feature_flags" // toggle Home Rental (and future) feature flags in Settings > Feature Management — owner/superuser only, enforced additionally by a hard role check server-side
-  | "manage_membership"; // sell/renew paid membership tiers (collects cash/QRIS, posts to accounting) — Membership & CRM tier/reward/voucher CRUD itself stays owner/superuser-only (see membership/page.tsx), this only gates the front-desk "Jual Keanggotaan" money-collecting action
+  | "manage_membership" // sell/renew paid membership tiers (collects cash/QRIS, posts to accounting) — Membership & CRM tier/reward/voucher CRUD itself stays owner/superuser-only (see membership/page.tsx), this only gates the front-desk "Jual Keanggotaan" money-collecting action
+  | "manage_cash_deposit" // record a cash pickup/deposit (till -> kas besar/saldo deposit virtual/kas kecil/prive/dividen)
+  | "void_cash_deposit"; // reverse an already-posted cash deposit
 
 export const ALL_ROLES: StaffRole[] = ["superuser", "owner", "manager", "cashier", "accountant", "kitchen", "supervisor"];
 
@@ -48,6 +50,7 @@ export const PERMISSION_GROUPS: { group: string; permissions: Permission[] }[] =
     permissions: ["void_order_direct", "refund_order", "approve_requests", "manage_bookings", "manage_ppob", "manage_membership", "kitchen_display"],
   },
   { group: "Pendapatan Lain-lain", permissions: ["manage_other_income"] },
+  { group: "Setoran Kas", permissions: ["manage_cash_deposit", "void_cash_deposit"] },
   { group: "Home Rental (Sewa Dibawa Pulang)", permissions: ["manage_home_rental", "manage_feature_flags"] },
   { group: "Inventori & Harga", permissions: ["manage_pricing_promo", "manage_inventory_purchasing"] },
   {
@@ -85,6 +88,8 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   manage_home_rental: "Operasikan Home Rental (Booking, Checkout, Return, Katalog)",
   manage_feature_flags: "Kelola Feature Management (aktif/nonaktifkan modul)",
   manage_membership: "Jual/Perpanjang Keanggotaan (terima pembayaran)",
+  manage_cash_deposit: "Catat Setoran Kas (Kas Besar/Saldo Deposit/Kas Kecil/Prive/Dividen)",
+  void_cash_deposit: "Batalkan Setoran Kas yang Sudah Diposting",
 };
 
 /**
@@ -106,7 +111,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
     "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing",
     "view_reports", "manage_devices", "manage_admin_data", "kitchen_display",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_settings", "manage_bookings", "manage_ppob", "manage_coa", "manage_other_income",
-    "manage_home_rental", "manage_feature_flags", "manage_membership",
+    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit",
   ],
   // The self-service top role for an outlet/merchant to manage its own business — same
   // permission set as "superuser" (see StaffRole comment above for the rationale for keeping
@@ -116,20 +121,24 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
     "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing",
     "view_reports", "manage_devices", "manage_admin_data", "kitchen_display",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_settings", "manage_bookings", "manage_ppob", "manage_coa", "manage_other_income",
-    "manage_home_rental", "manage_feature_flags", "manage_membership",
+    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit",
   ],
   manager: [
     "view_dashboard_owner", "view_accounting", "void_order_direct", "refund_order", "approve_requests",
     "manage_pricing_promo", "manage_inventory_purchasing", "view_reports", "manage_devices",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_bookings", "manage_ppob", "manage_other_income",
-    "manage_home_rental", "manage_membership",
+    "manage_home_rental", "manage_membership", "manage_cash_deposit", "void_cash_deposit",
   ],
   // Books the entries and can reverse mistakes, but nominal-based sign-off on
   // spending itself is a manager/owner call — no approve_expenses here.
   // manage_other_income is included since booking one-off, non-core income entries
   // correctly is squarely an accounting job, same rationale as post_manual_journal.
-  accountant: ["view_accounting", "post_manual_journal", "view_reports", "manage_expenses", "void_expense", "manage_assets", "manage_coa", "manage_other_income"],
-  supervisor: ["approve_requests", "manage_pricing_promo", "view_reports", "manage_devices", "manage_bookings", "manage_home_rental", "manage_membership"],
+  accountant: ["view_accounting", "post_manual_journal", "view_reports", "manage_expenses", "void_expense", "manage_assets", "manage_coa", "manage_other_income", "manage_cash_deposit", "void_cash_deposit"],
+  // approve_requests already covers reviewing void/refund/shift-close-review approvals; adding
+  // manage_cash_deposit lets a supervisor record their own pickup on the spot, since they're one
+  // of the four roles a cashier can name as the receiver — but not void_cash_deposit, same trust
+  // tier as manage_expenses (which supervisor also lacks).
+  supervisor: ["approve_requests", "manage_pricing_promo", "view_reports", "manage_devices", "manage_bookings", "manage_home_rental", "manage_membership", "manage_cash_deposit"],
   // Can create + pay expenses under the outlet's approval threshold directly, handle
   // the front-desk booking flow, and record PPOB sales (top-up/token/pulsa/tarik tunai)
   // at the counter — this is core cashier-facing work, not a manager-gated action.
@@ -138,7 +147,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
   // via manage_feature_flags which cashier never gets). manage_membership follows the
   // same logic: selling a paid membership at the counter is front-desk work too, even
   // though editing tiers/rewards/vouchers themselves stays owner/superuser-only.
-  cashier: ["manage_expenses", "manage_bookings", "manage_ppob", "manage_home_rental", "manage_membership"],
+  // manage_cash_deposit follows the same front-desk-work logic — logging a cash pickup handed to
+  // an Owner/Manager/Supervisor/Accounting is exactly the cashier-facing task this feature was
+  // built for (see lib/cash/deposits.ts) — but never void_cash_deposit, matching how cashier also
+  // lacks void_expense.
+  cashier: ["manage_expenses", "manage_bookings", "manage_ppob", "manage_home_rental", "manage_membership", "manage_cash_deposit"],
   kitchen: ["kitchen_display"],
 };
 

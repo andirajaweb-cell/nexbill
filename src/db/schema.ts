@@ -543,7 +543,7 @@ export const journalEntries = pgTable(
         "rental", "pos", "purchase_invoice", "purchase_payment", "purchase_return",
         "expense", "refund", "asset_purchase", "asset_disposal", "depreciation",
         "receivable_payment", "manual", "opening_balance", "ppob", "other_income",
-        "home_rental", "membership_fee",
+        "home_rental", "membership_fee", "cash_deposit",
       ],
     }).notNull(),
     sourceId: text("source_id"),
@@ -577,6 +577,40 @@ export const cashBankAccounts = pgTable("cash_bank_accounts", {
   type: text("type", { enum: ["cash", "bank"] }).notNull().default("cash"),
   accountId: text("account_id").notNull().references(() => accounts.id),
   isDefault: boolean("is_default").notNull().default(false),
+  ...timestamps,
+});
+
+/**
+ * Cash pickup/deposit — Owner/Manager/Supervisor/Accounting physically taking cash out of a
+ * till (almost always the store's main cash drawer) and moving it somewhere else: the main
+ * safe, a virtual deposit pool, petty cash, or out of the business entirely as an owner draw
+ * or dividend. See lib/cash/deposits.ts for the accounting behind each purposeType — an
+ * internal transfer (kas_besar/saldo_deposit_virtual/kas_kecil) debits another cashBankAccounts
+ * row and stays on the balance sheet; prive/dividen debits an equity account instead, since that
+ * cash has genuinely left the recorded business cash system.
+ *
+ * receivedByStaffUserId is mandatory and is the actual point of accountability this feature
+ * exists for — a cashier can't log an amount as "handed over" without naming a real staff
+ * member (Owner/Manager/Supervisor/Accounting) who took it, making every pickup traceable to a
+ * specific person rather than a vague "setoran ke atasan" with no name attached.
+ */
+export const cashDeposits = pgTable("cash_deposits", {
+  id: id(),
+  outletId: text("outlet_id").notNull().references(() => outlets.id),
+  shiftId: text("shift_id").references(() => shifts.id),
+  amount: doublePrecision("amount").notNull(),
+  purposeType: text("purpose_type", { enum: ["kas_besar", "saldo_deposit_virtual", "kas_kecil", "prive", "dividen"] }).notNull(),
+  sourceCashBankAccountId: text("source_cash_bank_account_id").notNull().references(() => cashBankAccounts.id),
+  // Only set for the three internal-transfer purposeTypes — null for prive/dividen, which credit
+  // an equity account (accounts.code 3130/3131) directly rather than another cash pool.
+  destinationCashBankAccountId: text("destination_cash_bank_account_id").references(() => cashBankAccounts.id),
+  receivedByStaffUserId: text("received_by_staff_user_id").notNull().references(() => staffUsers.id),
+  recordedByStaffUserId: text("recorded_by_staff_user_id").references(() => staffUsers.id),
+  notes: text("notes"),
+  journalEntryId: text("journal_entry_id").references(() => journalEntries.id),
+  status: text("status", { enum: ["posted", "void"] }).notNull().default("posted"),
+  voidReason: text("void_reason"),
+  voidedAt: text("voided_at"),
   ...timestamps,
 });
 
