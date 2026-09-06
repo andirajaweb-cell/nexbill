@@ -332,6 +332,16 @@ export async function updateShiftDetail(
     notes?: string;
     cashCounts?: CashCountInput[];
     balanceChecks?: BalanceCheckInput[];
+    // When true, re-derives each channel's expectedBalance from a fresh trial balance (same
+    // computation closeShift used originally) instead of keeping the value frozen at close time.
+    // Normally expectedBalance is intentionally locked forever — a closed shift's numbers
+    // shouldn't silently drift. The one legitimate exception is when the STORED number itself was
+    // wrong because of a data bug (e.g. the orphaned-journal-entry bug fixed in
+    // hardDeletePpobTransaction — see lib/accounting/orphan-cleanup.ts) rather than a real
+    // transaction: once the underlying ledger is corrected, this lets Owner/Superuser refresh
+    // this one shift's frozen figure to match, instead of it showing a stale phantom number
+    // forever with no way to clear it short of deleting the whole shift record.
+    recomputeExpectedBalances?: boolean;
   }
 ) {
   const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
@@ -376,12 +386,37 @@ export async function updateShiftDetail(
   if (input.balanceChecks && input.balanceChecks.length) {
     const existing = await db.select().from(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));
     const updates = new Map(input.balanceChecks.map((b) => [b.channelKey, b.actualBalance]));
+
+    // Recompute expectedBalance fresh instead of trusting the frozen value — see the
+    // recomputeExpectedBalances doc comment above. Bounded at this shift's own closedAt, exactly
+    // like the original closeShift() computation, so re-running this doesn't pull in activity
+    // from AFTER this shift (which belongs to whatever shift closed next).
+    let freshBalanceByAccountId: Map<string, number> | null = null;
+    let freshDepositChannelsByKey: Map<string, typeof depositBalanceChannels.$inferSelect> | null = null;
+    if (input.recomputeExpectedBalances && shift.closedAt) {
+      const tb = await computeTrialBalance(shift.outletId, undefined, shift.closedAt);
+      freshBalanceByAccountId = new Map(tb.map((r) => [r.accountId, r.balance]));
+      freshDepositChannelsByKey = new Map(
+        (await db.select().from(depositBalanceChannels).where(eq(depositBalanceChannels.outletId, shift.outletId))).map((dc) => [dc.channelKey, dc])
+      );
+    }
+
     for (const row of existing) {
       if (!updates.has(row.channelKey)) continue;
       const actualBalance = updates.get(row.channelKey)!;
+      let expectedBalance = row.expectedBalance;
+      if (freshBalanceByAccountId && freshDepositChannelsByKey) {
+        const depositChannel = freshDepositChannelsByKey.get(row.channelKey);
+        if (depositChannel) {
+          expectedBalance = freshBalanceByAccountId.get(depositChannel.accountId) ?? 0;
+        } else if (row.cashBankAccountId) {
+          const [cba] = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.id, row.cashBankAccountId)).limit(1);
+          expectedBalance = cba ? freshBalanceByAccountId.get(cba.accountId) ?? 0 : row.expectedBalance;
+        }
+      }
       await db
         .update(shiftBalanceChecks)
-        .set({ actualBalance, variance: actualBalance - row.expectedBalance })
+        .set({ actualBalance, expectedBalance, variance: actualBalance - expectedBalance })
         .where(eq(shiftBalanceChecks.id, row.id));
     }
     balanceCheckRows = await db.select().from(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));

@@ -158,6 +158,89 @@ function ResetDataSection() {
   );
 }
 
+/**
+ * One-time repair for the hard-delete bug fixed in lib/ppob/engine.ts (commit 7b8a18e) —
+ * deleting a PPOB transaction that had been voided/edited before left its unpaired reversal
+ * journal entry behind, quietly distorting that channel's balance (e.g. a shift's non-cash
+ * verification showing a negative "Ekspektasi" with no transaction to explain it). The fix only
+ * prevents new occurrences; this card finds and removes leftover orphans already in the ledger.
+ * See lib/accounting/orphan-cleanup.ts for exactly what "orphaned" means here — never touches an
+ * entry with a live, existing transaction behind it.
+ */
+function PpobOrphanCleanupSection() {
+  const { t } = useDashboardLang();
+  const [report, setReport] = useState<{ orphanedEntryCount: number; impact: { accountCode: string; accountName: string; netAmount: number }[] } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+
+  const checkNow = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/ppob-orphan-cleanup");
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setReport(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cleanNow = async () => {
+    if (!report || report.orphanedEntryCount === 0) return;
+    if (!(await showConfirm(
+      t("admin.ppobCleanup.confirmMessage", "Hapus {count} entri jurnal PPOB yatim ini? Ini hanya menghapus entri yang transaksinya sudah tidak ada sama sekali — tidak menyentuh transaksi yang masih hidup.").replace("{count}", String(report.orphanedEntryCount))
+    ))) return;
+    setCleaning(true);
+    try {
+      const res = await fetch("/api/admin/ppob-orphan-cleanup", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      await showAlert(t("admin.ppobCleanup.doneMessage", "Selesai. {count} entri jurnal yatim dihapus — saldo yang terdampak sudah dikoreksi.").replace("{count}", String(data.removedEntries)));
+      setReport(null);
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  return (
+    <Card className="border border-amber-600/40 space-y-3">
+      <h2 className="font-medium text-amber-400">{t("admin.ppobCleanup.title", "Bersihkan Jurnal PPOB Yatim (Perbaikan Saldo Minus)")}</h2>
+      <p className="text-sm text-neutral-400">
+        {t(
+          "admin.ppobCleanup.desc",
+          "Kalau kamu pernah melihat saldo channel PPOB/non-tunai yang aneh (misalnya minus) padahal transaksinya sudah dihapus, itu kemungkinan sisa dari bug lama yang sudah diperbaiki. Klik \"Cek Sekarang\" untuk melihat apakah outlet ini terdampak, lalu \"Bersihkan\" untuk menghapus sisa-sisanya. Tidak menyentuh transaksi yang masih ada."
+        )}
+      </p>
+      <div className="flex gap-2">
+        <Button variant="secondary" onClick={checkNow} disabled={loading}>
+          {loading ? t("admin.ppobCleanup.checking", "Mengecek...") : t("admin.ppobCleanup.checkBtn", "Cek Sekarang")}
+        </Button>
+        {report && report.orphanedEntryCount > 0 && (
+          <Button variant="danger" onClick={cleanNow} disabled={cleaning}>
+            {cleaning ? t("admin.ppobCleanup.cleaning", "Membersihkan...") : t("admin.ppobCleanup.cleanBtn", "Bersihkan {count} Entri").replace("{count}", String(report.orphanedEntryCount))}
+          </Button>
+        )}
+      </div>
+      {report && (
+        <div className="text-sm">
+          {report.orphanedEntryCount === 0 ? (
+            <span className="text-emerald-400">{t("admin.ppobCleanup.clean", "Bersih — tidak ada entri jurnal yatim ditemukan.")}</span>
+          ) : (
+            <div className="space-y-1">
+              <div className="text-amber-400">{t("admin.ppobCleanup.foundCount", "Ditemukan {count} entri jurnal yatim, berdampak pada akun:").replace("{count}", String(report.orphanedEntryCount))}</div>
+              {report.impact.map((i) => (
+                <div key={i.accountCode} className="text-xs text-neutral-400 pl-2">
+                  {i.accountCode} — {i.accountName}: <span className={i.netAmount < 0 ? "text-red-400" : "text-amber-400"}>Rp{i.netAmount.toLocaleString("id-ID")}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function AdminDataPage() {
   const { t } = useDashboardLang();
   const { user, loading } = useAuth();
@@ -329,6 +412,7 @@ export default function AdminDataPage() {
         </Card>
       )}
 
+      {canResetData && <PpobOrphanCleanupSection />}
       {canResetData && <ResetDataSection />}
     </div>
   );

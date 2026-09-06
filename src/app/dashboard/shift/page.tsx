@@ -77,6 +77,7 @@ export default function ShiftPage() {
   const [editQtyByDenom, setEditQtyByDenom] = useState<Record<number, number>>({});
   const [editBalanceChecks, setEditBalanceChecks] = useState<{ channelKey: string; label: string; actualBalance: number; expectedBalance: number }[]>([]);
   const [editNotes, setEditNotes] = useState("");
+  const [editRecomputeExpected, setEditRecomputeExpected] = useState(false);
   // Plain-language walkthrough for outlet staff who find the shift-close form confusing — starts
   // open since that's exactly the audience that needs it, but collapsible so it doesn't get in
   // the way once someone's done this a hundred times.
@@ -256,6 +257,7 @@ export default function ShiftPage() {
     }
     setEditingShiftId(s.id);
     setEditLoading(true);
+    setEditRecomputeExpected(false);
     try {
       const detail = await fetchJsonObject<{ shift: any; cashCounts: { denomination: number; qty: number }[]; balanceChecks: { channelKey: string; label: string; actualBalance: number; expectedBalance: number }[] }>(
         `/api/shifts/${s.id}`
@@ -288,11 +290,13 @@ export default function ShiftPage() {
           notes: editNotes,
           cashCounts: cashDenominations.map((d) => ({ denomination: d, qty: editQtyByDenom[d] || 0 })),
           balanceChecks: editBalanceChecks.map((b) => ({ channelKey: b.channelKey, actualBalance: b.actualBalance })),
+          recomputeExpectedBalances: editRecomputeExpected,
         }),
       });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
       setEditingShiftId(null);
+      setEditRecomputeExpected(false);
       if (outletId) fetchJsonArray(`/api/shifts?outletId=${outletId}`).then(setHistory);
     } finally {
       setEditSaving(false);
@@ -663,6 +667,15 @@ export default function ShiftPage() {
                                   '"Ekspektasi" adalah saldo yang seharusnya ada menurut sistem (tidak ikut berubah kalau kamu edit) — kalau kamu ubah "Aktual", "Selisih" di sebelahnya otomatis dihitung ulang: Aktual dikurangi Ekspektasi.'
                                 )}
                               </p>
+                              <label className="flex items-start gap-2 text-xs text-amber-400 mb-2 rounded-lg border border-amber-600/30 px-3 py-2">
+                                <input type="checkbox" className="mt-0.5" checked={editRecomputeExpected} onChange={(e) => setEditRecomputeExpected(e.target.checked)} />
+                                <span>
+                                  {t(
+                                    "shift.editRecomputeExpectedLabel",
+                                    'Hitung ulang "Ekspektasi" dari data sistem saat ini, bukan pakai angka lama. Gunakan HANYA kalau angka Ekspektasi lama diketahui salah karena bug data (misalnya sisa jurnal yatim yang sudah dibersihkan lewat halaman Admin Data) — jangan dipakai untuk menutupi selisih sungguhan.'
+                                  )}
+                                </span>
+                              </label>
                               <div className="grid grid-cols-1 gap-2">
                                 {editBalanceChecks.map((b, i) => {
                                   const variance = b.actualBalance - b.expectedBalance;

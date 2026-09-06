@@ -44,6 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       notes: body.notes,
       cashCounts: body.cashCounts,
       balanceChecks: body.balanceChecks,
+      recomputeExpectedBalances: Boolean(body.recomputeExpectedBalances),
     });
     return NextResponse.json(result);
   } catch (err: unknown) {
