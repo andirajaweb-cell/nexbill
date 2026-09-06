@@ -41,13 +41,15 @@ const DROPDOWN_LIMIT = 5;
 export function TopBar() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   // Was a hand-rolled useEffect + setInterval(load, 60000) — moved to useApi/SWR so this poll
   // (which runs on every dashboard page, since TopBar lives in the persistent layout) pauses
   // automatically when the browser tab is backgrounded, and so `mutate()` below can do an
   // optimistic local update on mark-as-read without a full extra round trip. See
   // src/lib/api/use-api.ts for what this wrapper adds over a plain fetch.
-  const { data, mutate } = useApi<{ items: NotificationItem[]; unreadCount: number }>("/api/notifications", { refreshInterval: 60000 });
+  // ?lang= is part of the SWR cache key, so switching language re-fetches with the new locale
+  // automatically instead of showing stale-language text until the next 60s poll.
+  const { data, mutate } = useApi<{ items: NotificationItem[]; unreadCount: number }>(`/api/notifications?lang=${lang}`, { refreshInterval: 60000 });
   const items = data?.items ?? [];
   const unreadCount = data?.unreadCount ?? 0;
   const [open, setOpen] = useState(false);

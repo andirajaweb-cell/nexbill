@@ -3,6 +3,13 @@ import { and, eq, or, isNull, sql } from "drizzle-orm";
 import { products, approvalRequests, expenses, bookings, subscriptions, notificationReads, platformAnnouncements, outlets } from "@/db/schema";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { listUnitsNeedingMaintenance } from "@/lib/rental/maintenance";
+import { translate, type LangCode } from "@/lib/i18n/registry";
+// Side-effect imports — this module runs server-side (API routes), so it can't rely on some
+// client page having already registered these dictionaries; each must be imported directly by
+// whatever server module actually calls translate() with its keys. dict-staff's approvalType.*
+// keys are reused here instead of duplicating another 6-language translation for the same labels.
+import "@/lib/i18n/dict-notifications";
+import "@/lib/i18n/dict-staff";
 
 export type NotificationSeverity = "info" | "warning" | "critical";
 
@@ -26,12 +33,15 @@ export type NotificationItem = {
   read: boolean;
 };
 
-const APPROVAL_TYPE_LABEL: Record<string, string> = {
-  void_order: "Void Order",
-  void_item: "Void Item",
-  refund: "Refund",
-  discount_override: "Override Diskon",
-  cancel_session: "Batal Sesi",
+/** Keyed to the same staff.approvalType.* strings the Staff page already uses (dict-staff.ts) — one 6-language translation, reused here instead of duplicated. */
+const APPROVAL_TYPE_KEY: Record<string, string> = {
+  void_order: "staff.approvalType.voidOrder",
+  void_item: "staff.approvalType.voidItem",
+  refund: "staff.approvalType.refund",
+  discount_override: "staff.approvalType.discountOverride",
+  cancel_session: "staff.approvalType.cancelSession",
+  shift_close_review: "staff.approvalType.shiftCloseReview",
+  cash_transfer: "staff.approvalType.cashTransfer",
 };
 
 function daysUntil(iso: string): number {
@@ -39,7 +49,7 @@ function daysUntil(iso: string): number {
 }
 
 // ---- Low stock (everyone) ----
-async function lowStockItems(outletId: string): Promise<NotificationItem[]> {
+async function lowStockItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
   const rows = await db
     .select()
     .from(products)
@@ -48,8 +58,12 @@ async function lowStockItems(outletId: string): Promise<NotificationItem[]> {
     key: `low_stock:${p.id}`,
     type: "low_stock" as const,
     severity: p.stockQty <= 0 ? ("critical" as const) : ("warning" as const),
-    title: "Stok menipis",
-    message: `${p.name} tersisa ${p.stockQty} ${p.unit} (ambang batas ${p.lowStockThreshold})`,
+    title: translate(lang, "notifications.lowStock.title", "Stok menipis"),
+    message: translate(lang, "notifications.lowStock.message", "{name} tersisa {qty} {unit} (ambang batas {threshold})")
+      .replace("{name}", p.name)
+      .replace("{qty}", String(p.stockQty))
+      .replace("{unit}", p.unit)
+      .replace("{threshold}", String(p.lowStockThreshold)),
     link: "/dashboard/inventory",
     createdAt: p.updatedAt,
     read: false,
@@ -57,7 +71,7 @@ async function lowStockItems(outletId: string): Promise<NotificationItem[]> {
 }
 
 // ---- Pending void/refund/etc. approvals (only those who can decide them) ----
-async function approvalItems(outletId: string): Promise<NotificationItem[]> {
+async function approvalItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
   const rows = await db
     .select()
     .from(approvalRequests)
@@ -66,8 +80,10 @@ async function approvalItems(outletId: string): Promise<NotificationItem[]> {
     key: `approval:${a.id}`,
     type: "approval_pending" as const,
     severity: "warning" as const,
-    title: `Persetujuan ${APPROVAL_TYPE_LABEL[a.type] ?? a.type}`,
-    message: a.reason ?? `Menunggu persetujuan (${a.refType})`,
+    title: `${translate(lang, "notifications.approvalPending.titlePrefix", "Persetujuan")} ${
+      APPROVAL_TYPE_KEY[a.type] ? translate(lang, APPROVAL_TYPE_KEY[a.type], a.type) : a.type
+    }`,
+    message: a.reason ?? translate(lang, "notifications.approvalPending.messageFallback", "Menunggu persetujuan ({refType})").replace("{refType}", a.refType),
     link: "/dashboard/staff",
     createdAt: a.createdAt,
     read: false,
@@ -75,7 +91,7 @@ async function approvalItems(outletId: string): Promise<NotificationItem[]> {
 }
 
 // ---- Pending expense approvals (only those who can approve expenses) ----
-async function expenseItems(outletId: string): Promise<NotificationItem[]> {
+async function expenseItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
   const rows = await db
     .select()
     .from(expenses)
@@ -84,7 +100,7 @@ async function expenseItems(outletId: string): Promise<NotificationItem[]> {
     key: `expense:${e.id}`,
     type: "expense_pending" as const,
     severity: "warning" as const,
-    title: "Expense butuh persetujuan",
+    title: translate(lang, "notifications.expensePending.title", "Expense butuh persetujuan"),
     message: `${e.expenseNumber} — ${e.description ?? e.category} (Rp${e.amount.toLocaleString("id-ID")})`,
     link: "/dashboard/expenses",
     createdAt: e.createdAt,
@@ -93,7 +109,7 @@ async function expenseItems(outletId: string): Promise<NotificationItem[]> {
 }
 
 // ---- Pending bookings needing confirmation (only those who manage bookings) ----
-async function bookingItems(outletId: string): Promise<NotificationItem[]> {
+async function bookingItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
   const rows = await db
     .select()
     .from(bookings)
@@ -102,8 +118,8 @@ async function bookingItems(outletId: string): Promise<NotificationItem[]> {
     key: `booking:${b.id}`,
     type: "booking_pending" as const,
     severity: "info" as const,
-    title: "Booking baru menunggu konfirmasi",
-    message: `${b.customerName ?? "Pelanggan"} — ${new Date(b.scheduledStart).toLocaleString("id-ID")}`,
+    title: translate(lang, "notifications.bookingPending.title", "Booking baru menunggu konfirmasi"),
+    message: `${b.customerName ?? translate(lang, "notifications.bookingPending.customerFallback", "Pelanggan")} — ${new Date(b.scheduledStart).toLocaleString("id-ID")}`,
     link: "/dashboard/booking",
     createdAt: b.createdAt,
     read: false,
@@ -111,7 +127,7 @@ async function bookingItems(outletId: string): Promise<NotificationItem[]> {
 }
 
 // ---- Subscription/billing state (only those who manage settings/billing) ----
-async function subscriptionItems(outletId: string): Promise<NotificationItem[]> {
+async function subscriptionItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
   const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.outletId, outletId)).limit(1);
   if (!sub) return [];
   if (sub.status === "trial") {
@@ -122,8 +138,11 @@ async function subscriptionItems(outletId: string): Promise<NotificationItem[]> 
         key: `subscription:${sub.id}:trial`,
         type: "subscription_trial",
         severity: left <= 1 ? "critical" : "warning",
-        title: "Masa trial akan berakhir",
-        message: left <= 0 ? "Masa trial berakhir hari ini." : `Sisa ${left} hari lagi.`,
+        title: translate(lang, "notifications.subscriptionTrial.endingTitle", "Masa trial akan berakhir"),
+        message:
+          left <= 0
+            ? translate(lang, "notifications.subscriptionTrial.endsToday", "Masa trial berakhir hari ini.")
+            : translate(lang, "notifications.subscriptionTrial.daysLeft", "Sisa {n} hari lagi.").replace("{n}", String(left)),
         link: "/dashboard/billing",
         createdAt: sub.trialEndsAt,
         read: false,
@@ -136,8 +155,8 @@ async function subscriptionItems(outletId: string): Promise<NotificationItem[]> 
         key: `subscription:${sub.id}:expired`,
         type: "subscription_trial",
         severity: "critical",
-        title: "Masa trial sudah berakhir",
-        message: "Berlangganan sekarang supaya sistem tidak terkunci.",
+        title: translate(lang, "notifications.subscriptionTrial.expiredTitle", "Masa trial sudah berakhir"),
+        message: translate(lang, "notifications.subscriptionTrial.expiredMessage", "Berlangganan sekarang supaya sistem tidak terkunci."),
         link: "/dashboard/billing",
         createdAt: sub.updatedAt,
         read: false,
@@ -150,8 +169,12 @@ async function subscriptionItems(outletId: string): Promise<NotificationItem[]> 
         key: `subscription:${sub.id}:${sub.status}`,
         type: "subscription_trial",
         severity: "critical",
-        title: sub.status === "grace" ? "Pembayaran langganan gagal" : "Langganan disuspend",
-        message: "Segera selesaikan pembayaran di halaman Langganan.",
+        title: translate(
+          lang,
+          sub.status === "grace" ? "notifications.subscriptionTrial.graceTitle" : "notifications.subscriptionTrial.suspendedTitle",
+          sub.status === "grace" ? "Pembayaran langganan gagal" : "Langganan disuspend"
+        ),
+        message: translate(lang, "notifications.subscriptionTrial.resolveMessage", "Segera selesaikan pembayaran di halaman Langganan."),
         link: "/dashboard/billing",
         createdAt: sub.updatedAt,
         read: false,
@@ -180,7 +203,7 @@ async function announcementItems(outletId: string): Promise<NotificationItem[]> 
 }
 
 // ---- Predictive maintenance (only those who control devices/units) ----
-async function maintenanceItems(outletId: string): Promise<NotificationItem[]> {
+async function maintenanceItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
   const [outlet] = await db.select({ notifyMaintenanceDue: outlets.notifyMaintenanceDue }).from(outlets).where(eq(outlets.id, outletId)).limit(1);
   if (outlet && !outlet.notifyMaintenanceDue) return [];
 
@@ -189,10 +212,17 @@ async function maintenanceItems(outletId: string): Promise<NotificationItem[]> {
     key: `maintenance:${unit.id}`,
     type: "maintenance_due" as const,
     severity: status.overdueHours > 0 ? ("critical" as const) : ("warning" as const),
-    title: "Unit butuh servis",
-    message: `${unit.name} sudah dipakai ${status.hoursSinceService} jam sejak servis terakhir (ambang batas ${status.thresholdHours} jam)${
-      status.overdueHours > 0 ? ` — lewat ${status.overdueHours} jam` : ""
-    }`,
+    title: translate(lang, "notifications.maintenanceDue.title", "Unit butuh servis"),
+    message: translate(lang, "notifications.maintenanceDue.message", "{name} sudah dipakai {hours} jam sejak servis terakhir (ambang batas {threshold} jam){overdue}")
+      .replace("{name}", unit.name)
+      .replace("{hours}", String(status.hoursSinceService))
+      .replace("{threshold}", String(status.thresholdHours))
+      .replace(
+        "{overdue}",
+        status.overdueHours > 0
+          ? translate(lang, "notifications.maintenanceDue.overdueSuffix", " — lewat {overdue} jam").replace("{overdue}", String(status.overdueHours))
+          : ""
+      ),
     link: "/dashboard/rental",
     createdAt: unit.updatedAt,
     read: false,
@@ -230,18 +260,19 @@ async function readKeysFor(staffUserId: string): Promise<Set<string>> {
 export async function getNotifications(
   outletId: string,
   staffUserId: string,
-  role: StaffRole
+  role: StaffRole,
+  lang: LangCode = "id"
 ): Promise<{ items: NotificationItem[]; unreadCount: number }> {
-  const sourcePromises: Promise<NotificationItem[]>[] = [lowStockItems(outletId), announcementItems(outletId)];
-  if (hasPermission(role, "approve_requests")) sourcePromises.push(approvalItems(outletId));
-  if (hasPermission(role, "approve_expenses")) sourcePromises.push(expenseItems(outletId));
-  if (hasPermission(role, "manage_bookings")) sourcePromises.push(bookingItems(outletId));
-  if (hasPermission(role, "manage_devices")) sourcePromises.push(maintenanceItems(outletId));
+  const sourcePromises: Promise<NotificationItem[]>[] = [lowStockItems(outletId, lang), announcementItems(outletId)];
+  if (hasPermission(role, "approve_requests")) sourcePromises.push(approvalItems(outletId, lang));
+  if (hasPermission(role, "approve_expenses")) sourcePromises.push(expenseItems(outletId, lang));
+  if (hasPermission(role, "manage_bookings")) sourcePromises.push(bookingItems(outletId, lang));
+  if (hasPermission(role, "manage_devices")) sourcePromises.push(maintenanceItems(outletId, lang));
   // Only Superuser (NEXBILL's own internal/testing account) is exempt from the subscription/
   // trial feature — Owner is the role every real paying merchant uses day to day, so it must
   // still get these warnings; suppressing them for Owner would mean the business never sees a
   // heads-up before SubscriptionGate locks its own dashboard.
-  if (role !== "superuser" && hasPermission(role, "manage_settings")) sourcePromises.push(subscriptionItems(outletId));
+  if (role !== "superuser" && hasPermission(role, "manage_settings")) sourcePromises.push(subscriptionItems(outletId, lang));
 
   const [sources, readKeys] = await Promise.all([Promise.all(sourcePromises), readKeysFor(staffUserId)]);
   const items = sources.flat();

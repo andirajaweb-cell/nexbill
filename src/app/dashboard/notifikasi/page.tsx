@@ -25,21 +25,23 @@ const TYPE_LABEL_META: Record<string, { key: string; fallback: string }> = {
 };
 
 export default function NotifikasiPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
   const load = () => {
-    fetchJsonObject<{ items: NotificationItem[]; unreadCount: number }>("/api/notifications").then((data) => {
+    fetchJsonObject<{ items: NotificationItem[]; unreadCount: number }>(`/api/notifications?lang=${lang}`).then((data) => {
       if (data) setItems(data.items);
       setLoading(false);
     });
   };
 
+  // Re-fetch whenever the dashboard language changes so item.title/message (baked server-side
+  // via lib/notifications/index.ts) switch languages immediately instead of needing a manual reload.
   useEffect(() => {
     load();
-  }, []);
+  }, [lang]);
 
   const markRead = async (key: string) => {
     setItems((prev) => prev.map((i) => (i.key === key ? { ...i, read: true } : i)));

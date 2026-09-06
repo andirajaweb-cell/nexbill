@@ -9,7 +9,11 @@ import { registerDict } from "./registry";
  * intentionally NOT part of this dictionary.
  */
 registerDict({
-  // --- Notification toggles (predictive-maintenance addition) ---
+  // --- Predictive-maintenance addition (genuinely new — see lib/rental/maintenance.ts) ---
+  // settings.common.* and settings.notification.* (heading/desc/savedAlert/saveButton/the other
+  // 4 toggle labels) turned out to ALREADY be fully registered further down this same file
+  // (originally missed due to a bad grep pattern) — only the maintenance-specific keys below are
+  // actually new, added here rather than duplicating the already-correct entries below.
   "settings.notification.toggle.maintenanceDue": { id: "Unit Butuh Servis", en: "Unit Needs Service", ms: "Unit Perlu Servis", th: "เครื่องต้องซ่อมบำรุง", fil: "Kailangan ng Serbisyo ang Unit", vi: "Máy cần bảo trì" },
   "settings.maintenance.heading": { id: "Maintenance Prediktif Unit", en: "Predictive Unit Maintenance", ms: "Penyelenggaraan Prediktif Unit", th: "การบำรุงรักษาเชิงพยากรณ์ของเครื่อง", fil: "Predictive Maintenance ng Unit", vi: "Bảo trì dự đoán cho máy" },
   "settings.maintenance.desc": {
