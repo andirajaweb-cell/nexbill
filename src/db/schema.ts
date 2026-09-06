@@ -290,6 +290,17 @@ export const products = pgTable(
     preferredSupplierId: text("preferred_supplier_id").references(() => suppliers.id),
     unit: text("unit").notNull().default("pcs"),
     isActive: boolean("is_active").notNull().default(true),
+    // Whether an order line for this product should land in Kitchen Display (/dashboard/kitchen)
+    // or skip straight to "served". NULL (the default for every product — old or newly created)
+    // means "not explicitly set, use the automatic fallback" — see
+    // src/lib/kitchen/routing.ts's resolveKitchenStatus for the exact resolution order (explicit
+    // value here wins; else an active Recipe/BOM implies it's actually prepared; else the legacy
+    // food/drink/coffee/snack/dessert category guess). Nullable on purpose so this ships with zero
+    // data migration: every existing product keeps behaving exactly as it did under the old
+    // category-only logic until an outlet explicitly flips the "Kirim ke Kitchen Display" checkbox
+    // on the Produk tab — e.g. to turn it OFF for a packaged/pre-made drink or snack that sits in
+    // the "drink"/"snack" category but was never actually made by the kitchen.
+    sendToKitchen: boolean("send_to_kitchen"),
     ...timestamps,
   },
   (t) => [index("products_outlet_idx").on(t.outletId)]

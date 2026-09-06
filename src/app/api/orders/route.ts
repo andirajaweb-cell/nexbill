@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { orders, orderItems, outlets, rentalSessions } from "@/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { orders, orderItems, outlets, rentalSessions, products, recipes } from "@/db/schema";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { validateVoucher, consumeVoucher } from "@/lib/pos/vouchers";
 import { getOpenBillForSession, addItemsToBill } from "@/lib/pos/bill";
 import { deductStockForItem } from "@/lib/inventory/stock";
+import { resolveKitchenStatus } from "@/lib/kitchen/routing";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 
@@ -122,8 +123,25 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
+    // Same kitchen-routing resolution as the rental-session bill path (addItemsToBill) — a
+    // standalone walk-in order used to always default to kitchenStatus "served" (the schema
+    // default) regardless of what was actually ordered, so F&B sold this way silently never
+    // reached Kitchen Display at all. Batch-resolved up front, same as addItemsToBill.
+    const standaloneProductIds = Array.from(new Set(lineItems.map((i) => i.productId).filter((id): id is string => !!id)));
+    const standaloneProductRows = standaloneProductIds.length
+      ? await db.select({ id: products.id, category: products.category, sendToKitchen: products.sendToKitchen }).from(products).where(inArray(products.id, standaloneProductIds))
+      : [];
+    const standaloneProductById = new Map(standaloneProductRows.map((p) => [p.id, p]));
+    const standaloneRecipeRows = standaloneProductIds.length
+      ? await db.select({ productId: recipes.productId }).from(recipes).where(inArray(recipes.productId, standaloneProductIds))
+      : [];
+    const standaloneProductIdsWithRecipe = new Set(standaloneRecipeRows.map((r) => r.productId));
+
     for (const item of lineItems) {
-      await db.insert(orderItems).values({ orderId: order.id, ...item, itemType: "product" });
+      const kitchenStatus = item.productId
+        ? resolveKitchenStatus(standaloneProductById.get(item.productId), standaloneProductIdsWithRecipe.has(item.productId))
+        : "served";
+      await db.insert(orderItems).values({ orderId: order.id, ...item, itemType: "product", kitchenStatus });
       if (item.productId) {
         await deductStockForItem(item.productId, item.qty, order.id, staffUserId);
       }

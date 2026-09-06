@@ -1,8 +1,9 @@
 import { db } from "@/db/client";
-import { orders, orderItems, outlets, products, payments } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { orders, orderItems, outlets, products, payments, recipes } from "@/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { deductStockForItem } from "@/lib/inventory/stock";
 import { validateVoucher, consumeVoucher } from "@/lib/pos/vouchers";
+import { resolveKitchenStatus } from "@/lib/kitchen/routing";
 
 export interface BillItemInput {
   productId?: string | null;
@@ -73,24 +74,29 @@ export async function recomputeBillTotals(orderId: string) {
   return updated;
 }
 
-function kitchenStatusForCategory(category?: string | null): "new" | "served" {
-  return category === "food" || category === "drink" || category === "snack" ? "new" : "served";
-}
-
 /** Add F&B (or any product) items to an already-open bill mid-session — no new invoice, stock deducts immediately. */
 export async function addItemsToBill(orderId: string, items: BillItemInput[], staffUserId?: string) {
   const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!order) throw new Error("Bill tidak ditemukan.");
   if (order.status !== "open") throw new Error("Bill sudah ditutup, tidak bisa menambah item baru.");
 
+  // Batch-resolve kitchen routing for every product in this call up front (one query each,
+  // regardless of how many line items reference the same product) instead of a query per item —
+  // see lib/kitchen/routing.ts's resolveKitchenStatus for the actual decision logic.
+  const productIds = Array.from(new Set(items.map((i) => i.productId).filter((id): id is string => !!id)));
+  const productRows = productIds.length
+    ? await db.select({ id: products.id, category: products.category, sendToKitchen: products.sendToKitchen }).from(products).where(inArray(products.id, productIds))
+    : [];
+  const productById = new Map(productRows.map((p) => [p.id, p]));
+  const recipeRows = productIds.length ? await db.select({ productId: recipes.productId }).from(recipes).where(inArray(recipes.productId, productIds)) : [];
+  const productIdsWithRecipe = new Set(recipeRows.map((r) => r.productId));
+
   for (const item of items) {
     if (item.qty <= 0) throw new Error("Qty item harus lebih dari 0.");
     const lineTotal = item.qty * item.unitPrice;
-    let kitchenStatus: "new" | "served" = "served";
-    if (item.productId) {
-      const [product] = await db.select({ category: products.category }).from(products).where(eq(products.id, item.productId)).limit(1);
-      kitchenStatus = kitchenStatusForCategory(product?.category);
-    }
+    const kitchenStatus = item.productId
+      ? resolveKitchenStatus(productById.get(item.productId), productIdsWithRecipe.has(item.productId))
+      : "served";
     await db.insert(orderItems).values({
       orderId,
       productId: item.productId ?? null,
