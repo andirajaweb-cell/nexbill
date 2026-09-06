@@ -1,11 +1,19 @@
 import { db } from "@/db/client";
 import { and, eq, or, isNull, sql } from "drizzle-orm";
-import { products, approvalRequests, expenses, bookings, subscriptions, notificationReads, platformAnnouncements } from "@/db/schema";
+import { products, approvalRequests, expenses, bookings, subscriptions, notificationReads, platformAnnouncements, outlets } from "@/db/schema";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
+import { listUnitsNeedingMaintenance } from "@/lib/rental/maintenance";
 
 export type NotificationSeverity = "info" | "warning" | "critical";
 
-export type NotificationType = "low_stock" | "approval_pending" | "expense_pending" | "booking_pending" | "subscription_trial" | "announcement";
+export type NotificationType =
+  | "low_stock"
+  | "approval_pending"
+  | "expense_pending"
+  | "booking_pending"
+  | "subscription_trial"
+  | "announcement"
+  | "maintenance_due";
 
 export type NotificationItem = {
   key: string;
@@ -171,6 +179,26 @@ async function announcementItems(outletId: string): Promise<NotificationItem[]> 
   }));
 }
 
+// ---- Predictive maintenance (only those who control devices/units) ----
+async function maintenanceItems(outletId: string): Promise<NotificationItem[]> {
+  const [outlet] = await db.select({ notifyMaintenanceDue: outlets.notifyMaintenanceDue }).from(outlets).where(eq(outlets.id, outletId)).limit(1);
+  if (outlet && !outlet.notifyMaintenanceDue) return [];
+
+  const due = await listUnitsNeedingMaintenance(outletId);
+  return due.map(({ unit, status }) => ({
+    key: `maintenance:${unit.id}`,
+    type: "maintenance_due" as const,
+    severity: status.overdueHours > 0 ? ("critical" as const) : ("warning" as const),
+    title: "Unit butuh servis",
+    message: `${unit.name} sudah dipakai ${status.hoursSinceService} jam sejak servis terakhir (ambang batas ${status.thresholdHours} jam)${
+      status.overdueHours > 0 ? ` — lewat ${status.overdueHours} jam` : ""
+    }`,
+    link: "/dashboard/rental",
+    createdAt: unit.updatedAt,
+    read: false,
+  }));
+}
+
 async function readKeysFor(staffUserId: string): Promise<Set<string>> {
   const reads = await db
     .select({ notificationKey: notificationReads.notificationKey })
@@ -208,6 +236,7 @@ export async function getNotifications(
   if (hasPermission(role, "approve_requests")) sourcePromises.push(approvalItems(outletId));
   if (hasPermission(role, "approve_expenses")) sourcePromises.push(expenseItems(outletId));
   if (hasPermission(role, "manage_bookings")) sourcePromises.push(bookingItems(outletId));
+  if (hasPermission(role, "manage_devices")) sourcePromises.push(maintenanceItems(outletId));
   // Only Superuser (NEXBILL's own internal/testing account) is exempt from the subscription/
   // trial feature — Owner is the role every real paying merchant uses day to day, so it must
   // still get these warnings; suppressing them for Owner would mean the business never sees a

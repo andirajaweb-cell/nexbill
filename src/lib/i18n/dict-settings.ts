@@ -9,6 +9,19 @@ import { registerDict } from "./registry";
  * intentionally NOT part of this dictionary.
  */
 registerDict({
+  // --- Notification toggles (predictive-maintenance addition) ---
+  "settings.notification.toggle.maintenanceDue": { id: "Unit Butuh Servis", en: "Unit Needs Service", ms: "Unit Perlu Servis", th: "เครื่องต้องซ่อมบำรุง", fil: "Kailangan ng Serbisyo ang Unit", vi: "Máy cần bảo trì" },
+  "settings.maintenance.heading": { id: "Maintenance Prediktif Unit", en: "Predictive Unit Maintenance", ms: "Penyelenggaraan Prediktif Unit", th: "การบำรุงรักษาเชิงพยากรณ์ของเครื่อง", fil: "Predictive Maintenance ng Unit", vi: "Bảo trì dự đoán cho máy" },
+  "settings.maintenance.desc": {
+    id: "Ambang jam pakai default sebelum sebuah unit PS ditandai butuh servis (bisa dioverride per unit di halaman Rental).",
+    en: "Default hours-of-use threshold before a PS unit is flagged as needing service (can be overridden per unit on the Rental page).",
+    ms: "Ambang jam penggunaan lalai sebelum unit PS ditanda perlu servis (boleh ditindih setiap unit di halaman Sewa).",
+    th: "เกณฑ์ชั่วโมงการใช้งานเริ่มต้นก่อนที่เครื่อง PS จะถูกทำเครื่องหมายว่าต้องซ่อมบำรุง (สามารถตั้งค่าเฉพาะเครื่องได้ที่หน้ารายการเช่า)",
+    fil: "Default na threshold ng oras ng paggamit bago mamarkahan ang isang PS unit na kailangan ng serbisyo (puwedeng i-override kada unit sa pahina ng Rental).",
+    vi: "Ngưỡng số giờ sử dụng mặc định trước khi một máy PS được đánh dấu cần bảo trì (có thể ghi đè theo từng máy ở trang Thuê).",
+  },
+  "settings.maintenance.thresholdLabel": { id: "Ambang default (jam)", en: "Default threshold (hours)", ms: "Ambang lalai (jam)", th: "เกณฑ์เริ่มต้น (ชม.)", fil: "Default na threshold (oras)", vi: "Ngưỡng mặc định (giờ)" },
+
   // --- Tabs ---
   "settings.tab.businessTax": { id: "Business & Tax", en: "Business & Tax", ms: "Perniagaan & Cukai", th: "ธุรกิจและภาษี", fil: "Negosyo at Buwis", vi: "Doanh nghiệp & Thuế" },
   "settings.tab.preferences": { id: "Preferensi", en: "Preferences", ms: "Keutamaan", th: "การตั้งค่าที่ต้องการ", fil: "Mga Kagustuhan", vi: "Tùy chọn" },

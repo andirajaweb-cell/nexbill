@@ -82,6 +82,11 @@ export const outlets = pgTable("outlets", {
   // "shift_close_review") rather than blocking the cashier from closing out — see closeShift().
   fraudVarianceThreshold: doublePrecision("fraud_variance_threshold").notNull().default(50000),
   fraudVoidCountThreshold: integer("fraud_void_count_threshold").notNull().default(3),
+  // Predictive-maintenance default (see lib/rental/maintenance.ts) — a rental unit is flagged
+  // "due for service" once its cumulative play-hours since last service pass this many hours.
+  // Per-unit override lives on rentalUnits.maintenanceThresholdHours (null = use this default).
+  defaultMaintenanceThresholdHours: integer("default_maintenance_threshold_hours").notNull().default(300),
+  notifyMaintenanceDue: boolean("notify_maintenance_due").notNull().default(true),
   ...timestamps,
 });
 
@@ -176,6 +181,17 @@ export const rentalUnits = pgTable("rental_units", {
   status: text("status", { enum: ["available", "occupied", "booked", "maintenance"] }).notNull().default("available"),
   note: text("note"),
   isActive: boolean("is_active").notNull().default(true),
+  // Predictive maintenance (see lib/rental/maintenance.ts) — totalUsageMinutes accumulates real
+  // elapsed play-time (raw, NOT billing-rounded) every time stopRentalSession() closes a session
+  // on this unit; it never resets, so it stays useful for the unit-performance report too.
+  // usageMinutesAtLastService is a snapshot of totalUsageMinutes taken the moment staff mark the
+  // unit serviced — "hours since service" is always (totalUsageMinutes - usageMinutesAtLastService).
+  // maintenanceThresholdHours is a per-unit override; null falls back to
+  // outlets.defaultMaintenanceThresholdHours.
+  totalUsageMinutes: doublePrecision("total_usage_minutes").notNull().default(0),
+  usageMinutesAtLastService: doublePrecision("usage_minutes_at_last_service").notNull().default(0),
+  lastServicedAt: text("last_serviced_at"),
+  maintenanceThresholdHours: integer("maintenance_threshold_hours"),
   ...timestamps,
 });
 

@@ -364,7 +364,11 @@ export async function stopRentalSession(sessionId: string) {
 
   let deviceWarning: string | null = null;
   if (unit) {
-    await db.update(rentalUnits).set({ status: "available" }).where(eq(rentalUnits.id, unit.id));
+    // Accumulate real elapsed play-time (raw, not billing-rounded) toward this unit's predictive-
+    // maintenance counter — see lib/rental/maintenance.ts. Simplification consistent with
+    // transferRentalSession below: if the session was transferred mid-play, the whole elapsed
+    // duration is attributed to whichever unit it finishes on, not split across units.
+    await db.update(rentalUnits).set({ status: "available", totalUsageMinutes: unit.totalUsageMinutes + elapsedMinutesRaw }).where(eq(rentalUnits.id, unit.id));
     if (unit.deviceId) {
       const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
       if (device) {

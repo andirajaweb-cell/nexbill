@@ -30,6 +30,8 @@ interface RentalUnit {
   status: "available" | "occupied" | "booked" | "maintenance";
   deviceId: string | null;
   isActive?: boolean;
+  maintenance?: { hoursSinceService: number; thresholdHours: number; isDue: boolean; overdueHours: number };
+  maintenanceThresholdHours?: number | null;
 }
 
 interface RentalSession {
@@ -346,7 +348,9 @@ export default function RentalPage() {
   const [customerMode, setCustomerMode] = useState<"non_member" | "member">("non_member");
   const [showUnitManager, setShowUnitManager] = useState(false);
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
-  const [unitForm, setUnitForm] = useState({ name: "", consoleType: "ps4", tvType: "smart_tv", hourlyRate: 0, note: "" });
+  const [unitForm, setUnitForm] = useState<{ name: string; consoleType: string; tvType: string; hourlyRate: number; note: string; maintenanceThresholdHours: number | null }>({
+    name: "", consoleType: "ps4", tvType: "smart_tv", hourlyRate: 0, note: "", maintenanceThresholdHours: null,
+  });
   const [addingUnit, setAddingUnit] = useState(false);
   const [transferUnitFor, setTransferUnitFor] = useState<string | null>(null);
   const [extendSessionFor, setExtendSessionFor] = useState<string | null>(null);
@@ -712,13 +716,13 @@ export default function RentalPage() {
   };
 
   const startNewUnit = () => {
-    setUnitForm({ name: "", consoleType: "ps4", tvType: "smart_tv", hourlyRate: 0, note: "" });
+    setUnitForm({ name: "", consoleType: "ps4", tvType: "smart_tv", hourlyRate: 0, note: "", maintenanceThresholdHours: null });
     setEditingUnitId(null);
     setAddingUnit(true);
   };
 
   const startEditUnit = (unit: RentalUnit) => {
-    setUnitForm({ name: unit.name, consoleType: unit.consoleType, tvType: unit.tvType, hourlyRate: unit.hourlyRate, note: "" });
+    setUnitForm({ name: unit.name, consoleType: unit.consoleType, tvType: unit.tvType, hourlyRate: unit.hourlyRate, note: "", maintenanceThresholdHours: unit.maintenanceThresholdHours ?? null });
     setEditingUnitId(unit.id);
     setAddingUnit(false);
   };
@@ -799,6 +803,19 @@ export default function RentalPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: goingUnderMaintenance ? "maintenance" : "available" }),
     });
+    if (!res.ok) return showAlert((await res.json()).error);
+    load();
+  };
+
+  /** Resets a unit's predictive-maintenance counter after staff have physically serviced it (see lib/rental/maintenance.ts). */
+  const markServiced = async (unit: RentalUnit) => {
+    if (
+      !(await showConfirm(
+        t("rental.confirmMarkServiced", "Tandai {unit} sudah diservis? Penghitung jam pemakaian sejak servis terakhir akan direset ke 0.").replace("{unit}", unit.name)
+      ))
+    )
+      return;
+    const res = await fetch(`/api/rental-units/${unit.id}/mark-serviced`, { method: "POST" });
     if (!res.ok) return showAlert((await res.json()).error);
     load();
   };
@@ -1021,6 +1038,14 @@ export default function RentalPage() {
                   <span className="text-xs text-neutral-500 ml-2 uppercase">{unit.consoleType} · {unit.tvType.replace("_", " ")} · {rupiah(unit.hourlyRate)}{t("rental.perHourSuffix", "/jam")}</span>
                   {unit.isActive === false && <span className="text-xs text-rose-400 ml-2">{t("rental.inactiveTag", "(nonaktif)")}</span>}
                   {unit.isActive !== false && unit.status === "maintenance" && <span className="text-xs text-amber-400 ml-2">{t("rental.maintenanceHiddenTag", "(maintenance — disembunyikan dari booking online)")}</span>}
+                  {unit.isActive !== false && unit.maintenance?.isDue && (
+                    <span className={`text-xs ml-2 inline-flex items-center gap-1 ${unit.maintenance.overdueHours > 0 ? "text-rose-400" : "text-amber-400"}`}>
+                      <Wrench size={11} />
+                      {t("rental.maintenanceDueTag", "Butuh servis — {hours} jam pakai (ambang {threshold} jam)")
+                        .replace("{hours}", String(unit.maintenance.hoursSinceService))
+                        .replace("{threshold}", String(unit.maintenance.thresholdHours))}
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   {unit.isActive === false ? (
@@ -1032,6 +1057,11 @@ export default function RentalPage() {
                       <Button variant="ghost" className="text-xs flex items-center gap-1" onClick={() => startEditUnit(unit)}>
                         <Pencil size={12} /> {t("rental.editUnit", "Edit")}
                       </Button>
+                      {unit.maintenance?.isDue && (
+                        <Button variant="ghost" className="text-xs flex items-center gap-1 text-emerald-400" onClick={() => markServiced(unit)}>
+                          <BadgeCheck size={12} /> {t("rental.markServiced", "Tandai Sudah Diservis")}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         className={`text-xs flex items-center gap-1 ${unit.status === "maintenance" ? "text-emerald-400" : "text-amber-400"}`}
@@ -1068,6 +1098,18 @@ export default function RentalPage() {
               </div>
               <input type="number" className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm" placeholder={t("rental.hourlyRatePlaceholder", "Tarif per jam (Rp)")}
                 value={unitForm.hourlyRate || ""} onChange={(e) => setUnitForm((f) => ({ ...f, hourlyRate: Number(e.target.value) }))} />
+              {editingUnitId && (
+                <div>
+                  <input
+                    type="number"
+                    className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                    placeholder={t("rental.maintenanceThresholdPlaceholder", "Ambang servis (jam) — kosongkan untuk pakai default outlet")}
+                    value={unitForm.maintenanceThresholdHours ?? ""}
+                    onChange={(e) => setUnitForm((f) => ({ ...f, maintenanceThresholdHours: e.target.value === "" ? null : Number(e.target.value) }))}
+                  />
+                  <p className="text-[10px] text-neutral-600 mt-1">{t("rental.maintenanceThresholdHint", "Unit ini akan ditandai butuh servis setelah jam pakai sejak servis terakhir melewati ambang ini.")}</p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button onClick={saveUnit}>{t("rental.save", "Simpan")}</Button>
                 <Button variant="ghost" onClick={cancelUnitForm}>{t("rental.cancel", "Batal")}</Button>

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { rentalUnits } from "@/db/schema";
+import { rentalUnits, outlets } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { computeMaintenanceStatus } from "@/lib/rental/maintenance";
 
 /**
  * Case/whitespace-insensitive duplicate check, scoped to this outlet's still-active units — two
@@ -23,7 +24,16 @@ export async function GET() {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
     const rows = await db.select().from(rentalUnits).where(eq(rentalUnits.outletId, session.outletId));
-    return NextResponse.json(rows);
+    const [outlet] = await db
+      .select({ defaultMaintenanceThresholdHours: outlets.defaultMaintenanceThresholdHours })
+      .from(outlets)
+      .where(eq(outlets.id, session.outletId))
+      .limit(1);
+    // Attach computed predictive-maintenance status (see lib/rental/maintenance.ts) so the Live
+    // Billing Board can show a "butuh servis" badge without every page needing its own copy of the
+    // threshold math.
+    const withMaintenance = rows.map((u) => ({ ...u, maintenance: computeMaintenanceStatus(u, outlet) }));
+    return NextResponse.json(withMaintenance);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }

@@ -1014,6 +1014,7 @@ function NotificationTab({ outletId, canManage }: { outletId: string; canManage:
     { key: "notifyPendingApproval", labelKey: "settings.notification.toggle.pendingApproval", labelFallback: "Expense Pending Approval" },
     { key: "notifyShiftVariance", labelKey: "settings.notification.toggle.shiftVariance", labelFallback: "Selisih Kas Shift" },
     { key: "notifyBookingReminder", labelKey: "settings.notification.toggle.bookingReminder", labelFallback: "Reminder Booking" },
+    { key: "notifyMaintenanceDue", labelKey: "settings.notification.toggle.maintenanceDue", labelFallback: "Unit Butuh Servis" },
   ];
 
   return (
@@ -1028,6 +1029,23 @@ function NotificationTab({ outletId, canManage }: { outletId: string; canManage:
             </label>
           ))}
         </div>
+      </Card>
+      <Card className="space-y-3">
+        <h2 className="font-medium">{t("settings.maintenance.heading", "Maintenance Prediktif Unit")}</h2>
+        <p className="text-xs text-neutral-500">
+          {t("settings.maintenance.desc", "Ambang jam pakai default sebelum sebuah unit PS ditandai butuh servis (bisa dioverride per unit di halaman Rental).")}
+        </p>
+        <label className="flex items-center gap-2 text-sm max-w-xs">
+          <span className="text-neutral-400 shrink-0">{t("settings.maintenance.thresholdLabel", "Ambang default (jam)")}</span>
+          <input
+            type="number"
+            min={1}
+            className="w-24 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-sm"
+            disabled={!canManage}
+            value={form.defaultMaintenanceThresholdHours ?? 300}
+            onChange={(e) => setForm({ ...form, defaultMaintenanceThresholdHours: Number(e.target.value) })}
+          />
+        </label>
       </Card>
       {canManage && <Button onClick={save} disabled={saving}>{saving ? t("settings.common.saving", "Menyimpan...") : t("settings.notification.saveButton", "Simpan Notifikasi")}</Button>}
     </div>
