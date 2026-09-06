@@ -5,6 +5,9 @@ import { eq } from "drizzle-orm";
 import { buildReportMeta } from "@/lib/reports/meta";
 import { denominationLabel } from "./denominations";
 import { formatMoney, currencyForCountry, type OutletCurrency } from "@/lib/currency/format";
+import { formatDateTime, type DateFormatStyle } from "@/lib/format/date";
+import { translate, type LangCode } from "@/lib/i18n/registry";
+import "@/lib/i18n/dict-shift";
 import type { getShiftDetail } from "./shift";
 
 const PAGE_MARGIN = 40;
@@ -25,6 +28,16 @@ interface Col {
   label: string;
   width: number;
   align?: "left" | "right";
+  /** How to render a numeric cell in this column — "currency" (default) applies the outlet's
+   * money format (e.g. "Rp10.000"); "plain" renders the raw number with no currency symbol, for
+   * counts like "how many Rp50.000 notes" which are a quantity, not an amount of money. Getting
+   * this wrong is exactly how a note count ended up printing as "Rp63" instead of "63". */
+  format?: "currency" | "plain";
+}
+
+function formatCell(cell: string | number, col: Col, currency: OutletCurrency): string {
+  if (typeof cell !== "number") return String(cell ?? "");
+  return col.format === "plain" ? cell.toLocaleString(currency.locale) : formatMoney(cell, currency);
 }
 
 function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (string | number)[][], currency: OutletCurrency, footer?: (string | number)[]): number {
@@ -44,8 +57,7 @@ function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (
     x = PAGE_MARGIN;
     row.forEach((cell, i) => {
       const c = cols[i];
-      const text = typeof cell === "number" ? formatMoney(cell, currency) : String(cell ?? "");
-      doc.text(text, x, y, { width: c.width, align: c.align ?? "left" });
+      doc.text(formatCell(cell, c, currency), x, y, { width: c.width, align: c.align ?? "left" });
       x += c.width;
     });
     y += rowHeight;
@@ -59,8 +71,7 @@ function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (
     x = PAGE_MARGIN;
     footer.forEach((cell, i) => {
       const c = cols[i];
-      const text = typeof cell === "number" ? formatMoney(cell, currency) : String(cell ?? "");
-      doc.text(text, x, y, { width: c.width, align: c.align ?? "left" });
+      doc.text(formatCell(cell, c, currency), x, y, { width: c.width, align: c.align ?? "left" });
       x += c.width;
     });
     y += rowHeight;
@@ -77,13 +88,15 @@ function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (
  * which is the point — a signed paper trail is much harder to dispute or
  * fabricate after the fact than a number in a database alone.
  */
-export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnType<typeof getShiftDetail>>>): Promise<Buffer> {
+export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnType<typeof getShiftDetail>>>, lang: LangCode = "id"): Promise<Buffer> {
   const { shift, cashCounts, balanceChecks } = detail;
+  const t = (key: string, fallback: string) => translate(lang, key, fallback);
   const [staff] = await db.select().from(staffUsers).where(eq(staffUsers.id, shift.staffUserId)).limit(1);
-  const [outlet] = await db.select({ outletCountry: outlets.outletCountry }).from(outlets).where(eq(outlets.id, shift.outletId)).limit(1);
+  const [outlet] = await db.select({ outletCountry: outlets.outletCountry, dateFormat: outlets.dateFormat }).from(outlets).where(eq(outlets.id, shift.outletId)).limit(1);
   const currency = currencyForCountry(outlet?.outletCountry);
+  const dateFormat = (outlet?.dateFormat ?? "dmy") as DateFormatStyle;
   const rupiah = (n: number) => formatMoney(n, currency);
-  const meta = await buildReportMeta(shift.outletId, "Berita Acara Tutup Kasir (Shift Closing Report)", shift.openedAt, shift.closedAt ?? undefined);
+  const meta = await buildReportMeta(shift.outletId, t("shift.pdf.title", "Berita Acara Tutup Kasir (Shift Closing Report)"), shift.openedAt, shift.closedAt ?? undefined);
 
   const doc = new PDFDocument({ size: "A4", margin: PAGE_MARGIN, bufferPages: true });
   let y = PAGE_MARGIN;
@@ -107,13 +120,13 @@ export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnTyp
 
   doc.font("Helvetica").fontSize(9);
   const infoLeft = [
-    ["Kasir", staff?.name ?? shift.staffUserId],
-    ["Dibuka", new Date(shift.openedAt).toLocaleString("id-ID")],
-    ["Ditutup", shift.closedAt ? new Date(shift.closedAt).toLocaleString("id-ID") : "-"],
+    [t("shift.pdf.cashier", "Kasir"), staff?.name ?? shift.staffUserId],
+    [t("shift.pdf.opened", "Dibuka"), formatDateTime(shift.openedAt, dateFormat)],
+    [t("shift.pdf.closed", "Ditutup"), shift.closedAt ? formatDateTime(shift.closedAt, dateFormat) : "-"],
   ];
   const infoRight = [
-    ["Modal Awal", rupiah(shift.openingCash)],
-    ["Status", shift.status === "closed" ? "Ditutup" : "Berjalan"],
+    [t("shift.pdf.openingCash", "Modal Awal"), rupiah(shift.openingCash)],
+    [t("shift.pdf.status", "Status"), shift.status === "closed" ? t("shift.pdf.statusClosed", "Ditutup") : t("shift.pdf.statusRunning", "Berjalan")],
   ];
   let iy = y;
   for (const [label, value] of infoLeft) {
@@ -129,31 +142,32 @@ export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnTyp
   }
   y = Math.max(y + infoLeft.length * 13, iy) + 12;
 
-  doc.font("Helvetica-Bold").fontSize(11).text("Rincian Hitung Fisik Kas (Per Pecahan)", PAGE_MARGIN, y);
+  doc.font("Helvetica-Bold").fontSize(11).text(t("shift.pdf.cashDetailHeading", "Rincian Hitung Fisik Kas (Per Pecahan)"), PAGE_MARGIN, y);
   y = doc.y + 4;
   const cashCols: Col[] = [
-    { label: "Pecahan", width: 150 },
-    { label: "Jumlah Lembar/Keping", width: 150, align: "right" },
-    { label: "Subtotal", width: 155, align: "right" },
+    { label: t("shift.pdf.colDenomination", "Pecahan"), width: 150 },
+    { label: t("shift.pdf.colSheetCount", "Jumlah Lembar/Keping"), width: 150, align: "right", format: "plain" },
+    { label: t("shift.pdf.colSubtotal", "Subtotal"), width: 155, align: "right" },
   ];
   const cashRows = cashCounts
     .sort((a, b) => b.denomination - a.denomination)
     .map((c) => [denominationLabel(c.denomination, currency), c.qty, c.subtotal]);
   const totalActualCash = cashCounts.reduce((s, c) => s + c.subtotal, 0);
-  y = drawTable(doc, y, cashCols, cashRows, currency, ["Total Kas Fisik (Aktual)", "", totalActualCash]);
+  y = drawTable(doc, y, cashCols, cashRows, currency, [t("shift.pdf.totalPhysicalCash", "Total Kas Fisik (Aktual)"), "", totalActualCash]);
 
   y += 4;
-  doc.font("Helvetica-Bold").fontSize(11).text("Rekonsiliasi Kas Tunai", PAGE_MARGIN, y);
+  doc.font("Helvetica-Bold").fontSize(11).text(t("shift.pdf.reconciliationHeading", "Rekonsiliasi Kas Tunai"), PAGE_MARGIN, y);
   y = doc.y + 4;
   doc.font("Helvetica").fontSize(9);
+  const varianceLabel = t("shift.pdf.variance", "Selisih");
   const cashSummary: [string, number | null][] = [
-    ["Modal Awal", shift.openingCash],
-    ["Ekspektasi Kas (Modal + Masuk − Keluar)", shift.expectedCash],
-    ["Kas Aktual (Hasil Hitung Fisik)", shift.actualCash],
-    ["Selisih", shift.variance],
+    [t("shift.pdf.openingCash", "Modal Awal"), shift.openingCash],
+    [t("shift.pdf.expectedCashFormula", "Ekspektasi Kas (Modal + Masuk − Keluar)"), shift.expectedCash],
+    [t("shift.pdf.actualCashResult", "Kas Aktual (Hasil Hitung Fisik)"), shift.actualCash],
+    [varianceLabel, shift.variance],
   ];
   for (const [label, value] of cashSummary) {
-    const isVariance = label === "Selisih";
+    const isVariance = label === varianceLabel;
     doc.font(isVariance ? "Helvetica-Bold" : "Helvetica");
     if (isVariance && value != null) {
       doc.fillColor(Math.abs(value) < 1 ? "#059669" : value < 0 ? "#dc2626" : "#d97706");
@@ -165,21 +179,21 @@ export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnTyp
 
   if (balanceChecks.length) {
     y += 8;
-    doc.font("Helvetica-Bold").fontSize(11).text("Verifikasi Saldo Channel Non-Tunai", PAGE_MARGIN, y);
+    doc.font("Helvetica-Bold").fontSize(11).text(t("shift.pdf.nonCashHeading", "Verifikasi Saldo Channel Non-Tunai"), PAGE_MARGIN, y);
     y = doc.y + 4;
     const balCols: Col[] = [
-      { label: "Channel", width: 160 },
-      { label: "Ekspektasi", width: 130, align: "right" },
-      { label: "Aktual (Input Kasir)", width: 105, align: "right" },
-      { label: "Selisih", width: 60, align: "right" },
+      { label: t("shift.pdf.colChannel", "Channel"), width: 160 },
+      { label: t("shift.pdf.colExpected", "Ekspektasi"), width: 130, align: "right" },
+      { label: t("shift.pdf.colActualInput", "Aktual (Input Kasir)"), width: 105, align: "right" },
+      { label: t("shift.pdf.variance", "Selisih"), width: 60, align: "right" },
     ];
     const balRows = balanceChecks.map((b) => [b.label, b.expectedBalance, b.actualBalance, b.variance]);
-    y = drawTable(doc, y, balCols, balRows, currency, ["Total Selisih Non-Tunai", "", "", shift.nonCashVarianceTotal ?? 0]);
+    y = drawTable(doc, y, balCols, balRows, currency, [t("shift.pdf.totalNonCashVariance", "Total Selisih Non-Tunai"), "", "", shift.nonCashVarianceTotal ?? 0]);
   }
 
   if (shift.notes) {
     y += 4;
-    doc.font("Helvetica-Bold").fontSize(10).text("Catatan:", PAGE_MARGIN, y);
+    doc.font("Helvetica-Bold").fontSize(10).text(t("shift.pdf.notes", "Catatan:"), PAGE_MARGIN, y);
     y = doc.y + 2;
     doc.font("Helvetica").fontSize(9).text(shift.notes, PAGE_MARGIN, y, { width: CONTENT_WIDTH });
     y = doc.y;
@@ -192,8 +206,8 @@ export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnTyp
   }
   const sigColWidth = CONTENT_WIDTH / 2 - 10;
   doc.font("Helvetica").fontSize(9);
-  doc.text("Dihitung dan diserahkan oleh (Kasir):", PAGE_MARGIN, y, { width: sigColWidth });
-  doc.text("Diverifikasi oleh (Manager/Owner):", PAGE_MARGIN + sigColWidth + 20, y, { width: sigColWidth });
+  doc.text(t("shift.pdf.signOffCashier", "Dihitung dan diserahkan oleh (Kasir):"), PAGE_MARGIN, y, { width: sigColWidth });
+  doc.text(t("shift.pdf.signOffManager", "Diverifikasi oleh (Manager/Owner):"), PAGE_MARGIN + sigColWidth + 20, y, { width: sigColWidth });
   y += 55;
   doc.moveTo(PAGE_MARGIN, y).lineTo(PAGE_MARGIN + sigColWidth, y).strokeColor("#333").stroke();
   doc.moveTo(PAGE_MARGIN + sigColWidth + 20, y).lineTo(PAGE_MARGIN + sigColWidth * 2 + 20, y).strokeColor("#333").stroke();

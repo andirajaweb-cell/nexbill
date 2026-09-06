@@ -47,7 +47,7 @@ interface DepositChannel {
 }
 
 export default function ShiftPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { user } = useAuth();
   const { currency, formatMoney: rupiah } = useCurrency();
   // Outlet's own date-display preference (Settings > Preferensi > Format Lainnya) — applied here
@@ -508,7 +508,7 @@ export default function ShiftPage() {
         <Card className={closeResult.shift.variance === 0 ? "border-emerald-500/30" : "border-amber-500/30"}>
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-medium">{t("shift.closeSummaryTitle", "Ringkasan Tutup Shift")}</h2>
-            <a href={`/api/shifts/${closeResult.shift.id}/export?format=pdf`} target="_blank" rel="noreferrer">
+            <a href={`/api/shifts/${closeResult.shift.id}/export?format=pdf&lang=${lang}`} target="_blank" rel="noreferrer">
               <Button variant="secondary" className="text-xs">{t("shift.downloadReportBtn", "Download Berita Acara (PDF)")}</Button>
             </a>
           </div>
@@ -594,7 +594,7 @@ export default function ShiftPage() {
                   </td>
                   <td className="whitespace-nowrap">
                     {s.status === "closed" && (
-                      <a href={`/api/shifts/${s.id}/export?format=pdf`} target="_blank" rel="noreferrer" className="text-xs text-emerald-400 hover:underline">{t("shift.pdfLink", "PDF")}</a>
+                      <a href={`/api/shifts/${s.id}/export?format=pdf&lang=${lang}`} target="_blank" rel="noreferrer" className="text-xs text-emerald-400 hover:underline">{t("shift.pdfLink", "PDF")}</a>
                     )}
                     {canManageShiftHistory && s.status === "closed" && (
                       <button
