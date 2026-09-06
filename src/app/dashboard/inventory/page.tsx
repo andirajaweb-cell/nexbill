@@ -9,12 +9,15 @@ import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { useCurrency } from "@/lib/currency/client";
+import { resolveSendToKitchen } from "@/lib/kitchen/routing";
 import "@/lib/i18n/dict-inventory";
 
 interface Product {
   id: string; name: string; category: string; price: number; costPrice: number;
   stockQty: number; lowStockThreshold: number; unit: string; isActive: boolean;
   preferredSupplierId: string | null;
+  sendToKitchen: boolean | null;
 }
 
 interface SupplierOption { id: string; name: string }
@@ -33,7 +36,11 @@ function UnitSelect({ units, value, onChange, className }: { units: UnitOption[]
   );
 }
 
-const rupiah = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
+// Was a hardcoded `Rp${...}` helper. Each component below now calls useCurrency() and destructures
+// its formatMoney as `rupiah` instead, so every call site here is unchanged but the symbol/locale
+// now follows the outlet's own country (Settings > Business & Tax > Negara) — see
+// src/lib/currency/format.ts for the SEA currency table and why this is display-only (no real
+// exchange-rate conversion of stored amounts).
 const TABS = ["Produk", "Resep / BOM", "Supplier", "Belanja Supplier", "Purchase Order", "Stock Opname"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -100,6 +107,7 @@ type ProductSortOption = "name_asc" | "name_desc" | "price_asc" | "price_desc" |
 
 function ProductTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const { user } = useAuth();
   // Was isSuperRole (Superuser-only) — deactivating your own outlet's product is a routine
   // day-to-day inventory task, not something that should require NEXBILL's internal account.
@@ -110,9 +118,14 @@ function ProductTab({ outletId }: { outletId: string }) {
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
-  const [form, setForm] = useState({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: "pcs", lowStockThreshold: 5, preferredSupplierId: "" });
+  // Recipe/BOM existence per product — used only to resolve the "Kirim ke Kitchen Display"
+  // checkbox's starting value for a product that's never had it explicitly set (sendToKitchen ===
+  // null in the DB), matching the exact fallback lib/kitchen/routing.ts uses when actually routing
+  // an order item. See that module's doc comment for the full resolution order.
+  const [recipeProductIds, setRecipeProductIds] = useState<Set<string>>(new Set());
+  const [form, setForm] = useState({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ name: string; category: string; price: number; costPrice: number; unit: string; lowStockThreshold: number; preferredSupplierId: string } | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; category: string; price: number; costPrice: number; unit: string; lowStockThreshold: number; preferredSupplierId: string; sendToKitchen: boolean } | null>(null);
 
   // "Penyesuaian Barang" — replaces the old costed Restock shortcut. Pure quantity tool (no
   // harga beli input): Tambah Unit / Kurangi Unit / Set ke Jumlah Tertentu, all posted via
@@ -137,6 +150,7 @@ function ProductTab({ outletId }: { outletId: string }) {
     fetchJsonArray<UnitOption>(`/api/units?outletId=${outletId}`).then((rows) => setUnits(rows.filter((u) => u.isActive)));
     fetchJsonArray<CategoryOption>(`/api/product-categories?outletId=${outletId}`).then(setCategories);
     fetchJsonArray<SupplierOption>(`/api/suppliers?outletId=${outletId}`).then(setSuppliers);
+    fetchJsonArray("/api/recipes").then((rows: any[]) => setRecipeProductIds(new Set(rows.map((r) => r.productId))));
   }, [outletId]);
 
   // Multi-keyword AND search on the product name (typing "kopi susu" matches
@@ -170,7 +184,7 @@ function ProductTab({ outletId }: { outletId: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...form, preferredSupplierId: form.preferredSupplierId || null, outletId: await getOutletId() }),
     });
-    setForm({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: units[0]?.code ?? "pcs", lowStockThreshold: 5, preferredSupplierId: "" });
+    setForm({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: units[0]?.code ?? "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
     load();
   };
 
@@ -219,7 +233,19 @@ function ProductTab({ outletId }: { outletId: string }) {
   const startEdit = (p: Product) => {
     setAdjustingId(null);
     setEditingId(p.id);
-    setEditForm({ name: p.name, category: p.category, price: p.price, costPrice: p.costPrice, unit: p.unit, lowStockThreshold: p.lowStockThreshold, preferredSupplierId: p.preferredSupplierId ?? "" });
+    setEditForm({
+      name: p.name,
+      category: p.category,
+      price: p.price,
+      costPrice: p.costPrice,
+      unit: p.unit,
+      lowStockThreshold: p.lowStockThreshold,
+      preferredSupplierId: p.preferredSupplierId ?? "",
+      // Never explicitly set (null) shows as whatever it currently resolves to (recipe → category
+      // fallback), so opening Edit and saving without touching this checkbox is a no-op — see
+      // lib/kitchen/routing.ts.
+      sendToKitchen: resolveSendToKitchen(p, recipeProductIds.has(p.id)),
+    });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
   const toggleEdit = (p: Product) => (editingId === p.id ? cancelEdit() : startEdit(p));
@@ -297,6 +323,10 @@ function ProductTab({ outletId }: { outletId: string }) {
           </select>
           <Button onClick={addProduct}>{t("inventory.action.add", "Tambah")}</Button>
         </div>
+        <label className="flex items-center gap-2 text-xs text-neutral-400 mt-2" title={t("inventory.product.sendToKitchenHint", "Nyalakan untuk produk yang benar-benar dibuat/diproses (masuk antrian Kitchen Display). Matikan untuk produk kemasan/siap saji (air mineral botol, snack kemasan, dll) yang tidak perlu diproses dapur meski kategorinya makanan/minuman.")}>
+          <input type="checkbox" checked={form.sendToKitchen} onChange={(e) => setForm({ ...form, sendToKitchen: e.target.checked })} />
+          {t("inventory.product.sendToKitchenLabel", "Kirim ke Kitchen Display (produk ini diproses/dibuat, bukan kemasan siap jual)")}
+        </label>
         <p className="text-xs text-neutral-600 mt-2">
           {t("inventory.product.unitSettingsPrefix", "Satuan bisa diatur di ")}<a href="/dashboard/settings" className="text-emerald-400 underline">{t("inventory.product.unitSettingsLinkLabel", "Pengaturan > Satuan")}</a>{t("inventory.product.categorySettingsMiddle", ", kategori bisa diatur di ")}<a href="/dashboard/settings" className="text-emerald-400 underline">{t("inventory.product.categorySettingsLinkLabel", "Pengaturan > Kategori Produk")}</a>{t("inventory.product.unitSettingsSuffix", ". Harga modal produk resep (F&B olahan) diatur lewat tab Resep/BOM, bukan di sini. Supplier utama dipakai untuk auto-buat draft Purchase Order saat stok mencapai minimum (lihat tab Purchase Order).")}
         </p>
@@ -336,7 +366,14 @@ function ProductTab({ outletId }: { outletId: string }) {
                     {p.name}
                     {p.isActive === false && <span className="text-xs text-rose-400 ml-2">{t("inventory.product.inactiveTag", "(nonaktif)")}</span>}
                   </td>
-                  <td className="capitalize text-neutral-400">{categoryLabel(categories, p.category)}</td>
+                  <td className="capitalize text-neutral-400">
+                    {categoryLabel(categories, p.category)}
+                    {resolveSendToKitchen(p, recipeProductIds.has(p.id)) && (
+                      <div className="text-[10px] text-amber-500/80 font-normal normal-case" title={t("inventory.product.sendToKitchenHint", "Nyalakan untuk produk yang benar-benar dibuat/diproses (masuk antrian Kitchen Display). Matikan untuk produk kemasan/siap saji (air mineral botol, snack kemasan, dll) yang tidak perlu diproses dapur meski kategorinya makanan/minuman.")}>
+                        {t("inventory.product.kitchenBadge", "→ Kitchen Display")}
+                      </div>
+                    )}
+                  </td>
                   <td>{rupiah(p.price)}</td>
                   <td className="text-neutral-500">{rupiah(p.costPrice)}</td>
                   <td className={p.stockQty <= p.lowStockThreshold ? "text-amber-400 font-medium" : ""}>
@@ -387,6 +424,10 @@ function ProductTab({ outletId }: { outletId: string }) {
                           </select>
                         </div>
                       </div>
+                      <label className="flex items-center gap-2 text-xs text-neutral-400 mt-2" title={t("inventory.product.sendToKitchenHint", "Nyalakan untuk produk yang benar-benar dibuat/diproses (masuk antrian Kitchen Display). Matikan untuk produk kemasan/siap saji (air mineral botol, snack kemasan, dll) yang tidak perlu diproses dapur meski kategorinya makanan/minuman.")}>
+                        <input type="checkbox" checked={editForm.sendToKitchen} onChange={(e) => setEditForm({ ...editForm, sendToKitchen: e.target.checked })} />
+                        {t("inventory.product.sendToKitchenLabel", "Kirim ke Kitchen Display (produk ini diproses/dibuat, bukan kemasan siap jual)")}
+                      </label>
                       <div className="flex gap-2 mt-2">
                         <Button className="text-xs px-2 py-1" onClick={() => saveEdit(p.id)}>{t("inventory.action.save", "Simpan")}</Button>
                         <Button variant="ghost" className="text-xs px-2 py-1" onClick={cancelEdit}>{t("inventory.action.cancel", "Batal")}</Button>
@@ -546,6 +587,7 @@ interface RecipeDraft {
  */
 function RecipeTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const { user } = useAuth();
   // Was isSuperRole (Superuser-only) — editing/deleting your own outlet's recipe is a routine
   // day-to-day inventory task, not something that should require NEXBILL's internal account.
@@ -864,6 +906,7 @@ function SupplierTab({ outletId }: { outletId: string }) {
 /** Quick supplier purchase for finished/resale F&B products (no recipe/BOM) — transport/parking/other costs get prorated into landed cost, which updates products.costPrice so HPP reflects true cost. */
 function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -1013,6 +1056,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
 
 function PurchaseOrderTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const [pos, setPos] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);

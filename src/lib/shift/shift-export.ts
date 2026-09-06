@@ -1,9 +1,10 @@
 import PDFDocument from "pdfkit";
 import { db } from "@/db/client";
-import { staffUsers } from "@/db/schema";
+import { staffUsers, outlets } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { buildReportMeta, rupiah } from "@/lib/reports/meta";
+import { buildReportMeta } from "@/lib/reports/meta";
 import { denominationLabel } from "./denominations";
+import { formatMoney, currencyForCountry, type OutletCurrency } from "@/lib/currency/format";
 import type { getShiftDetail } from "./shift";
 
 const PAGE_MARGIN = 40;
@@ -26,7 +27,7 @@ interface Col {
   align?: "left" | "right";
 }
 
-function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (string | number)[][], footer?: (string | number)[]): number {
+function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (string | number)[][], currency: OutletCurrency, footer?: (string | number)[]): number {
   let y = startY;
   const rowHeight = 15;
   doc.font("Helvetica-Bold").fontSize(9);
@@ -43,7 +44,7 @@ function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (
     x = PAGE_MARGIN;
     row.forEach((cell, i) => {
       const c = cols[i];
-      const text = typeof cell === "number" ? rupiah(cell) : String(cell ?? "");
+      const text = typeof cell === "number" ? formatMoney(cell, currency) : String(cell ?? "");
       doc.text(text, x, y, { width: c.width, align: c.align ?? "left" });
       x += c.width;
     });
@@ -58,7 +59,7 @@ function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (
     x = PAGE_MARGIN;
     footer.forEach((cell, i) => {
       const c = cols[i];
-      const text = typeof cell === "number" ? rupiah(cell) : String(cell ?? "");
+      const text = typeof cell === "number" ? formatMoney(cell, currency) : String(cell ?? "");
       doc.text(text, x, y, { width: c.width, align: c.align ?? "left" });
       x += c.width;
     });
@@ -79,6 +80,9 @@ function drawTable(doc: PDFKit.PDFDocument, startY: number, cols: Col[], rows: (
 export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnType<typeof getShiftDetail>>>): Promise<Buffer> {
   const { shift, cashCounts, balanceChecks } = detail;
   const [staff] = await db.select().from(staffUsers).where(eq(staffUsers.id, shift.staffUserId)).limit(1);
+  const [outlet] = await db.select({ outletCountry: outlets.outletCountry }).from(outlets).where(eq(outlets.id, shift.outletId)).limit(1);
+  const currency = currencyForCountry(outlet?.outletCountry);
+  const rupiah = (n: number) => formatMoney(n, currency);
   const meta = await buildReportMeta(shift.outletId, "Berita Acara Tutup Kasir (Shift Closing Report)", shift.openedAt, shift.closedAt ?? undefined);
 
   const doc = new PDFDocument({ size: "A4", margin: PAGE_MARGIN, bufferPages: true });
@@ -134,9 +138,9 @@ export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnTyp
   ];
   const cashRows = cashCounts
     .sort((a, b) => b.denomination - a.denomination)
-    .map((c) => [denominationLabel(c.denomination), c.qty, c.subtotal]);
+    .map((c) => [denominationLabel(c.denomination, currency), c.qty, c.subtotal]);
   const totalActualCash = cashCounts.reduce((s, c) => s + c.subtotal, 0);
-  y = drawTable(doc, y, cashCols, cashRows, ["Total Kas Fisik (Aktual)", "", totalActualCash]);
+  y = drawTable(doc, y, cashCols, cashRows, currency, ["Total Kas Fisik (Aktual)", "", totalActualCash]);
 
   y += 4;
   doc.font("Helvetica-Bold").fontSize(11).text("Rekonsiliasi Kas Tunai", PAGE_MARGIN, y);
@@ -170,7 +174,7 @@ export async function buildShiftClosingPdf(detail: NonNullable<Awaited<ReturnTyp
       { label: "Selisih", width: 60, align: "right" },
     ];
     const balRows = balanceChecks.map((b) => [b.label, b.expectedBalance, b.actualBalance, b.variance]);
-    y = drawTable(doc, y, balCols, balRows, ["Total Selisih Non-Tunai", "", "", shift.nonCashVarianceTotal ?? 0]);
+    y = drawTable(doc, y, balCols, balRows, currency, ["Total Selisih Non-Tunai", "", "", shift.nonCashVarianceTotal ?? 0]);
   }
 
   if (shift.notes) {

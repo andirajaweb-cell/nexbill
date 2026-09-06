@@ -1,10 +1,17 @@
 import { db } from "@/db/client";
-import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments } from "@/db/schema";
+import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { logAudit } from "@/lib/audit/log";
 import { computeTrialBalance } from "@/lib/accounting/reports";
 import { getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
-import { CASH_DENOMINATIONS, BALANCE_TRACKED_METHODS, CHANNEL_LABEL } from "./denominations";
+import { getCashDenominations, BALANCE_TRACKED_METHODS, CHANNEL_LABEL } from "./denominations";
+import { currencyForCountry } from "@/lib/currency/format";
+
+/** Resolves which set of physical note/coin denominations a shift's own outlet counts in — see denominations.ts's DENOMINATIONS_BY_CURRENCY doc comment. */
+async function getOutletCashDenominations(outletId: string): Promise<readonly number[]> {
+  const [outlet] = await db.select({ outletCountry: outlets.outletCountry }).from(outlets).where(eq(outlets.id, outletId)).limit(1);
+  return getCashDenominations(currencyForCountry(outlet?.outletCountry).code);
+}
 
 export async function openShift(outletId: string, staffUserId: string, openingCash: number) {
   const [existing] = await db
@@ -106,13 +113,14 @@ export async function closeShift(
   if (shift.status === "closed") throw new Error("Shift sudah ditutup.");
 
   // --- Validate & normalize the denomination count ---
+  const cashDenominations = await getOutletCashDenominations(shift.outletId);
   const countByDenom = new Map(input.cashCounts.map((c) => [c.denomination, Math.max(0, Math.floor(c.qty || 0))]));
   for (const denom of countByDenom.keys()) {
-    if (!(CASH_DENOMINATIONS as readonly number[]).includes(denom)) {
-      throw new Error(`Pecahan Rp${denom} tidak dikenal.`);
+    if (!cashDenominations.includes(denom)) {
+      throw new Error(`Pecahan ${denom} tidak dikenal.`);
     }
   }
-  const cashRows = CASH_DENOMINATIONS.map((denomination) => {
+  const cashRows = cashDenominations.map((denomination) => {
     const qty = countByDenom.get(denomination) ?? 0;
     return { denomination, qty, subtotal: denomination * qty };
   });
@@ -299,13 +307,14 @@ export async function updateShiftDetail(
 
   let actualCash = shift.actualCash;
   if (input.cashCounts) {
+    const cashDenominations = await getOutletCashDenominations(shift.outletId);
     const countByDenom = new Map(input.cashCounts.map((c) => [c.denomination, Math.max(0, Math.floor(c.qty || 0))]));
     for (const denom of countByDenom.keys()) {
-      if (!(CASH_DENOMINATIONS as readonly number[]).includes(denom)) {
-        throw new Error(`Pecahan Rp${denom} tidak dikenal.`);
+      if (!cashDenominations.includes(denom)) {
+        throw new Error(`Pecahan ${denom} tidak dikenal.`);
       }
     }
-    const cashRows = CASH_DENOMINATIONS.map((denomination) => {
+    const cashRows = cashDenominations.map((denomination) => {
       const qty = countByDenom.get(denomination) ?? 0;
       return { denomination, qty, subtotal: denomination * qty };
     });

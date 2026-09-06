@@ -8,21 +8,23 @@ import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
-import { CASH_DENOMINATIONS, denominationLabel } from "@/lib/shift/denominations";
+import { getCashDenominations, denominationLabel } from "@/lib/shift/denominations";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { useCurrency } from "@/lib/currency/client";
 import "@/lib/i18n/dict-shift";
-
-const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 
 /**
  * Shared over/under (lebih/kurang) labeling for shift cash & non-cash
  * variance — negative = shortage (uang kurang, risiko utama), positive =
  * overage (uang lebih, juga perlu ditandai karena bisa berarti salah catat
  * transaksi), near-zero = pas/sesuai. Used both in the close-shift reveal
- * card and the shift history table so the two always agree visually.
+ * card and the shift history table so the two always agree visually. Takes
+ * `rupiah` as a parameter (rather than closing over a module-level constant)
+ * since it's now the outlet's own currency formatter from useCurrency(),
+ * which can only be read inside a component.
  */
-function varianceBadge(v: number | null | undefined, t: (key: string, fallback?: string) => string): { text: string; className: string } {
+function varianceBadge(v: number | null | undefined, t: (key: string, fallback?: string) => string, rupiah: (n: number) => string): { text: string; className: string } {
   if (v == null) return { text: "-", className: "text-neutral-600" };
   if (Math.abs(v) < 1) return { text: rupiah(v), className: "text-emerald-400" };
   if (v < 0) return { text: `${rupiah(v)} ${t("shift.varianceShort", "(Kurang)")}`, className: "text-red-400 font-medium" };
@@ -46,6 +48,12 @@ interface DepositChannel {
 export default function ShiftPage() {
   const { t } = useDashboardLang();
   const { user } = useAuth();
+  const { currency, formatMoney: rupiah } = useCurrency();
+  // Which physical notes/coins the cashier counts follows the outlet's own currency (Settings >
+  // Business & Tax > Negara) instead of always assuming IDR — see denominations.ts's
+  // DENOMINATIONS_BY_CURRENCY doc comment. Server-side validation in lib/shift/shift.ts resolves
+  // the same list independently from the outlet's own record, so the two can't drift apart.
+  const cashDenominations = useMemo(() => getCashDenominations(currency.code), [currency.code]);
   const staffUserId = user?.id ?? "";
   const canManageChannels = hasPermission((user?.role ?? "cashier") as any, "manage_coa");
   // Owner/Superuser can both delete AND correct ("Edit") a shift's history — same gate for both,
@@ -170,8 +178,8 @@ export default function ShiftPage() {
   }, [currentShift]);
 
   const totalCounted = useMemo(
-    () => CASH_DENOMINATIONS.reduce((s, d) => s + d * (qtyByDenom[d] || 0), 0),
-    [qtyByDenom]
+    () => cashDenominations.reduce((s, d) => s + d * (qtyByDenom[d] || 0), 0),
+    [qtyByDenom, cashDenominations]
   );
 
   const openShift = async () => {
@@ -254,7 +262,7 @@ export default function ShiftPage() {
         body: JSON.stringify({
           openingCash: editOpeningCash,
           notes: editNotes,
-          cashCounts: CASH_DENOMINATIONS.map((d) => ({ denomination: d, qty: editQtyByDenom[d] || 0 })),
+          cashCounts: cashDenominations.map((d) => ({ denomination: d, qty: editQtyByDenom[d] || 0 })),
           balanceChecks: editBalanceChecks.map((b) => ({ channelKey: b.channelKey, actualBalance: b.actualBalance })),
         }),
       });
@@ -280,7 +288,7 @@ export default function ShiftPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cashCounts: CASH_DENOMINATIONS.map((d) => ({ denomination: d, qty: qtyByDenom[d] || 0 })),
+          cashCounts: cashDenominations.map((d) => ({ denomination: d, qty: qtyByDenom[d] || 0 })),
           balanceChecks: requiredChannels.map((c) => ({ channelKey: c.channelKey, actualBalance: actualByChannel[c.channelKey] || 0 })),
           notes: notes || undefined,
         }),
@@ -393,9 +401,9 @@ export default function ShiftPage() {
               )}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {CASH_DENOMINATIONS.map((d) => (
+              {cashDenominations.map((d) => (
                 <div key={d} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2">
-                  <span className="text-sm w-28 shrink-0">{denominationLabel(d)}</span>
+                  <span className="text-sm w-28 shrink-0">{denominationLabel(d, currency)}</span>
                   <input
                     type="number"
                     min={0}
@@ -513,8 +521,8 @@ export default function ShiftPage() {
           <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colOpen", "Buka")}</th><th>{t("shift.colClose", "Tutup")}</th><th>{t("shift.colStaff", "Karyawan")}</th><th>{t("shift.colOpeningCapital", "Modal")}</th><th title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.colExpected", "Ekspektasi")}</th><th title={t("shift.colActualCashHint", "Total uang tunai hasil hitungan fisik saat tutup shift")}>{t("shift.colActual", "Aktual")}</th><th title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")}</th><th title={t("shift.colNonCashVarianceHint", "Total selisih (aktual vs ekspektasi) untuk semua channel non-tunai seperti GoPay/DANA/Fastpay pada shift ini")}>{t("shift.colNonCashVariance", "Selisih Non-Tunai")}</th><th></th></tr></thead>
           <tbody>
             {history.map((s) => {
-              const cashV = varianceBadge(s.variance, t);
-              const nonCashV = varianceBadge(s.nonCashVarianceTotal, t);
+              const cashV = varianceBadge(s.variance, t, rupiah);
+              const nonCashV = varianceBadge(s.nonCashVarianceTotal, t, rupiah);
               return (
                 <Fragment key={s.id}>
                 <tr className="border-b border-neutral-900">
@@ -575,9 +583,9 @@ export default function ShiftPage() {
                           <div>
                             <h4 className="text-sm font-medium mb-2">{t("shift.cashCountTitle", "Hitung Fisik Kas (Per Pecahan)")}</h4>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {CASH_DENOMINATIONS.map((d) => (
+                              {cashDenominations.map((d) => (
                                 <div key={d} className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2">
-                                  <span className="text-sm w-28 shrink-0">{denominationLabel(d)}</span>
+                                  <span className="text-sm w-28 shrink-0">{denominationLabel(d, currency)}</span>
                                   <input
                                     type="number"
                                     min={0}
