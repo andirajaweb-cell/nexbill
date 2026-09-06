@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
@@ -163,10 +164,13 @@ function AssetListTab({ outletId, role }: { outletId: string; role: StaffRole })
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} disabled={form.recordAsPayable}>
               <option value="cash">{t("assets.paymentCash", "Cash")}</option><option value="bank">{t("assets.paymentBank", "Bank")}</option><option value="transfer">{t("assets.paymentTransfer", "Transfer")}</option><option value="qris">{t("assets.paymentQris", "QRIS")}</option>
             </select>
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.cashBankAccountId} onChange={(e) => setForm({ ...form, cashBankAccountId: e.target.value })} disabled={form.recordAsPayable}>
-              <option value="">{t("assets.optionCashBankAccount", "Akun Kas/Bank")}</option>
-              {bundle.cashBankAccounts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SearchableSelect
+              value={form.cashBankAccountId}
+              onChange={(v) => setForm({ ...form, cashBankAccountId: v })}
+              disabled={form.recordAsPayable}
+              placeholder={t("assets.optionCashBankAccount", "Akun Kas/Bank")}
+              options={bundle.cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+            />
             <label className="flex items-center gap-2 text-xs text-neutral-400">
               <input type="checkbox" checked={form.recordAsPayable} onChange={(e) => setForm({ ...form, recordAsPayable: e.target.checked })} /> {t("assets.checkboxRecordAsPayable", "Catat sebagai hutang")}
             </label>
@@ -181,10 +185,12 @@ function AssetListTab({ outletId, role }: { outletId: string; role: StaffRole })
           <h2 className="font-medium">{t("assets.disposeTitle", "Lepas Aset (Dispose)")}</h2>
           <div className="grid grid-cols-2 gap-2">
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("assets.placeholderDisposalAmount", "Hasil pelepasan (Rp, 0 jika tidak ada)")} value={disposeFor.disposalAmount || ""} onChange={(e) => setDisposeFor({ ...disposeFor, disposalAmount: Number(e.target.value) })} />
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={disposeFor.cashBankAccountId} onChange={(e) => setDisposeFor({ ...disposeFor, cashBankAccountId: e.target.value })}>
-              <option value="">{t("assets.optionCashBankAccountResult", "Akun Kas/Bank (jika ada hasil)")}</option>
-              {bundle.cashBankAccounts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SearchableSelect
+              value={disposeFor.cashBankAccountId}
+              onChange={(v) => setDisposeFor({ ...disposeFor, cashBankAccountId: v })}
+              placeholder={t("assets.optionCashBankAccountResult", "Akun Kas/Bank (jika ada hasil)")}
+              options={bundle.cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+            />
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" placeholder={t("assets.placeholderDisposeReason", "Alasan (rusak, dijual, hilang, dst)")} value={disposeFor.reason} onChange={(e) => setDisposeFor({ ...disposeFor, reason: e.target.value })} />
           </div>
           <div className="flex gap-2">
@@ -205,14 +211,18 @@ function AssetListTab({ outletId, role }: { outletId: string; role: StaffRole })
             </label>
             {maintFor.createExpenseFor && (
               <>
-                <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={maintFor.accountId} onChange={(e) => setMaintFor({ ...maintFor, accountId: e.target.value })}>
-                  <option value="">{t("assets.optionExpenseAccount", "Akun Beban (COA)")}</option>
-                  {expenseAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
-                </select>
-                <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={maintFor.cashBankAccountId} onChange={(e) => setMaintFor({ ...maintFor, cashBankAccountId: e.target.value })}>
-                  <option value="">{t("assets.optionCashBankAccountOrPayable", "Akun Kas/Bank (kosongkan = hutang)")}</option>
-                  {bundle.cashBankAccounts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <SearchableSelect
+                  value={maintFor.accountId}
+                  onChange={(v) => setMaintFor({ ...maintFor, accountId: v })}
+                  placeholder={t("assets.optionExpenseAccount", "Akun Beban (COA)")}
+                  options={expenseAccounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+                />
+                <SearchableSelect
+                  value={maintFor.cashBankAccountId}
+                  onChange={(v) => setMaintFor({ ...maintFor, cashBankAccountId: v })}
+                  placeholder={t("assets.optionCashBankAccountOrPayable", "Akun Kas/Bank (kosongkan = hutang)")}
+                  options={bundle.cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+                />
               </>
             )}
           </div>

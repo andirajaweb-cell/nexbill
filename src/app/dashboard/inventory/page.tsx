@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
@@ -760,10 +761,13 @@ function RecipeTab({ outletId }: { outletId: string }) {
             <UnitSelect units={units} value={newProductUnit} onChange={setNewProductUnit} className="col-span-3 sm:col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
           </div>
         ) : (
-          <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={existingProductId} onChange={(e) => setExistingProductId(e.target.value)}>
-            <option value="">{t("inventory.recipe.chooseExistingOption", "Pilih produk food (belum punya resep)")}</option>
-            {foodProductsNoRecipe.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <SearchableSelect
+            className="w-full"
+            value={existingProductId}
+            onChange={setExistingProductId}
+            placeholder={t("inventory.recipe.chooseExistingOption", "Pilih produk food (belum punya resep)")}
+            options={foodProductsNoRecipe.map((p) => ({ value: p.id, label: p.name }))}
+          />
         )}
 
         <div className="grid grid-cols-2 gap-2">
@@ -775,10 +779,13 @@ function RecipeTab({ outletId }: { outletId: string }) {
           <div className="text-xs text-neutral-500">{t("inventory.recipe.ingredientsLabel", "Bahan Baku")}</div>
           {rows.map((row, i) => (
             <div key={i} className="grid grid-cols-8 gap-2 items-center">
-              <select className="col-span-4 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" value={row.ingredientProductId} onChange={(e) => updateRow(setRows, i, { ingredientProductId: e.target.value })}>
-                <option value="">{t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}</option>
-                {ingredientOptions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <SearchableSelect
+                className="col-span-4"
+                value={row.ingredientProductId}
+                onChange={(v) => updateRow(setRows, i, { ingredientProductId: v })}
+                placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
+                options={ingredientOptions.map((p) => ({ value: p.id, label: p.name }))}
+              />
               <input type="number" className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" placeholder={t("inventory.recipe.qtyPerYieldPlaceholder", "Qty per yield")} value={row.qtyPerYield || ""} onChange={(e) => updateRow(setRows, i, { qtyPerYield: Number(e.target.value) })} />
               <UnitSelect units={units} value={row.unit} onChange={(v) => updateRow(setRows, i, { unit: v })} className="col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" />
               <button className="col-span-1 text-xs text-red-400" onClick={() => removeRow(setRows, i)}>{t("inventory.action.removeRow", "Hapus")}</button>
@@ -799,10 +806,13 @@ function RecipeTab({ outletId }: { outletId: string }) {
                 <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm" placeholder={t("inventory.recipe.yieldPlaceholder", "Yield (porsi per batch resep)")} value={editYieldQty} onChange={(e) => setEditYieldQty(Number(e.target.value))} />
                 {editRows.map((row, i) => (
                   <div key={i} className="grid grid-cols-8 gap-2 items-center">
-                    <select className="col-span-4 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={row.ingredientProductId} onChange={(e) => updateRow(setEditRows, i, { ingredientProductId: e.target.value })}>
-                      <option value="">{t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}</option>
-                      {ingredientOptions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                    <SearchableSelect
+                      className="col-span-4"
+                      value={row.ingredientProductId}
+                      onChange={(v) => updateRow(setEditRows, i, { ingredientProductId: v })}
+                      placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
+                      options={ingredientOptions.map((p) => ({ value: p.id, label: p.name }))}
+                    />
                     <input type="number" className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={row.qtyPerYield || ""} onChange={(e) => updateRow(setEditRows, i, { qtyPerYield: Number(e.target.value) })} />
                     <UnitSelect units={units} value={row.unit} onChange={(v) => updateRow(setEditRows, i, { unit: v })} className="col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" />
                     <button className="col-span-1 text-xs text-red-400" onClick={() => removeRow(setEditRows, i)}>X</button>
@@ -985,10 +995,13 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
         {suppliers.length === 0 && <div className="text-xs text-amber-400">{t("inventory.supplierPurchase.noSupplierHint", 'Belum ada supplier — tambah dulu di tab "Supplier".')}</div>}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <select className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={itemForm.productId} onChange={(e) => setItemForm({ ...itemForm, productId: e.target.value })}>
-            <option value="">{t("inventory.option.chooseProduct", "Pilih produk")}</option>
-            {resaleProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <SearchableSelect
+            className="col-span-2"
+            value={itemForm.productId}
+            onChange={(v) => setItemForm({ ...itemForm, productId: v })}
+            placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
+            options={resaleProducts.map((p) => ({ value: p.id, label: p.name }))}
+          />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.placeholder.qty", "Qty")} value={itemForm.qty} onChange={(e) => setItemForm({ ...itemForm, qty: Number(e.target.value) })} />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.placeholder.unitCost", "Harga beli/unit")} value={itemForm.unitCost || ""} onChange={(e) => setItemForm({ ...itemForm, unitCost: Number(e.target.value) })} />
         </div>
@@ -1162,10 +1175,13 @@ function PurchaseOrderTab({ outletId }: { outletId: string }) {
           {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <select className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
-            <option value="">{t("inventory.option.chooseProduct", "Pilih produk")}</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <SearchableSelect
+            className="col-span-2"
+            value={form.productId}
+            onChange={(v) => setForm({ ...form, productId: v })}
+            placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
+            options={products.map((p) => ({ value: p.id, label: p.name }))}
+          />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.placeholder.qty", "Qty")} value={form.qty} onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })} />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.placeholder.unitCost", "Harga beli/unit")} value={form.unitCost || ""} onChange={(e) => setForm({ ...form, unitCost: Number(e.target.value) })} />
         </div>

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
@@ -273,10 +274,13 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
             <p className="text-xs text-neutral-500">{t("expenses.cashOutDescription", "Pengeluaran kas kecil (parkir, beli air galon, dll) — langsung lunas dari {account}, tanpa isi form lengkap.").replace("{account}", defaultCashAccount?.name ?? t("expenses.defaultCashAccountName", "akun Kas"))}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" value={cashOutForm.accountId} onChange={(e) => setCashOutForm({ ...cashOutForm, accountId: e.target.value })}>
-              <option value="">{t("expenses.optionCategoryAccount", "Kategori (Akun Beban)")}</option>
-              {bundle.accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
-            </select>
+            <SearchableSelect
+              className="col-span-2"
+              value={cashOutForm.accountId}
+              onChange={(v) => setCashOutForm({ ...cashOutForm, accountId: v })}
+              placeholder={t("expenses.optionCategoryAccount", "Kategori (Akun Beban)")}
+              options={bundle.accounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+            />
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderAmountRp", "Nominal (Rp)")} value={cashOutForm.amount} onChange={(e) => setCashOutForm({ ...cashOutForm, amount: e.target.value })} />
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderNote", "Catatan (opsional)")} value={cashOutForm.note} onChange={(e) => setCashOutForm({ ...cashOutForm, note: e.target.value })} />
           </div>
@@ -296,10 +300,13 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
         <Card className="space-y-3">
           <h2 className="font-medium">{t("expenses.formTitle", "Form Expense")}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })}>
-              <option value="">{t("expenses.optionAccountCoa", "Akun Beban (COA)")}</option>
-              {bundle.accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
-            </select>
+            <SearchableSelect
+              className="col-span-2"
+              value={form.accountId}
+              onChange={(v) => setForm({ ...form, accountId: v })}
+              placeholder={t("expenses.optionAccountCoa", "Akun Beban (COA)")}
+              options={bundle.accounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+            />
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderCategoryExample", "Kategori (mis. Listrik)")} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             <input type="date" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} title={t("expenses.dueDateTooltip", "Jatuh tempo (jika hutang)")} />
 
@@ -325,10 +332,13 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} disabled={form.recordAsPayable}>
               <option value="cash">{t("expenses.method.cash", "Cash")}</option><option value="bank">{t("expenses.method.bank", "Bank")}</option><option value="transfer">{t("expenses.method.transfer", "Transfer")}</option><option value="qris">{t("expenses.method.qris", "QRIS")}</option>
             </select>
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.cashBankAccountId} onChange={(e) => setForm({ ...form, cashBankAccountId: e.target.value })} disabled={form.recordAsPayable}>
-              <option value="">{t("expenses.optionCashBankAccount", "Akun Kas/Bank")}</option>
-              {cashBankAccounts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SearchableSelect
+              value={form.cashBankAccountId}
+              onChange={(v) => setForm({ ...form, cashBankAccountId: v })}
+              disabled={form.recordAsPayable}
+              placeholder={t("expenses.optionCashBankAccount", "Akun Kas/Bank")}
+              options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+            />
             <label className="flex items-center gap-2 text-xs text-neutral-400">
               <input type="checkbox" checked={form.recordAsPayable} onChange={(e) => setForm({ ...form, recordAsPayable: e.target.checked })} /> {t("expenses.recordAsPayableCheckbox", "Catat sebagai hutang (belum dibayar)")}
             </label>
@@ -351,10 +361,12 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={payFor.method} onChange={(e) => setPayFor({ ...payFor, method: e.target.value })}>
               <option value="cash">{t("expenses.method.cash", "Cash")}</option><option value="bank">{t("expenses.method.bank", "Bank")}</option><option value="transfer">{t("expenses.method.transfer", "Transfer")}</option><option value="qris">{t("expenses.method.qris", "QRIS")}</option>
             </select>
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={payFor.cashBankAccountId} onChange={(e) => setPayFor({ ...payFor, cashBankAccountId: e.target.value })}>
-              <option value="">{t("expenses.optionCashBankAccount", "Akun Kas/Bank")}</option>
-              {cashBankAccounts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SearchableSelect
+              value={payFor.cashBankAccountId}
+              onChange={(v) => setPayFor({ ...payFor, cashBankAccountId: v })}
+              placeholder={t("expenses.optionCashBankAccount", "Akun Kas/Bank")}
+              options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+            />
           </div>
           <div className="flex gap-2">
             <Button onClick={submitPay}>{t("expenses.action.pay", "Bayar")}</Button>
@@ -506,10 +518,13 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
           <h2 className="font-medium">{t("expenses.newRecurringTemplate", "Template Recurring Baru")}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" placeholder={t("expenses.placeholderNameRecurring", "Nama (mis. Listrik Bulanan)")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })}>
-              <option value="">{t("expenses.optionAccountCoa", "Akun Beban (COA)")}</option>
-              {accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
-            </select>
+            <SearchableSelect
+              className="col-span-2"
+              value={form.accountId}
+              onChange={(v) => setForm({ ...form, accountId: v })}
+              placeholder={t("expenses.optionAccountCoa", "Akun Beban (COA)")}
+              options={accounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+            />
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderCategoryPlain", "Kategori")} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.amountLabel", "Nominal")} value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })}>

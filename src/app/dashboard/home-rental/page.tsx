@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonObject, fetchJsonArray } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
@@ -603,10 +604,13 @@ function AssetsTab({ outletId, canManage }: { outletId: string; canManage: boole
         <Card className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="space-y-1 block"><div className="text-xs text-neutral-500">{t("homeRental.asset.productLabel", "Produk")}</div>
-              <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
-                <option value="">{t("homeRental.common.selectProduct", "Pilih produk...")}</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select></label>
+              <SearchableSelect
+                className="w-full"
+                value={form.productId}
+                onChange={(v) => setForm({ ...form, productId: v })}
+                placeholder={t("homeRental.common.selectProduct", "Pilih produk...")}
+                options={products.map((p) => ({ value: p.id, label: p.name }))}
+              /></label>
             <label className="space-y-1 block"><div className="text-xs text-neutral-500">{t("homeRental.asset.codeLabel", "Kode Aset")}</div>
               <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.assetCode} onChange={(e) => setForm({ ...form, assetCode: e.target.value })} placeholder={t("homeRental.asset.codePlaceholder", "mis. PS5-001")} /></label>
             <label className="space-y-1 block"><div className="text-xs text-neutral-500">{t("homeRental.asset.serialLabel", "Serial Number")}</div>
@@ -713,10 +717,13 @@ function PackagesTab({ outletId, canManage }: { outletId: string; canManage: boo
             <div className="text-xs text-neutral-500">{t("homeRental.package.componentsLabel", "Komponen Paket")}</div>
             {items.map((it, idx) => (
               <div key={idx} className="flex gap-2">
-                <select className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={it.productId} onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, productId: e.target.value } : x))}>
-                  <option value="">{t("homeRental.common.selectProduct", "Pilih produk...")}</option>
-                  {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <SearchableSelect
+                  className="flex-1"
+                  value={it.productId}
+                  onChange={(v) => setItems(items.map((x, i) => i === idx ? { ...x, productId: v } : x))}
+                  placeholder={t("homeRental.common.selectProduct", "Pilih produk...")}
+                  options={products.map((p) => ({ value: p.id, label: p.name }))}
+                />
                 <input type="number" min={1} className="w-20 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={it.quantity} onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value) || 1 } : x))} />
               </div>
             ))}
@@ -905,10 +912,13 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
               <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></label>
             {pickMode === "product" ? (
               <label className="space-y-1 block"><div className="text-xs text-neutral-500">{t("homeRental.booking.productLabel", "Produk")}</div>
-                <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
-                  <option value="">{t("homeRental.common.selectProduct", "Pilih produk...")}</option>
-                  {products.filter((p) => p.isActive).map((p) => <option key={p.id} value={p.id}>{p.name} — {rupiah(p.dailyRate)}{t("homeRental.product.perDay", "/hari")}</option>)}
-                </select></label>
+                <SearchableSelect
+                  className="w-full"
+                  value={form.productId}
+                  onChange={(v) => setForm({ ...form, productId: v })}
+                  placeholder={t("homeRental.common.selectProduct", "Pilih produk...")}
+                  options={products.filter((p) => p.isActive).map((p) => ({ value: p.id, label: `${p.name} — ${rupiah(p.dailyRate)}${t("homeRental.product.perDay", "/hari")}` }))}
+                /></label>
             ) : (
               <label className="space-y-1 block"><div className="text-xs text-neutral-500">{t("homeRental.booking.packageLabel", "Paket")}</div>
                 <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.packageId} onChange={(e) => setForm({ ...form, packageId: e.target.value })}>

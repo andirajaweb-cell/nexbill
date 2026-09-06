@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
@@ -215,14 +216,18 @@ export default function MaintenancePage() {
             </label>
             {form.createExpenseFor && (
               <>
-                <select className={inputCls} value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })}>
-                  <option value="">{t("maintenance.expenseAccountPlaceholder", "Akun Beban (COA)")}</option>
-                  {expenseAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} {coaAccountName(t, a)}</option>)}
-                </select>
-                <select className={inputCls} value={form.cashBankAccountId} onChange={(e) => setForm({ ...form, cashBankAccountId: e.target.value })}>
-                  <option value="">{t("maintenance.cashBankAccountPlaceholder", "Akun Kas/Bank (kosongkan = hutang)")}</option>
-                  {(bundle.cashBankAccounts ?? []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <SearchableSelect
+                  value={form.accountId}
+                  onChange={(v) => setForm({ ...form, accountId: v })}
+                  placeholder={t("maintenance.expenseAccountPlaceholder", "Akun Beban (COA)")}
+                  options={expenseAccounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+                />
+                <SearchableSelect
+                  value={form.cashBankAccountId}
+                  onChange={(v) => setForm({ ...form, cashBankAccountId: v })}
+                  placeholder={t("maintenance.cashBankAccountPlaceholder", "Akun Kas/Bank (kosongkan = hutang)")}
+                  options={(bundle.cashBankAccounts ?? []).map((c: any) => ({ value: c.id, label: c.name }))}
+                />
               </>
             )}
           </div>

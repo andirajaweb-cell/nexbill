@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
@@ -947,22 +948,24 @@ function CashDepositTab({
           </div>
           <div>
             <label className="text-xs text-neutral-500">{t("cashDeposit.sourceLabel", "Dari Akun Kas")}</label>
-            <select className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
-              <option value="">{t("cashDeposit.selectPlaceholder", "Pilih")}</option>
-              {cashAccounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name} ({rupiah(a.balance)})</option>
-              ))}
-            </select>
+            <SearchableSelect
+              className="w-full mt-1"
+              value={sourceId}
+              onChange={(v) => setSourceId(v)}
+              placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
+              options={cashAccounts.map((a) => ({ value: a.id, label: `${a.name} (${rupiah(a.balance)})` }))}
+            />
           </div>
           {isInternalTransfer && (
             <div>
               <label className="text-xs text-neutral-500">{t("cashDeposit.destinationLabel", "Ke Akun Kas Tujuan")}</label>
-              <select className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={destinationId} onChange={(e) => setDestinationId(e.target.value)}>
-                <option value="">{t("cashDeposit.selectPlaceholder", "Pilih")}</option>
-                {destinationOptions.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name} ({rupiah(a.balance)})</option>
-                ))}
-              </select>
+              <SearchableSelect
+                className="w-full mt-1"
+                value={destinationId}
+                onChange={(v) => setDestinationId(v)}
+                placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
+                options={destinationOptions.map((a) => ({ value: a.id, label: `${a.name} (${rupiah(a.balance)})` }))}
+              />
               {destinationOptions.length === 0 && (
                 <p className="text-xs text-amber-400 mt-1">{t("cashDeposit.noDestinationHint", "Belum ada akun kas lain — tambahkan dulu di Admin Data > Akun Kas/Bank (mis. \"Kas Besar\").")}</p>
               )}
@@ -970,12 +973,13 @@ function CashDepositTab({
           )}
           <div className="sm:col-span-2">
             <label className="text-xs text-neutral-500">{t("cashDeposit.receiverLabel", "Diterima/Diambil Oleh (wajib)")}</label>
-            <select className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)}>
-              <option value="">{t("cashDeposit.selectPlaceholder", "Pilih")}</option>
-              {receivers.map((r) => (
-                <option key={r.id} value={r.id}>{r.name} ({roleLabelMap[r.role] ?? r.role})</option>
-              ))}
-            </select>
+            <SearchableSelect
+              className="w-full mt-1"
+              value={receivedBy}
+              onChange={(v) => setReceivedBy(v)}
+              placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
+              options={receivers.map((r) => ({ value: r.id, label: `${r.name} (${roleLabelMap[r.role] ?? r.role})` }))}
+            />
             {receivers.length === 0 && (
               <p className="text-xs text-amber-400 mt-1">{t("cashDeposit.noReceiverHint", "Belum ada staf dengan role Owner/Manager/Supervisor/Accounting di outlet ini.")}</p>
             )}
@@ -1145,21 +1149,23 @@ function CashTransferTab({
           <div />
           <div>
             <label className="text-xs text-neutral-500">{t("cashTransfer.sourceLabel", "Dari Akun Kas")}</label>
-            <select className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
-              <option value="">{t("cashDeposit.selectPlaceholder", "Pilih")}</option>
-              {cashAccounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name} ({rupiah(a.balance)})</option>
-              ))}
-            </select>
+            <SearchableSelect
+              className="w-full mt-1"
+              value={sourceId}
+              onChange={(v) => setSourceId(v)}
+              placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
+              options={cashAccounts.map((a) => ({ value: a.id, label: `${a.name} (${rupiah(a.balance)})` }))}
+            />
           </div>
           <div>
             <label className="text-xs text-neutral-500">{t("cashTransfer.destinationLabel", "Ke Akun Kas Tujuan")}</label>
-            <select className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={destinationId} onChange={(e) => setDestinationId(e.target.value)}>
-              <option value="">{t("cashDeposit.selectPlaceholder", "Pilih")}</option>
-              {destinationOptions.map((a) => (
-                <option key={a.id} value={a.id}>{a.name} ({rupiah(a.balance)})</option>
-              ))}
-            </select>
+            <SearchableSelect
+              className="w-full mt-1"
+              value={destinationId}
+              onChange={(v) => setDestinationId(v)}
+              placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
+              options={destinationOptions.map((a) => ({ value: a.id, label: `${a.name} (${rupiah(a.balance)})` }))}
+            />
             {destinationOptions.length === 0 && (
               <p className="text-xs text-amber-400 mt-1">{t("cashDeposit.noDestinationHint", "Belum ada akun kas lain — tambahkan dulu di Admin Data > Akun Kas/Bank (mis. \"Kas Besar\").")}</p>
             )}

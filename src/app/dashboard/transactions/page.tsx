@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
@@ -234,10 +235,15 @@ function TransactionListTab({ outletId }: { outletId: string }) {
       <Card className="space-y-3">
         <PeriodBar preset={preset} setPreset={setPreset} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
         <div className="flex flex-wrap gap-2">
-          <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
-            <option value="">{t("transactions.filter.allCashiers", "Semua Kasir")}</option>
-            {staffList.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-          </select>
+          <SearchableSelect
+            className="text-xs"
+            value={staffId}
+            onChange={setStaffId}
+            placeholder={t("transactions.filter.allCashiers", "Semua Kasir")}
+            allowClear
+            clearLabel={t("transactions.filter.allCashiers", "Semua Kasir")}
+            options={staffList.map((st) => ({ value: st.id, label: st.name }))}
+          />
           <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={type} onChange={(e) => setType(e.target.value)}>
             <option value="">{t("transactions.filter.allTypes", "Semua Jenis")}</option>
             <option value="rental">{typeLabel(t, "rental")}</option>

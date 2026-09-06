@@ -2,6 +2,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
@@ -245,10 +246,15 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
             </select>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <select className="col-span-2 rounded bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={editForm.parentId} onChange={(e) => setEditForm({ ...editForm, parentId: e.target.value })}>
-              <option value="">{t("accounting.coa.noParentOption", "(Tanpa induk / top-level)")}</option>
-              {potentialParents.filter((p) => p.id !== a.id).map((p) => <option key={p.id} value={p.id}>{p.code} — {coaAccountName(t, p)}</option>)}
-            </select>
+            <SearchableSelect
+              className="col-span-2 text-xs"
+              value={editForm.parentId}
+              onChange={(v) => setEditForm({ ...editForm, parentId: v })}
+              placeholder={t("accounting.coa.noParentOption", "(Tanpa induk / top-level)")}
+              allowClear
+              clearLabel={t("accounting.coa.noParentOption", "(Tanpa induk / top-level)")}
+              options={potentialParents.filter((p) => p.id !== a.id).map((p) => ({ value: p.id, label: `${p.code} — ${coaAccountName(t, p)}` }))}
+            />
             <label className="flex items-center gap-1 text-xs text-neutral-400"><input type="checkbox" checked={editForm.isPostingAllowed} onChange={(e) => setEditForm({ ...editForm, isPostingAllowed: e.target.checked })} /> {t("accounting.coa.postingAccountLabel", "Posting Account")}</label>
             <input className="rounded bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={editForm.costCenter} onChange={(e) => setEditForm({ ...editForm, costCenter: e.target.value })} placeholder={t("accounting.coa.placeholderCostCenter", "Cost Center")} />
           </div>
@@ -308,10 +314,15 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
             </select>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <select className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.parentId} onChange={(e) => setForm({ ...form, parentId: e.target.value })}>
-              <option value="">{t("accounting.coa.noParentOption", "(Tanpa induk / top-level)")}</option>
-              {potentialParents.map((p) => <option key={p.id} value={p.id}>{p.code} — {coaAccountName(t, p)}</option>)}
-            </select>
+            <SearchableSelect
+              className="col-span-2"
+              value={form.parentId}
+              onChange={(v) => setForm({ ...form, parentId: v })}
+              placeholder={t("accounting.coa.noParentOption", "(Tanpa induk / top-level)")}
+              allowClear
+              clearLabel={t("accounting.coa.noParentOption", "(Tanpa induk / top-level)")}
+              options={potentialParents.map((p) => ({ value: p.id, label: `${p.code} — ${coaAccountName(t, p)}` }))}
+            />
             <label className="flex items-center gap-1 text-xs text-neutral-400"><input type="checkbox" checked={form.isPostingAllowed} onChange={(e) => setForm({ ...form, isPostingAllowed: e.target.checked })} /> {t("accounting.coa.postingAccountLabel", "Posting Account")}</label>
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("accounting.coa.placeholderCostCenterOptional", "Cost Center (opsional)")} value={form.costCenter} onChange={(e) => setForm({ ...form, costCenter: e.target.value })} />
           </div>
@@ -423,10 +434,13 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
               {Object.entries(MAPPING_MODULE_LABEL_KEYS).map(([k, meta]) => <option key={k} value={k}>{t(meta.key, meta.fallback)}</option>)}
             </select>
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("accounting.mapping.placeholderTransactionKey", "Transaction key (mis. ps5, food, pulsa)")} value={form.transactionKey} onChange={(e) => setForm({ ...form, transactionKey: e.target.value })} />
-            <select className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })}>
-              <option value="">{t("accounting.mapping.chooseTargetAccount", "Pilih akun tujuan...")}</option>
-              {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {coaAccountName(t, a)}</option>)}
-            </select>
+            <SearchableSelect
+              className="col-span-2"
+              value={form.accountId}
+              onChange={(v) => setForm({ ...form, accountId: v })}
+              placeholder={t("accounting.mapping.chooseTargetAccount", "Pilih akun tujuan...")}
+              options={postableAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${coaAccountName(t, a)}` }))}
+            />
           </div>
           <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("accounting.mapping.placeholderLabel", "Label (opsional, mis. Rental PS5)")} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
           <Button className="text-xs" onClick={createMapping}>{t("accounting.mapping.saveMappingButton", "Simpan Mapping")}</Button>
@@ -449,9 +463,12 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
                   <td className="text-xs text-neutral-400">{m.label ?? "-"}</td>
                   <td className="text-xs">
                     {editingId === m.id ? (
-                      <select className="rounded bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={editAccountId} onChange={(e) => setEditAccountId(e.target.value)}>
-                        {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {coaAccountName(t, a)}</option>)}
-                      </select>
+                      <SearchableSelect
+                        className="text-xs"
+                        value={editAccountId}
+                        onChange={setEditAccountId}
+                        options={postableAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${coaAccountName(t, a)}` }))}
+                      />
                     ) : (
                       <span className="font-mono">{m.accountCode}</span>
                     )}{" "}
@@ -590,10 +607,13 @@ function JournalTab({ outletId }: { outletId: string }) {
           <div className="space-y-2">
             {form.lines.map((line, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                <select className={`${inputClsSm} col-span-4`} value={line.accountId} onChange={(e) => updateLine(i, { accountId: e.target.value })}>
-                  <option value="">{t("accounting.common.chooseAccount", "Pilih akun...")}</option>
-                  {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {coaAccountName(t, a)}</option>)}
-                </select>
+                <SearchableSelect
+                  className="col-span-4"
+                  value={line.accountId}
+                  onChange={(v) => updateLine(i, { accountId: v })}
+                  placeholder={t("accounting.common.chooseAccount", "Pilih akun...")}
+                  options={postableAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${coaAccountName(t, a)}` }))}
+                />
                 <input className={`${inputClsSm} col-span-2`} placeholder={t("accounting.journal.placeholderKeterangan", "Keterangan")} value={line.description} onChange={(e) => updateLine(i, { description: e.target.value })} />
                 <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={line.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: e.target.value ? "" : line.credit })} />
                 <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.credit", "Kredit")} value={line.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: e.target.value ? "" : line.debit })} />
@@ -955,10 +975,12 @@ function PayablesTab({ outletId }: { outletId: string }) {
               <option value="bank">{t("accounting.common.methodBank", "Bank")}</option>
               <option value="transfer">{t("accounting.common.methodTransfer", "Transfer")}</option>
             </select>
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={payFor.cashBankAccountId} onChange={(e) => setPayFor({ ...payFor, cashBankAccountId: e.target.value })}>
-              <option value="">{t("accounting.payables.cashBankAccountOption", "Akun Kas/Bank")}</option>
-              {cashBankAccounts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SearchableSelect
+              value={payFor.cashBankAccountId}
+              onChange={(v) => setPayFor({ ...payFor, cashBankAccountId: v })}
+              placeholder={t("accounting.payables.cashBankAccountOption", "Akun Kas/Bank")}
+              options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+            />
           </div>
           <div className="flex gap-2">
             <Button onClick={pay} disabled={busy}>{busy ? t("accounting.common.processing", "Memproses...") : t("accounting.payables.payButton", "Bayar")}</Button>
@@ -1409,10 +1431,13 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
           <div className="max-h-96 overflow-y-auto space-y-1">
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-12 gap-1 items-center">
-                <select className={`${inputClsSm} col-span-6`} value={l.accountId} onChange={(e) => updateLine(i, { accountId: e.target.value })}>
-                  <option value="">{t("accounting.common.chooseAccount", "Pilih akun...")}</option>
-                  {postableAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {coaAccountName(t, a)}</option>)}
-                </select>
+                <SearchableSelect
+                  className="col-span-6"
+                  value={l.accountId}
+                  onChange={(v) => updateLine(i, { accountId: v })}
+                  placeholder={t("accounting.common.chooseAccount", "Pilih akun...")}
+                  options={postableAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${coaAccountName(t, a)}` }))}
+                />
                 <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: "" })} />
                 <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.credit", "Kredit")} value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: "" })} />
                 <button className="col-span-2 text-xs text-red-400" onClick={() => removeLine(i)}>{t("accounting.common.delete", "Hapus")}</button>

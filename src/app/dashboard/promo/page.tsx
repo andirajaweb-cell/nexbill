@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -171,13 +172,13 @@ export default function PromoPage() {
           <div className="text-xs text-neutral-500 mb-1">{t("promo.bundleHeading", "Bundel Makanan/Minuman (Opsional)")}</div>
           <p className="text-xs text-neutral-600 mb-2">{t("promo.bundleHint", "Item di sini otomatis ditambahkan ke bill saat pelanggan pakai paket ini, dengan harga Rp0 (sudah termasuk Harga Paket di atas).")}</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2">
-            <select className="col-span-2 sm:col-span-3 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
-              value={pickProductId} onChange={(e) => setPickProductId(e.target.value)}>
-              <option value="">{t("promo.pickProductPlaceholder", "Pilih produk F&B...")}</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} ({rupiah(p.price)})</option>
-              ))}
-            </select>
+            <SearchableSelect
+              className="col-span-2 sm:col-span-3"
+              value={pickProductId}
+              onChange={setPickProductId}
+              placeholder={t("promo.pickProductPlaceholder", "Pilih produk F&B...")}
+              options={products.map((p) => ({ value: p.id, label: `${p.name} (${rupiah(p.price)})` }))}
+            />
             <input type="number" min={1} className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("promo.qtyPlaceholder", "Qty")}
               value={pickQty} onChange={(e) => setPickQty(Number(e.target.value))} />
             <Button variant="secondary" className="text-xs" onClick={addBundleDraftItem}>{t("promo.addItemButton", "+ Tambah Item")}</Button>
@@ -220,13 +221,13 @@ export default function PromoPage() {
                 <div className="pt-2 border-t border-neutral-800">
                   <div className="text-xs text-neutral-500 mb-1">{t("promo.bundleHeading", "Bundel Makanan/Minuman (Opsional)")}</div>
                   <div className="grid grid-cols-3 gap-1 mb-2">
-                    <select className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs"
-                      value={editPickProductId} onChange={(e) => setEditPickProductId(e.target.value)}>
-                      <option value="">{t("promo.pickProductPlaceholder", "Pilih produk F&B...")}</option>
-                      {products.map((prod) => (
-                        <option key={prod.id} value={prod.id}>{prod.name} ({rupiah(prod.price)})</option>
-                      ))}
-                    </select>
+                    <SearchableSelect
+                      className="col-span-2"
+                      value={editPickProductId}
+                      onChange={setEditPickProductId}
+                      placeholder={t("promo.pickProductPlaceholder", "Pilih produk F&B...")}
+                      options={products.map((prod) => ({ value: prod.id, label: `${prod.name} (${rupiah(prod.price)})` }))}
+                    />
                     <input type="number" min={1} className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("promo.qtyPlaceholder", "Qty")}
                       value={editPickQty} onChange={(e) => setEditPickQty(Number(e.target.value))} />
                   </div>

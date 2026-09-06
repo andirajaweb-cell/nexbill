@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
@@ -419,14 +420,20 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
         <div className="rounded-lg bg-neutral-900 border border-neutral-800 px-2 py-1.5 text-xs text-neutral-400 flex items-center justify-between sm:col-span-2">
           <span>{t("ppob.entryForm.uangMasukLabel", "Uang Masuk (dibebankan ke customer)")}</span><span className="font-medium text-neutral-200">{rupiah(uangMasuk)}</span>
         </div>
-        <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={funding} onChange={(e) => setFunding(e.target.value)}>
-          <option value="">{t("ppob.field.fundingPlaceholder", "Sumber Modal (keluar)")}</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={receiving} onChange={(e) => setReceiving(e.target.value)}>
-          <option value="">{t("ppob.field.receivingPlaceholder", "Penerima (uang masuk)")}</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
+        <SearchableSelect
+          className="text-xs"
+          value={funding}
+          onChange={(v) => setFunding(v)}
+          placeholder={t("ppob.field.fundingPlaceholder", "Sumber Modal (keluar)")}
+          options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+        />
+        <SearchableSelect
+          className="text-xs"
+          value={receiving}
+          onChange={(v) => setReceiving(v)}
+          placeholder={t("ppob.field.receivingPlaceholder", "Penerima (uang masuk)")}
+          options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+        />
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs sm:col-span-4" placeholder={t("ppob.field.notesPlaceholder", "Catatan (opsional)")} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
       <Button onClick={submit} disabled={saving}>{saving ? t("ppob.entryForm.saving", "Menyimpan...") : t("ppob.entryForm.submit", "Simpan Transaksi")}</Button>
@@ -498,14 +505,20 @@ function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: 
           <div className="rounded-lg bg-neutral-950 border border-neutral-800 px-2 py-1.5 text-xs text-neutral-400 flex items-center justify-between col-span-2">
             <span>{t("ppob.editModal.uangMasukLabel", "Uang Masuk")}</span><span className="font-medium text-neutral-200">{rupiah(uangMasuk)}</span>
           </div>
-          <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={funding} onChange={(e) => setFunding(e.target.value)}>
-            <option value="">{t("ppob.field.fundingPlaceholder", "Sumber Modal (keluar)")}</option>
-            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={receiving} onChange={(e) => setReceiving(e.target.value)}>
-            <option value="">{t("ppob.field.receivingPlaceholder", "Penerima (uang masuk)")}</option>
-            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
+          <SearchableSelect
+            className="text-xs"
+            value={funding}
+            onChange={(v) => setFunding(v)}
+            placeholder={t("ppob.field.fundingPlaceholder", "Sumber Modal (keluar)")}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+          />
+          <SearchableSelect
+            className="text-xs"
+            value={receiving}
+            onChange={(v) => setReceiving(v)}
+            placeholder={t("ppob.field.receivingPlaceholder", "Penerima (uang masuk)")}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+          />
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs col-span-2" placeholder={t("ppob.field.notesPlaceholderShort", "Catatan")} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
         <Button onClick={save} disabled={saving} className="w-full">{saving ? t("ppob.entryForm.saving", "Menyimpan...") : t("ppob.editModal.submit", "Simpan Koreksi")}</Button>
