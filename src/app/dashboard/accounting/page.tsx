@@ -1448,19 +1448,26 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
             a second, easy-to-miss scroll region — exactly the "not fully visible" complaint.
             Letting the list grow naturally means the page's own scroll is the only one involved.
           */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             {lines.map((l, i) => (
-              <div key={i} className="grid grid-cols-12 gap-1 items-center">
+              // Used to be a single unconditional `grid-cols-12` row (account 6 / debit 2 / credit 2
+              // / hapus 2) with no smaller-screen fallback, so on a narrower window/monitor the
+              // account SearchableSelect was squeezed down to a sliver too narrow to show the COA
+              // code+name (truncated to "Pilih ..."). Below `sm`, the account picker now gets its
+              // own full-width row, with debit/credit/hapus on a second row beneath it.
+              <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-1 sm:items-center">
                 <SearchableSelect
-                  className="col-span-6"
+                  className="sm:col-span-6"
                   value={l.accountId}
                   onChange={(v) => updateLine(i, { accountId: v })}
                   placeholder={t("accounting.common.chooseAccount", "Pilih akun...")}
                   options={postableAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${coaAccountName(t, a)}` }))}
                 />
-                <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: "" })} />
-                <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.credit", "Kredit")} value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: "" })} />
-                <button className="col-span-2 text-xs text-red-400" onClick={() => removeLine(i)}>{t("accounting.common.delete", "Hapus")}</button>
+                <div className="grid grid-cols-3 gap-1 sm:contents">
+                  <input type="number" className={`${inputClsSm} sm:col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: "" })} />
+                  <input type="number" className={`${inputClsSm} sm:col-span-2`} placeholder={t("accounting.common.credit", "Kredit")} value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: "" })} />
+                  <button className="sm:col-span-2 text-xs text-red-400" onClick={() => removeLine(i)}>{t("accounting.common.delete", "Hapus")}</button>
+                </div>
               </div>
             ))}
           </div>
