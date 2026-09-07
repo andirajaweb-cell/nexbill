@@ -353,10 +353,21 @@ function DeviceFormFields({
       <input className={cls} placeholder={t("devices.form.namePlaceholder", "Nama (mis. Plug Bilik 1)")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       <select className={cls} value={form.protocol} onChange={(e) => setForm({ ...form, protocol: e.target.value })}>
         <option value="tasmota_mqtt">{t("devices.form.protocol.tasmota", "Tasmota (MQTT)")}</option>
-        <option value="http_generic">{t("devices.form.protocol.httpGeneric", "HTTP Generik (mis. Shelly)")}</option>
         <option value="tuya">{t("devices.form.protocol.tuya", "Tuya Smart Life")}</option>
-        <option value="sonoff_ewelink">{t("devices.form.protocol.ewelink", "Sonoff eWeLink")}</option>
         <option value="android_tv_relay">{t("devices.form.protocol.tv", "TV (Android/Google TV)")}</option>
+        {/*
+          HTTP Generik dan Sonoff eWeLink sengaja disembunyikan dari pilihan perangkat baru (belum
+          jadi cara setup resmi yang didukung penuh tim NEXBILL) — tapi kalau ada perangkat lama
+          yang masih memakainya, opsinya tetap muncul di sini SAAT diedit, supaya perangkat itu
+          tidak "hilang" jadi tidak bisa disimpan/diubah. Sama seperti pola "android_tv_adb" di
+          bawah, yang sudah lebih dulu berstatus legacy.
+        */}
+        {form.protocol === "http_generic" && (
+          <option value="http_generic">{t("devices.form.protocol.httpGeneric", "HTTP Generik (mis. Shelly)")}</option>
+        )}
+        {form.protocol === "sonoff_ewelink" && (
+          <option value="sonoff_ewelink">{t("devices.form.protocol.ewelink", "Sonoff eWeLink")}</option>
+        )}
         {/* Legacy option — only appears while editing a device that already uses it. Not offered for new devices; direct-ADB is a NEXBILL-team self-hosted scenario, not part of the standard outlet setup (NexbillAgent.exe via Relay). */}
         {form.protocol === "android_tv_adb" && (
           <option value="android_tv_adb">{t("devices.form.protocol.androidTvAdb", "Android TV / Google TV (ADB Jaringan langsung)")}</option>

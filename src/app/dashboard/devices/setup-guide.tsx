@@ -64,10 +64,14 @@ export function DeviceSetupGuide() {
     }
   };
 
+  // "http" (HTTP Generik) and "ewelink" (Sonoff eWeLink) are deliberately left out of this list —
+  // both protocols still work for any device already set up on them (see page.tsx's
+  // DeviceFormFields, which keeps their dropdown option visible only while editing such a
+  // device), but they're not offered or documented as a setup path for NEW devices right now. The
+  // guide content itself (below, s.key === "http" / "ewelink") is left in place, just unreachable,
+  // so re-enabling either one later is a one-line change back to this array.
   const sections: { key: SectionKey; title: string }[] = [
-    { key: "http", title: t("devices.guide.http.title", "HTTP Generik (mis. Shelly)") },
     { key: "tuya", title: t("devices.guide.tuya.title", "Tuya Smart Life") },
-    { key: "ewelink", title: t("devices.guide.ewelink.title", "Sonoff eWeLink") },
     { key: "tv", title: t("devices.guide.tv.title", "TV (Android/Google TV) via NexbillAgent") },
   ];
 
