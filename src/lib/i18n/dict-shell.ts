@@ -106,6 +106,7 @@ registerDict({
   "card.rowRentalReguler": { id: "Rental PS — Reguler", en: "PS Rental — Regular", ms: "Sewa PS — Biasa", th: "เช่า PS — ทั่วไป", fil: "Upa ng PS — Regular", vi: "Cho thuê PS — Thường" },
   "card.rowRentalMember": { id: "Rental PS — Member", en: "PS Rental — Member", ms: "Sewa PS — Ahli", th: "เช่า PS — สมาชิก", fil: "Upa ng PS — Member", vi: "Cho thuê PS — Thành viên" },
   "card.rowAddon": { id: "Add-on (Controller/Headset/VR)", en: "Add-on (Controller/Headset/VR)", ms: "Add-on (Controller/Headset/VR)", th: "Add-on (Controller/Headset/VR)", fil: "Add-on (Controller/Headset/VR)", vi: "Add-on (Tay cầm/Tai nghe/VR)" },
+  "card.rowHomeRental": { id: "Home Rental (Sewa Dibawa Pulang)", en: "Home Rental (Take-Home)", ms: "Home Rental (Bawa Balik)", th: "เช่ากลับบ้าน (Home Rental)", fil: "Home Rental (Dalhin sa Bahay)", vi: "Cho thuê mang về (Home Rental)" },
   "card.rowFnb": { id: "F&B", en: "F&B", ms: "F&B", th: "F&B", fil: "F&B", vi: "F&B" },
   "card.rowProduk": { id: "Penjualan Produk", en: "Product Sales", ms: "Jualan Produk", th: "ยอดขายสินค้า", fil: "Benta ng Produkto", vi: "Bán sản phẩm" },
   "card.rowPpob": { id: "PPOB (Fee/Margin)", en: "Bill Payments (Fee/Margin)", ms: "PPOB (Fi/Margin)", th: "PPOB (ค่าธรรมเนียม/มาร์จิ้น)", fil: "PPOB (Fee/Margin)", vi: "PPOB (Phí/Chênh lệch)" },

@@ -26,8 +26,9 @@ interface OwnerDashboard {
   revenueRental: number;
   revenueFnb: number;
   revenueProduk: number;
-  revenueBySource: { rentalReguler: number; rentalMember: number; addon: number; fnb: number; produk: number; ppob: number; lainLain: number };
+  revenueBySource: { rentalReguler: number; rentalMember: number; addon: number; homeRental: number; fnb: number; produk: number; ppob: number; lainLain: number };
   revenueBySourceTotal: number;
+  enabledModules: { ppob: boolean; homeRental: boolean };
   salesTargetMonthly: number | null;
   salesTargetDaily: number | null;
   pengeluaranHariIni: number;
@@ -87,23 +88,32 @@ function StatCard({ label, value, glow = "cyan", sub, icon: Icon }: { label: str
   );
 }
 
-const REVENUE_SOURCE_ROWS: { key: keyof OwnerDashboard["revenueBySource"]; labelKey: string; barClass: string; subKey?: string }[] = [
+/** `moduleKey`, when set, gates this row on `enabledModules` — an outlet that never turned that
+ * optional module on (Settings > Feature Management) doesn't need a permanent "Rp0" line for it
+ * cluttering the dashboard. Rows without a `moduleKey` are core to every outlet and always show. */
+const REVENUE_SOURCE_ROWS: { key: keyof OwnerDashboard["revenueBySource"]; labelKey: string; barClass: string; subKey?: string; moduleKey?: keyof OwnerDashboard["enabledModules"] }[] = [
   { key: "rentalReguler", labelKey: "card.rowRentalReguler", barClass: "bg-cyan-400" },
   { key: "rentalMember", labelKey: "card.rowRentalMember", barClass: "bg-emerald-400" },
   { key: "addon", labelKey: "card.rowAddon", barClass: "bg-blue-400" },
+  { key: "homeRental", labelKey: "card.rowHomeRental", barClass: "bg-orange-400", moduleKey: "homeRental" },
   { key: "fnb", labelKey: "card.rowFnb", barClass: "bg-purple-400" },
   { key: "produk", labelKey: "card.rowProduk", barClass: "bg-amber-400" },
-  { key: "ppob", labelKey: "card.rowPpob", barClass: "bg-pink-400", subKey: "card.rowPpobSub" },
+  { key: "ppob", labelKey: "card.rowPpob", barClass: "bg-pink-400", subKey: "card.rowPpobSub", moduleKey: "ppob" },
   { key: "lainLain", labelKey: "card.rowLainLain", barClass: "bg-neutral-400" },
 ];
 
 /** Horizontal-bar revenue-by-source breakdown — mirrors what the accounting engine (postings.ts)
  * actually routes each order item to today (rental split member/reguler, F&B, retail product,
- * add-on rentals, PPOB margin only — not the pass-through nominal, service charge/tax). */
+ * add-on rentals, Home Rental, PPOB margin only — not the pass-through nominal, service
+ * charge/tax). PPOB and Home Rental are optional per-outlet modules (Settings > Feature
+ * Management) — their rows only render for outlets that actually turned that module on, see
+ * REVENUE_SOURCE_ROWS' moduleKey filter below. */
 function RevenueBreakdownCard({ data }: { data: OwnerDashboard | null }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
-  const rows = data ? REVENUE_SOURCE_ROWS.map((r) => ({ ...r, amount: data.revenueBySource[r.key] })) : [];
+  const rows = data
+    ? REVENUE_SOURCE_ROWS.filter((r) => !r.moduleKey || data.enabledModules[r.moduleKey]).map((r) => ({ ...r, amount: data.revenueBySource[r.key] }))
+    : [];
   const maxAmount = Math.max(1, ...rows.map((r) => r.amount));
   const hasTarget = data && data.salesTargetDaily != null;
   const bepPercent = hasTarget && data!.salesTargetDaily! > 0 ? Math.round((data!.revenueBySourceTotal / data!.salesTargetDaily!) * 1000) / 10 : 0;

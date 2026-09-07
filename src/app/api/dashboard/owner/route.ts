@@ -10,6 +10,7 @@ import { computeProfitLoss, computeTrialBalance } from "@/lib/accounting/reports
 import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
 import { outletHour, outletDayStartUtc } from "@/lib/time/outlet-time";
+import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 
 const FNB_CATEGORIES = new Set(["food", "drink", "coffee", "snack", "dessert"]);
 
@@ -63,6 +64,8 @@ export async function GET(req: NextRequest) {
       bankAccounts,
       trialBalance,
       pl,
+      ppobEnabled,
+      homeRentalEnabled,
     ] = await Promise.all([
       db.select().from(orders).where(sql`${orders.outletId} = ${outletId} AND ${orders.status} = 'paid' AND ${orders.createdAt} >= ${dayStartIso}`),
       db.select({ salesTargetMonthly: outlets.salesTargetMonthly }).from(outlets).where(eq(outlets.id, outletId)).limit(1),
@@ -89,6 +92,12 @@ export async function GET(req: NextRequest) {
       // indexes instead of a full sequential scan, not a shortcut around correctness.
       computeTrialBalance(outletId),
       computeProfitLoss(outletId, dayStartIso, undefined),
+      // Whether this outlet actually uses these optional modules — the revenue breakdown below
+      // only shows the PPOB / Home Rental rows to outlets that turned them on (see Feature
+      // Management in Settings), instead of every outlet seeing a permanent "Rp0" row for a
+      // module they never use. See lib/home-rental/feature-flags.ts.
+      isFeatureEnabled(outletId, "PPOB_ENABLED"),
+      isFeatureEnabled(outletId, "HOME_RENTAL_ENABLED"),
     ]);
 
     const revenueRental = paidOrdersToday.filter((o) => o.rentalSessionId).reduce((s, o) => s + o.total, 0);
@@ -136,7 +145,7 @@ export async function GET(req: NextRequest) {
     const isMemberByCustomerId = new Map(sessionCustomersToday.map((c) => [c.id, !!c.membershipTierId]));
     const orderByIdToday = new Map(paidOrdersToday.map((o) => [o.id, o]));
 
-    const revenueBySource = { rentalReguler: 0, rentalMember: 0, addon: 0, fnb: 0, produk: 0, ppob: 0, lainLain: 0 };
+    const revenueBySource = { rentalReguler: 0, rentalMember: 0, addon: 0, homeRental: 0, fnb: 0, produk: 0, ppob: 0, lainLain: 0 };
     for (const item of itemsToday) {
       if (item.itemType === "rental") {
         const order = orderByIdToday.get(item.orderId);
@@ -157,6 +166,13 @@ export async function GET(req: NextRequest) {
     // Service charge + tax post to the same "Lain-lain" bucket as postSalesJournal (postings.ts).
     revenueBySource.lainLain += paidOrdersToday.reduce((s, o) => s + (o.serviceCharge ?? 0) + (o.tax ?? 0), 0);
     revenueBySource.ppob = ppobToday.reduce((s, t) => s + (t.feeAdmin ?? 0), 0);
+    // Home Rental revenue doesn't come from orders/orderItems at all (it's a fully separate
+    // module — homeRentalRentals, see lib/home-rental/rentals.ts), so unlike every other bucket
+    // above it's pulled straight from the GL (pl.revenue, already computed for this same "today"
+    // window) instead of a hand-rolled query: account family 4800 HOME RENTAL REVENUE. This also
+    // guarantees it always ties out exactly to the Laba Rugi report, the same report this
+    // breakdown is meant to summarize on the dashboard.
+    revenueBySource.homeRental = pl.revenue.filter((r) => r.code.startsWith("48") && r.isPostingAllowed).reduce((s, r) => s + r.balance, 0);
 
     const revenueBySourceTotal = Object.values(revenueBySource).reduce((s, v) => s + v, 0);
 
@@ -279,6 +295,10 @@ export async function GET(req: NextRequest) {
       revenueProduk,
       revenueBySource,
       revenueBySourceTotal,
+      // Which optional-module breakdown rows this outlet actually wants surfaced — see Settings >
+      // Feature Management. The dashboard UI hides the PPOB / Home Rental rows entirely (not just
+      // shows Rp0) when the corresponding module is OFF for this outlet.
+      enabledModules: { ppob: ppobEnabled, homeRental: homeRentalEnabled },
       salesTargetMonthly,
       salesTargetDaily,
       pengeluaranHariIni,
