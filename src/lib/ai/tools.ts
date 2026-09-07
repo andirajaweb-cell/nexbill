@@ -13,7 +13,7 @@ export const toolDefinitions: Anthropic.Tool[] = [
       properties: {
         consoleType: {
           type: "string",
-          enum: ["ps2", "ps3", "ps4", "ps5", "ps4_pro", "ps5_slim", "ps6", "any"],
+          enum: ["ps2", "ps3", "ps4", "ps5", "ps4_pro", "ps5_slim", "ps6", "wii", "xbox", "driving_simulator", "any"],
           description: "Filter jenis konsol, atau 'any' untuk semua.",
         },
       },

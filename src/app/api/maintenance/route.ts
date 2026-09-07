@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { fixedAssets, assetMaintenanceLogs, cashBankAccounts } from "@/db/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { fixedAssets, assetMaintenanceLogs, assetMaintenancePartsUsed, cashBankAccounts, products } from "@/db/schema";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { logMaintenance } from "@/lib/accounting/asset";
+import { ensureSparePartCategory } from "@/lib/inventory/categories";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
@@ -22,12 +23,25 @@ export async function GET(_req: NextRequest) {
 
     const assets = await db.select().from(fixedAssets).where(eq(fixedAssets.outletId, outletId)).orderBy(desc(fixedAssets.acquisitionDate));
     const assetIds = assets.map((a) => a.id);
-    const [tickets, cashBank] = await Promise.all([
+    const sparePartCategory = await ensureSparePartCategory(outletId);
+    const [tickets, cashBank, spareParts] = await Promise.all([
       assetIds.length ? db.select().from(assetMaintenanceLogs).where(inArray(assetMaintenanceLogs.fixedAssetId, assetIds)).orderBy(desc(assetMaintenanceLogs.maintenanceDate)) : Promise.resolve([]),
       db.select().from(cashBankAccounts).where(eq(cashBankAccounts.outletId, outletId)),
+      db.select().from(products).where(and(eq(products.outletId, outletId), eq(products.category, sparePartCategory.code), eq(products.isActive, true))),
     ]);
+    const ticketIds = tickets.map((t) => t.id);
+    const partsUsedRows = ticketIds.length
+      ? await db.select().from(assetMaintenancePartsUsed).where(inArray(assetMaintenancePartsUsed.maintenanceLogId, ticketIds))
+      : [];
+    // Denormalize productName onto each row here rather than making the client join against
+    // `spareParts` — that list is filtered to the "sparepart" category, so a part later
+    // recategorized or deactivated would otherwise look like a "deleted" product on old tickets.
+    const usedProductIds = [...new Set(partsUsedRows.map((p) => p.productId))];
+    const usedProducts = usedProductIds.length ? await db.select().from(products).where(inArray(products.id, usedProductIds)) : [];
+    const usedProductNameById = new Map(usedProducts.map((p) => [p.id, p.name]));
+    const partsUsed = partsUsedRows.map((p) => ({ ...p, productName: usedProductNameById.get(p.productId) ?? null }));
 
-    return NextResponse.json({ assets, tickets, cashBankAccounts: cashBank });
+    return NextResponse.json({ assets, tickets, cashBankAccounts: cashBank, spareParts, partsUsed });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }

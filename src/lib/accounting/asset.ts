@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
-import { fixedAssets, assetDepreciationEntries, assetMaintenanceLogs, cashBankAccounts, rentalUnits } from "@/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { fixedAssets, assetDepreciationEntries, assetMaintenanceLogs, assetMaintenancePartsUsed, cashBankAccounts, rentalUnits, products, stockMovements } from "@/db/schema";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { postJournal, JournalLineInput } from "./journal";
 import { EXPENSE_PAYABLE_ACCOUNT_CODE } from "./coa";
 import { getMappedAccountId } from "./account-mapping";
@@ -239,6 +239,10 @@ export interface LogMaintenanceInput {
   accountId?: string;
   cashBankAccountId?: string;
   paymentMethod?: "cash" | "bank" | "transfer" | "qris";
+  /** Short free-text tag for the ticket list (e.g. "Analog stick kanan drift"). */
+  damageLabel?: string;
+  damageType?: "fisik" | "elektronik" | "konektor_port" | "software_firmware" | "baterai_power" | "lainnya";
+  damageSeverity?: "rusak_ringan" | "rusak_berat" | "tidak_bisa_diperbaiki";
 }
 
 export async function logMaintenance(input: LogMaintenanceInput) {
@@ -266,7 +270,17 @@ export async function logMaintenance(input: LogMaintenanceInput) {
 
   const [log] = await db
     .insert(assetMaintenanceLogs)
-    .values({ fixedAssetId: input.fixedAssetId, status: "queued", description: input.description, cost: input.cost ?? 0, expenseId, staffUserId: input.staffUserId })
+    .values({
+      fixedAssetId: input.fixedAssetId,
+      status: "queued",
+      description: input.description,
+      cost: input.cost ?? 0,
+      expenseId,
+      staffUserId: input.staffUserId,
+      damageLabel: input.damageLabel || null,
+      damageType: input.damageType || null,
+      damageSeverity: input.damageSeverity || null,
+    })
     .returning();
 
   await syncAssetMaintenanceStatus(input.fixedAssetId);
@@ -347,7 +361,16 @@ export async function updateMaintenanceStatus(logId: string, nextStatus: "queued
  * entry, so that case just returns an error pointing at the Expense page instead of half-fixing
  * one side of a two-sided record.
  */
-export async function updateMaintenanceLog(logId: string, patch: { description?: string; cost?: number }) {
+export async function updateMaintenanceLog(
+  logId: string,
+  patch: {
+    description?: string;
+    cost?: number;
+    damageLabel?: string | null;
+    damageType?: string | null;
+    damageSeverity?: string | null;
+  }
+) {
   const [log] = await db.select().from(assetMaintenanceLogs).where(eq(assetMaintenanceLogs.id, logId)).limit(1);
   if (!log) throw new Error("Tiket maintenance tidak ditemukan.");
   const next: Record<string, unknown> = {};
@@ -359,6 +382,9 @@ export async function updateMaintenanceLog(logId: string, patch: { description?:
     if (log.expenseId) throw new Error("Biaya tiket ini sudah tercatat sebagai Expense — ubah nominalnya lewat halaman Expense, bukan dari sini.");
     next.cost = patch.cost;
   }
+  if (patch.damageLabel !== undefined) next.damageLabel = patch.damageLabel || null;
+  if (patch.damageType !== undefined) next.damageType = patch.damageType || null;
+  if (patch.damageSeverity !== undefined) next.damageSeverity = patch.damageSeverity || null;
   if (Object.keys(next).length === 0) return log;
   const [updated] = await db.update(assetMaintenanceLogs).set(next).where(eq(assetMaintenanceLogs.id, logId)).returning();
   return updated;
@@ -374,7 +400,88 @@ export async function deleteMaintenanceLog(logId: string): Promise<{ fixedAssetI
   const [log] = await db.select().from(assetMaintenanceLogs).where(eq(assetMaintenanceLogs.id, logId)).limit(1);
   if (!log) throw new Error("Tiket maintenance tidak ditemukan.");
   if (log.expenseId) throw new Error("Tidak bisa dihapus: tiket ini sudah tercatat sebagai Expense. Batalkan/void Expense-nya dulu di halaman Expense.");
+
+  // Restock every spare part still attached to this ticket first — assetMaintenancePartsUsed has
+  // a foreign key to this row (no cascade), so leaving them in place would fail the delete below
+  // with a raw DB constraint error instead of this clean, translated one; restocking also means
+  // deleting a ticket by mistake doesn't quietly leave parts marked as consumed forever.
+  const attachedParts = await db.select().from(assetMaintenancePartsUsed).where(eq(assetMaintenancePartsUsed.maintenanceLogId, logId));
+  for (const part of attachedParts) {
+    await removeMaintenancePart(part.id);
+  }
+
   await db.delete(assetMaintenanceLogs).where(eq(assetMaintenanceLogs.id, logId));
   await syncAssetMaintenanceStatus(log.fixedAssetId);
   return { fixedAssetId: log.fixedAssetId };
+}
+
+/**
+ * Attaches one spare part/component to a repair ticket, decrementing stock immediately (parts are
+ * treated as "used" the moment a technician pulls them for this repair, not deferred to ticket
+ * completion) and recording a stockMovements row so it shows up in the normal stock ledger. Reuses
+ * the "adjustment" movement type rather than adding a new enum value — same semantics (a manual
+ * stock decrease that isn't a sale), distinguishable via the note text and refOrderId pointing at
+ * the maintenance ticket. Throws (rather than allowing negative stock) if not enough is on hand.
+ *
+ * Deliberately does NOT roll this cost into assetMaintenanceLogs.cost automatically — that field
+ * is a manually-entered number (typically labor/service cost) that gets locked once an Expense is
+ * posted for it (see updateMaintenanceLog), and silently adding to it here could double-count if a
+ * ticket already has its cost set. Parts cost is surfaced separately in the UI instead.
+ */
+export async function addMaintenancePart(input: { maintenanceLogId: string; productId: string; qty: number; staffUserId?: string }) {
+  if (!Number.isFinite(input.qty) || input.qty <= 0) throw new Error("Jumlah sparepart harus lebih dari 0.");
+
+  const [log] = await db.select().from(assetMaintenanceLogs).where(eq(assetMaintenanceLogs.id, input.maintenanceLogId)).limit(1);
+  if (!log) throw new Error("Tiket maintenance tidak ditemukan.");
+
+  const [product] = await db.select().from(products).where(eq(products.id, input.productId)).limit(1);
+  if (!product) throw new Error("Sparepart/komponen tidak ditemukan.");
+  if (product.stockQty < input.qty) throw new Error(`Stok "${product.name}" tidak cukup (sisa ${product.stockQty}).`);
+
+  const [asset] = await db.select({ outletId: fixedAssets.outletId, name: fixedAssets.name }).from(fixedAssets).where(eq(fixedAssets.id, log.fixedAssetId)).limit(1);
+
+  const [partUsed] = await db
+    .insert(assetMaintenancePartsUsed)
+    .values({ maintenanceLogId: input.maintenanceLogId, productId: input.productId, qty: input.qty, unitCost: product.costPrice ?? 0, staffUserId: input.staffUserId })
+    .returning();
+
+  await db.insert(stockMovements).values({
+    productId: input.productId,
+    type: "adjustment",
+    qty: -Math.abs(input.qty),
+    note: `Dipakai untuk perbaikan${asset ? ` — ${asset.name}` : ""} (tiket ${input.maintenanceLogId.slice(0, 8)})`,
+    refOrderId: input.maintenanceLogId,
+    staffUserId: input.staffUserId,
+  });
+  await db.update(products).set({ stockQty: sql`${products.stockQty} - ${input.qty}` }).where(eq(products.id, input.productId));
+
+  if (asset) {
+    await logAudit({
+      outletId: asset.outletId,
+      staffUserId: input.staffUserId,
+      action: "add_maintenance_part",
+      entityType: "asset_maintenance_log",
+      entityId: input.maintenanceLogId,
+      after: { productId: input.productId, productName: product.name, qty: input.qty },
+    });
+  }
+  return partUsed;
+}
+
+/** Un-attaches a spare part usage and restores its qty to stock — e.g. the wrong part was logged. */
+export async function removeMaintenancePart(partUsedId: string, staffUserId?: string) {
+  const [partUsed] = await db.select().from(assetMaintenancePartsUsed).where(eq(assetMaintenancePartsUsed.id, partUsedId)).limit(1);
+  if (!partUsed) throw new Error("Data pemakaian sparepart tidak ditemukan.");
+
+  await db.delete(assetMaintenancePartsUsed).where(eq(assetMaintenancePartsUsed.id, partUsedId));
+  await db.insert(stockMovements).values({
+    productId: partUsed.productId,
+    type: "adjustment",
+    qty: partUsed.qty,
+    note: `Batal pakai sparepart untuk perbaikan (tiket ${partUsed.maintenanceLogId.slice(0, 8)})`,
+    refOrderId: partUsed.maintenanceLogId,
+    staffUserId,
+  });
+  await db.update(products).set({ stockQty: sql`${products.stockQty} + ${partUsed.qty}` }).where(eq(products.id, partUsed.productId));
+  return { maintenanceLogId: partUsed.maintenanceLogId, productId: partUsed.productId };
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -10,7 +10,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { Wrench, PlayCircle, CheckCircle2, Pencil, Trash2 } from "lucide-react";
+import { Wrench, PlayCircle, CheckCircle2, Pencil, Trash2, ChevronDown, ChevronUp, PackagePlus, X } from "lucide-react";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import "@/lib/i18n/dict-maintenance";
@@ -61,15 +61,38 @@ function MaintenancePageInner() {
     in_progress: t("maintenance.status.inProgress", "Proses"),
     done: t("maintenance.status.done", "Selesai"),
   };
+  const DAMAGE_TYPE_LABEL: Record<string, string> = {
+    fisik: t("maintenance.damageType.fisik", "Fisik"),
+    elektronik: t("maintenance.damageType.elektronik", "Elektronik"),
+    konektor_port: t("maintenance.damageType.konektorPort", "Konektor / Port"),
+    software_firmware: t("maintenance.damageType.softwareFirmware", "Software / Firmware"),
+    baterai_power: t("maintenance.damageType.bateraiPower", "Baterai / Power"),
+    lainnya: t("maintenance.damageType.lainnya", "Lainnya"),
+  };
+  const DAMAGE_SEVERITY_LABEL: Record<string, string> = {
+    rusak_ringan: t("maintenance.damageSeverity.ringan", "Rusak Ringan"),
+    rusak_berat: t("maintenance.damageSeverity.berat", "Rusak Berat"),
+    tidak_bisa_diperbaiki: t("maintenance.damageSeverity.unrepairable", "Tidak Bisa Diperbaiki"),
+  };
+  const DAMAGE_SEVERITY_BADGE: Record<string, string> = { rusak_ringan: "pending", rusak_berat: "failed", tidak_bisa_diperbaiki: "failed" };
+
   const [outletId, setOutletId] = useState<string | null>(null);
-  const [bundle, setBundle] = useState<any>({ assets: [], tickets: [], cashBankAccounts: [] });
+  const [bundle, setBundle] = useState<any>({ assets: [], tickets: [], cashBankAccounts: [], spareParts: [], partsUsed: [] });
   const [expenseAccounts, setExpenseAccounts] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("Semua");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<any>({ fixedAssetId: "", description: "", cost: 0, createExpenseFor: false, accountId: "", cashBankAccountId: "" });
+  const [form, setForm] = useState<any>({
+    fixedAssetId: "", description: "", cost: 0, createExpenseFor: false, accountId: "", cashBankAccountId: "",
+    damageLabel: "", damageType: "", damageSeverity: "",
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ description: string; cost: number } | null>(null);
+  const [editForm, setEditForm] = useState<{ description: string; cost: number; damageLabel: string; damageType: string; damageSeverity: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Which tickets have their "Sparepart Dipakai" panel expanded, and the pending add-part
+  // selection per ticket (keyed by ticket id so multiple panels can be open with independent
+  // in-progress selections at once).
+  const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set());
+  const [partForm, setPartForm] = useState<Record<string, { productId: string; qty: number }>>({});
 
   const { user } = useAuth();
   const role = (user?.role ?? "cashier") as StaffRole;
@@ -88,6 +111,9 @@ function MaintenancePageInner() {
 
   const assets: any[] = bundle.assets ?? [];
   const tickets: any[] = bundle.tickets ?? [];
+  const spareParts: any[] = bundle.spareParts ?? [];
+  const partsUsed: any[] = bundle.partsUsed ?? [];
+  const partsForTicket = (ticketId: string) => partsUsed.filter((p) => p.maintenanceLogId === ticketId);
 
   // Runs once assets have actually loaded for this deep-link value (guarded by
   // handledDeepLinkRef so it doesn't re-fire and stomp on whatever the user is doing after a
@@ -138,7 +164,7 @@ function MaintenancePageInner() {
     const res = await fetch("/api/maintenance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
-    setForm({ fixedAssetId: "", description: "", cost: 0, createExpenseFor: false, accountId: "", cashBankAccountId: "" });
+    setForm({ fixedAssetId: "", description: "", cost: 0, createExpenseFor: false, accountId: "", cashBankAccountId: "", damageLabel: "", damageType: "", damageSeverity: "" });
     setShowForm(false);
     load();
   };
@@ -155,7 +181,16 @@ function MaintenancePageInner() {
     }
   };
 
-  const startEdit = (ticket: any) => { setEditingId(ticket.id); setEditForm({ description: ticket.description, cost: ticket.cost }); };
+  const startEdit = (ticket: any) => {
+    setEditingId(ticket.id);
+    setEditForm({
+      description: ticket.description,
+      cost: ticket.cost,
+      damageLabel: ticket.damageLabel ?? "",
+      damageType: ticket.damageType ?? "",
+      damageSeverity: ticket.damageSeverity ?? "",
+    });
+  };
 
   const saveEdit = async () => {
     if (!editingId || !editForm) return;
@@ -177,6 +212,46 @@ function MaintenancePageInner() {
     setBusyId(ticket.id);
     try {
       const res = await fetch(`/api/maintenance/${ticket.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const togglePartsPanel = (ticketId: string) => {
+    setExpandedParts((prev) => {
+      const next = new Set(prev);
+      if (next.has(ticketId)) next.delete(ticketId);
+      else next.add(ticketId);
+      return next;
+    });
+  };
+
+  const addPart = async (ticketId: string) => {
+    const pending = partForm[ticketId];
+    if (!pending?.productId) return showAlert(t("maintenance.parts.alertSelectPart", "Pilih sparepart/komponen yang dipakai."));
+    setBusyId(`part-${ticketId}`);
+    try {
+      const res = await fetch(`/api/maintenance/${ticketId}/parts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: pending.productId, qty: pending.qty || 1 }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setPartForm((prev) => ({ ...prev, [ticketId]: { productId: "", qty: 1 } }));
+      load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const removePart = async (ticketId: string, partId: string) => {
+    setBusyId(`part-${partId}`);
+    try {
+      const res = await fetch(`/api/maintenance/${ticketId}/parts/${partId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
       load();
@@ -248,6 +323,15 @@ function MaintenancePageInner() {
             </select>
             <input type="number" className={inputCls} placeholder={t("maintenance.costPlaceholder", "Biaya (Rp, 0 jika belum tahu)")} value={form.cost || ""} onChange={(e) => setForm({ ...form, cost: Number(e.target.value) })} />
             <input className={inputCls + " col-span-2 sm:col-span-4"} placeholder={t("maintenance.descriptionPlaceholder", "Deskripsi kerusakan (mis. Layar TV bergaris)")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <input className={inputCls} placeholder={t("maintenance.damageLabelPlaceholder", "Label kerusakan (mis. Stik drift)")} value={form.damageLabel} onChange={(e) => setForm({ ...form, damageLabel: e.target.value })} />
+            <select className={inputCls} value={form.damageType} onChange={(e) => setForm({ ...form, damageType: e.target.value })}>
+              <option value="">{t("maintenance.damageTypePlaceholder", "Jenis kerusakan...")}</option>
+              {Object.entries(DAMAGE_TYPE_LABEL).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </select>
+            <select className={inputCls} value={form.damageSeverity} onChange={(e) => setForm({ ...form, damageSeverity: e.target.value })}>
+              <option value="">{t("maintenance.damageSeverityPlaceholder", "Kategori kerusakan...")}</option>
+              {Object.entries(DAMAGE_SEVERITY_LABEL).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </select>
             <label className="flex items-center gap-2 text-xs text-neutral-400 col-span-2">
               <input type="checkbox" checked={form.createExpenseFor} onChange={(e) => setForm({ ...form, createExpenseFor: e.target.checked })} /> {t("maintenance.createExpenseCheckbox", "Buat Expense (Beban Maintenance) sekarang")}
             </label>
@@ -276,12 +360,13 @@ function MaintenancePageInner() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-500 border-b border-neutral-800">
-              <th className="py-2">{t("maintenance.col.asset", "Aset")}</th><th>{t("maintenance.col.category", "Kategori")}</th><th>{t("maintenance.col.description", "Deskripsi")}</th><th>{t("maintenance.col.cost", "Biaya")}</th><th>{t("maintenance.col.status", "Status")}</th><th>{t("maintenance.col.dateIn", "Masuk")}</th><th></th>
+              <th className="py-2">{t("maintenance.col.asset", "Aset")}</th><th>{t("maintenance.col.category", "Kategori")}</th><th>{t("maintenance.col.description", "Deskripsi")}</th><th>{t("maintenance.col.damage", "Kerusakan")}</th><th>{t("maintenance.col.cost", "Biaya")}</th><th>{t("maintenance.col.status", "Status")}</th><th>{t("maintenance.col.dateIn", "Masuk")}</th><th></th>
             </tr>
           </thead>
           <tbody>
             {visibleTickets.map((ticket) => (
-              <tr key={ticket.id} className="border-b border-neutral-900 align-top">
+              <Fragment key={ticket.id}>
+              <tr className="border-b border-neutral-900 align-top">
                 <td className="py-2 text-xs font-medium">{assetName(ticket.fixedAssetId)}</td>
                 <td className="text-xs">{CATEGORY_LABEL[assetCategory(ticket.fixedAssetId) ?? ""] ?? "-"}</td>
                 <td className="text-xs max-w-[220px]">
@@ -289,6 +374,33 @@ function MaintenancePageInner() {
                     <input className={inputCls + " w-full"} value={editForm?.description ?? ""} onChange={(e) => setEditForm({ ...(editForm as any), description: e.target.value })} />
                   ) : (
                     ticket.description
+                  )}
+                </td>
+                <td className="text-xs max-w-[180px] space-y-1">
+                  {editingId === ticket.id ? (
+                    <div className="space-y-1">
+                      <input
+                        className={inputCls + " w-full"}
+                        placeholder={t("maintenance.damageLabelPlaceholder", "Label kerusakan (mis. Stik drift)")}
+                        value={editForm?.damageLabel ?? ""}
+                        onChange={(e) => setEditForm({ ...(editForm as any), damageLabel: e.target.value })}
+                      />
+                      <select className={inputCls + " w-full"} value={editForm?.damageType ?? ""} onChange={(e) => setEditForm({ ...(editForm as any), damageType: e.target.value })}>
+                        <option value="">{t("maintenance.damageTypePlaceholder", "Jenis kerusakan...")}</option>
+                        {Object.entries(DAMAGE_TYPE_LABEL).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                      </select>
+                      <select className={inputCls + " w-full"} value={editForm?.damageSeverity ?? ""} onChange={(e) => setEditForm({ ...(editForm as any), damageSeverity: e.target.value })}>
+                        <option value="">{t("maintenance.damageSeverityPlaceholder", "Kategori kerusakan...")}</option>
+                        {Object.entries(DAMAGE_SEVERITY_LABEL).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {ticket.damageSeverity && <Badge status={DAMAGE_SEVERITY_BADGE[ticket.damageSeverity] ?? "unknown"}>{DAMAGE_SEVERITY_LABEL[ticket.damageSeverity] ?? ticket.damageSeverity}</Badge>}
+                      {ticket.damageType && <div className="text-neutral-500">{DAMAGE_TYPE_LABEL[ticket.damageType] ?? ticket.damageType}</div>}
+                      {ticket.damageLabel && <div className="text-neutral-400">{ticket.damageLabel}</div>}
+                      {!ticket.damageSeverity && !ticket.damageType && !ticket.damageLabel && <span className="text-neutral-600">-</span>}
+                    </div>
                   )}
                 </td>
                 <td className="text-xs">
@@ -326,6 +438,10 @@ function MaintenancePageInner() {
                             <CheckCircle2 size={12} /> {t("maintenance.markDone", "Tandai Selesai")}
                           </Button>
                         )}
+                        <Button variant="ghost" className="text-xs px-2 py-1 gap-1" onClick={() => togglePartsPanel(ticket.id)}>
+                          {expandedParts.has(ticket.id) ? <ChevronUp size={12} /> : <ChevronDown size={12} />} {t("maintenance.parts.toggle", "Sparepart")}
+                          {partsForTicket(ticket.id).length > 0 && ` (${partsForTicket(ticket.id).length})`}
+                        </Button>
                         {canManage && (
                           <div className="flex gap-1">
                             <Button variant="ghost" className="text-xs px-2 py-1 gap-1" onClick={() => startEdit(ticket)}><Pencil size={12} /> {t("maintenance.edit", "Edit")}</Button>
@@ -337,6 +453,72 @@ function MaintenancePageInner() {
                   </div>
                 </td>
               </tr>
+              {expandedParts.has(ticket.id) && (
+                <tr className="border-b border-neutral-900 bg-white/[0.02]">
+                  <td colSpan={8} className="py-3 px-2">
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-neutral-300 flex items-center gap-1.5"><PackagePlus size={13} className="text-emerald-400" /> {t("maintenance.parts.heading", "Sparepart Dipakai")}</div>
+                      {partsForTicket(ticket.id).length === 0 ? (
+                        <div className="text-xs text-neutral-500">{t("maintenance.parts.empty", "Belum ada sparepart dipakai untuk tiket ini.")}</div>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <tbody>
+                            {partsForTicket(ticket.id).map((p) => (
+                              <tr key={p.id} className="border-b border-neutral-900/60">
+                                <td className="py-1">{p.productName ?? t("maintenance.parts.deletedProduct", "(sparepart terhapus)")}</td>
+                                <td className="text-neutral-500">x{p.qty}</td>
+                                <td className="text-neutral-500">{rupiah(p.unitCost)}</td>
+                                <td className="font-medium">{rupiah(p.unitCost * p.qty)}</td>
+                                <td className="text-right">
+                                  {canManage && (
+                                    <Button variant="ghost" className="text-xs px-2 py-0.5 text-red-400" disabled={busyId === `part-${p.id}`} onClick={() => removePart(ticket.id, p.id)}>
+                                      <X size={11} />
+                                    </Button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                            <tr>
+                              <td colSpan={3} className="pt-1.5 text-neutral-500">{t("maintenance.parts.total", "Total Biaya Sparepart")}</td>
+                              <td className="pt-1.5 font-semibold" colSpan={2}>{rupiah(partsForTicket(ticket.id).reduce((s, p) => s + p.unitCost * p.qty, 0))}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      )}
+                      {canManage && (
+                        spareParts.length === 0 ? (
+                          <div className="text-xs text-neutral-500">
+                            {t("maintenance.parts.noSpareParts", "Belum ada sparepart terdaftar — tambahkan dulu di halaman")}{" "}
+                            <a href="/dashboard/inventory" className="text-emerald-400 underline">{t("maintenance.parts.inventoryLinkText", "Inventory Control")}</a>
+                            {" "}({t("maintenance.parts.categoryHint", "kategori Sparepart & Komponen")}).
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 items-center pt-1">
+                            <div className="w-56">
+                              <SearchableSelect
+                                value={partForm[ticket.id]?.productId ?? ""}
+                                onChange={(v) => setPartForm((prev) => ({ ...prev, [ticket.id]: { productId: v, qty: prev[ticket.id]?.qty ?? 1 } }))}
+                                placeholder={t("maintenance.parts.selectPlaceholder", "Pilih sparepart...")}
+                                options={spareParts.map((p: any) => ({ value: p.id, label: `${p.name} (stok ${p.stockQty})`, disabled: p.stockQty <= 0 }))}
+                              />
+                            </div>
+                            <input
+                              type="number"
+                              min={1}
+                              className={inputCls + " w-20"}
+                              placeholder={t("maintenance.parts.qtyPlaceholder", "Qty")}
+                              value={partForm[ticket.id]?.qty ?? 1}
+                              onChange={(e) => setPartForm((prev) => ({ ...prev, [ticket.id]: { productId: prev[ticket.id]?.productId ?? "", qty: Number(e.target.value) } }))}
+                            />
+                            <Button className="text-xs px-2 py-1.5" disabled={busyId === `part-${ticket.id}`} onClick={() => addPart(ticket.id)}>{t("maintenance.parts.add", "+ Tambah")}</Button>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>

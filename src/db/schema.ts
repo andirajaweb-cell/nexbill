@@ -174,7 +174,7 @@ export const rentalUnits = pgTable("rental_units", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),
   name: text("name").notNull(),
-  consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6"] }).notNull(),
+  consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6", "wii", "xbox", "driving_simulator"] }).notNull(),
   tvType: text("tv_type", { enum: ["android_tv", "smart_tv", "analog_tv"] }).notNull(),
   deviceId: text("device_id"),
   hourlyRate: doublePrecision("hourly_rate").notNull().default(0),
@@ -226,7 +226,7 @@ export const promos = pgTable("promos", {
   name: text("name").notNull(),
   type: text("type", { enum: ["rental_package", "bundle_discount", "happy_hour", "voucher_code"] }).notNull(),
   description: text("description"),
-  consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6", "any"] }),
+  consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6", "wii", "xbox", "driving_simulator", "any"] }),
   durationMinutes: integer("duration_minutes"),
   packagePrice: doublePrecision("package_price"),
   discountPercent: doublePrecision("discount_percent"),
@@ -948,8 +948,40 @@ export const assetMaintenanceLogs = pgTable("asset_maintenance_logs", {
   cost: doublePrecision("cost").notNull().default(0),
   expenseId: text("expense_id").references(() => expenses.id),
   staffUserId: text("staff_user_id").references(() => staffUsers.id),
+  // Damage classification — all optional/nullable so every ticket created before this shipped
+  // keeps working with no data migration. damageLabel is a short free-text tag for quick scanning
+  // in the ticket list (e.g. "Analog stick kanan drift"); damageType groups the underlying cause;
+  // damageSeverity is the specific 3-way triage the business asked for.
+  damageLabel: text("damage_label"),
+  damageType: text("damage_type", { enum: ["fisik", "elektronik", "konektor_port", "software_firmware", "baterai_power", "lainnya"] }),
+  damageSeverity: text("damage_severity", { enum: ["rusak_ringan", "rusak_berat", "tidak_bisa_diperbaiki"] }),
   ...timestamps,
 });
+
+/**
+ * Spare parts/components consumed by a repair ticket — each row is one part pulled from stock for
+ * one ticket. Deliberately reuses the SAME `products` table as F&B/merchandise inventory (via a
+ * dedicated "sparepart" product category, see lib/inventory/categories.ts's
+ * ensureSparePartCategory) rather than a brand-new parallel item catalog: that means spare parts
+ * automatically get purchase orders, supplier linkage, low-stock thresholds, and stock valuation
+ * completely for free from the existing Inventory Control + Purchasing modules — see
+ * addMaintenancePart()/removeMaintenancePart() in lib/accounting/asset.ts for the stock
+ * deduction/restock side of this.
+ */
+export const assetMaintenancePartsUsed = pgTable(
+  "asset_maintenance_parts_used",
+  {
+    id: id(),
+    maintenanceLogId: text("maintenance_log_id").notNull().references(() => assetMaintenanceLogs.id),
+    productId: text("product_id").notNull().references(() => products.id),
+    qty: integer("qty").notNull().default(1),
+    /** Snapshot of products.costPrice at the moment the part was used, so the ticket's historical part cost doesn't drift if the product's cost later changes. */
+    unitCost: doublePrecision("unit_cost").notNull().default(0),
+    staffUserId: text("staff_user_id").references(() => staffUsers.id),
+    ...timestamps,
+  },
+  (t) => [index("asset_maintenance_parts_used_log_idx").on(t.maintenanceLogId)]
+);
 
 /** ================= SUPPLIERS & PURCHASING ================= */
 
@@ -1127,7 +1159,7 @@ export const loyaltyPlayPointRates = pgTable(
   {
     id: id(),
     outletId: text("outlet_id").notNull().references(() => outlets.id),
-    consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6"] }).notNull(),
+    consoleType: text("console_type", { enum: ["ps2", "ps3", "ps4", "ps4_pro", "ps5", "ps5_slim", "ps6", "wii", "xbox", "driving_simulator"] }).notNull(),
     pointsPerSession: doublePrecision("points_per_session").notNull().default(0),
     ...timestamps,
   },

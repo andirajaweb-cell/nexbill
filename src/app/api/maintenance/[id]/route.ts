@@ -26,7 +26,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Role kamu tidak punya izin mengubah maintenance." }, { status: 403 });
     }
     const body = await req.json();
-    const updated = await updateMaintenanceLog(id, { description: body.description, cost: body.cost !== undefined ? Number(body.cost) : undefined });
+    const updated = await updateMaintenanceLog(id, {
+      description: body.description,
+      cost: body.cost !== undefined ? Number(body.cost) : undefined,
+      damageLabel: body.damageLabel,
+      damageType: body.damageType,
+      damageSeverity: body.damageSeverity,
+    });
     return NextResponse.json(updated);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });

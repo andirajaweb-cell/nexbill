@@ -78,4 +78,33 @@ registerDict({
   "maintenance.alertDescriptionRequired": { id: "Deskripsi maintenance wajib diisi.", en: "A maintenance description is required.", ms: "Penerangan penyelenggaraan wajib diisi.", th: "กรุณากรอกรายละเอียดการซ่อมบำรุง", fil: "Kinakailangan ang deskripsyon ng maintenance.", vi: "Vui lòng nhập mô tả bảo trì." },
   "maintenance.alertSelectExpenseAccount": { id: "Pilih akun beban untuk membuat expense maintenance.", en: "Select an expense account to create the maintenance expense.", ms: "Pilih akaun perbelanjaan untuk membuat perbelanjaan penyelenggaraan.", th: "โปรดเลือกบัญชีค่าใช้จ่ายเพื่อสร้างรายจ่ายซ่อมบำรุง", fil: "Pumili ng expense account para gumawa ng maintenance expense.", vi: "Chọn tài khoản chi phí để tạo chi phí bảo trì." },
   "maintenance.confirmDeleteTicket": { id: 'Hapus tiket maintenance "{desc}"? Tindakan ini permanen.', en: 'Delete the maintenance ticket "{desc}"? This action is permanent.', ms: 'Padam tiket penyelenggaraan "{desc}"? Tindakan ini kekal.', th: 'ลบตั๋วซ่อมบำรุง "{desc}" หรือไม่? การกระทำนี้ถาวร', fil: 'Tatanggalin ang maintenance ticket na "{desc}"? Permanente ang aksyon na ito.', vi: 'Xóa phiếu bảo trì "{desc}"? Hành động này không thể hoàn tác.' },
+
+  // --- Damage classification (new ticket form, edit mode, table column) ---
+  "maintenance.col.damage": { id: "Kerusakan", en: "Damage", ms: "Kerosakan", th: "ความเสียหาย", fil: "Sira", vi: "Hư hỏng" },
+  "maintenance.damageLabelPlaceholder": { id: "Label kerusakan (mis. Stik drift)", en: "Damage label (e.g. Stick drift)", ms: "Label kerosakan (cth. Stick drift)", th: "ป้ายความเสียหาย (เช่น จอยดริฟท์)", fil: "Label ng sira (hal. Stick drift)", vi: "Nhãn hư hỏng (vd: Cần analog bị lệch)" },
+  "maintenance.damageTypePlaceholder": { id: "Jenis kerusakan...", en: "Damage type...", ms: "Jenis kerosakan...", th: "ประเภทความเสียหาย...", fil: "Uri ng sira...", vi: "Loại hư hỏng..." },
+  "maintenance.damageSeverityPlaceholder": { id: "Kategori kerusakan...", en: "Damage category...", ms: "Kategori kerosakan...", th: "หมวดหมู่ความเสียหาย...", fil: "Kategorya ng sira...", vi: "Mức độ hư hỏng..." },
+  "maintenance.damageType.fisik": { id: "Fisik", en: "Physical", ms: "Fizikal", th: "ทางกายภาพ", fil: "Pisikal", vi: "Vật lý" },
+  "maintenance.damageType.elektronik": { id: "Elektronik", en: "Electronic", ms: "Elektronik", th: "อิเล็กทรอนิกส์", fil: "Elektroniko", vi: "Điện tử" },
+  "maintenance.damageType.konektorPort": { id: "Konektor / Port", en: "Connector / Port", ms: "Penyambung / Port", th: "ขั้วต่อ / พอร์ต", fil: "Connector / Port", vi: "Cổng kết nối" },
+  "maintenance.damageType.softwareFirmware": { id: "Software / Firmware", en: "Software / Firmware", ms: "Perisian / Firmware", th: "ซอฟต์แวร์ / เฟิร์มแวร์", fil: "Software / Firmware", vi: "Phần mềm / Firmware" },
+  "maintenance.damageType.bateraiPower": { id: "Baterai / Power", en: "Battery / Power", ms: "Bateri / Kuasa", th: "แบตเตอรี่ / ไฟเลี้ยง", fil: "Baterya / Power", vi: "Pin / Nguồn điện" },
+  "maintenance.damageType.lainnya": { id: "Lainnya", en: "Other", ms: "Lain-lain", th: "อื่นๆ", fil: "Iba pa", vi: "Khác" },
+  "maintenance.damageSeverity.ringan": { id: "Rusak Ringan", en: "Minor Damage", ms: "Kerosakan Ringan", th: "เสียหายเล็กน้อย", fil: "Bahagyang Sira", vi: "Hư hỏng nhẹ" },
+  "maintenance.damageSeverity.berat": { id: "Rusak Berat", en: "Severe Damage", ms: "Kerosakan Teruk", th: "เสียหายหนัก", fil: "Malubhang Sira", vi: "Hư hỏng nặng" },
+  "maintenance.damageSeverity.unrepairable": { id: "Tidak Bisa Diperbaiki", en: "Unrepairable", ms: "Tidak Boleh Dibaiki", th: "ไม่สามารถซ่อมได้", fil: "Hindi Na Maaayos", vi: "Không thể sửa chữa" },
+
+  // --- Spare parts panel (per-ticket, expandable) ---
+  "maintenance.parts.toggle": { id: "Sparepart", en: "Parts", ms: "Alat Ganti", th: "อะไหล่", fil: "Spare Parts", vi: "Linh kiện" },
+  "maintenance.parts.heading": { id: "Sparepart Dipakai", en: "Parts Used", ms: "Alat Ganti Digunakan", th: "อะไหล่ที่ใช้", fil: "Ginamit na Spare Parts", vi: "Linh kiện đã dùng" },
+  "maintenance.parts.empty": { id: "Belum ada sparepart dipakai untuk tiket ini.", en: "No parts used for this ticket yet.", ms: "Belum ada alat ganti digunakan untuk tiket ini.", th: "ยังไม่มีอะไหล่ที่ใช้สำหรับตั๋วนี้", fil: "Wala pang spare parts na ginamit para sa ticket na ito.", vi: "Chưa có linh kiện nào được dùng cho phiếu này." },
+  "maintenance.parts.deletedProduct": { id: "(sparepart terhapus)", en: "(deleted part)", ms: "(alat ganti dipadam)", th: "(อะไหล่ที่ถูกลบ)", fil: "(tinanggal na parte)", vi: "(linh kiện đã xóa)" },
+  "maintenance.parts.total": { id: "Total Biaya Sparepart", en: "Total Parts Cost", ms: "Jumlah Kos Alat Ganti", th: "รวมค่าอะไหล่", fil: "Kabuuang Gastos sa Parts", vi: "Tổng chi phí linh kiện" },
+  "maintenance.parts.noSpareParts": { id: "Belum ada sparepart terdaftar — tambahkan dulu di halaman", en: "No parts registered yet — add one first on the", ms: "Belum ada alat ganti didaftarkan — tambah dahulu di halaman", th: "ยังไม่มีอะไหล่ที่ลงทะเบียน — โปรดเพิ่มที่หน้า", fil: "Wala pang nakarehistrong spare part — magdagdag muna sa pahina ng", vi: "Chưa có linh kiện nào được đăng ký — hãy thêm tại trang" },
+  "maintenance.parts.inventoryLinkText": { id: "Inventory Control", en: "Inventory Control", ms: "Inventory Control", th: "Inventory Control", fil: "Inventory Control", vi: "Inventory Control" },
+  "maintenance.parts.categoryHint": { id: "kategori Sparepart & Komponen", en: "Sparepart & Component category", ms: "kategori Alat Ganti & Komponen", th: "หมวดหมู่อะไหล่และชิ้นส่วน", fil: "kategoryang Sparepart & Component", vi: "danh mục Linh kiện & Phụ tùng" },
+  "maintenance.parts.selectPlaceholder": { id: "Pilih sparepart...", en: "Select a part...", ms: "Pilih alat ganti...", th: "เลือกอะไหล่...", fil: "Pumili ng spare part...", vi: "Chọn linh kiện..." },
+  "maintenance.parts.qtyPlaceholder": { id: "Qty", en: "Qty", ms: "Kuantiti", th: "จำนวน", fil: "Qty", vi: "SL" },
+  "maintenance.parts.add": { id: "+ Tambah", en: "+ Add", ms: "+ Tambah", th: "+ เพิ่ม", fil: "+ Idagdag", vi: "+ Thêm" },
+  "maintenance.parts.alertSelectPart": { id: "Pilih sparepart/komponen yang dipakai.", en: "Select the part/component used.", ms: "Pilih alat ganti/komponen yang digunakan.", th: "โปรดเลือกอะไหล่/ชิ้นส่วนที่ใช้", fil: "Pumili ng spare part/component na ginamit.", vi: "Chọn linh kiện/phụ tùng đã dùng." },
 });

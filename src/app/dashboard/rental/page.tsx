@@ -58,6 +58,13 @@ const CONSOLE_TYPES = [
   { value: "ps5", label: "PS5" },
   { value: "ps5_slim", label: "PS5 Slim" },
   { value: "ps6", label: "PS6" },
+  { value: "wii", label: "Nintendo Wii" },
+  { value: "xbox", label: "Xbox" },
+  // Best guess for "stir (driving console)" from the request — a steering-wheel driving
+  // simulator/arcade unit, distinct from a wheel accessory plugged into a regular PS console.
+  // Flagged in the summary; easy to rename (just this label + value everywhere it's used) if
+  // a different console/cabinet was meant.
+  { value: "driving_simulator", label: "Simulator Balap (Stir)" },
 ];
 const TV_TYPES = [
   { value: "android_tv", label: "Android TV" },
