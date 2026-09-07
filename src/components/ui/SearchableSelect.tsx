@@ -162,7 +162,16 @@ export function SearchableSelect({
   }
 
   return (
-    <div ref={rootRef} className="relative inline-block w-full">
+    // `className` is applied here too, not just on the <button> below: this outer div is the
+    // actual grid/flex item as far as a parent `grid grid-cols-N` or `flex` layout is concerned,
+    // so a caller passing a sizing class like "col-span-6" or "sm:col-span-2" needs it here to
+    // have any effect. It used to land only on the button, which is just a plain block inside
+    // this div's own box — so a parent CSS Grid always saw this div at its default auto (1
+    // column) span no matter what col-span the caller passed to fit the button around, and the
+    // button (itself `w-full` of that too-narrow box) rendered squeezed and truncated. Also
+    // keeping it on the button preserves purely-visual overrides (e.g. "text-xs") exactly as
+    // before.
+    <div ref={rootRef} className={clsx("relative inline-block w-full", className)}>
       <button
         type="button"
         disabled={disabled}
