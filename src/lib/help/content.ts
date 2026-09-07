@@ -110,7 +110,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         title: "Langkah 5 (Opsional) — Hubungkan Kontrol TV/Perangkat",
         navHint: "Kontrol Perangkat",
         steps: [
-          "Kalau punya smart plug/TV yang mau dikendalikan nyala-mati dari dashboard, tambahkan perangkatnya sesuai protokolnya (Tasmota/Tuya Smart Life/Sonoff/Android TV), lalu hubungkan ke unit rental yang sesuai di tabel \"Hubungkan Perangkat ke Unit Rental\".",
+          "Kalau punya smart plug/TV yang mau dikendalikan nyala-mati dari dashboard, tambahkan perangkatnya sesuai jenisnya (Tasmota/Tuya Smart Life/Android TV), lalu hubungkan ke unit rental yang sesuai di tabel \"Hubungkan Perangkat ke Unit Rental\".",
           "Selama masa trial langganan, smart plug belum bisa ditambah sama sekali (harus beli/aktif dulu lewat halaman Langganan NEXBILL) dan kontrol Android TV dibatasi maksimal 1 unit — jangan kaget kalau belum bisa nambah banyak perangkat saat masih trial.",
           "Langkah ini boleh dilewati dulu kalau mau jalan manual (nyalakan TV pakai remote seperti biasa) — bisa dihubungkan belakangan kapan saja.",
         ],
@@ -423,7 +423,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         title: "Tambah/Edit/Hapus Perangkat (izin manage_devices)",
         steps: [
-          "Isi form \"Tambah Perangkat\": nama, lalu pilih Protokol (Tasmota MQTT / HTTP Generik / Tuya Smart Life / Sonoff eWeLink / Android TV via ADB langsung / Android TV via Relay Agent) — field yang muncul menyesuaikan protokol yang dipilih.",
+          "Isi form \"Tambah Perangkat\": nama, lalu pilih Protokol (Tasmota MQTT / Tuya Smart Life / Android TV via Relay Agent) — field yang muncul menyesuaikan protokol yang dipilih. Protokol lama (HTTP Generik, Sonoff eWeLink, Android TV via ADB langsung) tetap berfungsi untuk perangkat yang sudah lebih dulu didaftarkan, tapi tidak lagi ditawarkan untuk perangkat baru.",
           "Klik Edit pada kartu untuk mengubah field yang sama secara inline, atau Hapus untuk menghapus (unit rental yang terhubung ke perangkat ini akan otomatis terlepas).",
           "Di tabel \"Hubungkan Perangkat ke Unit Rental\", pilih perangkat dari dropdown di sebelah tiap unit untuk menautkannya.",
         ],
