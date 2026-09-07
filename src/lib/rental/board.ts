@@ -1,8 +1,7 @@
 import { db } from "@/db/client";
-import { rentalSessions, rentalUnits, customers } from "@/db/schema";
+import { rentalSessions, rentalUnits, customers, orders, orderItems, sessionAccessories } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { getOpenBillForSession, getBillBreakdown } from "@/lib/pos/bill";
-import { listSessionAccessories, estimateAccessoryCharge } from "@/lib/rental/accessories";
+import { estimateAccessoryCharge } from "@/lib/rental/accessories";
 
 export interface LiveBillingBoardRow {
   sessionId: string;
@@ -32,6 +31,16 @@ export interface LiveBillingBoardRow {
  * session's open bill, and a running grand total. Mirrors the exact "no rounding, no
  * overtime" estimate formula already shown on the Rental page cards
  * (elapsedHours * ratePerHour) so both views stay consistent for the cashier.
+ *
+ * PERF: this used to fetch each session's open bill (getOpenBillForSession), that bill's
+ * item/payment breakdown (getBillBreakdown), and its accessories (listSessionAccessories) inside
+ * a `for` loop with `await` — 5 sequential DB round-trips per active session, none of them
+ * parallelized. The billing-board page polls this every 3s, so with a busful of active PS units
+ * that added up to dozens of serial queries per poll, slow enough that polls started overlapping
+ * (the next 3s tick firing before the previous one finished) — the visible "loads forever / keeps
+ * reloading" symptom. Rewritten to batch-fetch open bills, their items, and accessories for ALL
+ * sessions in one query each (like units/customers already were), then join in memory — a fixed
+ * handful of queries regardless of how many sessions are active.
  */
 export async function getLiveBillingBoard(outletId: string): Promise<LiveBillingBoardRow[]> {
   const sessions = await db
@@ -41,13 +50,36 @@ export async function getLiveBillingBoard(outletId: string): Promise<LiveBilling
 
   if (sessions.length === 0) return [];
 
+  const sessionIds = sessions.map((s) => s.id);
   const unitIds = [...new Set(sessions.map((s) => s.rentalUnitId))];
-  const units = await db.select().from(rentalUnits).where(inArray(rentalUnits.id, unitIds));
-  const unitById = new Map(units.map((u) => [u.id, u]));
-
   const customerIds = [...new Set(sessions.map((s) => s.customerId).filter((id): id is string => !!id))];
-  const customerRows = customerIds.length ? await db.select().from(customers).where(inArray(customers.id, customerIds)) : [];
+
+  const [units, customerRows, openOrders, accessoryRows] = await Promise.all([
+    db.select().from(rentalUnits).where(inArray(rentalUnits.id, unitIds)),
+    customerIds.length ? db.select().from(customers).where(inArray(customers.id, customerIds)) : Promise.resolve([]),
+    db.select().from(orders).where(and(inArray(orders.rentalSessionId, sessionIds), eq(orders.status, "open"))),
+    db.select().from(sessionAccessories).where(inArray(sessionAccessories.rentalSessionId, sessionIds)),
+  ]);
+
+  const unitById = new Map(units.map((u) => [u.id, u]));
   const customerById = new Map(customerRows.map((c) => [c.id, c]));
+  const openOrderBySessionId = new Map(openOrders.map((o) => [o.rentalSessionId as string, o]));
+
+  const orderIds = openOrders.map((o) => o.id);
+  const orderItemRows = orderIds.length ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds)) : [];
+  const itemsByOrderId = new Map<string, typeof orderItemRows>();
+  for (const item of orderItemRows) {
+    const bucket = itemsByOrderId.get(item.orderId);
+    if (bucket) bucket.push(item);
+    else itemsByOrderId.set(item.orderId, [item]);
+  }
+
+  const accessoriesBySessionId = new Map<string, typeof accessoryRows>();
+  for (const acc of accessoryRows) {
+    const bucket = accessoriesBySessionId.get(acc.rentalSessionId);
+    if (bucket) bucket.push(acc);
+    else accessoriesBySessionId.set(acc.rentalSessionId, [acc]);
+  }
 
   const rows: LiveBillingBoardRow[] = [];
   const now = Date.now();
@@ -64,13 +96,14 @@ export async function getLiveBillingBoard(outletId: string): Promise<LiveBilling
     const elapsedHours = Math.max(0, (now - new Date(session.startedAt).getTime() - effectivePauseMs) / 3600000);
     const rentalEstimate = Math.round(elapsedHours * session.ratePerHour);
 
-    const bill = await getOpenBillForSession(session.id);
-    const breakdown = bill ? await getBillBreakdown(bill.id) : null;
-    const fnbSubtotal = breakdown?.fnbSubtotal ?? 0;
-    const fnbItemCount = breakdown?.fnbItemCount ?? 0;
+    const bill = openOrderBySessionId.get(session.id) ?? null;
+    const items = bill ? itemsByOrderId.get(bill.id) ?? [] : [];
+    const activeFnbItems = items.filter((i) => i.kitchenStatus !== "cancelled" && i.itemType === "product");
+    const fnbSubtotal = activeFnbItems.reduce((s, i) => s + i.lineTotal, 0);
+    const fnbItemCount = activeFnbItems.length;
 
-    const sessionAccessories = await listSessionAccessories(session.id);
-    const activeAccessories = sessionAccessories.filter((a) => !a.removedAt);
+    const sessionAccessoryRows = accessoriesBySessionId.get(session.id) ?? [];
+    const activeAccessories = sessionAccessoryRows.filter((a) => !a.removedAt);
     const accessoryEstimate = activeAccessories.reduce((s, a) => s + estimateAccessoryCharge(a, now), 0);
 
     rows.push({

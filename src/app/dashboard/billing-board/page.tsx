@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Clock, UtensilsCrossed, Gamepad2 } from "lucide-react";
@@ -56,11 +56,26 @@ export default function BillingBoardPage() {
   const [rows, setRows] = useState<BoardRow[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Guards against overlapping requests: if a poll is still waiting on a slow response when the
+  // next 3s tick fires, skip that tick instead of firing another request on top of it. Without
+  // this, a slow backend response caused requests to pile up faster than they resolved — the
+  // "keeps loading over and over" symptom — each one competing for the same DB connections and
+  // making the next one slower still.
+  const loadingRef = useRef(false);
   const load = (id: string) => {
-    fetchJsonArray<BoardRow>(`/api/billing-board?outletId=${id}`).then((data) => {
-      setRows(data);
-      setLastUpdated(new Date());
-    });
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    fetchJsonArray<BoardRow>(`/api/billing-board?outletId=${id}`)
+      .then((data) => {
+        setRows(data);
+        setLastUpdated(new Date());
+      })
+      .catch(() => {
+        // Transient network/server hiccup — keep showing the last good data; the next 3s tick retries.
+      })
+      .finally(() => {
+        loadingRef.current = false;
+      });
   };
 
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
