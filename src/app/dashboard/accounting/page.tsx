@@ -1428,7 +1428,15 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
               <Button variant="ghost" className="text-xs" onClick={addLine}>{t("accounting.openingBalance.addLineButton", "+ Baris")}</Button>
             </div>
           </div>
-          <div className="max-h-96 overflow-y-auto space-y-1">
+          {/*
+            Used to be `max-h-96 overflow-y-auto` — a short, separately-scrolling box nested
+            inside the page's own scroll. Harmless with a couple of manually-added rows, but
+            "Muat Semua Akun Postable" above can drop dozens of rows in here at once (one per
+            postable COA account), so that inner scrollbar mostly just hid rows from view behind
+            a second, easy-to-miss scroll region — exactly the "not fully visible" complaint.
+            Letting the list grow naturally means the page's own scroll is the only one involved.
+          */}
+          <div className="space-y-1">
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-12 gap-1 items-center">
                 <SearchableSelect
