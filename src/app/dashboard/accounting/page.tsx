@@ -1450,23 +1450,26 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
           */}
           <div className="space-y-2">
             {lines.map((l, i) => (
-              // Used to be a single unconditional `grid-cols-12` row (account 6 / debit 2 / credit 2
-              // / hapus 2) with no smaller-screen fallback, so on a narrower window/monitor the
-              // account SearchableSelect was squeezed down to a sliver too narrow to show the COA
-              // code+name (truncated to "Pilih ..."). Below `sm`, the account picker now gets its
-              // own full-width row, with debit/credit/hapus on a second row beneath it.
-              <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-1 sm:items-center">
+              // Was a `grid-cols-12` row (account span-6 / debit span-2 / credit span-2 / hapus
+              // span-2) with no smaller-screen fallback, so on a narrower window the account
+              // SearchableSelect was squeezed down to a sliver too narrow to show the COA
+              // code+name (truncated to "Pilih ..."). Rewritten with flexbox instead of a grid
+              // span: `flex-1 min-w-0` lets the account field grow to take up all the row's
+              // leftover space (whatever that is at any width) while debit/credit/hapus keep
+              // their small fixed sizes, rather than relying on both this row's column spans AND
+              // SearchableSelect's own internals correctly propagating a specific span number.
+              <div key={i} className="flex flex-col sm:flex-row gap-1 sm:items-center">
                 <SearchableSelect
-                  className="sm:col-span-6"
+                  className="sm:flex-1 sm:min-w-0"
                   value={l.accountId}
                   onChange={(v) => updateLine(i, { accountId: v })}
                   placeholder={t("accounting.common.chooseAccount", "Pilih akun...")}
                   options={postableAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${coaAccountName(t, a)}` }))}
                 />
-                <div className="grid grid-cols-3 gap-1 sm:contents">
-                  <input type="number" className={`${inputClsSm} sm:col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: "" })} />
-                  <input type="number" className={`${inputClsSm} sm:col-span-2`} placeholder={t("accounting.common.credit", "Kredit")} value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: "" })} />
-                  <button className="sm:col-span-2 text-xs text-red-400" onClick={() => removeLine(i)}>{t("accounting.common.delete", "Hapus")}</button>
+                <div className="flex gap-1 shrink-0">
+                  <input type="number" className={`${inputClsSm} w-24`} placeholder={t("accounting.common.debit", "Debit")} value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: "" })} />
+                  <input type="number" className={`${inputClsSm} w-24`} placeholder={t("accounting.common.credit", "Kredit")} value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: "" })} />
+                  <button className="text-xs text-red-400 px-1 shrink-0" onClick={() => removeLine(i)}>{t("accounting.common.delete", "Hapus")}</button>
                 </div>
               </div>
             ))}
