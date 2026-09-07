@@ -90,9 +90,18 @@ export function SearchableSelect({
   // a fixed-position portal has no way to know a container scrolled short of a scroll listener,
   // and for a short-lived search popover, closing is a perfectly normal UX (same as most native
   // comboboxes) instead of risking a dropdown that's silently drifted away from its button.
+  //
+  // Listening in the capture phase is what lets this catch scrolling on ANY ancestor container
+  // (scroll events don't bubble, so a plain bubble-phase window listener would miss them) — but
+  // that same capture-phase listener also fires for scrolling the option list's own internal
+  // `overflow-y-auto` div, since capture happens on the way down to the target regardless of
+  // bubbling. Without excluding that case, scrolling the list itself instantly closed the
+  // dropdown before the scroll could register — the "can't scroll the options" bug. Guard by
+  // ignoring scroll events whose target is inside the panel itself.
   useEffect(() => {
     if (!open) return;
-    function onScrollOrResize() {
+    function onScrollOrResize(e: Event) {
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
       setOpen(false);
       setQuery("");
     }
