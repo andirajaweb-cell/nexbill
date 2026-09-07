@@ -9,7 +9,7 @@ import { sql, eq, and, inArray } from "drizzle-orm";
 import { computeProfitLoss, computeTrialBalance } from "@/lib/accounting/reports";
 import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
-import { outletHour } from "@/lib/time/outlet-time";
+import { outletHour, outletDayStartUtc } from "@/lib/time/outlet-time";
 
 const FNB_CATEGORIES = new Set(["food", "drink", "coffee", "snack", "dessert"]);
 
@@ -22,8 +22,13 @@ export async function GET(req: NextRequest) {
     const outletId = session.outletId;
 
     const dateParam = req.nextUrl.searchParams.get("date");
-    const dayStart = dateParam ? new Date(dateParam) : new Date();
-    dayStart.setHours(0, 0, 0, 0);
+    // outletDayStartUtc(), not `new Date(); .setHours(0, 0, 0, 0)` — this route runs server-side,
+    // and .setHours() resets hours in the SERVER PROCESS's own timezone (UTC on most hosts), not
+    // Asia/Jakarta. That mismatch silently shifted "Hari Ini" here 7 hours later than the Laba
+    // Rugi report's "Hari Ini" (computed client-side in the merchant's own browser timezone via
+    // PeriodPicker.tsx), dropping the outlet's 00:00-07:00 WIB transactions from this dashboard's
+    // totals — see the doc comment on outletDayStartUtc() for the full explanation.
+    const dayStart = outletDayStartUtc(dateParam ? new Date(dateParam) : new Date());
     const dayStartIso = dayStart.toISOString();
     const dayEndIso = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
     const now = new Date();

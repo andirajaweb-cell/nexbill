@@ -5,6 +5,7 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { getAccessibleOutlets } from "@/lib/outlets/membership";
 import { describeError } from "@/lib/api/error";
+import { outletDayStartUtc } from "@/lib/time/outlet-time";
 
 /**
  * Lightweight cross-outlet summary for the "Ringkasan Semua Outlet" page — one row per outlet
@@ -28,8 +29,11 @@ export async function GET() {
     if (accessible.length === 0) return NextResponse.json({ outlets: [] });
     const outletIds = accessible.map((o) => o.id);
 
-    const dayStart = new Date();
-    dayStart.setHours(0, 0, 0, 0);
+    // outletDayStartUtc(), not `new Date(); .setHours(0, 0, 0, 0)` — see the doc comment on
+    // outletDayStartUtc() in lib/time/outlet-time.ts: this route runs server-side, where
+    // .setHours() resets hours in the host's own timezone (UTC), not Asia/Jakarta, which
+    // undercounts "today" by dropping the outlet's 00:00-07:00 WIB transactions.
+    const dayStart = outletDayStartUtc();
     const dayStartIso = dayStart.toISOString();
 
     const [paidOrdersToday, allUnits, allSubs, outletRows] = await Promise.all([

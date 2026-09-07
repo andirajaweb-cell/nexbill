@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { expenses, accounts, costCenters, suppliers, rentalUnits, outlets } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { computeProfitLoss } from "@/lib/accounting/reports";
+import { outletDayStartUtc } from "@/lib/time/outlet-time";
 
 /** Only "approved"/"paid" expenses represent real recognized spend — draft/pending/rejected/cancelled never posted a journal. */
 const RECOGNIZED = new Set(["approved", "paid"]);
@@ -116,8 +117,10 @@ export async function computeExpenseReport(outletId: string, from?: string, to?:
 /** Dashboard summary cards: Total Hari Ini, Bulan Ini, Outstanding, Pending Approval, Paid, by Category, by Branch, Trend. */
 export async function computeExpenseDashboard(outletId: string) {
   const now = new Date();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
+  // outletDayStartUtc(), not `new Date(now); .setHours(0, 0, 0, 0)` — this runs server-side,
+  // where .setHours() resets hours in the host's own timezone (UTC), not Asia/Jakarta; see
+  // lib/time/outlet-time.ts.
+  const todayStart = outletDayStartUtc(now);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 

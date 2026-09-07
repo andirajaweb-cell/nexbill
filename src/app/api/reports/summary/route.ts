@@ -4,6 +4,7 @@ import { orders, payments, rentalSessions, products } from "@/db/schema";
 import { sql, eq } from "drizzle-orm";
 import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
+import { outletDayStartUtc } from "@/lib/time/outlet-time";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,8 +13,8 @@ export async function GET(req: NextRequest) {
     const outletId = session.outletId;
 
     const dateParam = req.nextUrl.searchParams.get("date");
-    const start = dateParam ? new Date(dateParam) : new Date();
-    start.setHours(0, 0, 0, 0);
+    // outletDayStartUtc(), not `new Date(); .setHours(0, 0, 0, 0)` — see lib/time/outlet-time.ts.
+    const start = outletDayStartUtc(dateParam ? new Date(dateParam) : new Date());
     const startIso = start.toISOString();
 
     const paidOrdersToday = await db

@@ -20,6 +20,7 @@ import { assertNotBlacklisted, determineApprovalStatus, recomputeCustomerRisk } 
 import { queueHomeRentalNotification, homeRentalMessages, outletName } from "./notifications";
 import { computeRentalFee } from "./pricing";
 import { computeDeliveryFee } from "./policy";
+import { outletDayStartUtc, outletDayEndUtc } from "@/lib/time/outlet-time";
 
 /**
  * Core Home Rental ("Sewa Dibawa Pulang") workflow engine — Phase 1 scope:
@@ -576,8 +577,12 @@ export async function getHomeRentalDashboardSummary(outletId: string) {
   const rentals = await db.select().from(homeRentalRentals).where(eq(homeRentalRentals.outletId, outletId));
   const assets = await db.select().from(homeRentalAssets).where(eq(homeRentalAssets.outletId, outletId));
   const now = Date.now();
-  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+  // outletDayStartUtc()/outletDayEndUtc(), not `new Date(); .setHours(...)` — this runs
+  // server-side, where .setHours() resets hours in the host's own timezone (UTC), not
+  // Asia/Jakarta; see lib/time/outlet-time.ts. Was misclassifying rentals due in the outlet's
+  // early morning (00:00-07:00 WIB) as "due yesterday" instead of "due today".
+  const startOfToday = outletDayStartUtc();
+  const endOfToday = outletDayEndUtc();
 
   const active = rentals.filter((r) => r.status === "active");
   const dueToday = active.filter((r) => {
