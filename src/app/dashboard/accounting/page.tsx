@@ -134,6 +134,11 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
   const [form, setForm] = useState(emptyAccountForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(emptyAccountForm);
+  // Raw (untranslated) stored name of the account currently being edited, e.g. "CURRENT ASSETS"
+  // for a default/system account whose editForm.name is displaying the localized "ASET LANCAR".
+  // Needed so saveEdit can tell "user left the translated name untouched" apart from "user typed
+  // a real rename" — see saveEdit below and the coaAccountName() doc comment in coa-data.ts.
+  const [editOriginalRawName, setEditOriginalRawName] = useState<string | null>(null);
 
   const load = () => { fetchJsonArray(`/api/accounting/coa?outletId=${outletId}`).then(setRows); };
   useEffect(load, [outletId]);
@@ -154,14 +159,21 @@ function ChartOfAccountsTab({ outletId }: { outletId: string }) {
 
   const startEdit = (a: AccountRow) => {
     setEditingId(a.id);
-    setEditForm({ code: a.code, name: a.name, type: a.type, parentId: a.parentId ?? "", isPostingAllowed: a.isPostingAllowed, costCenter: a.costCenter ?? "", taxCode: a.taxCode ?? "" });
+    setEditOriginalRawName(a.name);
+    setEditForm({ code: a.code, name: coaAccountName(t, a), type: a.type, parentId: a.parentId ?? "", isPostingAllowed: a.isPostingAllowed, costCenter: a.costCenter ?? "", taxCode: a.taxCode ?? "" });
   };
-  const cancelEdit = () => { setEditingId(null); setEditForm(emptyAccountForm); };
+  const cancelEdit = () => { setEditingId(null); setEditForm(emptyAccountForm); setEditOriginalRawName(null); };
   const saveEdit = async (id: string) => {
+    // If the name field still shows exactly the localized default name we pre-filled it with,
+    // send the original raw (English) name back unchanged so the account stays recognized as a
+    // default account in coaAccountName() and keeps translating in every language. Only send the
+    // edited text verbatim when the user actually typed something different — a real rename.
+    const nameUnchanged = editOriginalRawName !== null && editForm.name === coaAccountName(t, { code: editForm.code, name: editOriginalRawName });
+    const nameToSave = nameUnchanged ? editOriginalRawName! : editForm.name;
     const res = await fetch(`/api/accounting/coa/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editForm, parentId: editForm.parentId || null }),
+      body: JSON.stringify({ ...editForm, name: nameToSave, parentId: editForm.parentId || null }),
     });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
