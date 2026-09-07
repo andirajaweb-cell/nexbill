@@ -9,6 +9,7 @@ import { sql, eq, and, inArray } from "drizzle-orm";
 import { computeProfitLoss, computeTrialBalance } from "@/lib/accounting/reports";
 import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
+import { outletHour } from "@/lib/time/outlet-time";
 
 const FNB_CATEGORIES = new Set(["food", "drink", "coffee", "snack", "dessert"]);
 
@@ -237,9 +238,13 @@ export async function GET(req: NextRequest) {
     const topProducts = Array.from(productAgg.values()).sort((a, b) => b.qty - a.qty).slice(0, 5);
 
     // ---- Busy / quiet hours (last 30 days, all paid orders grouped by hour-of-day) ----
+    // outletHour() (not .getHours()) — createdAt is a genuine UTC instant, and plain .getHours()
+    // reads it back in the SERVER's own timezone, not the outlet's, which is exactly what made
+    // this chart's hours not match reality whenever the app happens to run on a host set to UTC.
+    // See src/lib/time/outlet-time.ts for the full explanation.
     const hourCounts = new Array(24).fill(0);
     for (const o of recentOrders) {
-      const h = new Date(o.createdAt).getHours();
+      const h = outletHour(new Date(o.createdAt));
       hourCounts[h]++;
     }
     const busyHours = hourCounts.map((count, hour) => ({ hour, count }));

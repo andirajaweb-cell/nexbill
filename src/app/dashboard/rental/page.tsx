@@ -12,6 +12,7 @@ import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { describeError } from "@/lib/api/error";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { LiveClock } from "@/components/dashboard/LiveClock";
 import "@/lib/i18n/dict-rental";
 import { scaledGain } from "@/lib/ui/notification-sound";
 import { NotificationVolumeControl } from "@/components/dashboard/NotificationVolumeControl";
@@ -299,7 +300,7 @@ function consoleLabel(type: string) {
 export default function RentalPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const staffUserId = user?.id ?? null;
   const [outletId, setOutletId] = useState<string | null>(null);
   const [methods, setMethods] = useState(PAYMENT_METHOD_OPTIONS); // static 8 as a safe default, replaced once the outlet's live catalog loads
@@ -1021,6 +1022,7 @@ export default function RentalPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <LiveClock lang={lang} />
           <NotificationVolumeControl onPreview={() => playAlertBeep()} />
           <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowUnitManager((v) => !v)}>
             <Settings size={14} /> {showUnitManager ? t("rental.toggleCloseUnitManager", "Tutup Kelola Unit") : t("rental.toggleOpenUnitManager", "Kelola Unit")}

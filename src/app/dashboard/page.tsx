@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useApi } from "@/lib/api/use-api";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
+import { LiveClock } from "@/components/dashboard/LiveClock";
 
 // recharts is a sizeable chunk of client JS that only this section of the page actually uses —
 // loaded on demand (ssr:false, since it reads from the browser canvas/DOM APIs) instead of
@@ -171,7 +172,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export default function OwnerDashboardPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   // Was two hand-rolled useEffects (fetch default outlet, then a setInterval(load, 30000) fetch
   // of the owner-dashboard payload) — now useApi/SWR: the outlet id rarely changes so it uses the
@@ -205,7 +206,10 @@ export default function OwnerDashboardPage() {
           </h1>
           <p className="text-sm text-neutral-500 mt-1">{t("dash.subtitle")}</p>
         </div>
-        {data && <Badge status="available">{t("dash.live")}</Badge>}
+        <div className="flex items-center gap-4">
+          <LiveClock lang={lang} />
+          {data && <Badge status="available">{t("dash.live")}</Badge>}
+        </div>
       </div>
 
       <SectionTitle>{t("section.revenueProfit")}</SectionTitle>

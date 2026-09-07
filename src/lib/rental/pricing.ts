@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { pricingRules, customers, membershipTiers, rentalUnits } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { outletDay, outletTimeHHmm } from "@/lib/time/outlet-time";
 
 const DAY_CODES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
@@ -48,12 +49,15 @@ function ruleMatchesNow(rule: { daysOfWeek: string; startTime: string; endTime: 
  * common real-world convention, and avoids the complexity of splitting a
  * running timer across multiple rate segments.
  *
- * Note: day/time matching uses the server's local clock. This assumes the
- * app runs on a machine physically at (or in the same timezone as) the
- * outlet — true for the typical single-outlet self-hosted setup this
- * project targets. Overnight windows that cross midnight (e.g. 22:00–02:00)
- * ARE supported — see ruleMatchesNow() above; a rule's daysOfWeek names the
- * day the window starts on.
+ * Note: day/time matching uses outletHour()/outletDay() (src/lib/time/outlet-time.ts), NOT the
+ * server's ambient clock — `at` is a real UTC instant, and plain `.getHours()`/`.getDay()` on it
+ * would silently read back the SERVER's own timezone instead of the outlet's (WIB) whenever the
+ * app happens to run on a host set to UTC, which is the default on most cloud hosts. That exact
+ * bug is what made the dashboard's busy-hours charts show the wrong hour; the fix here is the
+ * same one, applied to pricing rule matching (happy hour / jam malam / weekend rates) so a wrong
+ * server timezone can't silently apply the wrong rate window too. Overnight windows that cross
+ * midnight (e.g. 22:00–02:00) ARE supported — see ruleMatchesNow() above; a rule's daysOfWeek
+ * names the day the window starts on.
  */
 export async function computeEffectiveHourlyRate(
   outletId: string,
@@ -65,11 +69,9 @@ export async function computeEffectiveHourlyRate(
   if (!unit) throw new Error("Unit rental tidak ditemukan.");
 
   const baseRate = unit.hourlyRate;
-  const dayCode = DAY_CODES[at.getDay()];
-  const prevDayCode = DAY_CODES[(at.getDay() + 6) % 7];
-  const hh = String(at.getHours()).padStart(2, "0");
-  const mm = String(at.getMinutes()).padStart(2, "0");
-  const nowTime = `${hh}:${mm}`;
+  const dayCode = DAY_CODES[outletDay(at)];
+  const prevDayCode = DAY_CODES[(outletDay(at) + 6) % 7];
+  const nowTime = outletTimeHHmm(at);
 
   const rules = await db
     .select()
