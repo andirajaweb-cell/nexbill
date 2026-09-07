@@ -58,12 +58,18 @@ export interface LandingCopy {
   };
   solusi: { kicker: string; title: string; sub: string; points: PainPoint[] };
   fitur: { kicker: string; title: string; sub: string; items: Feature[] };
+  // Competitive-gap section (page.tsx, between #fitur and #harga) — features most generic PS
+  // rental billing/POS software doesn't have. Deliberately does not name any competitor by name
+  // (see docs/SEO-ARCHITECTURE.md §8 guardrails: no misleading/unsubstantiated claims) — every
+  // item here is a real, already-shipped NEXBILL feature, framed generically against "kebanyakan
+  // software billing rental PS" rather than any specific named product.
+  gap: { kicker: string; title: string; sub: string; items: Feature[] };
   harga: {
     kicker: string; title: string; sub: string;
     badge: string; plan: string; period: string; save: string;
     feats: string[]; cta: string;
     payLabel: string; payBadges: string[];
-    addonTag: string; addonTitle: string; addonPriceSuffix: string; addonDesc: string;
+    addonTag: string; addonTitle: string; addonFromPrefix: string; addonPriceSuffix: string; addonDesc: string;
     compatNeedLabel: string; compatNeedText: string; compatSkipLabel: string; compatSkipText: string;
   };
   faq: { kicker: string; headline: string; sub: string; items: Faq[] };
@@ -148,6 +154,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Hak Akses Staf & Jejak Audit", desc: "Setiap staf login dengan akun dan hak aksesnya sendiri — semua transaksi tercatat by user, jadi jelas siapa yang bertanggung jawab kalau ada selisih." },
       ],
     },
+    gap: {
+      kicker: "Bukan Software Kasir Biasa",
+      title: "Yang Jarang Dimiliki Software Billing Rental PS Lain",
+      sub: "Kebanyakan software billing/kasir rental PS berhenti di “hitung tarif & cetak struk”. NEXBILL dibangun lebih jauh dari itu:",
+      items: [
+        { title: "Akuntansi Penuh, Bukan Cuma Kasir", desc: "Jurnal otomatis, neraca, dan laba rugi tersusun langsung dari transaksi kasir — kebanyakan software billing rental PS berhenti di rekap omzet harian, tidak sampai ke pembukuan akuntansi yang bisa dipakai untuk pajak atau laporan ke investor." },
+        { title: "Rekonsiliasi Kas Sampai ke Sumbernya", desc: "Selisih kas dipecah per sumber: tunai, QRIS, PPOB (pulsa/token/tarik tunai), setoran kas, sampai pindah kas antar pos — bukan cuma satu angka “total uang masuk” yang mengaburkan dari mana selisih itu berasal." },
+        { title: "PPOB Terintegrasi ke Pembukuan", desc: "Transaksi pulsa, token listrik, dan tarik tunai otomatis masuk-keluar dari kas shift yang sama — kebanyakan sistem lain memperlakukan PPOB sebagai modul terpisah yang tidak nyambung ke laporan keuangan utama." },
+        { title: "Kontrol Internal Anti-Fraud", desc: "Pemindahan kas antar pos wajib approval atasan, deteksi pola shift berisiko otomatis, dan skor kepercayaan pelanggan berbasis riwayat — bukan sekadar catatan transaksi tanpa lapisan pengawasan." },
+        { title: "Satu Sistem untuk Banyak Model Bisnis", desc: "Sewa konsol, sewa alat/barang (home rental), sampai jual makanan/minuman digabung jadi satu tagihan dan satu laporan — tidak perlu tempel-tempel aplikasi kasir terpisah untuk tiap lini bisnis." },
+      ],
+    },
     harga: {
       kicker: "Harga", title: "Satu harga, semua fitur",
       sub: "Tanpa biaya tersembunyi — satu-satunya biaya di luar langganan adalah pembelian unit Smart Plug (terintegrasi Tuya) untuk kontrol otomatis TV/konsol. Coba gratis 30 hari sebelum berlangganan.",
@@ -164,7 +182,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       cta: "Mulai Berlangganan",
       payLabel: "Dibayar aman lewat iPaymu — semua metode diterima",
       payBadges: ["QRIS", "Transfer Bank / VA", "E-Wallet", "Kartu Kredit & Debit", "Gerai Retail"],
-      addonTag: "Opsional", addonTitle: "Smart Plug (Integrasi Tuya)", addonPriceSuffix: "/unit, sekali beli",
+      addonTag: "Opsional", addonTitle: "Smart Plug (Integrasi Tuya)", addonFromPrefix: "Mulai dari ", addonPriceSuffix: "/unit, sekali beli",
       addonDesc: "Satu-satunya biaya di luar langganan — untuk kontrol otomatis nyala/mati TV & konsol",
       compatNeedLabel: "Perlu Smart Plug:", compatNeedText: "TV analog/tabung, TV digital biasa, & smart TV non-Android (Viva OS, Hisense OS, webOS, dll)",
       compatSkipLabel: "Tidak perlu:", compatSkipText: "TV dengan sistem Android TV — sudah bisa dikontrol langsung lewat software NEXBILL",
@@ -283,6 +301,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Staff Access Rights & Audit Trail", desc: "Every staff member logs in with their own account and permissions — every transaction is recorded by user, so it's clear who's responsible if something doesn't add up." },
       ],
     },
+    gap: {
+      kicker: "Not Just Another POS",
+      title: "What Most PS Rental Billing Software Doesn't Have",
+      sub: "Most PS rental billing/POS software stops at \"calculate the rate & print a receipt.\" NEXBILL goes further:",
+      items: [
+        { title: "Full Accounting, Not Just a Cash Register", desc: "Automatic journal entries, a balance sheet, and profit & loss are built straight from cashier transactions — most rental billing software stops at a daily revenue recap, never reaching real bookkeeping you can use for taxes or investor reports." },
+        { title: "Cash Reconciliation Down to the Source", desc: "Cash variance is broken down by source: cash, QRIS, PPOB (airtime/electricity/cash withdrawal), cash drops, and internal transfers between accounts — not just one \"total income\" number that hides where the gap came from." },
+        { title: "PPOB Built Into the Books", desc: "Airtime, electricity token, and cash withdrawal transactions automatically flow in and out of the same shift's cash balance — most other systems treat PPOB as a separate module disconnected from the main financial reports." },
+        { title: "Built-In Anti-Fraud Controls", desc: "Moving cash between accounts requires manager approval, risky shifts get flagged automatically, and customers get a trust score based on history — not just a transaction log with no oversight layer." },
+        { title: "One System for Multiple Business Lines", desc: "Console rental, equipment rental, and food & drink sales combine into a single bill and a single report — no need to stitch together separate POS apps for each line of business." },
+      ],
+    },
     harga: {
       kicker: "Pricing", title: "One price, every feature",
       sub: "No hidden fees — the only cost beyond your subscription is buying a Smart Plug unit (Tuya-integrated) for automatic TV/console control. Try it free for 30 days before subscribing.",
@@ -299,7 +329,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       cta: "Start Subscription",
       payLabel: "Paid securely via iPaymu — every payment method accepted",
       payBadges: ["QRIS", "Bank Transfer / VA", "E-Wallet", "Credit & Debit Card", "Retail Outlets"],
-      addonTag: "Optional", addonTitle: "Smart Plug (Tuya Integration)", addonPriceSuffix: "/unit, one-time purchase",
+      addonTag: "Optional", addonTitle: "Smart Plug (Tuya Integration)", addonFromPrefix: "Starting from ", addonPriceSuffix: "/unit, one-time purchase",
       addonDesc: "The only cost beyond your subscription — for automatic TV & console on/off control",
       compatNeedLabel: "Smart Plug needed:", compatNeedText: "Analog/CRT TVs, standard digital TVs, & non-Android smart TVs (Viva OS, Hisense OS, webOS, etc.)",
       compatSkipLabel: "Not needed:", compatSkipText: "TVs running Android TV — already controllable directly through NEXBILL's software",
@@ -418,6 +448,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Hak Akses Staf & Rekod Audit", desc: "Setiap staf log masuk dengan akaun dan hak akses sendiri — semua transaksi direkod mengikut pengguna, jadi jelas siapa bertanggungjawab jika ada percanggahan." },
       ],
     },
+    gap: {
+      kicker: "Bukan Sekadar POS Biasa",
+      title: "Apa yang Kebanyakan Software Billing Sewa PS Tiada",
+      sub: "Kebanyakan software billing/kaunter jualan sewa PS berhenti di \"kira kadar & cetak resit.\" NEXBILL pergi lebih jauh:",
+      items: [
+        { title: "Perakaunan Penuh, Bukan Sekadar Kaunter Jualan", desc: "Entri jurnal automatik, kunci kira-kira, dan untung rugi terus terbentuk dari transaksi kaunter jualan — kebanyakan software billing sewa PS berhenti di rekap hasil harian, tidak sampai ke perakaunan sebenar untuk cukai atau laporan kepada pelabur." },
+        { title: "Penyesuaian Tunai Sampai ke Puncanya", desc: "Perbezaan tunai dipecahkan mengikut sumber: tunai, QRIS, PPOB (topup/token elektrik/pengeluaran tunai), deposit kas, sehingga pindahan dalaman antara akaun — bukan sekadar satu angka \"jumlah masuk\" yang menyembunyikan puncanya." },
+        { title: "PPOB Bersepadu dengan Pembukuan", desc: "Transaksi topup, token elektrik, dan pengeluaran tunai automatik masuk-keluar dari baki tunai syif yang sama — kebanyakan sistem lain anggap PPOB sebagai modul berasingan yang tidak berkait dengan laporan kewangan utama." },
+        { title: "Kawalan Dalaman Anti-Penipuan", desc: "Pemindahan tunai antara akaun wajib kelulusan pengurus, syif berisiko dikesan automatik, dan pelanggan diberi skor kepercayaan berdasarkan sejarah — bukan sekadar log transaksi tanpa lapisan pengawasan." },
+        { title: "Satu Sistem untuk Pelbagai Lini Perniagaan", desc: "Sewa konsol, sewa peralatan (home rental), dan jualan makanan/minuman digabung jadi satu bil dan satu laporan — tidak perlu guna app kaunter jualan berasingan untuk setiap lini perniagaan." },
+      ],
+    },
     harga: {
       kicker: "Harga", title: "Satu harga, semua ciri",
       sub: "Tiada bayaran tersembunyi — satu-satunya kos di luar langganan ialah pembelian unit Smart Plug (bersepadu Tuya) untuk kawalan automatik TV/konsol. Cuba percuma 30 hari sebelum melanggan.",
@@ -434,7 +476,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       cta: "Mula Melanggan",
       payLabel: "Dibayar dengan selamat melalui iPaymu — semua kaedah diterima",
       payBadges: ["QRIS", "Pindahan Bank / VA", "E-Wallet", "Kad Kredit & Debit", "Kedai Runcit"],
-      addonTag: "Pilihan", addonTitle: "Smart Plug (Bersepadu Tuya)", addonPriceSuffix: "/unit, bayaran sekali",
+      addonTag: "Pilihan", addonTitle: "Smart Plug (Bersepadu Tuya)", addonFromPrefix: "Bermula dari ", addonPriceSuffix: "/unit, bayaran sekali",
       addonDesc: "Satu-satunya kos di luar langganan — untuk kawalan automatik hidup/mati TV & konsol",
       compatNeedLabel: "Perlukan Smart Plug:", compatNeedText: "TV analog/tiub, TV digital biasa, & smart TV bukan-Android (Viva OS, Hisense OS, webOS, dll.)",
       compatSkipLabel: "Tidak perlu:", compatSkipText: "TV dengan sistem Android TV — sudah boleh dikawal terus melalui perisian NEXBILL",
@@ -556,6 +598,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "สิทธิ์การเข้าถึงพนักงานและบันทึกตรวจสอบ", desc: "พนักงานแต่ละคนล็อกอินด้วยบัญชีและสิทธิ์ของตัวเอง — ทุกธุรกรรมถูกบันทึกตามผู้ใช้ ชัดเจนว่าใครรับผิดชอบหากมีความคลาดเคลื่อน" },
       ],
     },
+    gap: {
+      kicker: "ไม่ใช่แค่ POS ทั่วไป",
+      title: "สิ่งที่ซอฟต์แวร์บิลลิ่งร้านเช่า PS ส่วนใหญ่ไม่มี",
+      sub: "ซอฟต์แวร์บิลลิ่ง/แคชเชียร์เช่า PS ส่วนใหญ่หยุดแค่ \"คำนวณค่าเช่าแล้วพิมพ์ใบเสร็จ\" แต่ NEXBILL ไปไกลกว่านั้น:",
+      items: [
+        { title: "บัญชีเต็มรูปแบบ ไม่ใช่แค่แคชเชียร์", desc: "สร้างสมุดรายวัน งบดุล และกำไรขาดทุนอัตโนมัติจากทุกธุรกรรมหน้าร้าน — ซอฟต์แวร์ส่วนใหญ่หยุดแค่สรุปยอดขายรายวัน ไปไม่ถึงบัญชีจริงที่ใช้ยื่นภาษีหรือรายงานนักลงทุนได้" },
+        { title: "กระทบยอดเงินสดถึงต้นตอ", desc: "แยกส่วนต่างเงินสดตามแหล่งที่มา: เงินสด, QRIS, PPOB (เติมเงิน/ค่าไฟ/ถอนเงินสด), นำฝากเงินสด, ไปจนถึงการโอนภายในระหว่างบัญชี — ไม่ใช่แค่ตัวเลข \"ยอดรวมรับเข้า\" ตัวเดียวที่ซ่อนที่มาของส่วนต่าง" },
+        { title: "PPOB เชื่อมกับบัญชีโดยตรง", desc: "ธุรกรรมเติมเงิน ค่าไฟ และถอนเงินสด เข้า-ออกจากยอดเงินสดกะเดียวกันโดยอัตโนมัติ — ระบบอื่นส่วนใหญ่แยก PPOB เป็นโมดูลต่างหากที่ไม่เชื่อมกับรายงานการเงินหลัก" },
+        { title: "ระบบควบคุมภายในป้องกันการโกง", desc: "การโอนเงินสดระหว่างบัญชีต้องได้รับอนุมัติจากผู้จัดการ ตรวจจับกะที่มีความเสี่ยงโดยอัตโนมัติ และให้คะแนนความน่าเชื่อถือลูกค้าจากประวัติ — ไม่ใช่แค่บันทึกธุรกรรมที่ไม่มีการตรวจสอบ" },
+        { title: "ระบบเดียวสำหรับหลายประเภทธุรกิจ", desc: "เช่าคอนโซล เช่าอุปกรณ์ (home rental) และขายอาหาร/เครื่องดื่ม รวมเป็นบิลเดียวและรายงานเดียว — ไม่ต้องใช้แอปแคชเชียร์แยกสำหรับแต่ละธุรกิจ" },
+      ],
+    },
     harga: {
       kicker: "ราคา", title: "ราคาเดียว ฟีเจอร์ครบ",
       sub: "ไม่มีค่าใช้จ่ายแอบแฝง — ค่าใช้จ่ายเดียวนอกเหนือจากค่าสมัครสมาชิกคือการซื้อสมาร์ทปลั๊ก (เชื่อมต่อ Tuya) สำหรับควบคุมทีวี/เครื่องเล่นอัตโนมัติ ทดลองใช้ฟรี 30 วันก่อนสมัครสมาชิก",
@@ -572,7 +626,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       cta: "เริ่มสมัครสมาชิก",
       payLabel: "ชำระเงินปลอดภัยผ่าน iPaymu — รับทุกช่องทางการชำระเงิน",
       payBadges: ["QRIS", "โอนผ่านธนาคาร / VA", "อีวอลเล็ต", "บัตรเครดิต/เดบิต", "เคาน์เตอร์ร้านสะดวกซื้อ"],
-      addonTag: "ทางเลือกเสริม", addonTitle: "สมาร์ทปลั๊ก (เชื่อมต่อ Tuya)", addonPriceSuffix: "/ชิ้น ซื้อครั้งเดียว",
+      addonTag: "ทางเลือกเสริม", addonTitle: "สมาร์ทปลั๊ก (เชื่อมต่อ Tuya)", addonFromPrefix: "เริ่มต้นที่ ", addonPriceSuffix: "/ชิ้น ซื้อครั้งเดียว",
       addonDesc: "ค่าใช้จ่ายเดียวนอกเหนือจากค่าสมัครสมาชิก — สำหรับควบคุมเปิด/ปิดทีวีและเครื่องเล่นอัตโนมัติ",
       compatNeedLabel: "ต้องใช้สมาร์ทปลั๊ก:", compatNeedText: "ทีวีอนาล็อก/จอตู้ ทีวีดิจิทัลทั่วไป และสมาร์ททีวีที่ไม่ใช่ Android (Viva OS, Hisense OS, webOS ฯลฯ)",
       compatSkipLabel: "ไม่จำเป็น:", compatSkipText: "ทีวีระบบ Android TV — ควบคุมได้โดยตรงผ่านซอฟต์แวร์ NEXBILL อยู่แล้ว",
@@ -694,6 +748,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Phân quyền nhân viên & nhật ký kiểm toán", desc: "Mỗi nhân viên đăng nhập bằng tài khoản và quyền hạn riêng — mọi giao dịch được ghi nhận theo người dùng, rõ ràng ai chịu trách nhiệm nếu có chênh lệch." },
       ],
     },
+    gap: {
+      kicker: "Không Chỉ Là Phần Mềm Thu Ngân",
+      title: "Những Gì Phần Mềm Billing Cho Thuê PS Khác Thường Không Có",
+      sub: "Hầu hết phần mềm billing/thu ngân cho thuê PS chỉ dừng ở \"tính giá & in hóa đơn.\" NEXBILL đi xa hơn thế:",
+      items: [
+        { title: "Kế Toán Đầy Đủ, Không Chỉ Là Máy Tính Tiền", desc: "Tự động lập sổ nhật ký, bảng cân đối kế toán và báo cáo lãi lỗ ngay từ giao dịch thu ngân — hầu hết phần mềm khác chỉ dừng ở tổng kết doanh thu hàng ngày, chưa đạt đến mức sổ sách kế toán thực sự dùng để khai thuế hay báo cáo nhà đầu tư." },
+        { title: "Đối Soát Tiền Mặt Đến Tận Gốc", desc: "Chênh lệch tiền mặt được tách theo từng nguồn: tiền mặt, QRIS, PPOB (nạp tiền/tiền điện/rút tiền mặt), nộp quỹ, đến chuyển khoản nội bộ giữa các tài khoản — không chỉ một con số \"tổng thu\" duy nhất che giấu chênh lệch đến từ đâu." },
+        { title: "PPOB Tích Hợp Thẳng Vào Sổ Sách", desc: "Giao dịch nạp tiền điện thoại, tiền điện, và rút tiền mặt tự động ra/vào đúng quỹ tiền mặt của ca làm việc đó — hầu hết hệ thống khác coi PPOB là mô-đun riêng biệt, không liên kết với báo cáo tài chính chính." },
+        { title: "Kiểm Soát Nội Bộ Chống Gian Lận", desc: "Chuyển tiền mặt giữa các tài khoản bắt buộc phải được quản lý phê duyệt, ca làm việc rủi ro được tự động gắn cờ, và khách hàng có điểm tin cậy dựa trên lịch sử — không chỉ là nhật ký giao dịch không có lớp giám sát nào." },
+        { title: "Một Hệ Thống Cho Nhiều Mô Hình Kinh Doanh", desc: "Cho thuê máy chơi game, cho thuê thiết bị (home rental), và bán đồ ăn/thức uống gộp thành một hóa đơn và một báo cáo duy nhất — không cần ghép nhiều ứng dụng thu ngân riêng lẻ cho từng mảng kinh doanh." },
+      ],
+    },
     harga: {
       kicker: "Bảng giá", title: "Một mức giá, đầy đủ tính năng",
       sub: "Không phí ẩn — chi phí duy nhất ngoài gói đăng ký là mua thiết bị Smart Plug (tích hợp Tuya) để điều khiển TV/máy chơi game tự động. Dùng thử miễn phí 30 ngày trước khi đăng ký.",
@@ -710,7 +776,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       cta: "Bắt đầu đăng ký",
       payLabel: "Thanh toán an toàn qua iPaymu — chấp nhận mọi phương thức",
       payBadges: ["QRIS", "Chuyển khoản ngân hàng / VA", "Ví điện tử", "Thẻ tín dụng & ghi nợ", "Cửa hàng bán lẻ"],
-      addonTag: "Tùy chọn", addonTitle: "Smart Plug (Tích hợp Tuya)", addonPriceSuffix: "/thiết bị, mua một lần",
+      addonTag: "Tùy chọn", addonTitle: "Smart Plug (Tích hợp Tuya)", addonFromPrefix: "Bắt đầu từ ", addonPriceSuffix: "/thiết bị, mua một lần",
       addonDesc: "Chi phí duy nhất ngoài gói đăng ký — dùng để điều khiển bật/tắt TV & máy chơi game tự động",
       compatNeedLabel: "Cần Smart Plug:", compatNeedText: "TV analog/CRT, TV kỹ thuật số thông thường, & smart TV không phải Android (Viva OS, Hisense OS, webOS, v.v.)",
       compatSkipLabel: "Không cần:", compatSkipText: "TV chạy hệ điều hành Android TV — đã có thể điều khiển trực tiếp qua phần mềm NEXBILL",
@@ -832,6 +898,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Access Rights ng Staff & Audit Trail", desc: "Bawat staff ay naglo-log in gamit ang sariling account at access rights — lahat ng transaksyon ay naitatala ayon sa user, kaya malinaw kung sino ang may pananagutan kung may hindi tumutugma." },
       ],
     },
+    gap: {
+      kicker: "Hindi Lang Basic na POS",
+      title: "Ang Kadalasang Wala sa Ibang Software na Billing Para sa Rental ng PS",
+      sub: "Karamihan sa software na billing/cashier para sa rental ng PS ay hanggang \"kwentahin ang rate at magprint ng resibo\" lang. Mas malayo ang narating ng NEXBILL:",
+      items: [
+        { title: "Buong Accounting, Hindi Lang Cash Register", desc: "Awtomatikong journal entries, balance sheet, at profit & loss galing mismo sa mga transaksyon ng cashier — karamihan sa software ay hanggang daily revenue recap lang, hindi umaabot sa totoong bookkeeping na pwedeng gamitin para sa buwis o report sa investor." },
+        { title: "Cash Reconciliation Hanggang sa Pinagmulan", desc: "Hinahati ang variance ng cash ayon sa pinagmulan: cash, QRIS, PPOB (load/kuryente/cash withdrawal), cash drop, hanggang internal transfer sa pagitan ng mga account — hindi lang iisang numero na \"total income\" na nagtatago kung saan galing ang pagkakaiba." },
+        { title: "PPOB Nakaintegrate sa Libro", desc: "Awtomatikong papasok at lalabas ang load, kuryente, at cash withdrawal sa parehong cash balance ng shift — karamihan sa ibang sistema ay itinuturing ang PPOB bilang hiwalay na module na hindi konektado sa pangunahing financial report." },
+        { title: "Built-In na Anti-Fraud Control", desc: "Kailangan ng approval ng manager ang paglipat ng cash sa pagitan ng mga account, awtomatikong na-fla-flag ang mga risky na shift, at may trust score ang customer batay sa history nila — hindi lang basic na transaction log na walang oversight." },
+        { title: "Iisang Sistema para sa Maraming Uri ng Negosyo", desc: "Pagpapaupa ng konsola, pagpapaupa ng gamit (home rental), at pagbebenta ng pagkain/inumin ay pinagsasama sa iisang bill at iisang report — hindi na kailangan ng hiwalay na POS app para sa bawat linya ng negosyo." },
+      ],
+    },
     harga: {
       kicker: "Presyo", title: "Isang presyo, lahat ng feature",
       sub: "Walang nakatagong bayad — ang tanging gastos sa labas ng subscription ay ang pagbili ng Smart Plug unit (naka-integrate ang Tuya) para sa automatic na kontrol ng TV/konsol. Subukan nang libre sa 30 araw bago mag-subscribe.",
@@ -848,7 +926,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       cta: "Magsimulang Mag-subscribe",
       payLabel: "Secure na bayad sa pamamagitan ng iPaymu — tinatanggap lahat ng paraan ng pagbabayad",
       payBadges: ["QRIS", "Bank Transfer / VA", "E-Wallet", "Credit & Debit Card", "Retail Outlet"],
-      addonTag: "Opsyonal", addonTitle: "Smart Plug (Tuya Integration)", addonPriceSuffix: "/unit, isang beses na bili",
+      addonTag: "Opsyonal", addonTitle: "Smart Plug (Tuya Integration)", addonFromPrefix: "Simula sa ", addonPriceSuffix: "/unit, isang beses na bili",
       addonDesc: "Ang tanging gastos sa labas ng subscription — para sa automatic na on/off na kontrol ng TV & konsol",
       compatNeedLabel: "Kailangan ang Smart Plug:", compatNeedText: "Analog/tube TV, karaniwang digital TV, & non-Android na smart TV (Viva OS, Hisense OS, webOS, atbp.)",
       compatSkipLabel: "Hindi kailangan:", compatSkipText: "TV na may Android TV system — direkta nang makokontrol sa pamamagitan ng software ng NEXBILL",

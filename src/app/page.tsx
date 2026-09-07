@@ -1106,14 +1106,45 @@ function LandingPageInner() {
         </div>
       </section>
 
+      {/* SECTION: GAP KOMPETITIF — apa yang jarang dimiliki software billing rental PS lain.
+          Deliberately generic ("kebanyakan software billing rental PS", not any named product) —
+          see docs/SEO-ARCHITECTURE.md §8 guardrails on unsubstantiated/comparative claims. Every
+          item here is a real, already-shipped NEXBILL feature (full double-entry accounting,
+          per-source cash reconciliation incl. PPOB/cash-drop/cash-transfer, approval-gated
+          internal transfers + fraud flagging, multi-business-line billing) — not aspirational
+          copy. Reuses the exact .feat-grid/.feat-card visual language from the FITUR section
+          above (same index-readout treatment) so it reads as a continuation of that section
+          rather than a bolted-on comparison table. */}
+      <section id="gap" style={{ backgroundColor: 'transparent' }}>
+        <div className="wrap">
+          <div className="section-head">
+            <div className="kicker">{t.gap.kicker}</div>
+            <h2>{t.gap.title}</h2>
+            <p>{t.gap.sub}</p>
+          </div>
+          <div className="feat-grid">
+            {t.gap.items.map((g, i) => (
+              <div className="feat-card" key={i} style={{ backdropFilter: 'blur(10px)', backgroundColor: 'rgba(13, 21, 38, 0.5)' }}>
+                <div className="feat-icon floating-3d-asset" style={{ boxShadow: 'inset 0 4px 6px rgba(255,255,255,0.1), 0 10px 15px -3px rgba(59, 130, 246, 0.3)' }}>
+                  {String(i + 1).padStart(2, "0")}
+                </div>
+                <h3>{g.title}</h3>
+                <p>{g.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* SECTION: HARGA & ADD-ONS */}
       {/* HARGA — premium redesign: satu "bundle" visual (kartu langganan + konektor "+" + kartu
           hardware opsional) menggantikan layout lama (kartu tunggal + grid 3-addon terpisah),
           dengan glow gradient di latar dan trust-row metode pembayaran iPaymu di bawah CTA. Harga
-          Smart Plug diturunkan dari Rp275.000 ke Rp249.000/unit — modal beli ~Rp150.000 (generik,
-          tanpa brand tertentu), jadi margin ~40% (~Rp99rb/unit) masih sehat untuk menutup ongkos
-          kirim, packaging, & QC sebelum kirim ke outlet, sambil harganya "match" angka langganan
-          untuk kesan lebih premium & mudah diingat. */}
+          Smart Plug diturunkan lagi ke Rp149.000/unit (dari Rp249.000 sebelumnya) — ditampilkan
+          dengan framing "mulai dari" karena harga aktual dikontrol dari platform-admin (Plans) dan
+          bisa naik untuk varian smart plug lain di masa depan. Fallback ke literal 149.000 kalau
+          pricingEntry belum termuat ATAU kalau admin belum sempat mengisi angka realnya (nilai 0
+          dianggap "belum diisi", bukan harga sungguhan Rp0). */}
       <section id="harga" style={{ backgroundColor: 'transparent', position: 'relative', overflow: 'hidden' }}>
         <div className="harga-glow" aria-hidden="true" />
         <div className="wrap">
@@ -1167,7 +1198,11 @@ function LandingPageInner() {
                 </picture>
               </div>
               <h4>{t.harga.addonTitle}</h4>
-              <div className="a-price">{pricingEntry ? formatPlanPrice(pricingEntry.currency, pricingEntry.smartPlugPrice) : "Rp249.000"}<span>{t.harga.addonPriceSuffix}</span></div>
+              <div className="a-price">
+                {t.harga.addonFromPrefix}
+                {pricingEntry && pricingEntry.smartPlugPrice > 0 ? formatPlanPrice(pricingEntry.currency, pricingEntry.smartPlugPrice) : "Rp149.000"}
+                <span>{t.harga.addonPriceSuffix}</span>
+              </div>
               <p>{t.harga.addonDesc}</p>
               {/* Kompatibilitas: hanya TV yang TIDAK punya kontrol jaringan sendiri yang butuh smart
                   plug fisik ini (TV analog/tabung, TV digital biasa, dan smart TV non-Android seperti
