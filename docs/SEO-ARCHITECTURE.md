@@ -24,7 +24,7 @@ Completed in prior sessions — this roadmap builds on top of it, not instead of
 | Core Web Vitals: images | homepage showcase images | ✅ converted to WebP + lazy-loading + explicit width/height |
 | Semantic landmarks | homepage | ✅ single `h1`, `<main>`, `<nav>`, `<footer>` |
 
-**Known gap flagged but not yet fixed:** `/book/[slug]` (per-outlet public booking pages) has no `generateMetadata()` — each outlet's page currently inherits the homepage's title/OG image. Real fix needs per-outlet name/logo pulled from the DB; scoped as its own ticket (§9, Phase 2).
+**Gap closed:** `/book/[slug]` (per-outlet public booking pages) now has its own `generateMetadata()` (`src/app/book/[slug]/layout.tsx`) — title, description, canonical, and OG/Twitter image all pulled live per-outlet (real name via `resolveOutletDisplayName`, real address, real `logoUrl` falling back to the site's own `og-image.jpg`). Unknown slugs get a `noindex` "Booking Tidak Ditemukan" fallback matching the page's own error state. Deliberately still excluded from `sitemap.ts` — each page is merchant-specific content NEXBILL doesn't control, not the company's own marketing content.
 
 ---
 
