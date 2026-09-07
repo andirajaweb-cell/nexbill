@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { fixedAssets, assetDepreciationEntries, assetMaintenanceLogs, cashBankAccounts } from "@/db/schema";
+import { fixedAssets, assetDepreciationEntries, assetMaintenanceLogs, cashBankAccounts, rentalUnits } from "@/db/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { postJournal, JournalLineInput } from "./journal";
 import { EXPENSE_PAYABLE_ACCOUNT_CODE } from "./coa";
@@ -292,6 +292,28 @@ async function syncAssetMaintenanceStatus(fixedAssetId: string): Promise<void> {
   const nextStatus = shouldBeUnderMaintenance ? "under_maintenance" : "active";
   if (asset.status !== nextStatus) {
     await db.update(fixedAssets).set({ status: nextStatus }).where(eq(fixedAssets.id, fixedAssetId));
+  }
+
+  // Mirror onto the linked rental unit (if this asset is tied to one via fixedAssets.rentalUnitId)
+  // so the Rental dashboard's maintenance badge stays in sync with the ticket workflow automatically
+  // — creating a ticket here is what puts the unit into "maintenance" (see
+  // src/app/dashboard/rental/page.tsx's toggleMaintenance(), which now deep-links into this module
+  // instead of just flipping the flag locally), and marking the last open ticket "done" is what
+  // brings it back to "available", with no separate manual step required on the Rental page.
+  // Deliberately never touches a unit that's currently "occupied" (a live session shouldn't be
+  // silently reclassified out from under the cashier) — an edge case that shouldn't arise in
+  // practice since the Rental page already blocks starting a maintenance ticket on an occupied
+  // unit, but this keeps the sync safe even if a ticket is created some other way (e.g. directly
+  // from the Assets page's own "+ Maintenance" shortcut).
+  if (asset.rentalUnitId) {
+    const [unit] = await db.select({ status: rentalUnits.status }).from(rentalUnits).where(eq(rentalUnits.id, asset.rentalUnitId)).limit(1);
+    if (unit && unit.status !== "occupied") {
+      if (shouldBeUnderMaintenance && unit.status !== "maintenance") {
+        await db.update(rentalUnits).set({ status: "maintenance" }).where(eq(rentalUnits.id, asset.rentalUnitId));
+      } else if (!shouldBeUnderMaintenance && unit.status === "maintenance") {
+        await db.update(rentalUnits).set({ status: "available" }).where(eq(rentalUnits.id, asset.rentalUnitId));
+      }
+    }
   }
 }
 

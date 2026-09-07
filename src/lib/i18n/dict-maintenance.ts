@@ -38,6 +38,15 @@ registerDict({
   "maintenance.newTicketHeading": { id: "Tiket Maintenance Baru", en: "New Maintenance Ticket", ms: "Tiket Penyelenggaraan Baharu", th: "ตั๋วซ่อมบำรุงใหม่", fil: "Bagong Maintenance Ticket", vi: "Phiếu bảo trì mới" },
   "maintenance.selectAssetPlaceholder": { id: "Pilih aset...", en: "Select an asset...", ms: "Pilih aset...", th: "เลือกสินทรัพย์...", fil: "Pumili ng asset...", vi: "Chọn tài sản..." },
   "maintenance.ticketAlreadyRunning": { id: " (sudah ada tiket berjalan)", en: " (a ticket is already in progress)", ms: " (sudah ada tiket berjalan)", th: " (มีตั๋วที่กำลังดำเนินการอยู่แล้ว)", fil: " (may tiket na na patakbo)", vi: " (đã có phiếu đang xử lý)" },
+  // Deep link from Rental's "Set Maintenance" button when the unit has no linked Fixed Asset yet.
+  "maintenance.deepLinkNoAsset": {
+    id: "Unit ini belum terhubung ke Aset manapun, jadi belum bisa dipilih otomatis. Pilih asetnya manual di bawah, atau hubungkan unit ini ke sebuah Aset dulu di halaman Aset.",
+    en: "This unit isn't linked to any Asset yet, so it couldn't be auto-selected. Pick the asset manually below, or link this unit to an Asset first on the Assets page.",
+    ms: "Unit ini belum disambungkan ke mana-mana Aset, jadi tidak dapat dipilih secara automatik. Pilih aset secara manual di bawah, atau sambungkan unit ini ke satu Aset dahulu di halaman Aset.",
+    th: "ยูนิตนี้ยังไม่ได้เชื่อมกับสินทรัพย์ใดๆ จึงเลือกให้อัตโนมัติไม่ได้ กรุณาเลือกสินทรัพย์เองด้านล่าง หรือเชื่อมยูนิตนี้กับสินทรัพย์ที่หน้าสินทรัพย์ก่อน",
+    fil: "Ang unit na ito ay hindi pa naka-link sa anumang Asset, kaya hindi ito awtomatikong napili. Piliin ang asset nang manu-mano sa ibaba, o i-link muna ang unit na ito sa isang Asset sa pahina ng Assets.",
+    vi: "Unit này chưa được liên kết với Tài sản nào, nên không thể tự động chọn. Hãy chọn tài sản thủ công bên dưới, hoặc liên kết unit này với một Tài sản trước tại trang Tài sản.",
+  },
   "maintenance.costPlaceholder": { id: "Biaya (Rp, 0 jika belum tahu)", en: "Cost (Rp, 0 if unknown)", ms: "Kos (Rp, 0 jika belum diketahui)", th: "ค่าใช้จ่าย (Rp, 0 หากยังไม่ทราบ)", fil: "Gastos (Rp, 0 kung hindi pa alam)", vi: "Chi phí (Rp, để 0 nếu chưa biết)" },
   "maintenance.descriptionPlaceholder": { id: "Deskripsi kerusakan (mis. Layar TV bergaris)", en: "Damage description (e.g. TV screen has lines)", ms: "Penerangan kerosakan (cth. Skrin TV bergaris)", th: "รายละเอียดความเสียหาย (เช่น จอทีวีมีเส้น)", fil: "Deskripsyon ng sira (hal. May guhit ang screen ng TV)", vi: "Mô tả hư hỏng (vd: Màn hình TV bị sọc)" },
   "maintenance.createExpenseCheckbox": { id: "Buat Expense (Beban Maintenance) sekarang", en: "Create an expense (maintenance cost) now", ms: "Buat Perbelanjaan (Kos Penyelenggaraan) sekarang", th: "สร้างรายจ่าย (ค่าซ่อมบำรุง) ตอนนี้", fil: "Gumawa ng Expense (Gastos sa Maintenance) ngayon", vi: "Tạo chi phí (bảo trì) ngay" },

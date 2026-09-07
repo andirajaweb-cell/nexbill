@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -296,6 +297,7 @@ function consoleLabel(type: string) {
 }
 
 export default function RentalPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const { t } = useDashboardLang();
   const staffUserId = user?.id ?? null;
@@ -780,28 +782,27 @@ export default function RentalPage() {
   };
 
   /**
-   * Flips a unit between "maintenance" and "available" — this is what actually shows up as the
-   * grey "Maintenance" badge on the public /book page (its API already returns/renders that
-   * status; the Kelola Unit panel just never had a control to set it). Blocked while a session
-   * is running so staff can't maintenance-flag a unit mid-rental without stopping it first,
-   * mirroring the same guard the API already enforces for isActive:false.
+   * "Set Maintenance" now deep-links into the real Maintenance ticket workflow
+   * (/dashboard/maintenance?rentalUnitId=...) instead of just flipping unit.status locally — that
+   * page auto-opens a new ticket pre-filled with this unit's linked Fixed Asset (if one exists).
+   * Creating the ticket is what actually puts the unit into "maintenance" (see
+   * syncAssetMaintenanceStatus() in lib/accounting/asset.ts), and marking the ticket "Selesai" is
+   * what automatically flips it back to "available" — no separate manual step on this page for
+   * that direction anymore. "Selesai Maintenance" (the reverse direction, unit already under
+   * maintenance) is kept as a local, manual toggle — a deliberate escape hatch for units with no
+   * linked asset/ticket (nothing for the ticket workflow to sync from in that case) or for
+   * clearing a stuck flag without hunting down its ticket.
    */
   const toggleMaintenance = async (unit: RentalUnit) => {
     const goingUnderMaintenance = unit.status !== "maintenance";
-    if (
-      goingUnderMaintenance &&
-      !(await showConfirm(
-        t(
-          "rental.confirmSetMaintenance",
-          "Tandai {unit} sedang maintenance? Unit tidak bisa dipilih untuk sesi baru atau booking online sampai diaktifkan lagi."
-        ).replace("{unit}", unit.name)
-      ))
-    )
+    if (goingUnderMaintenance) {
+      router.push(`/dashboard/maintenance?rentalUnitId=${unit.id}`);
       return;
+    }
     const res = await fetch(`/api/rental-units/${unit.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: goingUnderMaintenance ? "maintenance" : "available" }),
+      body: JSON.stringify({ status: "available" }),
     });
     if (!res.ok) return showAlert((await res.json()).error);
     load();

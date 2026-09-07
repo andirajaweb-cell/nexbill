@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -32,7 +33,21 @@ const inputCls = "rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 
  * "+ Maintenance" shortcut creates — see lib/accounting/asset.ts.
  */
 export default function MaintenancePage() {
+  return (
+    <Suspense fallback={null}>
+      <MaintenancePageInner />
+    </Suspense>
+  );
+}
+
+function MaintenancePageInner() {
   const { t } = useDashboardLang();
+  const searchParams = useSearchParams();
+  // Deep link from Rental's "Set Maintenance" button (/dashboard/rental) — see toggleMaintenance()
+  // there. Opens the new-ticket form pre-filled with the Fixed Asset linked to that rental unit
+  // (fixedAssets.rentalUnitId), so staff don't have to hunt for it in the dropdown themselves.
+  const deepLinkRentalUnitId = searchParams.get("rentalUnitId");
+  const handledDeepLinkRef = useRef<string | null>(null);
   const CATEGORY_LABEL: Record<string, string> = {
     playstation: t("maintenance.category.playstation", "PlayStation / Konsol"),
     tv: t("maintenance.category.tv", "TV"),
@@ -73,6 +88,28 @@ export default function MaintenancePage() {
 
   const assets: any[] = bundle.assets ?? [];
   const tickets: any[] = bundle.tickets ?? [];
+
+  // Runs once assets have actually loaded for this deep-link value (guarded by
+  // handledDeepLinkRef so it doesn't re-fire and stomp on whatever the user is doing after a
+  // background refetch from load()). If no asset is linked to this rental unit yet, the form
+  // still opens — just without a pre-selection — since the unit link (fixedAssets.rentalUnitId)
+  // is set from the Assets page, not something this page can create on the fly.
+  useEffect(() => {
+    if (!deepLinkRentalUnitId || assets.length === 0 || handledDeepLinkRef.current === deepLinkRentalUnitId) return;
+    handledDeepLinkRef.current = deepLinkRentalUnitId;
+    const linkedAsset = assets.find((a) => a.rentalUnitId === deepLinkRentalUnitId);
+    setShowForm(true);
+    if (linkedAsset) {
+      setForm((f: any) => ({ ...f, fixedAssetId: linkedAsset.id }));
+    } else {
+      showAlert(
+        t(
+          "maintenance.deepLinkNoAsset",
+          "Unit ini belum terhubung ke Aset manapun, jadi belum bisa dipilih otomatis. Pilih asetnya manual di bawah, atau hubungkan unit ini ke sebuah Aset dulu di halaman Aset."
+        )
+      );
+    }
+  }, [deepLinkRentalUnitId, assets, t]);
 
   const summary = useMemo(() => {
     const nonDisposed = assets.filter((a) => a.status !== "disposed");
