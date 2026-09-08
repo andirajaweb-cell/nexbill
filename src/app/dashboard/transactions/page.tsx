@@ -266,6 +266,8 @@ function TransactionListTab({ outletId }: { outletId: string }) {
       </Card>
 
       {s && (
+        <>
+        <p className="text-xs text-neutral-600 -mb-1">{t("transactions.summaryScopeNote", "Kartu ringkasan di bawah mengikuti tanggal pengakuan pendapatan (sama dengan Laba Rugi di Accounting) — sesi rental yang dimulai di hari sebelumnya tapi baru dibayar/selesai pada periode ini akan terhitung di sini. Daftar transaksi mengikuti tanggal transaksi dibuat, jadi bisa berbeda cakupan dari kartu ringkasan.")}</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           {[
             [t("transactions.stat.totalTransactions", "Total Transaksi"), s.totalTransactions, false],
@@ -291,6 +293,7 @@ function TransactionListTab({ outletId }: { outletId: string }) {
             </Card>
           ))}
         </div>
+        </>
       )}
 
       <Card>

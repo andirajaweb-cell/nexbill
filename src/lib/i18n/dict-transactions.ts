@@ -57,6 +57,14 @@ registerDict({
   // --- Summary stat cards ---
   "transactions.stat.totalTransactions": { id: "Total Transaksi", en: "Total Transactions", ms: "Jumlah Transaksi", th: "จำนวนธุรกรรมทั้งหมด", fil: "Kabuuang Transaksyon", vi: "Tổng giao dịch" },
   "transactions.stat.netSales": { id: "Net Sales", en: "Net Sales", ms: "Jualan Bersih", th: "ยอดขายสุทธิ", fil: "Net Sales", vi: "Doanh số ròng" },
+  "transactions.summaryScopeNote": {
+    id: "Kartu ringkasan di bawah mengikuti tanggal pengakuan pendapatan (sama dengan Laba Rugi di Accounting) — sesi rental yang dimulai di hari sebelumnya tapi baru dibayar/selesai pada periode ini akan terhitung di sini. Daftar transaksi mengikuti tanggal transaksi dibuat, jadi bisa berbeda cakupan dari kartu ringkasan.",
+    en: "The summary cards below follow the revenue-recognition date (same as the Laba Rugi report in Accounting) — a rental session started the day before but only paid/finished within this period is counted here. The transaction list follows the order's creation date, so its coverage can differ from the summary cards.",
+    ms: "Kad ringkasan di bawah mengikut tarikh pengiktirafan hasil (sama seperti laporan Laba Rugi dalam Accounting) — sesi sewa yang bermula sehari sebelumnya tetapi baru dibayar/selesai dalam tempoh ini akan dikira di sini. Senarai transaksi mengikut tarikh transaksi dibuat, jadi liputannya boleh berbeza daripada kad ringkasan.",
+    th: "การ์ดสรุปด้านล่างอิงตามวันที่รับรู้รายได้ (เหมือนกับรายงานกำไรขาดทุนในบัญชี) — เซสชันเช่าที่เริ่มเมื่อวันก่อนแต่เพิ่งชำระ/เสร็จสิ้นในช่วงนี้จะถูกนับที่นี่ รายการธุรกรรมอิงตามวันที่สร้างคำสั่งซื้อ ขอบเขตจึงอาจแตกต่างจากการ์ดสรุป",
+    fil: "Ang mga summary card sa ibaba ay sumusunod sa petsa ng pagkilala ng kita (kapareho ng Laba Rugi report sa Accounting) — isang rental session na nagsimula noong nakaraang araw pero kabababayad/katatapos lang sa panahong ito ay bibilangin dito. Ang listahan ng transaksyon ay sumusunod sa petsa ng paggawa ng order, kaya maaaring iba ang saklaw nito sa mga summary card.",
+    vi: "Các thẻ tổng hợp bên dưới theo ngày ghi nhận doanh thu (giống báo cáo Lãi Lỗ trong Kế toán) — một phiên thuê bắt đầu từ hôm trước nhưng vừa thanh toán/hoàn tất trong kỳ này sẽ được tính ở đây. Danh sách giao dịch theo ngày tạo đơn hàng, nên phạm vi có thể khác với các thẻ tổng hợp.",
+  },
   "transactions.stat.rentalRevenue": { id: "Rental Revenue", en: "Rental Revenue", ms: "Hasil Sewa", th: "รายได้จากการเช่า", fil: "Kita sa Rental", vi: "Doanh thu cho thuê" },
   "transactions.stat.fnbRevenue": { id: "F&B Revenue", en: "F&B Revenue", ms: "Hasil F&B", th: "รายได้ F&B", fil: "Kita sa F&B", vi: "Doanh thu F&B" },
   "transactions.stat.ppobRevenue": { id: "PPOB Revenue", en: "PPOB Revenue", ms: "Hasil PPOB", th: "รายได้ PPOB", fil: "Kita sa PPOB", vi: "Doanh thu PPOB" },

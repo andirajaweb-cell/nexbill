@@ -7,6 +7,7 @@ import { sql, inArray, eq } from "drizzle-orm";
 // Shared with the accounting engine instead of a hand-copied category list — see that constant's
 // own doc comment for the bug this used to cause (coffee/dessert sales misclassified here).
 import { FNB_CATEGORIES } from "@/lib/accounting/postings";
+import { computeProfitLoss } from "@/lib/accounting/reports";
 
 function dayRangeConditions(column: any, from?: string, to?: string) {
   const conditions = [];
@@ -33,6 +34,34 @@ function itemRevenueBucket(itemType: string, category?: string): "rental" | "fnb
   if (itemType === "rental" || itemType === "accessory") return "rental";
   if (category && FNB_CATEGORIES.has(category)) return "fnb";
   return "product";
+}
+
+/**
+ * Maps a COA revenue account code to the same 4-way bucket the summary cards below show
+ * (Rental/F&B/Produk/PPOB) — see the account ranges in lib/accounting/coa-data.ts. Used to source
+ * those cards straight from the General Ledger (via computeProfitLoss) for the requested period
+ * instead of re-deriving them from raw orders/orderItems filtered by `orders.createdAt` — those two
+ * are NOT the same "today": a rental session started yesterday (or a bill amended mid-stay) but
+ * paid/settled today posts its revenue to the GL with today's entryDate, so Laba Rugi's "Hari Ini"
+ * correctly includes it, while an `orders.createdAt`-filtered query for "today" excludes it
+ * entirely (it belongs to yesterday's created-orders window). That's what previously made this
+ * page's Rental/F&B totals for "Hari Ini" come out lower than Laba Rugi's for the identical period.
+ * Sourcing from the GL instead means these cards can never disagree with Laba Rugi again — same
+ * underlying journal_lines rows, not a second independent calculation.
+ *
+ * Codes outside Rental/F&B/Produk/PPOB (Home Rental 48xx, Other Income 47xx, Contra Revenue 49xx)
+ * intentionally return "other" and get excluded — those belong to their own dedicated reports
+ * (Home Rental's own dashboard, Pendapatan Lain-lain), not this page's Rental/POS/F&B/PPOB scope,
+ * matching this page's own subtitle. 46xx (service charge/tax/misc, e.g. the 4650 catch-all
+ * postSalesJournal uses) folds into "product", matching that card's "Produk/Lainnya" label.
+ */
+function glRevenueBucket(code: string): "rental" | "fnb" | "product" | "ppob" | "other" {
+  if (code.startsWith("41") || code === "4530") return "rental"; // base + member rental (41xx), member add-on (4530)
+  if (code.startsWith("435")) return "rental"; // non-member add-on rental (4351-4354)
+  if (code.startsWith("42") || code === "4510") return "fnb"; // F&B (42xx), member F&B (4510)
+  if (code.startsWith("44")) return "ppob";
+  if ((code.startsWith("43") && !code.startsWith("435")) || code === "4520" || code.startsWith("46")) return "product";
+  return "other";
 }
 
 /** Order-level type badge for the Transaction Center table/filter: an order that touches a rental
@@ -169,16 +198,31 @@ export async function computeTransactionList(filters: TransactionFilters) {
   const recognized = summarySet.filter((t) => t.status === "paid" || t.status === "partial");
   const cancelled = summarySet.filter((t) => t.status === "cancelled");
 
-  // Revenue-by-type mirrors postings.ts exactly: per line item by itemType/category, plus service
-  // charge + tax landing in the "product/lain-lain" bucket (same simplification as the accounting engine).
+  // Revenue-by-type is sourced from the General Ledger (see glRevenueBucket's doc comment for why
+  // deriving it from raw orders/orderItems filtered by createdAt used to disagree with Laba Rugi)
+  // whenever a period is given — which /api/transactions always provides. Falls back to the old
+  // item-level derivation only if somehow called without one, so this never throws.
   const revenueByType = { rental: 0, fnb: 0, product: 0, ppob: 0 };
-  for (const t of recognized) {
-    for (const it of itemsByOrder.get(t.id) ?? []) {
-      const category = it.productId ? productCategoryById.get(it.productId) : undefined;
-      const bucket = itemRevenueBucket(it.itemType, category);
-      revenueByType[bucket] += it.lineTotal;
+  let totalDiscount = 0;
+  if (from && to) {
+    const pl = await computeProfitLoss(outletId, from, to);
+    for (const r of pl.revenue) {
+      if (!r.isPostingAllowed) continue; // header rows recursively sum their own children — counting both would double it
+      const bucket = glRevenueBucket(r.code);
+      if (bucket === "other") continue; // Home Rental / Other Income / Contra Revenue — out of this page's scope, see glRevenueBucket
+      revenueByType[bucket] += r.balance;
     }
-    revenueByType.product += (t.serviceCharge ?? 0) + (t.tax ?? 0);
+    totalDiscount = pl.totalDiscount;
+  } else {
+    for (const t of recognized) {
+      for (const it of itemsByOrder.get(t.id) ?? []) {
+        const category = it.productId ? productCategoryById.get(it.productId) : undefined;
+        const bucket = itemRevenueBucket(it.itemType, category);
+        revenueByType[bucket] += it.lineTotal;
+      }
+      revenueByType.product += (t.serviceCharge ?? 0) + (t.tax ?? 0);
+    }
+    totalDiscount = recognized.reduce((s, t) => s + t.discount, 0);
   }
 
   const byPaymentMethodMap = new Map<string, number>();
@@ -191,8 +235,10 @@ export async function computeTransactionList(filters: TransactionFilters) {
 
   const refundedAmount = summarySet.reduce((sum, t) => sum + t.payments.filter((p) => p.status === "refunded").reduce((s, p) => s + p.amount, 0), 0);
 
-  const totalRevenue = recognized.reduce((s, t) => s + t.total, 0);
-  const totalDiscount = recognized.reduce((s, t) => s + t.discount, 0);
+  // Net of discount, same as Laba Rugi's own "Total Pendapatan" (computeProfitLoss.totalRevenue
+  // nets contra-revenue 4910-4950 straight into its sum) — not the sum of order.total, which would
+  // double-subtract discount that's already netted out of revenueByType above when sourced from the GL.
+  const totalRevenue = revenueByType.rental + revenueByType.fnb + revenueByType.product + revenueByType.ppob - totalDiscount;
   const totalTax = recognized.reduce((s, t) => s + t.tax, 0);
 
   const summary = {
