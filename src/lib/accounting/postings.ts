@@ -17,7 +17,7 @@ import {
   rentalUnits,
   customers,
 } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { postJournal, JournalLineInput } from "./journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "./account-mapping";
 import { isPeriodLocked } from "./periods";
@@ -247,6 +247,26 @@ export function resolveOrderBusinessDate(order: { businessDate: string | null; c
 
 export async function postSalesJournal(orderId: string) {
   return db.transaction(async (tx) => {
+    // Serialize concurrent postings for THIS order before the idempotency check below even runs.
+    // Found in production: two orders each ended up with their sales journal AND its COGS journal
+    // posted twice (netRevenue coming out exactly 2x the order total) — a real TOCTOU race where
+    // two near-simultaneous triggers for the same order (e.g. the overnight session-auto-stop
+    // sweep and a cashier's manual payment confirmation landing within milliseconds of each
+    // other — see lib/rental/scheduler.ts's runSessionAutoStop) both reached the "does a journal
+    // already exist" SELECT before either had committed its INSERT, so both saw "no" and both
+    // posted. There's no DB-level unique constraint to fall back on here: (source_id, reference)
+    // can't be made globally unique because other modules deliberately reuse the same
+    // sourceId+reference across several distinct, legitimate postings for one entity (see
+    // lib/home-rental/rentals.ts, which posts up to 5 separate journals — checkout, deposit, late
+    // fee, damage, deposit release — all sharing sourceId=rental.id and reference=rental.rentalCode
+    // by design). A transaction-scoped advisory lock keyed on this specific orderId has none of
+    // that collateral risk: it only ever blocks a second concurrent call for the SAME order, is
+    // released automatically when this transaction commits or rolls back (no separate unlock
+    // needed, so it can't leak), and by the time a blocked second caller wakes up, the first
+    // call's journal is already committed and visible — its own idempotency check below correctly
+    // no-ops instead of racing past it.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${orderId}))`);
+
     const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) throw new Error("Order tidak ditemukan untuk posting jurnal.");
 
