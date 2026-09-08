@@ -310,7 +310,16 @@ function TransactionListTab({ outletId }: { outletId: string }) {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-neutral-900 align-top">
-                  <td className="py-2 whitespace-nowrap">{new Date(row.createdAt).toLocaleString("id-ID")}</td>
+                  <td
+                    className="py-2 whitespace-nowrap"
+                    title={
+                      row.businessDate && row.businessDate !== row.createdAt
+                        ? `${t("transactions.col.timeCreatedTooltip", "Order dibuat")}: ${new Date(row.createdAt).toLocaleString("id-ID")}`
+                        : undefined
+                    }
+                  >
+                    {new Date(row.businessDate ?? row.createdAt).toLocaleString("id-ID")}
+                  </td>
                   <td>{row.staffName}</td>
                   <td><Badge status="unknown">{typeLabel(t, row.type)}</Badge></td>
                   <td>{row.customerName ?? "-"}{row.memberTier ? ` (${row.memberTier})` : ""}</td>

@@ -401,9 +401,30 @@ export const orders = pgTable(
     splitGroupId: text("split_group_id"),
     mergedFromOrderIds: text("merged_from_order_ids"),
     source: text("source", { enum: ["pos", "whatsapp", "instagram", "ai_agent"] }).notNull().default("pos"),
+    // Business Date: the single date this order's REVENUE belongs to, distinct from `createdAt`
+    // (which for a rental order is session START time — often the wrong day for a session that
+    // runs past midnight) and from a payment's own `paidAt` (which can be days later for an AR/
+    // running-tab customer, and must never re-date revenue that was already recognized). Set
+    // explicitly, once, at the moment the transaction is actually finalized:
+    //   - Rental: when stopRentalSession finalizes the bill (session end), see lib/rental/sessions.ts
+    //   - POS/F&B/Produk (no rental session): never explicitly set — createdAt IS the completion
+    //     instant already (the order is created and paid in the same checkout action), so callers
+    //     read COALESCE(businessDate, createdAt) instead of duplicating that value here.
+    //   - PPOB: has no `orders` row at all — ppobTransactions.createdAt is already its business
+    //     date (single atomic insert at success time), see lib/ppob/engine.ts.
+    // Nullable and never overwritten once set — a later partial payment or receivable settlement
+    // must not re-date revenue that was already recognized. NULL for historical rows created
+    // before this column existed and for any order this logic doesn't explicitly cover; every
+    // reader must use COALESCE(business_date, created_at), never business_date alone, so old data
+    // behaves exactly as before (zero regression) instead of silently vanishing from every report.
+    businessDate: text("business_date"),
     ...timestamps,
   },
-  (t) => [index("orders_outlet_status_idx").on(t.outletId, t.status), index("orders_outlet_created_idx").on(t.outletId, t.createdAt)]
+  (t) => [
+    index("orders_outlet_status_idx").on(t.outletId, t.status),
+    index("orders_outlet_created_idx").on(t.outletId, t.createdAt),
+    index("orders_outlet_business_date_idx").on(t.outletId, t.businessDate),
+  ]
 );
 
 export const orderItems = pgTable(

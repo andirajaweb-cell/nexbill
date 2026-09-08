@@ -442,6 +442,20 @@ export async function stopRentalSession(sessionId: string) {
     order = refreshedOrder ?? order;
   }
 
+  // Business Date: stamp it HERE, the moment this bill is actually finalized (session end +
+  // final rental charge + accessory charges all settled) — not `bill.createdAt` (session START,
+  // often the wrong calendar day for a session that runs past midnight) and not whenever payment
+  // happens to be collected (could be minutes later, or days later for a running-tab customer).
+  // Set once and never touched again — a later partial payment or receivable settlement must not
+  // re-date revenue that was already recognized here. postSalesJournal (below, via
+  // settleOrderAfterPayment) reads this back and uses it as the journal's entryDate, so Accounting
+  // and Transaction Center/Dashboard (see lib/reports/transactions.ts) always anchor on the exact
+  // same date for this order, however late the actual cash is collected.
+  if (!order.businessDate) {
+    const [dated] = await db.update(orders).set({ businessDate: new Date(now).toISOString() }).where(eq(orders.id, bill.id)).returning();
+    order = dated ?? order;
+  }
+
   // Now that the bill's total is the REAL final amount (not the placeholder
   // estimate from an optional "bayar di muka" deposit), re-evaluate
   // settlement for the first time against it. No-ops harmlessly if nothing's

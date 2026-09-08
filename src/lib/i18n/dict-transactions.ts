@@ -76,6 +76,7 @@ registerDict({
 
   // --- Table columns (Transaction List + Cashier Performance) ---
   "transactions.col.time": { id: "Waktu", en: "Time", ms: "Masa", th: "เวลา", fil: "Oras", vi: "Thời gian" },
+  "transactions.col.timeCreatedTooltip": { id: "Order dibuat", en: "Order created", ms: "Order dibuat", th: "สร้างออเดอร์เมื่อ", fil: "Ginawa ang order", vi: "Đơn tạo lúc" },
   "transactions.col.cashier": { id: "Kasir", en: "Cashier", ms: "Juruwang", th: "แคชเชียร์", fil: "Cashier", vi: "Thu ngân" },
   "transactions.col.type": { id: "Jenis", en: "Type", ms: "Jenis", th: "ประเภท", fil: "Uri", vi: "Loại" },
   "transactions.col.customer": { id: "Customer", en: "Customer", ms: "Pelanggan", th: "ลูกค้า", fil: "Customer", vi: "Khách hàng" },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FNB_CATEGORIES, fnbMappingKey, merchMappingKey, rentalMappingKey } from "./postings";
+import { FNB_CATEGORIES, fnbMappingKey, merchMappingKey, rentalMappingKey, resolveOrderBusinessDate } from "./postings";
 
 /**
  * Task #63 — these three classification helpers decide which COA revenue/COGS account a line
@@ -64,5 +64,24 @@ describe("rentalMappingKey", () => {
     expect(rentalMappingKey(null)).toBe("other");
     expect(rentalMappingKey(undefined)).toBe("other");
     expect(rentalMappingKey("xbox")).toBe("other");
+  });
+});
+
+/**
+ * Business Date model (see the doc comment on orders.businessDate in db/schema.ts): the single
+ * fallback rule postSalesJournal's entryDate and lib/reports/transactions.ts's
+ * orderBusinessDateExpr SQL must both agree on. This guards the JS side of that agreement — the
+ * SQL side (COALESCE) is exercised indirectly by transactions.test.ts's own tests and by the fact
+ * that both express the identical "prefer businessDate, else createdAt" rule.
+ */
+describe("resolveOrderBusinessDate", () => {
+  it("prefers the explicitly-set businessDate (finalization time) over createdAt (session start)", () => {
+    const resolved = resolveOrderBusinessDate({ businessDate: "2026-09-09T00:15:00.000Z", createdAt: "2026-09-08T23:58:00.000Z" });
+    expect(resolved).toBe("2026-09-09T00:15:00.000Z");
+  });
+
+  it("falls back to createdAt for historical orders with no businessDate ever set (NULL)", () => {
+    const resolved = resolveOrderBusinessDate({ businessDate: null, createdAt: "2026-01-01T00:00:00.000Z" });
+    expect(resolved).toBe("2026-01-01T00:00:00.000Z");
   });
 });

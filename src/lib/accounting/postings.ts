@@ -20,6 +20,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { postJournal, JournalLineInput } from "./journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "./account-mapping";
+import { isPeriodLocked } from "./periods";
 
 const round = (n: number) => Math.round(n);
 
@@ -229,6 +230,21 @@ async function cogsAccountIdForCategory(outletId: string, category: string, dbc:
  * shortfall that the journal already assumed existed — exactly the "setengah berhasil" state the
  * requested architecture calls out. Now either all of it lands, or none of it does.
  */
+
+/**
+ * Pure resolution of which date an order's revenue belongs to — the single fallback rule every
+ * caller must agree on: the order's own `businessDate` if it was explicitly set at finalization
+ * (see the doc comment on `orders.businessDate` in db/schema.ts), else its `createdAt`. Used here
+ * to pick the sales/COGS journal's entryDate, and mirrored in SQL by `orderBusinessDateExpr` in
+ * lib/reports/transactions.ts (`COALESCE(business_date, created_at)`) for period filtering — kept
+ * as its own tiny, independently-tested function so a future edit to either side can't silently
+ * drift the two apart (which would reopen exactly the Accounting-vs-Transaction-Center gap this
+ * whole Business Date model exists to close).
+ */
+export function resolveOrderBusinessDate(order: { businessDate: string | null; createdAt: string }): string {
+  return order.businessDate ?? order.createdAt;
+}
+
 export async function postSalesJournal(orderId: string) {
   return db.transaction(async (tx) => {
     const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
@@ -377,9 +393,27 @@ export async function postSalesJournal(orderId: string) {
     ];
 
     const methodsLabel = [...new Set(successPayments.map((p) => p.method))].join("+");
+
+    // Journal Posting Date follows the order's Business Date (see the doc comment on
+    // orders.businessDate in db/schema.ts) — NOT "now" (when this function happens to run, which
+    // could be well after the order was actually finalized, e.g. an AR/running-tab customer who
+    // pays days later). This is what makes Accounting's Total Pendapatan for a given date
+    // reconcile against Transaction Center/Dashboard's Gross Sales for the same date, instead of
+    // the two drifting apart by however long payment collection was delayed.
+    //
+    // Falls back to today's date (the existing, already-documented period-locking convention —
+    // see postJournal's own comment: "posting koreksi dengan tanggal hari ini") in the rare case
+    // the Business Date's own accounting period has since been closed by the time this actually
+    // posts — e.g. revenue for a session that finished in an already-closed month, only paid off
+    // today. This must never silently drop the revenue entirely; landing it in today's still-open
+    // period is exactly the same correction path a human bookkeeper would take.
+    const businessDate = resolveOrderBusinessDate(order);
+    const entryDate = (await isPeriodLocked(order.outletId, businessDate, tx)) ? new Date().toISOString() : businessDate;
+
     const journalId = await postJournal(
       {
         outletId: order.outletId,
+        entryDate,
         reference,
         description: `Penjualan order ${order.id.slice(0, 8)} (${methodsLabel})${shortfall > 0 ? " — sebagian piutang" : ""}`,
         sourceType: order.rentalSessionId ? "rental" : "pos",
@@ -407,6 +441,10 @@ export async function postSalesJournal(orderId: string) {
       await postJournal(
         {
           outletId: order.outletId,
+          // Same entryDate as the revenue journal above — COGS must land in the same period as
+          // the revenue it's matched against (the matching principle), not "whenever this
+          // function happened to run".
+          entryDate,
           reference: `ORDER-${order.id.slice(0, 8)}-COGS`,
           description: `HPP F&B/Produk untuk order ${order.id.slice(0, 8)}`,
           sourceType: "pos",

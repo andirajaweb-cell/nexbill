@@ -16,6 +16,21 @@ function dayRangeConditions(column: any, from?: string, to?: string) {
 }
 
 /**
+ * Business Date (see the doc comment on orders.businessDate in db/schema.ts): the date a
+ * transaction's REVENUE belongs to, distinct from `createdAt` (session START time for a rental —
+ * often the wrong calendar day for a session that runs past midnight). This is what
+ * computeTransactionList/computeCashierPerformance filter and sort "Hari Ini"/"Kemarin"/etc. by
+ * now, instead of raw createdAt, so a period selected here always matches the same period's
+ * Accounting > Laba Rugi total (postSalesJournal stamps its journal's entryDate from this exact
+ * same order.businessDate — see lib/accounting/postings.ts). COALESCE, not businessDate alone: it's
+ * NULL for historical orders created before this column existed and for any order whose
+ * finalization path doesn't explicitly set it (see the schema doc comment for which paths do) —
+ * falling back to createdAt for those means old data keeps behaving exactly as it did before this
+ * change, never silently disappearing from a period's totals.
+ */
+const orderBusinessDateExpr = sql`COALESCE(${orders.businessDate}, ${orders.createdAt})`;
+
+/**
  * Same classification the accounting engine actually uses (see revenueAccountIdForItem in
  * postings.ts): routed by the item's own `itemType` flag, not by sniffing its description text.
  * This used to check `description.toLowerCase().startsWith("rental:")` instead — a redundant,
@@ -136,7 +151,7 @@ export interface TransactionFilters {
 
 export async function computeTransactionList(filters: TransactionFilters) {
   const { outletId, from, to } = filters;
-  const conditions = [sql`${orders.outletId} = ${outletId}`, ...dayRangeConditions(orders.createdAt, from, to)];
+  const conditions = [sql`${orders.outletId} = ${outletId}`, ...dayRangeConditions(orderBusinessDateExpr, from, to)];
   if (filters.staffUserId) conditions.push(sql`${orders.staffUserId} = ${filters.staffUserId}`);
   if (filters.status) conditions.push(sql`${orders.status} = ${filters.status}`);
   if (filters.customerId) conditions.push(sql`${orders.customerId} = ${filters.customerId}`);
@@ -144,7 +159,10 @@ export async function computeTransactionList(filters: TransactionFilters) {
   if (filters.minTotal !== undefined) conditions.push(sql`${orders.total} >= ${filters.minTotal}`);
   if (filters.maxTotal !== undefined) conditions.push(sql`${orders.total} <= ${filters.maxTotal}`);
 
-  const orderRows = await db.select().from(orders).where(sql.join(conditions, sql` AND `)).orderBy(sql`${orders.createdAt} DESC`);
+  // Sorted by the same Business Date this table is filtered by — a rental order finalized just
+  // now but whose bill was opened (session started) yesterday should sort with today's other
+  // transactions, not bury itself at the bottom under yesterday's createdAt timestamp.
+  const orderRows = await db.select().from(orders).where(sql.join(conditions, sql` AND `)).orderBy(sql`${orderBusinessDateExpr} DESC`);
   const orderIds = orderRows.map((o) => o.id);
   // Scope customers/sessions to only what THIS filtered window's orders actually reference,
   // instead of pulling every customer/session the outlet has ever had on every single load —
@@ -202,6 +220,11 @@ export async function computeTransactionList(filters: TransactionFilters) {
     return {
       id: o.id,
       createdAt: o.createdAt,
+      // Business Date this row's revenue is filtered/sorted by (see orderBusinessDateExpr's doc
+      // comment) — surfaced separately from createdAt so the UI can show WHY a row appears in
+      // this period even when its createdAt timestamp reads a different calendar day (a rental
+      // bill opened yesterday, finalized/appearing here today).
+      businessDate: o.businessDate ?? o.createdAt,
       staffUserId: o.staffUserId,
       staffName: o.staffUserId ? staffNameById.get(o.staffUserId) ?? "-" : "-",
       customerId: o.customerId,
@@ -387,7 +410,7 @@ export interface CashierPerformanceRow {
  * exactly the Total Transaksi / Gross Sales Daftar Transaksi shows for the same outlet/period.
  */
 export async function computeCashierPerformance(outletId: string, from?: string, to?: string): Promise<CashierPerformanceRow[]> {
-  const conditions = [sql`${orders.outletId} = ${outletId}`, ...dayRangeConditions(orders.createdAt, from, to)];
+  const conditions = [sql`${orders.outletId} = ${outletId}`, ...dayRangeConditions(orderBusinessDateExpr, from, to)];
   const orderRows = await db.select().from(orders).where(sql.join(conditions, sql` AND `));
   const orderIds = orderRows.map((o) => o.id);
   const items = orderIds.length ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds)) : [];
