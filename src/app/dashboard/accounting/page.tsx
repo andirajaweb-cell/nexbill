@@ -1242,16 +1242,44 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<ReconciliationData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
   const period = usePeriodState("today");
 
-  useEffect(() => {
+  const load = () => {
     if (!period.from || !period.to) return;
     setLoading(true);
     const qs = new URLSearchParams({ outletId, from: period.from, to: period.to });
     fetchJsonObject<ReconciliationData>(`/api/accounting/reconciliation?${qs}`)
       .then(setData)
       .finally(() => setLoading(false));
-  }, [outletId, period.from, period.to]);
+  };
+
+  useEffect(load, [outletId, period.from, period.to]);
+
+  // "Post Ulang" on a missing_gl row — re-invokes postSalesJournal directly instead of leaving
+  // the merchant stuck staring at a gap they have no way to act on (see the doc comment on
+  // /api/accounting/reconciliation/retry-posting). Surfaces whatever the server found — a real
+  // thrown error, "nothing to post yet" (no successful payment on file), or success — instead of
+  // that reason only ever reaching a server console log.
+  const retryPosting = async (orderId: string) => {
+    setRetrying(orderId);
+    try {
+      const res = await fetch("/api/accounting/reconciliation/retry-posting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.error) {
+        showAlert(result.error || t("accounting.recon.retryFailed", "Gagal posting ulang."));
+        return;
+      }
+      showAlert(t("accounting.recon.retrySuccess", "Jurnal berhasil diposting."));
+      load();
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   const interesting = data?.rows.filter((r) => r.reconciliationStatus !== "match" && r.reconciliationStatus !== "pending_payment") ?? [];
   const pending = data?.rows.filter((r) => r.reconciliationStatus === "pending_payment") ?? [];
@@ -1306,6 +1334,7 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
                     <th className="text-right">{t("accounting.recon.col.txTotal", "Total Transaksi")}</th>
                     <th className="text-right">{t("accounting.recon.col.glRevenue", "Revenue Jurnal")}</th>
                     <th>{t("accounting.recon.col.status", "Status")}</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1318,6 +1347,17 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
                       <td className="text-right">{rupiah(r.transactionsTotal)}</td>
                       <td className="text-right">{r.glRevenue !== null ? rupiah(r.glRevenue) : "-"}</td>
                       <td><Badge status={RECON_BADGE[r.reconciliationStatus].badge}>{t(RECON_BADGE[r.reconciliationStatus].key, RECON_BADGE[r.reconciliationStatus].fallback)}</Badge></td>
+                      <td>
+                        {r.reconciliationStatus === "missing_gl" && (
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 whitespace-nowrap"
+                            disabled={retrying === r.orderId}
+                            onClick={() => retryPosting(r.orderId)}
+                          >
+                            {retrying === r.orderId ? t("accounting.recon.retrying", "Memposting...") : t("accounting.recon.retryButton", "Post Ulang")}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {data.orphans.map((o) => (
@@ -1328,6 +1368,7 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
                       <td className="text-right">-</td>
                       <td className="text-right">{rupiah(o.glRevenue)}</td>
                       <td><Badge status="failed">{t("accounting.recon.status.orphan", "Order Tak Ditemukan")}</Badge></td>
+                      <td></td>
                     </tr>
                   ))}
                 </tbody>
