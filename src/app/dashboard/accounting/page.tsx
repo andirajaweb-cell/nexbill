@@ -1,6 +1,7 @@
 "use client";
 import { Fragment, useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
@@ -25,7 +26,7 @@ const inputClsSm = "w-full rounded-lg bg-neutral-800 border border-neutral-700 p
 function Field({ label, children }: { label: string; children: any }) {
   return <label className="space-y-1 block"><div className="text-xs text-neutral-500">{label}</div>{children}</label>;
 }
-const TABS = ["Chart of Accounts", "Account Mapping", "Jurnal", "Neraca Saldo", "Piutang (AR)", "Hutang (AP)", "Laba Rugi", "Neraca", "Arus Kas", "Tutup Periode", "Migrasi Data"] as const;
+const TABS = ["Chart of Accounts", "Account Mapping", "Jurnal", "Neraca Saldo", "Piutang (AR)", "Hutang (AP)", "Laba Rugi", "Rekonsiliasi", "Neraca", "Arus Kas", "Tutup Periode", "Migrasi Data"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
@@ -36,6 +37,7 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Piutang (AR)": { key: "accounting.tab.receivables", fallback: "Piutang (AR)" },
   "Hutang (AP)": { key: "accounting.tab.payables", fallback: "Hutang (AP)" },
   "Laba Rugi": { key: "accounting.tab.profitLoss", fallback: "Laba Rugi" },
+  "Rekonsiliasi": { key: "accounting.tab.reconciliation", fallback: "Rekonsiliasi" },
   "Neraca": { key: "accounting.tab.balanceSheet", fallback: "Neraca" },
   "Arus Kas": { key: "accounting.tab.cashFlow", fallback: "Arus Kas" },
   "Tutup Periode": { key: "accounting.tab.periodLock", fallback: "Tutup Periode" },
@@ -90,6 +92,8 @@ export default function AccountingPage() {
         <PayablesTab outletId={outletId} />
       ) : tab === "Laba Rugi" ? (
         <ProfitLossTab outletId={outletId} />
+      ) : tab === "Rekonsiliasi" ? (
+        <ReconciliationTab outletId={outletId} />
       ) : tab === "Neraca" ? (
         <BalanceSheetTab outletId={outletId} />
       ) : tab === "Arus Kas" ? (
@@ -1181,6 +1185,170 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
           </Card>
         </div>
       )}
+    </div>
+  );
+}
+
+interface ReconciliationRow {
+  orderId: string;
+  type: "rental" | "fnb" | "product" | "ppob";
+  status: string;
+  businessDate: string;
+  transactionsTotal: number;
+  glEntryDate: string | null;
+  glRevenue: number | null;
+  reconciliationStatus: "match" | "pending_payment" | "date_mismatch" | "amount_mismatch" | "missing_gl" | "cancelled_with_gl";
+}
+interface OrphanRow {
+  orderId: string;
+  glEntryDate: string;
+  glRevenue: number;
+}
+interface ReconciliationData {
+  rows: ReconciliationRow[];
+  orphans: OrphanRow[];
+  summary: {
+    totalOrders: number;
+    match: number;
+    pendingPayment: number;
+    dateMismatch: number;
+    amountMismatch: number;
+    missingGl: number;
+    cancelledWithGl: number;
+    orphanGl: number;
+    netAmountDelta: number;
+  };
+}
+
+const RECON_BADGE: Record<ReconciliationRow["reconciliationStatus"], { badge: string; key: string; fallback: string }> = {
+  match: { badge: "success", key: "accounting.recon.status.match", fallback: "Cocok" },
+  pending_payment: { badge: "pending", key: "accounting.recon.status.pendingPayment", fallback: "Menunggu Pembayaran" },
+  date_mismatch: { badge: "pending", key: "accounting.recon.status.dateMismatch", fallback: "Beda Tanggal" },
+  amount_mismatch: { badge: "failed", key: "accounting.recon.status.amountMismatch", fallback: "Beda Nominal" },
+  missing_gl: { badge: "failed", key: "accounting.recon.status.missingGl", fallback: "Belum Terposting" },
+  cancelled_with_gl: { badge: "failed", key: "accounting.recon.status.cancelledWithGl", fallback: "Dibatalkan tapi Masih di Jurnal" },
+};
+
+/**
+ * Order-level reconciliation between this Accounting module (GL, posting/entryDate) and
+ * Transaction Center (Business Date) for the same period — see the doc comment atop
+ * lib/reports/reconciliation.ts. Built so a summary-card-level gap ("Rental beda Rp44.000") can be
+ * traced down to the exact order(s) responsible, and so a genuine bug (missing_gl,
+ * cancelled_with_gl) is visually distinct from an expected, by-design difference
+ * (pending_payment) instead of both looking like the same kind of "mismatch".
+ */
+function ReconciliationTab({ outletId }: { outletId: string }) {
+  const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
+  const [data, setData] = useState<ReconciliationData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const period = usePeriodState("today");
+
+  useEffect(() => {
+    if (!period.from || !period.to) return;
+    setLoading(true);
+    const qs = new URLSearchParams({ outletId, from: period.from, to: period.to });
+    fetchJsonObject<ReconciliationData>(`/api/accounting/reconciliation?${qs}`)
+      .then(setData)
+      .finally(() => setLoading(false));
+  }, [outletId, period.from, period.to]);
+
+  const interesting = data?.rows.filter((r) => r.reconciliationStatus !== "match" && r.reconciliationStatus !== "pending_payment") ?? [];
+  const pending = data?.rows.filter((r) => r.reconciliationStatus === "pending_payment") ?? [];
+  const matched = data?.rows.filter((r) => r.reconciliationStatus === "match") ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PeriodBar preset={period.preset} setPreset={period.setPreset} customFrom={period.customFrom} setCustomFrom={period.setCustomFrom} customTo={period.customTo} setCustomTo={period.setCustomTo} />
+      </div>
+
+      <p className="text-xs text-neutral-500">
+        {t(
+          "accounting.recon.intro",
+          "Membandingkan setiap order pada periode ini antara Halaman Transaksi (Business Date) dan Jurnal Accounting (Posting Date). \"Cocok\" dan \"Menunggu Pembayaran\" adalah hal wajar — status lain layak diperiksa."
+        )}
+      </p>
+
+      {loading ? (
+        <div className="text-sm text-neutral-500 py-4 text-center">{t("transactions.loading", "Memuat...")}</div>
+      ) : data ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            <Card><div className="text-[11px] text-neutral-500">{t("accounting.recon.stat.total", "Total Order")}</div><div className="text-lg font-bold">{data.summary.totalOrders}</div></Card>
+            <Card><div className="text-[11px] text-neutral-500">{t("accounting.recon.status.match", "Cocok")}</div><div className="text-lg font-bold text-emerald-400">{data.summary.match}</div></Card>
+            <Card><div className="text-[11px] text-neutral-500">{t("accounting.recon.status.pendingPayment", "Menunggu Pembayaran")}</div><div className="text-lg font-bold text-amber-400">{data.summary.pendingPayment}</div></Card>
+            <Card><div className="text-[11px] text-neutral-500">{t("accounting.recon.status.dateMismatch", "Beda Tanggal")}</div><div className="text-lg font-bold text-amber-400">{data.summary.dateMismatch}</div></Card>
+            <Card><div className="text-[11px] text-neutral-500">{t("accounting.recon.status.amountMismatch", "Beda Nominal")}</div><div className="text-lg font-bold text-rose-400">{data.summary.amountMismatch}</div></Card>
+            <Card><div className="text-[11px] text-neutral-500">{t("accounting.recon.status.missingGl", "Belum Terposting")}</div><div className="text-lg font-bold text-rose-400">{data.summary.missingGl}</div></Card>
+            <Card><div className="text-[11px] text-neutral-500">{t("accounting.recon.status.cancelledWithGl", "Batal tapi di Jurnal")}</div><div className="text-lg font-bold text-rose-400">{data.summary.cancelledWithGl + data.summary.orphanGl}</div></Card>
+          </div>
+
+          <Card>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-neutral-400">{t("accounting.recon.netDelta", "Selisih bersih (Jurnal − Transaksi) untuk periode ini")}</span>
+              <span className={`font-bold ${Math.abs(data.summary.netAmountDelta) < 1 ? "text-emerald-400" : "text-rose-400"}`}>{rupiah(data.summary.netAmountDelta)}</span>
+            </div>
+          </Card>
+
+          {interesting.length === 0 && data.orphans.length === 0 ? (
+            <Card className="text-sm text-emerald-400 text-center py-4">{t("accounting.recon.allClear", "Tidak ada order bermasalah pada periode ini — hanya \"Cocok\" dan \"Menunggu Pembayaran\".")}</Card>
+          ) : (
+            <Card className="overflow-x-auto">
+              <h2 className="text-sm font-semibold mb-2 text-rose-300">{t("accounting.recon.needsReview", "Perlu Diperiksa")}</h2>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-neutral-500 border-b border-neutral-800">
+                    <th className="py-2">{t("accounting.recon.col.order", "Order")}</th>
+                    <th>{t("accounting.recon.col.type", "Jenis")}</th>
+                    <th>{t("accounting.recon.col.businessDate", "Business Date")}</th>
+                    <th>{t("accounting.recon.col.glDate", "Tgl. Jurnal")}</th>
+                    <th className="text-right">{t("accounting.recon.col.txTotal", "Total Transaksi")}</th>
+                    <th className="text-right">{t("accounting.recon.col.glRevenue", "Revenue Jurnal")}</th>
+                    <th>{t("accounting.recon.col.status", "Status")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {interesting.map((r) => (
+                    <tr key={r.orderId} className="border-b border-neutral-900">
+                      <td className="py-2 font-mono text-xs">{r.orderId.slice(0, 8)}</td>
+                      <td className="capitalize">{r.type}</td>
+                      <td className="whitespace-nowrap">{new Date(r.businessDate).toLocaleString("id-ID")}</td>
+                      <td className="whitespace-nowrap">{r.glEntryDate ? new Date(r.glEntryDate).toLocaleString("id-ID") : "-"}</td>
+                      <td className="text-right">{rupiah(r.transactionsTotal)}</td>
+                      <td className="text-right">{r.glRevenue !== null ? rupiah(r.glRevenue) : "-"}</td>
+                      <td><Badge status={RECON_BADGE[r.reconciliationStatus].badge}>{t(RECON_BADGE[r.reconciliationStatus].key, RECON_BADGE[r.reconciliationStatus].fallback)}</Badge></td>
+                    </tr>
+                  ))}
+                  {data.orphans.map((o) => (
+                    <tr key={`orphan-${o.orderId}`} className="border-b border-neutral-900">
+                      <td className="py-2 font-mono text-xs">{o.orderId.slice(0, 8)}</td>
+                      <td colSpan={2} className="text-neutral-500 text-xs">{t("accounting.recon.orphanNote", "Ada revenue di jurnal, tapi order ini tidak muncul di Halaman Transaksi untuk periode yang sama (Business Date-nya beda hari)")}</td>
+                      <td className="whitespace-nowrap">{new Date(o.glEntryDate).toLocaleString("id-ID")}</td>
+                      <td className="text-right">-</td>
+                      <td className="text-right">{rupiah(o.glRevenue)}</td>
+                      <td><Badge status="failed">{t("accounting.recon.status.orphan", "Order Tak Ditemukan")}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
+
+          <details className="text-xs text-neutral-500">
+            <summary className="cursor-pointer select-none">{t("accounting.recon.showMatched", "Tampilkan {n} order yang cocok/menunggu pembayaran").replace("{n}", String(matched.length + pending.length))}</summary>
+            <div className="mt-2 space-y-1">
+              {[...matched, ...pending].map((r) => (
+                <div key={r.orderId} className="flex justify-between border-b border-neutral-900 py-1">
+                  <span className="font-mono">{r.orderId.slice(0, 8)}</span>
+                  <span>{rupiah(r.transactionsTotal)}</span>
+                  <Badge status={RECON_BADGE[r.reconciliationStatus].badge}>{t(RECON_BADGE[r.reconciliationStatus].key, RECON_BADGE[r.reconciliationStatus].fallback)}</Badge>
+                </div>
+              ))}
+            </div>
+          </details>
+        </>
+      ) : null}
     </div>
   );
 }
