@@ -1,26 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import {
-  orders, orderItems, payments, expenses, rentalUnits, rentalSessions,
+  orders, orderItems, expenses, rentalUnits, rentalSessions,
   products, customers, receivables, purchaseInvoices,
   bookings, cashBankAccounts, outlets,
 } from "@/db/schema";
 import { sql, eq, and, inArray } from "drizzle-orm";
 import { computeProfitLoss, computeTrialBalance } from "@/lib/accounting/reports";
+import { computeTransactionList } from "@/lib/reports/transactions";
 import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
 import { outletHour, outletDayStartUtc } from "@/lib/time/outlet-time";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 
 /**
- * Buckets a COA revenue account code into this dashboard's own revenue-by-source breakdown — this
- * page's Laba Kotor/Estimasi Laba Bersih figures are, correctly, still sourced from the General
- * Ledger (computeProfitLoss, entryDate/posting_date-scoped) since that's literally what those
- * figures mean. Transaction Center (lib/reports/transactions.ts) deliberately does NOT use the GL
- * or this bucketing anymore — its cards are sourced purely from the same orders/createdAt dataset
- * as its own table instead, per a separate, explicit requirement that its summary cards always
- * reconcile against the table regardless of accrual timing. See the account ranges in
- * lib/accounting/coa-data.ts and the seed rows in lib/accounting/account-mapping.ts DEFAULT_MAPPING_SEED.
+ * Buckets a COA revenue account code — used ONLY to pull out the Home Rental figure below now.
+ * Home Rental (Sewa Dibawa Pulang) is a fully separate module that never creates rows in
+ * orders/orderItems at all, so it's the one legitimate case where this dashboard's Sales cards
+ * still have to read the General Ledger instead of the transaction-date dataset everything else
+ * on this page now uses (see the big comment above the Wave-1 Promise.all below for the full
+ * history of why this page used to be entirely GL-sourced, and why that was wrong for every
+ * OTHER bucket). Laba Kotor/Estimasi Laba Bersih remain correctly, separately GL-sourced
+ * (computeProfitLoss, entryDate/posting_date-scoped) since that's literally what those figures
+ * mean — see the `reconciliation` block near the bottom of this route for how any resulting gap
+ * between this page's (now transaction-date) Sales cards and Laba Rugi's (posting-date) Total
+ * Pendapatan is surfaced explicitly instead of the two silently disagreeing. See the account
+ * ranges in lib/accounting/coa-data.ts and the seed rows in
+ * lib/accounting/account-mapping.ts DEFAULT_MAPPING_SEED.
  */
 function dashboardRevenueBucket(code: string): "rentalReguler" | "rentalMember" | "addon" | "fnb" | "produk" | "ppob" | "lainLain" | "homeRental" | "other" {
   if (code === "4180") return "rentalMember";
@@ -65,7 +71,7 @@ export async function GET(req: NextRequest) {
     // instead: everything in a wave only depends on results from an earlier wave, never a
     // sibling in the same one — so within each wave the DB round-trips happen concurrently.
     const [
-      paidOrdersToday,
+      txResult,
       outletRow,
       expensesToday,
       cashAccounts,
@@ -86,7 +92,13 @@ export async function GET(req: NextRequest) {
       ppobEnabled,
       homeRentalEnabled,
     ] = await Promise.all([
-      db.select().from(orders).where(sql`${orders.outletId} = ${outletId} AND ${orders.status} = 'paid' AND ${orders.createdAt} >= ${dayStartIso}`),
+      // Single source of truth for every Sales/Revenue/Transaction-count figure below (except
+      // Home Rental and Laba Kotor/Bersih — see the doc comments on dashboardRevenueBucket and on
+      // `reconciliation` further down) — the exact same query Transaction Center's Daftar
+      // Transaksi/Performa Kasir tabs use for this outlet+period, bounded to [dayStart, dayEnd)
+      // instead of the previous open-ended ">= dayStart" (which silently included data past the
+      // requested day whenever `date` pointed at a day other than today).
+      computeTransactionList({ outletId, from: dayStartIso, to: dayEndIso }),
       db.select({ salesTargetMonthly: outlets.salesTargetMonthly }).from(outlets).where(eq(outlets.id, outletId)).limit(1),
       db.select().from(expenses).where(sql`${expenses.outletId} = ${outletId} AND ${expenses.status} IN ('approved','paid') AND ${expenses.expenseDate} >= ${dayStartIso}`),
       db.select().from(cashBankAccounts).where(and(eq(cashBankAccounts.outletId, outletId), eq(cashBankAccounts.type, "cash"))),
@@ -118,52 +130,86 @@ export async function GET(req: NextRequest) {
       isFeatureEnabled(outletId, "HOME_RENTAL_ENABLED"),
     ]);
 
-    const orderIdsToday = paidOrdersToday.map((o) => o.id);
+    // Strictly status === "paid" (not "partial") — preserves this dashboard's original "N
+    // transaksi lunas" meaning exactly, sourced from the SAME transaction-date dataset as
+    // everything else below instead of a second, separately-filtered orders query.
+    const paidTransactionsToday = txResult.transactions.filter((t) => t.status === "paid");
+    const orderIdsToday = paidTransactionsToday.map((t) => t.id);
+    const txSummary = txResult.summary;
 
-    // ---- Revenue today, sourced from the General Ledger (the same computeProfitLoss("Hari Ini")
-    // this route's own grossProfit/netProfit below already use) instead of re-deriving it from
-    // raw orders/orderItems filtered by orders.createdAt. Those two are NOT the same "today": a
-    // rental session started yesterday (or a bill amended mid-stay) but paid/settled today posts
-    // its revenue to the GL with today's entryDate — correctly included in grossProfit/netProfit
-    // (already GL-sourced via `pl`) and in Accounting > Laba Rugi's "Hari Ini" — but an
-    // orders.createdAt-filtered query for "today" excludes it entirely, since the order itself was
-    // created yesterday. That's exactly what made this dashboard's "Pendapatan Hari Ini" (and its
-    // revenue-by-source breakdown) disagree with its own "Laba Kotor"/"Estimasi Laba Bersih" cards
-    // on the very same page. (Transaction Center's summary cards used to be fixed the same way,
-    // but that was later deliberately reverted there — its cards must instead match its own
-    // createdAt-scoped table exactly; see the doc comment atop lib/reports/transactions.ts.)
-    // dashboardRevenueBucket below is that same idea with finer buckets (regular vs member rental,
-    // add-ons split out, PPOB) to match what this dashboard's breakdown widget displays.
-    const revenueBySource = { rentalReguler: 0, rentalMember: 0, addon: 0, homeRental: 0, fnb: 0, produk: 0, ppob: 0, lainLain: 0 };
+    // ---- Revenue today: transaction-date basis (orders.createdAt), sourced from the exact same
+    // computeTransactionList() call Transaction Center's Daftar Transaksi tab uses for this
+    // outlet+period — NOT the General Ledger anymore. This dashboard's Sales/Revenue/Transaction-
+    // count cards and Transaction Center's own cards now always reconcile exactly for the same
+    // period, because they're now literally the same query. (An earlier version of this route
+    // sourced these from computeProfitLoss/entryDate instead, specifically to agree with THIS
+    // page's own Laba Kotor/Estimasi Laba Bersih cards — but that made it disagree with
+    // Transaction Center instead, which is the mismatch that was actually reported. Laba
+    // Kotor/Estimasi Laba Bersih legitimately stay GL/posting-date-sourced below via `pl`, since
+    // accrual profit is inherently a posting-date concept — see the `reconciliation` block further
+    // down for how the resulting Sales-vs-Accounting-Revenue gap, if any, is now surfaced instead
+    // of the two just silently disagreeing.)
+    //
+    // Home Rental is the one exception: it never creates orders/orderItems rows at all, so it has
+    // no transaction-date figure to read here — it's still pulled from the GL via
+    // dashboardRevenueBucket, exactly as before.
+    let homeRentalRevenue = 0;
     for (const r of pl.revenue) {
       if (!r.isPostingAllowed) continue;
-      const bucket = dashboardRevenueBucket(r.code);
-      if (bucket === "other") continue; // 47xx Other Income (its own dashboard/report), 49xx Contra Revenue (netted into lainLain below instead)
-      revenueBySource[bucket] += r.balance;
+      if (dashboardRevenueBucket(r.code) === "homeRental") homeRentalRevenue += r.balance;
     }
-    // Nets the day's discount out of the catch-all bucket so the buckets' own sum ties back
-    // exactly to pl.totalRevenue (already net of discount) — same netting pattern used for
-    // Transaction Center's summary cards in lib/reports/transactions.ts.
-    revenueBySource.lainLain -= pl.totalDiscount;
+
+    const revenueBySource = {
+      rentalReguler: txSummary.rentalRegulerRevenue,
+      rentalMember: txSummary.rentalMemberRevenue,
+      addon: txSummary.addonRevenue,
+      homeRental: homeRentalRevenue,
+      fnb: txSummary.fnbRevenue,
+      produk: txSummary.pureProductRevenue,
+      ppob: txSummary.ppobRevenue, // Admin Fee/Margin only — PPOB principal is never revenue, see lib/ppob/engine.ts
+      // Nets the day's discount out of the catch-all bucket so the buckets' own sum ties back
+      // exactly to grossSales + homeRental + ppob below (same netting pattern used for
+      // Transaction Center's own summary cards in lib/reports/transactions.ts).
+      lainLain: txSummary.otherRevenue - txSummary.discount,
+    };
 
     const revenueBySourceTotal = Object.values(revenueBySource).reduce((s, v) => s + v, 0);
-    const omzet = pl.totalRevenue;
-    const revenueRental = revenueBySource.rentalReguler + revenueBySource.rentalMember + revenueBySource.addon;
-    const revenueFnb = revenueBySource.fnb;
-    const revenueProduk = revenueBySource.produk;
+    // "Pendapatan Hari Ini" = Gross Sales for the period, transaction-date basis — identical
+    // figure and identical dataset as Transaction Center's own "Gross Sales" card for this exact
+    // period (see computeTransactionList). Deliberately excludes Home Rental and PPOB Admin
+    // Fee/Margin (both real revenue, but not orders-based) so this headline number reconciles
+    // 1:1 with the Transactions page; those two are still visible in the breakdown card below and
+    // folded into `revenueBySourceTotal`.
+    const omzet = txSummary.grossSales;
+    const revenueRental = txSummary.rentalRevenue;
+    const revenueFnb = txSummary.fnbRevenue;
+    const revenueProduk = txSummary.pureProductRevenue;
 
-    // ---- Wave 2: only depends on paidOrdersToday (wave 1) — itemsToday/cashPaymentsToday still
-    // drive operational (not financial-summary) widgets below: top products sold today and cash
-    // physically received today, both legitimately scoped to "orders created today" rather than
-    // "revenue recognized today" (an item rung up on an order created today is today's operational
-    // activity regardless of which day its cash ultimately gets journaled). No longer needs
-    // rentalSessions/customers for a member-vs-regular split — that now comes straight from the
-    // GL above (accounts 4180/4530/4510/4520), removing what was a hand-rolled re-derivation of
-    // logic the accounting engine (postings.ts) already owns.
-    const [itemsToday, cashPaymentsToday] = await Promise.all([
-      orderIdsToday.length ? db.select().from(orderItems).where(inArray(orderItems.orderId, orderIdsToday)) : Promise.resolve([]),
-      orderIdsToday.length ? db.select().from(payments).where(and(inArray(payments.orderId, orderIdsToday), eq(payments.method, "cash"), eq(payments.status, "success"))) : Promise.resolve([]),
-    ]);
+    // ---- Dashboard (transaction-date) vs Accounting (posting-date) reconciliation. These two are
+    // legitimate, DIFFERENT dates by design (see the Date/Period Resolver discussion) — a rental
+    // session started yesterday but paid/settled today posts revenue to the GL with today's
+    // entryDate (included in `pl.totalRevenue` and in Laba Rugi's "Hari Ini") but its order was
+    // created yesterday (excluded from `omzet`, which is strictly today's orders). Rather than
+    // silently showing two disagreeing numbers on two different pages, or forcing them to fake-
+    // agree by picking one basis for both, the resulting gap is computed and returned here so the
+    // UI can explain it plainly instead of leaving the merchant to wonder why they differ.
+    const reconciliation = {
+      transactionDateRevenue: omzet,
+      postingDateRevenue: pl.totalRevenue,
+      delta: Math.round((pl.totalRevenue - omzet) * 100) / 100,
+      isReconciled: Math.abs(pl.totalRevenue - omzet) < 1,
+    };
+
+    // ---- Wave 2: only depends on paidTransactionsToday (wave 1) — itemsToday still drives a
+    // purely operational (not financial-summary) widget below: top products sold today,
+    // legitimately scoped to "orders created today" (an item rung up on an order created today is
+    // today's operational activity regardless of which day its cash ultimately gets journaled).
+    // Cash actually received today no longer needs its own query at all — txSummary.byPaymentMethod
+    // (computed by the SAME computeTransactionList call above, over "recognized" i.e. paid/partial
+    // transactions with a successful payment) already has exactly this figure, guaranteeing it's
+    // identical to Transaction Center's own "Cash" card for the same period.
+    const itemsToday = orderIdsToday.length ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIdsToday)) : [];
+    const cashIn = txSummary.byPaymentMethod.find((p) => p.method === "Cash")?.amount ?? 0;
 
     // ---- Target penjualan (BEP) — manual monthly figure set by superuser in Settings, split
     // into a daily figure at read time by dividing by the number of days in the current month.
@@ -182,8 +228,6 @@ export async function GET(req: NextRequest) {
     const kasKeluar = paidCashExpensesToday
       .filter((e) => e.cashBankAccountId && cashAccountIds.has(e.cashBankAccountId))
       .reduce((s, e) => s + e.amount + (e.taxAmount ?? 0), 0);
-
-    const cashIn = cashPaymentsToday.reduce((s, p) => s + p.amount, 0);
 
     // ---- Saldo Kas / Saldo Rekening — authoritative running balance from the GL (all-time, nets out voids automatically) ----
     const cashGlAccountIds = new Set(cashAccounts.map((a) => a.accountId));
@@ -265,7 +309,7 @@ export async function GET(req: NextRequest) {
       : null;
 
     // ---- Customers: served today (distinct, from paid orders) + new members registered today ----
-    const distinctCustomerIdsToday = new Set(paidOrdersToday.map((o) => o.customerId).filter((id): id is string => !!id));
+    const distinctCustomerIdsToday = new Set(paidTransactionsToday.map((t) => t.customerId).filter((id): id is string => !!id));
 
     // ---- AR / AP outstanding ----
     // See src/lib/accounting/ar-ap.ts for the full consolidated AR/AP view with
@@ -284,6 +328,10 @@ export async function GET(req: NextRequest) {
       revenueProduk,
       revenueBySource,
       revenueBySourceTotal,
+      // Transaction-date (Sales/Revenue, orders.createdAt) vs posting-date (Laba Rugi's Total
+      // Pendapatan, entryDate) reconciliation for this exact period — see the doc comment above
+      // where this is computed. The UI shows this note only when isReconciled is false.
+      reconciliation,
       // Which optional-module breakdown rows this outlet actually wants surfaced — see Settings >
       // Feature Management. The dashboard UI hides the PPOB / Home Rental rows entirely (not just
       // shows Rp0) when the corresponding module is OFF for this outlet.
@@ -293,7 +341,11 @@ export async function GET(req: NextRequest) {
       pengeluaranHariIni,
       grossProfit: pl.grossProfit,
       netProfit: pl.netProfit,
-      transactionsCount: paidOrdersToday.length,
+      transactionsCount: paidTransactionsToday.length,
+      // Total Transaksi (valid, non-cancelled — includes Open/Awaiting Payment), sourced from the
+      // exact same computeTransactionList call — always equal to Transaction Center's own "Total
+      // Transaksi" card for the same period.
+      totalTransactionsValid: txSummary.totalTransactions,
       customersServedTodayCount: distinctCustomerIdsToday.size,
       newMembersTodayCount: newMembersToday.length,
       cashIn,

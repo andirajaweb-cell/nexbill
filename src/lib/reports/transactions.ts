@@ -36,6 +36,23 @@ function itemRevenueBucket(itemType: string, category?: string): "rental" | "fnb
 }
 
 /**
+ * Finer rental sub-classification (Reguler vs Member vs Add-on), additive to itemRevenueBucket
+ * above rather than a replacement for it — Transaction Center's own table/type filter only needs
+ * the coarser "rental" bucket, so this stays a separate, independently-testable function instead
+ * of changing itemRevenueBucket's contract (and risking every existing caller/test of it). Used by
+ * the Owner Dashboard's per-source breakdown, which needs this finer split computed from the SAME
+ * transaction-date-scoped dataset as everything else in this file — never from the GL — so the
+ * Dashboard's rental/add-on rows always reconcile against Transaction Center's "Rental" total for
+ * the same period (rentalReguler + rentalMember + addon === itemRevenueBucket's "rental" bucket,
+ * by construction: both only ever fire for itemType "rental"/"accessory").
+ */
+export function rentalRevenueSubBucket(itemType: string, isMember: boolean): "rentalReguler" | "rentalMember" | "addon" | null {
+  if (itemType === "accessory") return "addon";
+  if (itemType === "rental") return isMember ? "rentalMember" : "rentalReguler";
+  return null;
+}
+
+/**
  * NOTE ON DESIGN (Transaction Center vs Accounting): this page used to source its revenue-by-type
  * cards from the General Ledger (via computeProfitLoss + a `glRevenueBucket` account-code mapper)
  * so they'd never disagree with Laba Rugi. That was deliberately reverted — the user asked for the
@@ -228,13 +245,28 @@ export async function computeTransactionList(filters: TransactionFilters) {
   // reverses the earlier GL-sourced version of this file; Laba Rugi keeps its own, separate,
   // posting_date-based computation and is not read anywhere in this module.
   const revenueByType = { rental: 0, fnb: 0, product: 0 };
+  // Finer breakdown for the Owner Dashboard's per-source card (rentalRevenueSubBucket's doc
+  // comment explains why this is additive rather than replacing revenueByType above).
+  // pureProductRevenue + otherRevenue === revenueByType.product by construction (same loop,
+  // same inputs) — otherRevenue is exposed separately so a caller that wants product revenue
+  // WITHOUT service charge/tax folded in (the Dashboard's GL-style "Produk" bucket always
+  // excluded those) doesn't have to re-derive it.
+  let pureProductRevenue = 0;
+  let otherRevenue = 0; // service charge + tax, folded into revenueByType.product below (unchanged existing behavior)
+  const rentalSub = { rentalReguler: 0, rentalMember: 0, addon: 0 };
   for (const t of validTransactions) {
+    const isMember = !!t.memberTier;
     for (const it of itemsByOrder.get(t.id) ?? []) {
       const category = it.productId ? productCategoryById.get(it.productId) : undefined;
       const bucket = itemRevenueBucket(it.itemType, category);
       revenueByType[bucket] += it.lineTotal;
+      if (bucket === "product") pureProductRevenue += it.lineTotal;
+      const sub = rentalRevenueSubBucket(it.itemType, isMember);
+      if (sub) rentalSub[sub] += it.lineTotal;
     }
-    revenueByType.product += (t.serviceCharge ?? 0) + (t.tax ?? 0);
+    const orderOther = (t.serviceCharge ?? 0) + (t.tax ?? 0);
+    revenueByType.product += orderOther;
+    otherRevenue += orderOther;
   }
   const totalDiscount = validTransactions.reduce((s, t) => s + t.discount, 0);
   const totalTax = validTransactions.reduce((s, t) => s + t.tax, 0);
@@ -290,6 +322,14 @@ export async function computeTransactionList(filters: TransactionFilters) {
     fnbRevenue: revenueByType.fnb,
     ppobRevenue,
     productRevenue: revenueByType.product,
+    // Finer breakdown consumed by the Owner Dashboard's per-source card — see
+    // rentalRevenueSubBucket's doc comment. rentalReguler+rentalMember+addon === rentalRevenue,
+    // pureProductRevenue+otherRevenue === productRevenue, both by construction (same loop above).
+    rentalRegulerRevenue: rentalSub.rentalReguler,
+    rentalMemberRevenue: rentalSub.rentalMember,
+    addonRevenue: rentalSub.addon,
+    pureProductRevenue,
+    otherRevenue,
     discount: totalDiscount,
     tax: totalTax,
     refund: refundedAmount,

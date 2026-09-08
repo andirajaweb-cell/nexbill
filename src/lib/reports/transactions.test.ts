@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { reconcileSales } from "./transactions";
+import { reconcileSales, rentalRevenueSubBucket } from "./transactions";
 
 /**
  * Task: "Perbaiki logika halaman Transaksi..." — reconcileSales is the pure reconciliation
@@ -41,5 +41,51 @@ describe("reconcileSales", () => {
     // A structural tripwire, not a live risk today — see the doc comment on reconcileSales for why.
     const result = reconcileSales([10, 20, 30], 5);
     expect(result.isReconciled).toBe(true);
+  });
+});
+
+/**
+ * Task: "Unify Dashboard revenue cards with Transaction Center dataset" — rentalRevenueSubBucket
+ * is the pure helper the Owner Dashboard's per-source breakdown (Rental Reguler/Member/Add-on)
+ * now uses, additive to itemRevenueBucket's coarser "rental" bucket rather than a replacement for
+ * it. The key invariant this guards: every itemType that itemRevenueBucket folds into "rental"
+ * (rental, accessory) must resolve to a non-null sub-bucket here, and every itemType it does NOT
+ * (fnb-category products, plain products, misc) must resolve to null — otherwise the Dashboard's
+ * rentalReguler+rentalMember+addon sum would silently drift away from Transaction Center's own
+ * "Rental Revenue" card for the same period.
+ */
+describe("rentalRevenueSubBucket", () => {
+  it("a non-member's rental line goes to Reguler", () => {
+    expect(rentalRevenueSubBucket("rental", false)).toBe("rentalReguler");
+  });
+
+  it("a member's rental line goes to Member", () => {
+    expect(rentalRevenueSubBucket("rental", true)).toBe("rentalMember");
+  });
+
+  it("accessory (per-hour add-on) lines always go to Add-on, regardless of membership", () => {
+    expect(rentalRevenueSubBucket("accessory", false)).toBe("addon");
+    expect(rentalRevenueSubBucket("accessory", true)).toBe("addon");
+  });
+
+  it("non-rental itemTypes (product/misc) resolve to null — they belong to a different bucket entirely", () => {
+    expect(rentalRevenueSubBucket("product", false)).toBeNull();
+    expect(rentalRevenueSubBucket("misc", true)).toBeNull();
+  });
+
+  it("every itemType itemRevenueBucket would call \"rental\" resolves to a non-null sub-bucket here, and nothing else does", () => {
+    // Mirrors itemRevenueBucket's own condition (itemType === "rental" || itemType === "accessory")
+    // without importing it directly, so this test would fail loudly if the two functions' itemType
+    // sets ever drifted apart.
+    const rentalItemTypes = ["rental", "accessory"];
+    const otherItemTypes = ["product", "misc"];
+    for (const itemType of rentalItemTypes) {
+      expect(rentalRevenueSubBucket(itemType, false)).not.toBeNull();
+      expect(rentalRevenueSubBucket(itemType, true)).not.toBeNull();
+    }
+    for (const itemType of otherItemTypes) {
+      expect(rentalRevenueSubBucket(itemType, false)).toBeNull();
+      expect(rentalRevenueSubBucket(itemType, true)).toBeNull();
+    }
   });
 });

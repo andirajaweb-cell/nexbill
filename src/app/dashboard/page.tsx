@@ -28,6 +28,8 @@ interface OwnerDashboard {
   revenueProduk: number;
   revenueBySource: { rentalReguler: number; rentalMember: number; addon: number; homeRental: number; fnb: number; produk: number; ppob: number; lainLain: number };
   revenueBySourceTotal: number;
+  reconciliation: { transactionDateRevenue: number; postingDateRevenue: number; delta: number; isReconciled: boolean };
+  totalTransactionsValid: number;
   enabledModules: { ppob: boolean; homeRental: boolean };
   salesTargetMonthly: number | null;
   salesTargetDaily: number | null;
@@ -101,6 +103,43 @@ const REVENUE_SOURCE_ROWS: { key: keyof OwnerDashboard["revenueBySource"]; label
   { key: "ppob", labelKey: "card.rowPpob", barClass: "bg-pink-400", subKey: "card.rowPpobSub", moduleKey: "ppob" },
   { key: "lainLain", labelKey: "card.rowLainLain", barClass: "bg-neutral-400" },
 ];
+
+/**
+ * Explains, instead of hiding, the legitimate gap between this dashboard's "Pendapatan Hari Ini"
+ * (transaction-date, orders.createdAt — same dataset as the Transactions page) and Laba Rugi's
+ * Total Pendapatan (posting/revenue-recognition-date, entryDate). Renders nothing when the two
+ * already agree for this period (reconciliation.isReconciled) — most outlets, most days, won't
+ * ever see this card since the gap only appears when a session/order spans midnight or a bill is
+ * amended after its creation day.
+ */
+function ReconciliationNote({ data }: { data: OwnerDashboard | null }) {
+  const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
+  if (!data || data.reconciliation.isReconciled) return null;
+  const { transactionDateRevenue, postingDateRevenue, delta } = data.reconciliation;
+  return (
+    <Card className="border-amber-400/20">
+      <h2 className="gm-heading font-semibold mb-2 flex items-center gap-2 text-amber-300">
+        <Sparkles size={14} /> {t("card.reconciliationTitle")}
+      </h2>
+      <p className="text-xs text-neutral-400 leading-relaxed">{t("card.reconciliationNote")}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 text-xs">
+        <div>
+          <div className="text-neutral-500">{t("card.reconciliationTxDate")}</div>
+          <div className="font-medium text-neutral-100 mt-0.5">{rupiah(transactionDateRevenue)}</div>
+        </div>
+        <div>
+          <div className="text-neutral-500">{t("card.reconciliationPostingDate")}</div>
+          <div className="font-medium text-neutral-100 mt-0.5">{rupiah(postingDateRevenue)}</div>
+        </div>
+        <div>
+          <div className="text-neutral-500">{t("card.reconciliationDelta")}</div>
+          <div className={`font-medium mt-0.5 ${delta >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{delta >= 0 ? "+" : ""}{rupiah(delta)}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 /** Horizontal-bar revenue-by-source breakdown — mirrors what the accounting engine (postings.ts)
  * actually routes each order item to today (rental split member/reguler, F&B, retail product,
@@ -233,11 +272,19 @@ export default function OwnerDashboardPage() {
         <StatCard label={t("stat.netProfitEst")} value={data ? rupiah(data.netProfit) : "—"} glow={data && data.netProfit < 0 ? "rose" : "emerald"} icon={data && data.netProfit < 0 ? TrendingDown : TrendingUp} />
       </div>
 
+      <ReconciliationNote data={data ?? null} />
+
       <RevenueBreakdownCard data={data ?? null} />
 
       <SectionTitle>{t("section.transactionsCustomers")}</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={t("stat.transactionCount")} value={data ? String(data.transactionsCount) : "—"} glow="cyan" icon={Receipt} />
+        <StatCard
+          label={t("stat.transactionCount")}
+          value={data ? String(data.transactionsCount) : "—"}
+          glow="cyan"
+          icon={Receipt}
+          sub={data ? `${t("stat.totalTransactionsValidSub")}: ${data.totalTransactionsValid}` : undefined}
+        />
         <StatCard label={t("stat.customersToday")} value={data ? String(data.customersServedTodayCount) : "—"} glow="blue" icon={Users} />
         <StatCard label={t("stat.newMembersToday")} value={data ? String(data.newMembersTodayCount) : "—"} glow="emerald" icon={UserPlus} />
         <StatCard label={t("stat.bookingsToday")} value={data ? String(data.bookingsTodayCount) : "—"} glow="purple" icon={CalendarClock} />
