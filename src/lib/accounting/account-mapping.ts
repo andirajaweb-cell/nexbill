@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db, type DbOrTx } from "@/db/client";
 import { accountMappings, accounts, cashBankAccounts } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getAccountIdByCode } from "./coa";
@@ -43,7 +43,14 @@ export function invalidateMappingCache(outletId: string) {
   mappingCache.delete(outletId);
 }
 
-export async function getMappedAccountId(outletId: string, module: MappingModule, transactionKey: string, fallbackCode: string): Promise<string> {
+/** `dbc` (Task #61): pass a caller's open `tx` through so this read joins that transaction instead of a separate implicit one; defaults to the plain top-level `db`. */
+export async function getMappedAccountId(
+  outletId: string,
+  module: MappingModule,
+  transactionKey: string,
+  fallbackCode: string,
+  dbc: DbOrTx = db
+): Promise<string> {
   const cacheKey = `${module}:${transactionKey.toLowerCase()}`;
   let outletCache = mappingCache.get(outletId);
   if (!outletCache) {
@@ -52,7 +59,7 @@ export async function getMappedAccountId(outletId: string, module: MappingModule
   }
   if (outletCache.has(cacheKey)) return outletCache.get(cacheKey)!;
 
-  const [row] = await db
+  const [row] = await dbc
     .select()
     .from(accountMappings)
     .where(
@@ -65,7 +72,7 @@ export async function getMappedAccountId(outletId: string, module: MappingModule
     )
     .limit(1);
 
-  const accountId = row ? row.accountId : await getAccountIdByCode(outletId, fallbackCode);
+  const accountId = row ? row.accountId : await getAccountIdByCode(outletId, fallbackCode, dbc);
   outletCache.set(cacheKey, accountId);
   return accountId;
 }
@@ -269,20 +276,20 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = { ...SHARED_PAYMENT_METHOD_
  * old lumped Bank account and are not retroactively migrated; only new
  * payments from now on route to the correct channel).
  */
-export async function getCashBankAccountIdForPaymentMethod(outletId: string, method: string): Promise<string> {
+export async function getCashBankAccountIdForPaymentMethod(outletId: string, method: string, dbc: DbOrTx = db): Promise<string> {
   const key = method.toLowerCase();
   const fallbackCode = PAYMENT_METHOD_FALLBACK_CODE[key] ?? "1121";
-  const accountId = await getMappedAccountId(outletId, "payment", key, fallbackCode);
+  const accountId = await getMappedAccountId(outletId, "payment", key, fallbackCode, dbc);
 
-  const [existing] = await db
+  const [existing] = await dbc
     .select()
     .from(cashBankAccounts)
     .where(and(eq(cashBankAccounts.outletId, outletId), eq(cashBankAccounts.accountId, accountId)))
     .limit(1);
   if (existing) return existing.id;
 
-  const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
-  const [inserted] = await db
+  const [account] = await dbc.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
+  const [inserted] = await dbc
     .insert(cashBankAccounts)
     .values({
       outletId,

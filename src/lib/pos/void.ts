@@ -24,28 +24,36 @@ async function assertCanReviewRequest(request: typeof approvalRequests.$inferSel
   }
 }
 
-/** Actually void a paid order: reverses its accounting journal(s), restocks items, marks payment refunded. */
+/**
+ * Actually void a paid order: reverses its accounting journal(s), restocks items, marks payment
+ * refunded. Atomic (Task #61): every journal reversal, every restock, and both status updates
+ * run inside one `db.transaction()` — previously a crash partway through (e.g. after the first
+ * of two journals was reversed but before items were restocked) could leave an order half-voided:
+ * revenue reversed on the books but stock still short, or vice versa.
+ */
 export async function executeVoidOrder(orderId: string, reason: string, staffUserId?: string) {
-  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-  if (!order) throw new Error("Order tidak ditemukan.");
-  if (order.status === "cancelled") throw new Error("Order sudah dibatalkan.");
+  return db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!order) throw new Error("Order tidak ditemukan.");
+    if (order.status === "cancelled") throw new Error("Order sudah dibatalkan.");
 
-  const relatedJournals = await db.select().from(journalEntries).where(and(eq(journalEntries.sourceId, orderId), eq(journalEntries.status, "posted")));
-  for (const j of relatedJournals) {
-    await voidJournal(j.id, reason);
-  }
+    const relatedJournals = await tx.select().from(journalEntries).where(and(eq(journalEntries.sourceId, orderId), eq(journalEntries.status, "posted")));
+    for (const j of relatedJournals) {
+      await voidJournal(j.id, reason, tx);
+    }
 
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-  for (const item of items) {
-    if (item.productId && item.kitchenStatus !== "cancelled") await restockForItem(item.productId, item.qty, orderId, "Void order");
-  }
+    const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+    for (const item of items) {
+      if (item.productId && item.kitchenStatus !== "cancelled") await restockForItem(item.productId, item.qty, orderId, "Void order", tx);
+    }
 
-  await db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, orderId));
-  await db.update(payments).set({ status: "refunded" }).where(eq(payments.orderId, orderId));
+    await tx.update(orders).set({ status: "cancelled" }).where(eq(orders.id, orderId));
+    await tx.update(payments).set({ status: "refunded" }).where(eq(payments.orderId, orderId));
 
-  await logAudit({ outletId: order.outletId, staffUserId, action: "void_order", entityType: "order", entityId: orderId, after: { reason } });
+    await logAudit({ outletId: order.outletId, staffUserId, action: "void_order", entityType: "order", entityId: orderId, after: { reason } });
 
-  return { orderId, journalsVoided: relatedJournals.length, itemsRestocked: items.length };
+    return { orderId, journalsVoided: relatedJournals.length, itemsRestocked: items.length };
+  });
 }
 
 /**
@@ -59,57 +67,76 @@ export async function executeVoidOrder(orderId: string, reason: string, staffUse
  * in which case that already happened once and doing it again would
  * double-count stock) so deleting a mistaken sale doesn't leave stock
  * permanently short.
+ *
+ * Atomic (Task #61): restock + every journal/line/payment/item/order delete run in one
+ * `db.transaction()` — a hard delete is destructive and irreversible by design (no reversing
+ * entry, unlike void/refund), so a partial failure here is worse than for any other flow: it
+ * could leave dangling journalLines with no parent entry, or an order deleted with its payments
+ * still on file.
  */
 export async function hardDeleteOrder(orderId: string, staffUserId: string) {
-  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-  if (!order) throw new Error("Order tidak ditemukan.");
+  return db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!order) throw new Error("Order tidak ditemukan.");
 
-  if (order.status !== "cancelled") {
-    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-    for (const item of items) {
-      if (item.productId && item.kitchenStatus !== "cancelled") await restockForItem(item.productId, item.qty, orderId, "Hapus transaksi (Owner)");
+    if (order.status !== "cancelled") {
+      const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+      for (const item of items) {
+        if (item.productId && item.kitchenStatus !== "cancelled") await restockForItem(item.productId, item.qty, orderId, "Hapus transaksi (Owner)", tx);
+      }
     }
-  }
 
-  const relatedJournals = await db.select().from(journalEntries).where(eq(journalEntries.sourceId, orderId));
-  for (const j of relatedJournals) {
-    await db.delete(journalLines).where(eq(journalLines.journalEntryId, j.id));
-  }
-  if (relatedJournals.length) {
-    await db.delete(journalEntries).where(eq(journalEntries.sourceId, orderId));
-  }
+    const relatedJournals = await tx.select().from(journalEntries).where(eq(journalEntries.sourceId, orderId));
+    for (const j of relatedJournals) {
+      await tx.delete(journalLines).where(eq(journalLines.journalEntryId, j.id));
+    }
+    if (relatedJournals.length) {
+      await tx.delete(journalEntries).where(eq(journalEntries.sourceId, orderId));
+    }
 
-  await db.delete(payments).where(eq(payments.orderId, orderId));
-  await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
-  await db.delete(orders).where(eq(orders.id, orderId));
+    await tx.delete(payments).where(eq(payments.orderId, orderId));
+    await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    await tx.delete(orders).where(eq(orders.id, orderId));
 
-  await logAudit({ outletId: order.outletId, staffUserId, action: "delete_order", entityType: "order", entityId: orderId, before: order });
+    await logAudit({ outletId: order.outletId, staffUserId, action: "delete_order", entityType: "order", entityId: orderId, before: order });
 
-  return { orderId, journalsDeleted: relatedJournals.length };
+    return { orderId, journalsDeleted: relatedJournals.length };
+  });
 }
 
 /**
  * Void a single line item on a bill (e.g. a wrong F&B order) without touching the
  * rest of the bill — restocks the item and recomputes the order's totals. Only
  * valid before the bill is fully paid (use executeRefundOrder for a paid bill).
+ *
+ * Atomic (Task #61): the restock + item status update run in one `db.transaction()`.
+ * recomputeBillTotals runs after that transaction commits (it's a separate, self-contained
+ * read-then-write over the order/orderItems it recomputes, not part of the void itself) — if it
+ * throws, the void has already durably happened and the item is correctly marked cancelled and
+ * restocked; only the order's cached totals would need a manual recompute, which is a much
+ * smaller and more recoverable gap than the item silently coming back un-void.
  */
 export async function executeVoidItem(orderItemId: string, reason: string, staffUserId?: string) {
-  const [item] = await db.select().from(orderItems).where(eq(orderItems.id, orderItemId)).limit(1);
-  if (!item) throw new Error("Item tidak ditemukan.");
-  if (item.kitchenStatus === "cancelled") throw new Error("Item sudah dibatalkan.");
+  const { item, order } = await db.transaction(async (tx) => {
+    const [item] = await tx.select().from(orderItems).where(eq(orderItems.id, orderItemId)).limit(1);
+    if (!item) throw new Error("Item tidak ditemukan.");
+    if (item.kitchenStatus === "cancelled") throw new Error("Item sudah dibatalkan.");
 
-  const [order] = await db.select().from(orders).where(eq(orders.id, item.orderId)).limit(1);
-  if (!order) throw new Error("Order tidak ditemukan.");
-  if (order.status === "paid") throw new Error("Bill sudah lunas — gunakan refund, bukan void item.");
-  if (order.status === "cancelled") throw new Error("Order sudah dibatalkan.");
-  if (item.itemType === "rental") throw new Error("Item biaya rental tidak bisa di-void sendiri — void seluruh order jika perlu.");
+    const [order] = await tx.select().from(orders).where(eq(orders.id, item.orderId)).limit(1);
+    if (!order) throw new Error("Order tidak ditemukan.");
+    if (order.status === "paid") throw new Error("Bill sudah lunas — gunakan refund, bukan void item.");
+    if (order.status === "cancelled") throw new Error("Order sudah dibatalkan.");
+    if (item.itemType === "rental") throw new Error("Item biaya rental tidak bisa di-void sendiri — void seluruh order jika perlu.");
 
-  if (item.productId) await restockForItem(item.productId, item.qty, item.orderId, "Void item");
+    if (item.productId) await restockForItem(item.productId, item.qty, item.orderId, "Void item", tx);
 
-  await db
-    .update(orderItems)
-    .set({ kitchenStatus: "cancelled", cancelReason: reason, voidedBy: staffUserId, voidedAt: new Date().toISOString() })
-    .where(eq(orderItems.id, orderItemId));
+    await tx
+      .update(orderItems)
+      .set({ kitchenStatus: "cancelled", cancelReason: reason, voidedBy: staffUserId, voidedAt: new Date().toISOString() })
+      .where(eq(orderItems.id, orderItemId));
+
+    return { item, order };
+  });
 
   const updatedOrder = await recomputeBillTotals(item.orderId);
 

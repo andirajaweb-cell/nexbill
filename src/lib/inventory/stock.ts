@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db, type DbOrTx } from "@/db/client";
 import { products, stockMovements, recipes, recipeIngredients } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
@@ -8,15 +8,17 @@ import { eq, sql } from "drizzle-orm";
  * time via computeItemCogs), otherwise deducts the product's own stock
  * directly. Shared by the standalone POS order flow and the unified rental
  * bill's mid-session F&B additions so both go through identical stock logic.
+ * `dbc` (Task #61): pass a caller's open `tx` so the stock movement + qty update join that
+ * caller's transaction (e.g. a void/refund that must not partially restock across a crash).
  */
-export async function deductStockForItem(productId: string, qty: number, orderId: string, staffUserId?: string) {
-  const [recipe] = await db.select().from(recipes).where(eq(recipes.productId, productId)).limit(1);
+export async function deductStockForItem(productId: string, qty: number, orderId: string, staffUserId?: string, dbc: DbOrTx = db) {
+  const [recipe] = await dbc.select().from(recipes).where(eq(recipes.productId, productId)).limit(1);
 
   if (recipe) {
-    const ingredients = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
+    const ingredients = await dbc.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
     for (const ing of ingredients) {
       const deductQty = Math.round(((ing.qtyPerYield * qty) / Math.max(1, recipe.yieldQty)) * 100) / 100;
-      await db.insert(stockMovements).values({
+      await dbc.insert(stockMovements).values({
         productId: ing.ingredientProductId,
         type: "sale_out",
         qty: -Math.abs(deductQty),
@@ -24,7 +26,7 @@ export async function deductStockForItem(productId: string, qty: number, orderId
         refOrderId: orderId,
         staffUserId,
       });
-      await db
+      await dbc
         .update(products)
         .set({ stockQty: sql`${products.stockQty} - ${deductQty}` })
         .where(eq(products.id, ing.ingredientProductId));
@@ -32,8 +34,8 @@ export async function deductStockForItem(productId: string, qty: number, orderId
     return;
   }
 
-  await db.insert(stockMovements).values({ productId, type: "sale_out", qty: -Math.abs(qty), refOrderId: orderId, staffUserId });
-  await db
+  await dbc.insert(stockMovements).values({ productId, type: "sale_out", qty: -Math.abs(qty), refOrderId: orderId, staffUserId });
+  await dbc
     .update(products)
     .set({ stockQty: sql`${products.stockQty} - ${qty}` })
     .where(eq(products.id, productId));
@@ -72,22 +74,23 @@ export async function receiveStockForItem(
   return { newCostPrice };
 }
 
-/** Reverse a stock deduction (used by item-level void and bill-level void/refund). */
-export async function restockForItem(productId: string, qty: number, orderId: string, note = "Void/refund item") {
-  const [recipe] = await db.select().from(recipes).where(eq(recipes.productId, productId)).limit(1);
+/** Reverse a stock deduction (used by item-level void and bill-level void/refund). `dbc` (Task
+ * #61): same tx-or-db pass-through as deductStockForItem above. */
+export async function restockForItem(productId: string, qty: number, orderId: string, note = "Void/refund item", dbc: DbOrTx = db) {
+  const [recipe] = await dbc.select().from(recipes).where(eq(recipes.productId, productId)).limit(1);
 
   if (recipe) {
-    const ingredients = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
+    const ingredients = await dbc.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
     for (const ing of ingredients) {
       const restoreQty = Math.round(((ing.qtyPerYield * qty) / Math.max(1, recipe.yieldQty)) * 100) / 100;
-      await db.insert(stockMovements).values({
+      await dbc.insert(stockMovements).values({
         productId: ing.ingredientProductId,
         type: "adjustment",
         qty: restoreQty,
         note: `${note} (order ${orderId.slice(0, 8)}) — kembalikan bahan baku`,
         refOrderId: orderId,
       });
-      await db
+      await dbc
         .update(products)
         .set({ stockQty: sql`${products.stockQty} + ${restoreQty}` })
         .where(eq(products.id, ing.ingredientProductId));
@@ -95,8 +98,8 @@ export async function restockForItem(productId: string, qty: number, orderId: st
     return;
   }
 
-  await db.insert(stockMovements).values({ productId, type: "adjustment", qty, note: `${note} (order ${orderId.slice(0, 8)})`, refOrderId: orderId });
-  await db
+  await dbc.insert(stockMovements).values({ productId, type: "adjustment", qty, note: `${note} (order ${orderId.slice(0, 8)})`, refOrderId: orderId });
+  await dbc
     .update(products)
     .set({ stockQty: sql`${products.stockQty} + ${qty}` })
     .where(eq(products.id, productId));

@@ -44,3 +44,17 @@ const client = postgres(connectionString, { max: 10, prepare: false });
 
 export const db = drizzle(client, { schema });
 export type DB = typeof db;
+
+/**
+ * The type drizzle-orm/postgres-js hands a `db.transaction(async (tx) => ...)` callback — it
+ * supports the exact same `.select/.insert/.update/.delete` query-builder surface as `db` itself,
+ * so any function written to accept "either `db` or a `tx`" can be called standalone (atomic on
+ * its own, via its own internal `db.transaction()`) or nested inside a caller's larger transaction
+ * (atomic together with everything else the caller does) without any code duplication. See the
+ * `dbc: DbOrTx = db` parameter pattern in accounting/journal.ts, accounting/coa.ts,
+ * accounting/account-mapping.ts, and accounting/postings.ts — part of Task #61 (wrapping
+ * multi-step accounting writes in DB transactions so invoice/payment/inventory/journal never end
+ * up half-applied).
+ */
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type DbOrTx = DB | Tx;

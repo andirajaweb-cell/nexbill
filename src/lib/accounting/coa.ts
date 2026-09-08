@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db, type DbOrTx } from "@/db/client";
 import { accounts, cashBankAccounts, depositBalanceChannels } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { type AccountType, type CoaDef, DEFAULT_COA } from "./coa-data";
@@ -241,7 +241,13 @@ export function invalidateAccountCache(outletId: string) {
   codeCache.delete(outletId);
 }
 
-export async function getAccountIdByCode(outletId: string, code: string): Promise<string> {
+/**
+ * `dbc` lets a caller that's already inside a `db.transaction(async (tx) => ...)` (see Task #61 —
+ * postJournal, postSalesJournal, etc.) pass that `tx` through so this read participates in the
+ * same transaction instead of opening a separate implicit one; defaults to the plain top-level
+ * `db` for the (still very common) case of calling this standalone.
+ */
+export async function getAccountIdByCode(outletId: string, code: string, dbc: DbOrTx = db): Promise<string> {
   let outletCache = codeCache.get(outletId);
   if (!outletCache) {
     outletCache = new Map();
@@ -249,18 +255,18 @@ export async function getAccountIdByCode(outletId: string, code: string): Promis
   }
   if (outletCache.has(code)) return outletCache.get(code)!;
 
-  const [row] = await db.select().from(accounts).where(and(eq(accounts.outletId, outletId), eq(accounts.code, code))).limit(1);
+  const [row] = await dbc.select().from(accounts).where(and(eq(accounts.outletId, outletId), eq(accounts.code, code))).limit(1);
   if (!row) throw new Error(`Akun COA dengan kode ${code} tidak ditemukan untuk outlet ${outletId}. Jalankan seedChartOfAccounts dulu.`);
   if (!row.isPostingAllowed) throw new Error(`Akun "${row.name}" (${code}) adalah akun Header — tidak bisa menerima jurnal langsung. Gunakan salah satu akun turunannya.`);
   outletCache.set(code, row.id);
   return row.id;
 }
 
-/** Bulk header-posting guard used by postJournal for lines that resolve via a raw accountId (bypassing getAccountIdByCode's own check above). */
-export async function assertPostableAccountIds(accountIds: string[]) {
+/** Bulk header-posting guard used by postJournal for lines that resolve via a raw accountId (bypassing getAccountIdByCode's own check above). Accepts the same optional `dbc` (tx-or-db) as getAccountIdByCode. */
+export async function assertPostableAccountIds(accountIds: string[], dbc: DbOrTx = db) {
   const uniqueIds = [...new Set(accountIds)];
   if (uniqueIds.length === 0) return;
-  const rows = await db.select().from(accounts).where(inArray(accounts.id, uniqueIds));
+  const rows = await dbc.select().from(accounts).where(inArray(accounts.id, uniqueIds));
   for (const row of rows) {
     if (!row.isPostingAllowed) throw new Error(`Akun "${row.name}" (${row.code}) adalah akun Header — tidak bisa menerima jurnal langsung.`);
   }

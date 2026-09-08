@@ -15,37 +15,44 @@ import { logAudit } from "@/lib/audit/log";
  * already-paid bill aren't supported since the posted sales journal can't be
  * split after the fact without re-deriving per-account amounts; void the
  * specific item instead if the bill hasn't been paid yet.
+ *
+ * Atomic (Task #61): every journal reversal, every restock, and both status updates run inside
+ * one `db.transaction()` — same reasoning as executeVoidOrder in void.ts: a refund is a
+ * multi-part operation (reverse revenue, put stock back, mark payments refunded, cancel the
+ * order) that must never be left half-applied by a crash partway through.
  */
 export async function executeRefundOrder(orderId: string, reason: string, staffUserId?: string) {
-  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-  if (!order) throw new Error("Order tidak ditemukan.");
-  if (order.status === "cancelled") throw new Error("Order sudah dibatalkan/direfund.");
-  if (order.status === "open" || order.status === "awaiting_payment") {
-    throw new Error("Bill ini belum ada pembayaran yang berhasil — gunakan void, bukan refund.");
-  }
-
-  const relatedJournals = await db.select().from(journalEntries).where(and(eq(journalEntries.sourceId, orderId), eq(journalEntries.status, "posted")));
-  for (const j of relatedJournals) {
-    await voidJournal(j.id, `Refund: ${reason}`);
-  }
-
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-  let itemsRestocked = 0;
-  for (const item of items) {
-    if (item.productId && item.kitchenStatus !== "cancelled") {
-      await restockForItem(item.productId, item.qty, orderId, "Refund order");
-      itemsRestocked++;
+  return db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!order) throw new Error("Order tidak ditemukan.");
+    if (order.status === "cancelled") throw new Error("Order sudah dibatalkan/direfund.");
+    if (order.status === "open" || order.status === "awaiting_payment") {
+      throw new Error("Bill ini belum ada pembayaran yang berhasil — gunakan void, bukan refund.");
     }
-  }
 
-  const successPayments = await db.select().from(payments).where(and(eq(payments.orderId, orderId), eq(payments.status, "success")));
-  await db.update(payments).set({ status: "refunded" }).where(eq(payments.orderId, orderId));
+    const relatedJournals = await tx.select().from(journalEntries).where(and(eq(journalEntries.sourceId, orderId), eq(journalEntries.status, "posted")));
+    for (const j of relatedJournals) {
+      await voidJournal(j.id, `Refund: ${reason}`, tx);
+    }
 
-  await db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, orderId));
+    const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+    let itemsRestocked = 0;
+    for (const item of items) {
+      if (item.productId && item.kitchenStatus !== "cancelled") {
+        await restockForItem(item.productId, item.qty, orderId, "Refund order", tx);
+        itemsRestocked++;
+      }
+    }
 
-  await logAudit({ outletId: order.outletId, staffUserId, action: "refund_order", entityType: "order", entityId: orderId, after: { reason } });
+    const successPayments = await tx.select().from(payments).where(and(eq(payments.orderId, orderId), eq(payments.status, "success")));
+    await tx.update(payments).set({ status: "refunded" }).where(eq(payments.orderId, orderId));
 
-  return { orderId, journalsVoided: relatedJournals.length, itemsRestocked, paymentsRefunded: successPayments.length, amountRefunded: successPayments.reduce((s, p) => s + p.amount, 0) };
+    await tx.update(orders).set({ status: "cancelled" }).where(eq(orders.id, orderId));
+
+    await logAudit({ outletId: order.outletId, staffUserId, action: "refund_order", entityType: "order", entityId: orderId, after: { reason } });
+
+    return { orderId, journalsVoided: relatedJournals.length, itemsRestocked, paymentsRefunded: successPayments.length, amountRefunded: successPayments.reduce((s, p) => s + p.amount, 0) };
+  });
 }
 
 /** Same approval-gate pattern as void: refund_order permission lets owner/manager execute immediately, everyone else needs approval. */
