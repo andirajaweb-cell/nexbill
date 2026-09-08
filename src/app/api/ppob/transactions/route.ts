@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
       category: body.category,
       product: body.product,
       serviceRef: body.serviceRef ?? null,
+      providerRef: body.providerRef ?? null,
       customerId: body.customerId ?? null,
       customerName: body.customerName ?? null,
       nominal: Number(body.nominal),
@@ -69,6 +70,10 @@ export async function POST(req: NextRequest) {
       staffUserId: session.sub,
       shiftId: currentShift?.id ?? null,
       notes: body.notes ?? null,
+      // Client generates this once per form-open and resends it unchanged on retry — see
+      // postPpobTransaction's idempotency doc comment. Optional: a caller that never sends one
+      // (e.g. an older client build) simply gets no dedup protection, same as before this feature.
+      idempotencyKey: body.idempotencyKey ?? null,
     });
     return NextResponse.json(result);
   } catch (err: unknown) {

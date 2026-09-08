@@ -729,25 +729,69 @@ export const ppobTransactions = pgTable("ppob_transactions", {
   }).notNull(),
   product: text("product").notNull(),
   serviceRef: text("service_ref"),
+  // External reference from the provider (Fastpay trx_id, etc.) — distinct from serviceRef, which
+  // is the CUSTOMER's identifier (phone number/ID pelanggan), not the provider's transaction id.
+  // Nullable: today's manual-entry flow has no live provider API call to return one; a future
+  // webhook/H2H-driven flow fills this in, and idempotencyKey (below) is what actually protects
+  // against double-processing regardless of whether this is present.
+  providerRef: text("provider_ref"),
   customerId: text("customer_id").references(() => customers.id),
   customerName: text("customer_name"),
   nominal: doublePrecision("nominal").notNull().default(0),
   modal: doublePrecision("modal").notNull().default(0),
   providerFee: doublePrecision("provider_fee").notNull().default(0),
+  // Pass-through/third-party accounting principle (see buildPpobCollectionLines in lib/ppob/
+  // engine.ts): the customer's payment has two economically distinct components —
+  //   principal (modal + providerFee) — money that belongs to the provider, NOT NexBill revenue.
+  //     Held as a liability (PPOB Provider Payable, COA 2121) from collection until settlement.
+  //   feeAdmin (this column, aka "Admin Fee" / margin) — the ONLY component that is NexBill's own
+  //     revenue. This is the sole figure that reaches Profit & Loss for PPOB.
+  // Stored explicitly (not just derived at read-time) so historical rows keep their exact booked
+  // figures even if the modal/providerFee/principal relationship is refined later.
   feeAdmin: doublePrecision("fee_admin").notNull().default(0),
+  // = modal + providerFee at the time of posting — the exact amount credited to PPOB Provider
+  // Payable at collection and debited back out of it at settlement. Stored (not computed on the
+  // fly) so a later change to how principal is derived can never retroactively shift what a
+  // historical transaction's payable/settlement journals actually booked.
+  principal: doublePrecision("principal").notNull().default(0),
   uangMasuk: doublePrecision("uang_masuk").notNull().default(0),
+  // Settlement: whether/when the principal payable above has actually been paid out to the
+  // provider. Today's flow auto-settles in the same operation as collection (see
+  // postPpobTransaction) since this app has no deferred provider settlement cycle yet — but the
+  // field exists so a future batched/webhook-driven settlement flow can post it separately, and so
+  // reports can always show "how much is still owed to the provider" (settlementStatus=pending)
+  // distinctly from "how much has already been paid" (settled).
+  settlementStatus: text("settlement_status", { enum: ["pending", "settled"] }).notNull().default("pending"),
+  settlementAmount: doublePrecision("settlement_amount").notNull().default(0),
+  settledAt: text("settled_at"),
+  settlementJournalEntryId: text("settlement_journal_entry_id"),
+  // Snapshot of the receiving account's channel name at posting time (Cash/Bank/QRIS/Fastpay
+  // Gateway/etc.) — see paymentMethodSnapshot() in lib/ppob/engine.ts. Snapshotted rather than
+  // joined live so a PPOB report never shows a different payment method for an old transaction
+  // just because someone renamed/repurposed a cashBankAccounts row afterward.
+  paymentMethod: text("payment_method"),
   fundingCashBankAccountId: text("funding_cash_bank_account_id").notNull().references(() => cashBankAccounts.id),
   receivingCashBankAccountId: text("receiving_cash_bank_account_id").notNull().references(() => cashBankAccounts.id),
   staffUserId: text("staff_user_id").references(() => staffUsers.id),
   shiftId: text("shift_id"),
   status: text("status", { enum: ["success", "reversed"] }).notNull().default("success"),
+  // The transaction's current COLLECTION journal (Dr Cash/Bank, Cr PPOB Payable + Cr Admin Fee
+  // Revenue) — settlementJournalEntryId above is the separate Dr Payable/Cr Cash-Bank entry.
   journalEntryId: text("journal_entry_id"),
+  // Dedupes retried inserts (double form-submit, or a future webhook redelivering the same event)
+  // so neither a duplicate row nor a duplicate pair of journal entries can ever be created for the
+  // same underlying transaction — see findOrCreateIdempotent() in lib/ppob/engine.ts. Nullable +
+  // unique: legacy rows before this column existed simply have no key and never collide.
+  idempotencyKey: text("idempotency_key"),
   notes: text("notes"),
   reversedReason: text("reversed_reason"),
   reversedAt: text("reversed_at"),
   ...timestamps,
 },
-  (t) => [index("ppob_transactions_outlet_created_idx").on(t.outletId, t.createdAt)]
+  (t) => [
+    index("ppob_transactions_outlet_created_idx").on(t.outletId, t.createdAt),
+    uniqueIndex("ppob_transactions_idempotency_key_idx").on(t.idempotencyKey),
+  ]
 );
 
 export const ppobPriceRules = pgTable("ppob_price_rules", {

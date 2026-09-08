@@ -28,7 +28,7 @@ function dashboardRevenueBucket(code: string): "rentalReguler" | "rentalMember" 
   if (code.startsWith("435") || code === "4530") return "addon"; // non-member (4351-4354) + member (4530) add-on rental
   if (code.startsWith("42") || code === "4510") return "fnb"; // base F&B (42xx) + member F&B (4510)
   if ((code.startsWith("43") && !code.startsWith("435")) || code === "4520") return "produk"; // retail merchandise/accessory (43xx excl. 435x) + member product (4520)
-  if (code.startsWith("44")) return "ppob"; // PPOB revenue == providerFee + feeAdmin, per buildPpobJournalLines in lib/ppob/engine.ts
+  if (code.startsWith("44")) return "ppob"; // PPOB revenue = Admin Fee/Margin ONLY (pass-through principal never posts here) — see buildPpobCollectionLines in lib/ppob/engine.ts
   if (code.startsWith("46")) return "lainLain"; // service charge/tax/misc catch-all (postSalesJournal uses 4650)
   if (code.startsWith("48")) return "homeRental"; // Home Rental (Sewa Dibawa Pulang) — a fully separate module, doesn't come from orders/orderItems at all
   return "other"; // 47xx Other Income (its own dashboard), 49xx Contra Revenue (discount — netted into lainLain separately, see below)

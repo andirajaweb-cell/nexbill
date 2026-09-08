@@ -94,12 +94,14 @@ export async function getRequiredBalanceChannels(shiftId: string): Promise<{ cha
  * closeShift()'s cashIn/cashOut/expectedCash before this: a normal PPOB purchase pays for itself
  * out of the outlet's Fastpay saldo while the customer's cash payment (uangMasuk) lands IN the
  * drawer; "tarik tunai" (cash withdrawal) does the reverse — cash goes OUT to the customer
- * (modal+providerFee, matching the journal in buildPpobJournalLines) while the Fastpay saldo is
- * credited back. Funding/receiving accounts are freely chosen per-transaction (not fixed by
- * category), so this checks each transaction's actual accounts rather than assuming "tarik
- * tunai" always means cash-out. When funding and receiving are the SAME account, no cash
- * physically moves (see engine.ts's collapsed-journal comment), so that case contributes to
- * neither side. Shared by closeShift (live) and getShiftDetail (history/PDF, recomputed on read).
+ * (principal = modal+providerFee, matching the settlement journal in buildPpobSettlementLines)
+ * while the Fastpay saldo is credited back. This is purely a physical cash-movement tracker —
+ * unaffected by which GL accounts the pass-through accounting model (see engine.ts) books the
+ * transaction to; the cash in the drawer moves the same way regardless. Funding/receiving accounts
+ * are freely chosen per-transaction (not fixed by category), so this checks each transaction's
+ * actual accounts rather than assuming "tarik tunai" always means cash-out. When funding and
+ * receiving are the SAME account, no cash physically moves, so that case contributes to neither
+ * side. Shared by closeShift (live) and getShiftDetail (history/PDF, recomputed on read).
  */
 async function computePpobCashEffect(shiftId: string): Promise<{ ppobCashIn: number; ppobCashOut: number }> {
   const shiftPpobTransactions = await db
@@ -114,7 +116,7 @@ async function computePpobCashEffect(shiftId: string): Promise<{ ppobCashIn: num
   for (const p of shiftPpobTransactions) {
     if (p.fundingCashBankAccountId === p.receivingCashBankAccountId) continue;
     if (ppobAccountTypeById.get(p.receivingCashBankAccountId) === "cash") ppobCashIn += p.uangMasuk;
-    if (ppobAccountTypeById.get(p.fundingCashBankAccountId) === "cash") ppobCashOut += p.modal + p.providerFee;
+    if (ppobAccountTypeById.get(p.fundingCashBankAccountId) === "cash") ppobCashOut += p.principal;
   }
   return { ppobCashIn, ppobCashOut };
 }

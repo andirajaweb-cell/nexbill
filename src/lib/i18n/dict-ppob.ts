@@ -129,10 +129,12 @@ registerDict({
   "ppob.col.ref": { id: "Ref", en: "Ref", ms: "Ref", th: "อ้างอิง", fil: "Ref", vi: "Ref" },
   "ppob.col.nominal": { id: "Nominal", en: "Amount", ms: "Nominal", th: "จำนวนเงิน", fil: "Halaga", vi: "Số tiền" },
   "ppob.col.modal": { id: "Modal", en: "Cost", ms: "Modal", th: "ต้นทุน", fil: "Puhunan", vi: "Vốn" },
-  "ppob.col.providerFee": { id: "Biaya Fastpay", en: "Fastpay Fee", ms: "Fi Fastpay", th: "ค่าธรรมเนียม Fastpay", fil: "Bayad sa Fastpay", vi: "Phí Fastpay" },
-  "ppob.col.margin": { id: "Margin", en: "Margin", ms: "Margin", th: "มาร์จิ้น", fil: "Margin", vi: "Biên lợi nhuận" },
+  "ppob.col.providerFee": { id: "Biaya Provider", en: "Provider Fee", ms: "Fi Pembekal", th: "ค่าธรรมเนียมผู้ให้บริการ", fil: "Bayad sa Provider", vi: "Phí nhà cung cấp" },
+  "ppob.col.principal": { id: "Payable (Pokok)", en: "Payable (Principal)", ms: "Belum Bayar (Prinsipal)", th: "เจ้าหนี้ (เงินต้น)", fil: "Payable (Principal)", vi: "Phải trả (Gốc)" },
+  "ppob.col.margin": { id: "Admin Fee/Margin", en: "Admin Fee/Margin", ms: "Fi Admin/Margin", th: "ค่าธรรมเนียม/มาร์จิ้น", fil: "Admin Fee/Margin", vi: "Phí quản lý/Biên lợi nhuận" },
   "ppob.col.uangMasuk": { id: "Uang Masuk", en: "Cash In", ms: "Wang Masuk", th: "เงินเข้า", fil: "Papasok na Pera", vi: "Tiền thu vào" },
   "ppob.col.account": { id: "Akun", en: "Account", ms: "Akaun", th: "บัญชี", fil: "Account", vi: "Tài khoản" },
+  "ppob.col.settlement": { id: "Settlement", en: "Settlement", ms: "Penyelesaian", th: "การชำระบัญชี", fil: "Settlement", vi: "Quyết toán" },
   "ppob.col.status": { id: "Status", en: "Status", ms: "Status", th: "สถานะ", fil: "Status", vi: "Trạng thái" },
   "ppob.col.action": { id: "Aksi", en: "Action", ms: "Tindakan", th: "การดำเนินการ", fil: "Aksyon", vi: "Thao tác" },
   "ppob.noTransactions": { id: "Belum ada transaksi PPOB pada periode ini.", en: "No PPOB transactions in this period yet.", ms: "Belum ada transaksi PPOB dalam tempoh ini.", th: "ยังไม่มีธุรกรรม PPOB ในช่วงเวลานี้", fil: "Wala pang transaksyon ng PPOB sa panahong ito.", vi: "Chưa có giao dịch PPOB nào trong khoảng thời gian này." },
@@ -140,11 +142,23 @@ registerDict({
   // --- Status badges ---
   "ppob.status.success": { id: "Sukses", en: "Success", ms: "Berjaya", th: "สำเร็จ", fil: "Matagumpay", vi: "Thành công" },
   "ppob.status.reversed": { id: "Reversed", en: "Reversed", ms: "Dibatalkan", th: "ยกเลิกแล้ว", fil: "Na-reverse", vi: "Đã hủy" },
+  "ppob.settlement.settled": { id: "Settled", en: "Settled", ms: "Selesai", th: "ชำระแล้ว", fil: "Settled", vi: "Đã quyết toán" },
+  "ppob.settlement.pending": { id: "Pending", en: "Pending", ms: "Tertunda", th: "รอดำเนินการ", fil: "Pending", vi: "Đang chờ" },
 
   // --- Summary cards ---
   "ppob.summary.saldoFastpay": { id: "Saldo Deposit Fastpay", en: "Fastpay Deposit Balance", ms: "Baki Deposit Fastpay", th: "ยอดเงินฝาก Fastpay", fil: "Balanse ng Deposit sa Fastpay", vi: "Số dư ký quỹ Fastpay" },
   "ppob.summary.transactionsPeriod": { id: "Transaksi (periode ini)", en: "Transactions (this period)", ms: "Transaksi (tempoh ini)", th: "ธุรกรรม (ช่วงเวลานี้)", fil: "Transaksyon (sa panahong ito)", vi: "Giao dịch (trong kỳ này)" },
+  "ppob.summary.totalNominal": { id: "Total Nominal PPOB (Pihak Ketiga)", en: "Total PPOB Amount (Third-Party)", ms: "Jumlah Nominal PPOB (Pihak Ketiga)", th: "ยอดรวม PPOB (บุคคลที่สาม)", fil: "Kabuuang Nominal PPOB (Third-Party)", vi: "Tổng giá trị PPOB (Bên thứ ba)" },
+  "ppob.summary.totalNominalNote": { id: "Nilai transaksi provider — bukan revenue NexBill", en: "Provider transaction value — not NexBill revenue", ms: "Nilai transaksi pembekal — bukan hasil NexBill", th: "มูลค่าธุรกรรมของผู้ให้บริการ — ไม่ใช่รายได้ NexBill", fil: "Halaga ng transaksyon ng provider — hindi revenue ng NexBill", vi: "Giá trị giao dịch của nhà cung cấp — không phải doanh thu NexBill" },
   "ppob.summary.providerFeeExpense": { id: "Beban Biaya Fastpay", en: "Fastpay Fee Expense", ms: "Perbelanjaan Fi Fastpay", th: "ค่าใช้จ่ายค่าธรรมเนียม Fastpay", fil: "Gastos sa Bayad ng Fastpay", vi: "Chi phí phí Fastpay" },
-  "ppob.summary.marginNetProfit": { id: "Margin (Keuntungan Bersih)", en: "Margin (Net Profit)", ms: "Margin (Untung Bersih)", th: "มาร์จิ้น (กำไรสุทธิ)", fil: "Margin (Net Profit)", vi: "Biên lợi nhuận (Lợi nhuận ròng)" },
+  "ppob.summary.marginNetProfit": { id: "Admin Fee/Margin (Revenue NexBill)", en: "Admin Fee/Margin (NexBill Revenue)", ms: "Fi Admin/Margin (Hasil NexBill)", th: "ค่าธรรมเนียม/มาร์จิ้น (รายได้ NexBill)", fil: "Admin Fee/Margin (Revenue ng NexBill)", vi: "Phí quản lý/Biên lợi nhuận (Doanh thu NexBill)" },
+  "ppob.summary.marginNote": { id: "Satu-satunya komponen PPOB yang masuk Laba Rugi", en: "The only PPOB component that flows into Profit & Loss", ms: "Satu-satunya komponen PPOB yang masuk Untung Rugi", th: "องค์ประกอบ PPOB เดียวที่เข้าสู่งบกำไรขาดทุน", fil: "Ang tanging bahagi ng PPOB na pumapasok sa Profit & Loss", vi: "Thành phần PPOB duy nhất đi vào báo cáo Lãi Lỗ" },
+  "ppob.summary.totalPrincipalPayable": { id: "Total Nominal Pokok (Payable/Clearing)", en: "Total Principal (Payable/Clearing)", ms: "Jumlah Prinsipal (Belum Bayar/Kliring)", th: "เงินต้นรวม (เจ้าหนี้/บัญชีพัก)", fil: "Kabuuang Principal (Payable/Clearing)", vi: "Tổng gốc (Phải trả/Trung gian)" },
+  "ppob.summary.totalPrincipalNote": { id: "= Modal + Biaya Provider — dana titipan, bukan beban/revenue", en: "= Cost + Provider Fee — held funds, not an expense or revenue", ms: "= Modal + Fi Pembekal — dana pegangan, bukan perbelanjaan/hasil", th: "= ต้นทุน + ค่าธรรมเนียมผู้ให้บริการ — เงินฝาก ไม่ใช่ค่าใช้จ่าย/รายได้", fil: "= Puhunan + Bayad sa Provider — pondong hawak, hindi gastos/revenue", vi: "= Vốn + Phí nhà cung cấp — tiền giữ hộ, không phải chi phí/doanh thu" },
+  "ppob.summary.totalSettlement": { id: "Total Settlement ke Provider", en: "Total Settled to Provider", ms: "Jumlah Diselesaikan kepada Pembekal", th: "ยอดชำระให้ผู้ให้บริการรวม", fil: "Kabuuang Naisettle sa Provider", vi: "Tổng đã quyết toán cho nhà cung cấp" },
+  "ppob.summary.totalOutstandingPayable": { id: "Belum Disettle (Outstanding Payable)", en: "Not Yet Settled (Outstanding Payable)", ms: "Belum Diselesaikan (Belum Bayar Tertunggak)", th: "ยังไม่ชำระ (เจ้าหนี้คงค้าง)", fil: "Hindi Pa Naisettle (Outstanding Payable)", vi: "Chưa quyết toán (Còn phải trả)" },
   "ppob.summary.categoryLine": { id: "{count}x · {amount} margin", en: "{count}x · {amount} margin", ms: "{count}x · {amount} margin", th: "{count} ครั้ง · มาร์จิ้น {amount}", fil: "{count}x · {amount} margin", vi: "{count} lần · lợi nhuận {amount}" },
+
+  // --- Entry form: provider reference ---
+  "ppob.entryForm.providerRefPlaceholder": { id: "Ref. Provider (opsional, mis. Trx ID Fastpay)", en: "Provider Ref (optional, e.g. Fastpay Trx ID)", ms: "Ref. Pembekal (opsyenal, cth. Trx ID Fastpay)", th: "อ้างอิงผู้ให้บริการ (ไม่บังคับ เช่น Trx ID Fastpay)", fil: "Ref. Provider (opsyonal, hal. Trx ID Fastpay)", vi: "Mã tham chiếu nhà cung cấp (tùy chọn, vd. Trx ID Fastpay)" },
 });

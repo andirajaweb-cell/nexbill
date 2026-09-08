@@ -128,13 +128,23 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "addon", transactionKey: "vr", accountCode: "4353", label: "Add-on — VR (opsional, tidak dipakai default)" },
   { module: "addon", transactionKey: "member", accountCode: "4530", label: "Add-on — Member" },
   { module: "product", transactionKey: "inventory", accountCode: "1161", label: "Inventory F&B" },
-  { module: "ppob", transactionKey: "pulsa", accountCode: "4410", label: "PPOB Pulsa" },
-  { module: "ppob", transactionKey: "token_listrik", accountCode: "4430", label: "PPOB Token Listrik (PLN)" },
-  { module: "ppob", transactionKey: "ewallet_topup", accountCode: "4460", label: "PPOB Top-up E-Wallet" },
-  { module: "ppob", transactionKey: "transfer", accountCode: "4480", label: "PPOB Transfer" },
-  { module: "ppob", transactionKey: "tarik_tunai", accountCode: "4480", label: "PPOB Tarik Tunai" },
-  { module: "ppob", transactionKey: "lainnya", accountCode: "4480", label: "PPOB Lainnya" },
-  { module: "ppob", transactionKey: "provider_fee", accountCode: "6570", label: "Beban Biaya Provider PPOB" },
+  // Revenue accounts below now receive ONLY the admin fee/margin (feeAdmin) — see
+  // buildPpobCollectionLines in lib/ppob/engine.ts. The provider's own cut (providerFee) is no
+  // longer grossed into these as revenue-then-expensed; it's part of "principal", routed through
+  // the payable account below instead, and never touches P&L at all (pure pass-through).
+  { module: "ppob", transactionKey: "pulsa", accountCode: "4410", label: "PPOB Pulsa (Admin Fee/Margin)" },
+  { module: "ppob", transactionKey: "token_listrik", accountCode: "4430", label: "PPOB Token Listrik (PLN) (Admin Fee/Margin)" },
+  { module: "ppob", transactionKey: "ewallet_topup", accountCode: "4460", label: "PPOB Top-up E-Wallet (Admin Fee/Margin)" },
+  { module: "ppob", transactionKey: "transfer", accountCode: "4480", label: "PPOB Transfer (Admin Fee/Margin)" },
+  { module: "ppob", transactionKey: "tarik_tunai", accountCode: "4480", label: "PPOB Tarik Tunai (Admin Fee/Margin)" },
+  { module: "ppob", transactionKey: "lainnya", accountCode: "4480", label: "PPOB Lainnya (Admin Fee/Margin)" },
+  // Retained only so historical rows posted before this change (which DID book providerFee as a
+  // gross-up expense) still resolve a mapping if ever re-queried/audited — no code posts to this
+  // key going forward.
+  { module: "ppob", transactionKey: "provider_fee", accountCode: "6570", label: "Beban Biaya Provider PPOB (Legacy — tidak dipakai lagi)" },
+  // The pass-through liability: principal (modal + providerFee) is credited here at collection —
+  // NOT revenue — and debited back out at settlement when NexBill actually pays the provider.
+  { module: "ppob", transactionKey: "payable", accountCode: "2121", label: "PPOB Provider Payable (Clearing)" },
   { module: "expense", transactionKey: "listrik", accountCode: "6220", label: "Expense — Listrik" },
   { module: "expense", transactionKey: "internet", accountCode: "6240", label: "Expense — Internet" },
   { module: "expense", transactionKey: "gaji", accountCode: "6110", label: "Expense — Gaji" },

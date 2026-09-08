@@ -251,10 +251,12 @@ export async function computeTransactionList(filters: TransactionFilters) {
     const ppobConditions = [sql`${ppobTransactions.outletId} = ${outletId}`, sql`${ppobTransactions.status} = 'success'`, ...dayRangeConditions(ppobTransactions.createdAt, from, to)];
     if (filters.staffUserId) ppobConditions.push(sql`${ppobTransactions.staffUserId} = ${filters.staffUserId}`);
     if (filters.shiftId) ppobConditions.push(sql`${ppobTransactions.shiftId} = ${filters.shiftId}`);
-    const ppobRows = await db.select({ providerFee: ppobTransactions.providerFee, feeAdmin: ppobTransactions.feeAdmin }).from(ppobTransactions).where(sql.join(ppobConditions, sql` AND `));
-    // Actual GL-booked PPOB revenue, matching buildPpobJournalLines in lib/ppob/engine.ts — NOT
-    // just feeAdmin (the shop's own margin), which would understate it.
-    ppobRevenue = ppobRows.reduce((s, r) => s + (r.providerFee ?? 0) + (r.feeAdmin ?? 0), 0);
+    const ppobRows = await db.select({ feeAdmin: ppobTransactions.feeAdmin }).from(ppobTransactions).where(sql.join(ppobConditions, sql` AND `));
+    // Admin Fee/Margin ONLY — matching buildPpobCollectionLines in lib/ppob/engine.ts's pass-through
+    // model. providerFee is principal (money owed to the provider, held in PPOB Provider Payable),
+    // NEVER NexBill revenue — summing it in here would overstate this card exactly the way the old
+    // gross-up journal used to overstate the GL revenue account itself.
+    ppobRevenue = ppobRows.reduce((s, r) => s + (r.feeAdmin ?? 0), 0);
   }
 
   const byPaymentMethodMap = new Map<string, number>();

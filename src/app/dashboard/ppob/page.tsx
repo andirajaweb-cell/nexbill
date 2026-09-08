@@ -133,7 +133,7 @@ export default function PpobPage() {
       <div>
         <h1 className="gm-display text-2xl font-bold gm-gradient-title">PPOB</h1>
         <p className="text-sm text-neutral-500">
-          {t("ppob.subtitle", "Pencatatan transaksi PPOB (top up e-wallet, token listrik, pulsa, transfer, tarik tunai) via Fastpay — terpisah dari stok F&B, tetap satu accounting. Biaya provider (Fastpay Fee Outlet, tier Basic) dibukukan sebagai beban riil, terpisah dari margin toko yang Anda atur sendiri. Edit dan hapus permanen transaksi hanya bisa dilakukan akun Superuser.")}
+          {t("ppob.subtitle", "Pencatatan transaksi PPOB (top up e-wallet, token listrik, pulsa, transfer, tarik tunai) via Fastpay — terpisah dari stok F&B, tetap satu accounting. Setiap transaksi diperlakukan sebagai dana titipan pihak ketiga: nominal pokok (modal + biaya provider) dibukukan sebagai PPOB Payable/Clearing dan disetorkan ke provider saat settlement, BUKAN sebagai revenue atau beban NexBill. Hanya Admin Fee/Margin yang benar-benar menjadi pendapatan NexBill dan masuk Laba Rugi. Edit dan hapus permanen transaksi hanya bisa dilakukan akun Superuser.")}
         </p>
       </div>
 
@@ -163,7 +163,7 @@ export default function PpobPage() {
               <thead>
                 <tr className="text-left text-neutral-500 border-b border-neutral-800">
                   <th className="py-2">{t("ppob.col.time", "Waktu")}</th><th>{t("ppob.col.cashier", "Kasir")}</th><th>{t("ppob.col.category", "Kategori")}</th><th>{t("ppob.col.product", "Produk")}</th><th>{t("ppob.col.ref", "Ref")}</th>
-                  <th>{t("ppob.col.nominal", "Nominal")}</th><th>{t("ppob.col.modal", "Modal")}</th><th>{t("ppob.col.providerFee", "Biaya Fastpay")}</th><th>{t("ppob.col.margin", "Margin")}</th><th>{t("ppob.col.uangMasuk", "Uang Masuk")}</th><th>{t("ppob.col.account", "Akun")}</th><th>{t("ppob.col.status", "Status")}</th><th>{t("ppob.col.action", "Aksi")}</th>
+                  <th>{t("ppob.col.nominal", "Nominal")}</th><th>{t("ppob.col.modal", "Modal")}</th><th>{t("ppob.col.providerFee", "Biaya Provider")}</th><th>{t("ppob.col.principal", "Payable (Pokok)")}</th><th>{t("ppob.col.margin", "Admin Fee/Margin")}</th><th>{t("ppob.col.uangMasuk", "Uang Masuk")}</th><th>{t("ppob.col.account", "Akun")}</th><th>{t("ppob.col.settlement", "Settlement")}</th><th>{t("ppob.col.status", "Status")}</th><th>{t("ppob.col.action", "Aksi")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -176,10 +176,12 @@ export default function PpobPage() {
                     <td className="text-xs text-neutral-400">{tx.serviceRef ?? "-"}</td>
                     <td className="text-xs">{rupiah(tx.nominal)}</td>
                     <td className="text-xs">{rupiah(tx.modal)}</td>
-                    <td className="text-xs text-amber-400">{rupiah(tx.providerFee)}</td>
+                    <td className="text-xs text-neutral-400">{rupiah(tx.providerFee)}</td>
+                    <td className="text-xs text-amber-400">{rupiah(tx.principal)}</td>
                     <td className="text-xs text-emerald-400">{rupiah(tx.feeAdmin)}</td>
                     <td className="text-xs font-medium">{rupiah(tx.uangMasuk)}</td>
                     <td className="text-xs text-neutral-400">{tx.fundingAccountName} → {tx.receivingAccountName}</td>
+                    <td><Badge status={tx.settlementStatus === "settled" ? "success" : "pending"}>{tx.settlementStatus === "settled" ? t("ppob.settlement.settled", "Settled") : t("ppob.settlement.pending", "Pending")}</Badge></td>
                     <td><Badge status={tx.status === "success" ? "success" : "failed"}>{tx.status === "success" ? t("ppob.status.success", "Sukses") : t("ppob.status.reversed", "Reversed")}</Badge></td>
                     <td>
                       <div className="flex flex-wrap gap-1">
@@ -197,7 +199,7 @@ export default function PpobPage() {
                   </tr>
                 ))}
                 {(data?.transactions ?? []).length === 0 && (
-                  <tr><td colSpan={13} className="text-center text-neutral-500 py-6">{t("ppob.noTransactions", "Belum ada transaksi PPOB pada periode ini.")}</td></tr>
+                  <tr><td colSpan={15} className="text-center text-neutral-500 py-6">{t("ppob.noTransactions", "Belum ada transaksi PPOB pada periode ini.")}</td></tr>
                 )}
               </tbody>
             </table>
@@ -231,13 +233,30 @@ function SummaryCards({ saldoFastpay, summary }: { saldoFastpay: number | null; 
         <div className="text-lg font-semibold mt-1">{summary?.activeTransactions ?? 0}</div>
       </Card>
       <Card className="p-3">
-        <div className="text-xs text-neutral-500">{t("ppob.summary.providerFeeExpense", "Beban Biaya Fastpay")}</div>
-        <div className="text-lg font-semibold mt-1 text-amber-400">{rupiah(summary?.totalProviderFee ?? 0)}</div>
+        <div className="text-xs text-neutral-500">{t("ppob.summary.totalNominal", "Total Nominal PPOB (Pihak Ketiga)")}</div>
+        <div className="text-lg font-semibold mt-1 text-neutral-300">{rupiah(summary?.totalNominal ?? 0)}</div>
+        <div className="text-[10px] text-neutral-600 mt-0.5">{t("ppob.summary.totalNominalNote", "Nilai transaksi provider — bukan revenue NexBill")}</div>
       </Card>
       <Card className="p-3">
-        <div className="text-xs text-neutral-500">{t("ppob.summary.marginNetProfit", "Margin (Keuntungan Bersih)")}</div>
+        <div className="text-xs text-neutral-500">{t("ppob.summary.marginNetProfit", "Admin Fee/Margin (Revenue NexBill)")}</div>
         <div className="text-lg font-semibold mt-1 text-emerald-400">{rupiah(summary?.totalFeeAdmin ?? 0)}</div>
+        <div className="text-[10px] text-neutral-600 mt-0.5">{t("ppob.summary.marginNote", "Satu-satunya komponen PPOB yang masuk Laba Rugi")}</div>
       </Card>
+      <Card className="p-3">
+        <div className="text-xs text-neutral-500">{t("ppob.summary.totalPrincipalPayable", "Total Nominal Pokok (Payable/Clearing)")}</div>
+        <div className="text-lg font-semibold mt-1 text-amber-400">{rupiah(summary?.totalPrincipal ?? 0)}</div>
+        <div className="text-[10px] text-neutral-600 mt-0.5">{t("ppob.summary.totalPrincipalNote", "= Modal + Biaya Provider — dana titipan, bukan beban/revenue")}</div>
+      </Card>
+      <Card className="p-3">
+        <div className="text-xs text-neutral-500">{t("ppob.summary.totalSettlement", "Total Settlement ke Provider")}</div>
+        <div className="text-lg font-semibold mt-1">{rupiah(summary?.totalSettlement ?? 0)}</div>
+      </Card>
+      {(summary?.totalOutstandingPayable ?? 0) !== 0 && (
+        <Card className="p-3 border-red-500/40">
+          <div className="text-xs text-neutral-500">{t("ppob.summary.totalOutstandingPayable", "Belum Disettle (Outstanding Payable)")}</div>
+          <div className="text-lg font-semibold mt-1 text-red-400">{rupiah(summary?.totalOutstandingPayable ?? 0)}</div>
+        </Card>
+      )}
       {summary?.byCategory?.map((c: any) => (
         <Card key={c.category} className="p-3">
           <div className="text-xs text-neutral-500">{CATEGORY_LABEL[c.category] ?? c.category}</div>
@@ -334,6 +353,7 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
   const [category, setCategory] = useState("ewallet_topup");
   const [product, setProduct] = useState("");
   const [serviceRef, setServiceRef] = useState("");
+  const [providerRef, setProviderRef] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [nominal, setNominal] = useState("");
   const [modal, setModal] = useState("");
@@ -343,6 +363,10 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
   const [receiving, setReceiving] = useState(defaultReceiving ?? "");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  // Generated once per "session" of filling out this form and reused unchanged across a retry
+  // (e.g. a flaky connection causing the cashier to hit Simpan twice) — see the idempotencyKey doc
+  // comment on postPpobTransaction. A fresh key is drawn only after a successful submit.
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   useEffect(() => { if (defaultFunding && !funding) setFunding(defaultFunding); }, [defaultFunding]);
   useEffect(() => { if (defaultReceiving && !receiving) setReceiving(defaultReceiving); }, [defaultReceiving]);
@@ -386,15 +410,17 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
     const res = await fetch("/api/ppob/transactions", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        outletId, category, product, serviceRef: serviceRef || null, customerName: customerName || null,
+        outletId, category, product, serviceRef: serviceRef || null, providerRef: providerRef || null, customerName: customerName || null,
         nominal: Number(nominal), modal: Number(modal || nominal), providerFee: Number(providerFee || 0), feeAdmin: Number(feeAdmin || 0),
         fundingCashBankAccountId: funding, receivingCashBankAccountId: receiving, notes: notes || null,
+        idempotencyKey,
       }),
     });
     const out = await res.json();
     setSaving(false);
     if (!res.ok) return showAlert(out.error);
-    setProduct(""); setServiceRef(""); setCustomerName(""); setNominal(""); setModal(""); setProviderFee(""); setFeeAdmin(""); setNotes("");
+    setProduct(""); setServiceRef(""); setProviderRef(""); setCustomerName(""); setNominal(""); setModal(""); setProviderFee(""); setFeeAdmin(""); setNotes("");
+    setIdempotencyKey(crypto.randomUUID()); // fresh key for the next transaction — this one is now posted
     onCreated();
   };
 
@@ -410,12 +436,13 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
           {productsForCategory.map((r) => <option key={r.id} value={r.product} />)}
         </datalist>
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.serviceRefPlaceholder", "No. HP / ID Pelanggan (perintah jasa)")} value={serviceRef} onChange={(e) => setServiceRef(e.target.value)} />
+        <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.providerRefPlaceholder", "Ref. Provider (opsional, mis. Trx ID Fastpay)")} value={providerRef} onChange={(e) => setProviderRef(e.target.value)} />
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.customerNamePlaceholder", "Nama customer (opsional)")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
 
         <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.nominalPlaceholder", "Nominal")} value={nominal} onChange={(e) => setNominal(e.target.value)} />
         <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.modalPlaceholder", "Modal (default = nominal)")} value={modal} onChange={(e) => setModal(e.target.value)} />
-        <input type="number" className="rounded-lg bg-amber-950/30 border border-amber-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.providerFeePlaceholder", "Biaya Fastpay (beban)")} value={providerFee} onChange={(e) => setProviderFee(e.target.value)} />
-        <input type="number" className="rounded-lg bg-emerald-950/30 border border-emerald-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.feeAdminPlaceholder", "Margin (keuntungan)")} value={feeAdmin} onChange={(e) => setFeeAdmin(e.target.value)} />
+        <input type="number" className="rounded-lg bg-amber-950/30 border border-amber-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.providerFeePlaceholder", "Biaya Provider (bagian dari Payable)")} value={providerFee} onChange={(e) => setProviderFee(e.target.value)} />
+        <input type="number" className="rounded-lg bg-emerald-950/30 border border-emerald-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.feeAdminPlaceholder", "Admin Fee/Margin (revenue NexBill)")} value={feeAdmin} onChange={(e) => setFeeAdmin(e.target.value)} />
 
         <div className="rounded-lg bg-neutral-900 border border-neutral-800 px-2 py-1.5 text-xs text-neutral-400 flex items-center justify-between sm:col-span-2">
           <span>{t("ppob.entryForm.uangMasukLabel", "Uang Masuk (dibebankan ke customer)")}</span><span className="font-medium text-neutral-200">{rupiah(uangMasuk)}</span>
@@ -424,14 +451,14 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
           className="text-xs"
           value={funding}
           onChange={(v) => setFunding(v)}
-          placeholder={t("ppob.field.fundingPlaceholder", "Sumber Modal (keluar)")}
+          placeholder={t("ppob.field.fundingPlaceholder", "Akun Settlement (bayar ke provider)")}
           options={accounts.map((a) => ({ value: a.id, label: a.name }))}
         />
         <SearchableSelect
           className="text-xs"
           value={receiving}
           onChange={(v) => setReceiving(v)}
-          placeholder={t("ppob.field.receivingPlaceholder", "Penerima (uang masuk)")}
+          placeholder={t("ppob.field.receivingPlaceholder", "Penerima (uang masuk dari customer)")}
           options={accounts.map((a) => ({ value: a.id, label: a.name }))}
         />
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs sm:col-span-4" placeholder={t("ppob.field.notesPlaceholder", "Catatan (opsional)")} value={notes} onChange={(e) => setNotes(e.target.value)} />
