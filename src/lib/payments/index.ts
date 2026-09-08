@@ -5,9 +5,9 @@ import { danaGateway, gopayGateway } from "./adapters/ewallet-via-fastpay";
 import { bukupayGateway } from "./adapters/bukupay";
 import { ipaymuCrossBorderGateway } from "./adapters/ipaymu-crossborder";
 import { manualGateway } from "./adapters/manual";
-import { db } from "@/db/client";
+import { db, type DbOrTx } from "@/db/client";
 import { payments, orders, receivables } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { postSalesJournal, postReceivableSettlement, postDepositJournal } from "@/lib/accounting/postings";
 import { applyLoyaltyAndSpending } from "@/lib/membership/loyalty";
 
@@ -34,11 +34,11 @@ export interface OrderPaymentSummary {
 }
 
 /** Sum of successful payments against an order vs. its total — the basis for split/partial payment and the "partial" order status. */
-export async function getOrderPaymentSummary(orderId: string): Promise<OrderPaymentSummary | null> {
-  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+export async function getOrderPaymentSummary(orderId: string, dbc: DbOrTx = db): Promise<OrderPaymentSummary | null> {
+  const [order] = await dbc.select().from(orders).where(eq(orders.id, orderId)).limit(1);
   if (!order) return null;
 
-  const allPayments = await db.select().from(payments).where(eq(payments.orderId, orderId));
+  const allPayments = await dbc.select().from(payments).where(eq(payments.orderId, orderId));
   const paidTotal = allPayments.filter((p) => p.status === "success").reduce((s, p) => s + p.amount, 0);
   const remaining = Math.max(0, Math.round((order.total - paidTotal) * 100) / 100);
 
@@ -63,31 +63,57 @@ export async function initiatePayment(req: PaymentRequest) {
   const gateway = resolveGateway(req.method);
   if (req.amount <= 0) throw new Error("Jumlah pembayaran harus lebih dari 0.");
 
-  const summary = await getOrderPaymentSummary(req.orderId);
-  if (!summary) throw new Error("Order tidak ditemukan.");
-  if (req.amount > summary.remaining + 0.5) {
-    throw new Error(`Jumlah pembayaran (${req.amount}) melebihi sisa tagihan (${summary.remaining}).`);
-  }
+  return db.transaction(async (tx) => {
+    // Serialize concurrent payment attempts for THIS order before the remaining-balance check
+    // below even runs. Found in production: a Rp5.000 order ended up with THREE successful cash
+    // payments of Rp5.000 each against it (Rp15.000 total) — every one individually looked like a
+    // legitimate payment because getOrderPaymentSummary's "remaining" read the same stale, still-
+    // fully-unpaid balance each time, since none of the earlier calls had committed yet. The most
+    // likely trigger is a cashier double/triple-tapping "Bayar" on a touchscreen POS while waiting
+    // on a slow response — there was no debounce on the button AND no idempotency here, so nothing
+    // stopped 3 near-simultaneous calls from each creating and confirming their own payment row.
+    // (This is also why the order sat "missing_gl" indefinitely: postSalesJournal's debit=credit
+    // balance check correctly refused to post the resulting imbalanced journal, so the General
+    // Ledger itself was never corrupted — but the extra phantom cash was still sitting in
+    // Transaction Center / shift cash totals, which read straight from this `payments` table.)
+    //
+    // Same advisory-lock pattern as postSalesJournal's own race fix: transaction-scoped, released
+    // automatically on commit/rollback, and safe under this project's pgbouncer transaction-mode
+    // pooling (see the doc comment in db/client.ts) specifically because pg_advisory_xact_lock is
+    // tied to the transaction rather than the underlying connection. A second concurrent call for
+    // the SAME order blocks here until the first transaction finishes; by the time it wakes up,
+    // the first payment is already committed, so its own remaining-balance check correctly sees
+    // the reduced balance and rejects (rather than duplicating) an amount that no longer fits —
+    // legitimate sequential split payments (cash then QRIS for the rest) are unaffected since the
+    // client already awaits each call before firing the next one.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${req.orderId}))`);
 
-  const result = await gateway.createPayment({ ...req, outletId: summary.order.outletId });
+    const summary = await getOrderPaymentSummary(req.orderId, tx);
+    if (!summary) throw new Error("Order tidak ditemukan.");
+    if (req.amount > summary.remaining + 0.5) {
+      throw new Error(`Jumlah pembayaran (${req.amount}) melebihi sisa tagihan (${summary.remaining}).`);
+    }
 
-  const [row] = await db
-    .insert(payments)
-    .values({
-      orderId: req.orderId,
-      method: req.method,
-      amount: req.amount,
-      status: result.status,
-      providerRef: result.providerRef,
-      qrString: result.qrString,
-      qrImageUrl: result.qrImageUrl,
-      feeAmount: result.feeAmount ?? 0,
-      rawResponse: JSON.stringify(result.rawResponse ?? {}),
-      expiresAt: result.expiresAt,
-    })
-    .returning();
+    const result = await gateway.createPayment({ ...req, outletId: summary.order.outletId });
 
-  return row;
+    const [row] = await tx
+      .insert(payments)
+      .values({
+        orderId: req.orderId,
+        method: req.method,
+        amount: req.amount,
+        status: result.status,
+        providerRef: result.providerRef,
+        qrString: result.qrString,
+        qrImageUrl: result.qrImageUrl,
+        feeAmount: result.feeAmount ?? 0,
+        rawResponse: JSON.stringify(result.rawResponse ?? {}),
+        expiresAt: result.expiresAt,
+      })
+      .returning();
+
+    return row;
+  });
 }
 
 /**

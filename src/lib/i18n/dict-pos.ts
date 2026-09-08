@@ -30,6 +30,7 @@ registerDict({
   "pos.estimatedTotal": { id: "Estimasi Total", en: "Estimated Total", ms: "Anggaran Jumlah", th: "ยอดประมาณการ", fil: "Tinatayang Kabuuan", vi: "Tổng ước tính" },
   "pos.paymentMethod": { id: "Metode Pembayaran", en: "Payment Method", ms: "Kaedah Pembayaran", th: "วิธีการชำระเงิน", fil: "Paraan ng Bayad", vi: "Phương thức thanh toán" },
   "pos.payButton": { id: "Bayar {amount}", en: "Pay {amount}", ms: "Bayar {amount}", th: "ชำระ {amount}", fil: "Bayad {amount}", vi: "Thanh toán {amount}" },
+  "pos.payBusy": { id: "Memproses...", en: "Processing...", ms: "Memproses...", th: "กำลังดำเนินการ...", fil: "Pinoproseso...", vi: "Đang xử lý..." },
   "pos.orderCreated": { id: "Order #{id} dibuat.", en: "Order #{id} created.", ms: "Pesanan #{id} dicipta.", th: "สร้างออเดอร์ #{id} แล้ว", fil: "Nagawa na ang Order #{id}.", vi: "Đã tạo đơn hàng #{id}." },
   "pos.qrisReady": { id: "QRIS siap discan pelanggan (lihat halaman Pembayaran).", en: "QRIS is ready for the customer to scan (see the Payments page).", ms: "QRIS sedia untuk diimbas pelanggan (lihat halaman Pembayaran).", th: "QRIS พร้อมให้ลูกค้าสแกน (ดูที่หน้าการชำระเงิน)", fil: "Handa nang i-scan ng customer ang QRIS (tingnan sa Payments page).", vi: "QRIS đã sẵn sàng để khách quét (xem ở trang Thanh toán)." },
   "pos.confirmCashReceived": { id: "Konfirmasi Cash Diterima", en: "Confirm Cash Received", ms: "Sahkan Tunai Diterima", th: "ยืนยันรับเงินสดแล้ว", fil: "Kumpirmahin na Natanggap ang Cash", vi: "Xác nhận đã nhận tiền mặt" },

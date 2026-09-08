@@ -332,6 +332,7 @@ export default function RentalPage() {
   const activeFinishedBill = finishedBills.find((f) => f.bill.order.id === expandedFinishedOrderId)?.bill ?? null;
   const [payMethod, setPayMethod] = useState("cash");
   const [payAmount, setPayAmount] = useState(0);
+  const [payBusy, setPayBusy] = useState(false);
   const [checkoutDiscount, setCheckoutDiscount] = useState(0);
   const [checkoutTax, setCheckoutTax] = useState(false);
   const [checkoutVoucherCode, setCheckoutVoucherCode] = useState("");
@@ -936,41 +937,50 @@ export default function RentalPage() {
   };
 
   const payFinishedOrder = async () => {
-    if (!activeFinishedBill) return;
-    const orderId = activeFinishedBill.order.id;
+    if (!activeFinishedBill || payBusy) return; // guards against a double/triple-tap firing this
+    // more than once before the first click's request even lands — the backend now also closes
+    // this race server-side (see the advisory-lock comment on initiatePayment in
+    // lib/payments/index.ts), but disabling the button here avoids the confusing "did that even
+    // register?" UX that made a cashier tap it again in the first place.
+    setPayBusy(true);
+    try {
+      const orderId = activeFinishedBill.order.id;
 
-    // Discount/tax only apply once, before any payment has landed — resending them on a
-    // second split-payment round would re-negotiate the bill mid-settlement.
-    if (activeFinishedBill.paidTotal === 0 && (checkoutDiscount > 0 || checkoutTax)) {
-      await fetch(`/api/orders/${orderId}/checkout-options`, {
+      // Discount/tax only apply once, before any payment has landed — resending them on a
+      // second split-payment round would re-negotiate the bill mid-settlement.
+      if (activeFinishedBill.paidTotal === 0 && (checkoutDiscount > 0 || checkoutTax)) {
+        await fetch(`/api/orders/${orderId}/checkout-options`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ discount: checkoutDiscount, applyTax: checkoutTax }),
+        });
+      }
+
+      const res = await fetch(`/api/orders/${orderId}/pay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discount: checkoutDiscount, applyTax: checkoutTax }),
+        body: JSON.stringify({ method: payMethod, amount: payAmount }),
       });
-    }
+      const payment = await res.json();
+      if (!res.ok) return showAlert(payment.error);
 
-    const res = await fetch(`/api/orders/${orderId}/pay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method: payMethod, amount: payAmount }),
-    });
-    const payment = await res.json();
-    if (!res.ok) return showAlert(payment.error);
+      // Every payment starts "pending" regardless of method (see cash/manual/fastpay adapters) —
+      // only flip it to "success" here ourselves for the staff-confirmed methods; gateway-backed
+      // methods wait for their webhook (or the manual "Tandai Diterima" override below, e.g. mock mode).
+      if (!ASYNC_GATEWAY_METHODS.has(payMethod)) {
+        await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
+      }
 
-    // Every payment starts "pending" regardless of method (see cash/manual/fastpay adapters) —
-    // only flip it to "success" here ourselves for the staff-confirmed methods; gateway-backed
-    // methods wait for their webhook (or the manual "Tandai Diterima" override below, e.g. mock mode).
-    if (!ASYNC_GATEWAY_METHODS.has(payMethod)) {
-      await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
-    }
-
-    const refreshed = await fetchJsonObject<BillBreakdown>(`/api/orders/${orderId}/bill`);
-    if (!refreshed || refreshed.balanceDue <= 0.5) {
-      updateFinishedBillEntry(orderId, null);
-      load();
-    } else {
-      updateFinishedBillEntry(orderId, refreshed);
-      setPayAmount(refreshed.balanceDue);
+      const refreshed = await fetchJsonObject<BillBreakdown>(`/api/orders/${orderId}/bill`);
+      if (!refreshed || refreshed.balanceDue <= 0.5) {
+        updateFinishedBillEntry(orderId, null);
+        load();
+      } else {
+        updateFinishedBillEntry(orderId, refreshed);
+        setPayAmount(refreshed.balanceDue);
+      }
+    } finally {
+      setPayBusy(false);
     }
   };
 
@@ -1241,7 +1251,7 @@ export default function RentalPage() {
               <select className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
                 {methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
-              <Button onClick={payFinishedOrder}>{t("rental.payButtonAmount", "Bayar {amount}").replace("{amount}", rupiah(payAmount))}</Button>
+              <Button onClick={payFinishedOrder} disabled={payBusy}>{payBusy ? t("rental.payButtonBusy", "Memproses...") : t("rental.payButtonAmount", "Bayar {amount}").replace("{amount}", rupiah(payAmount))}</Button>
               <Button variant="ghost" onClick={() => updateFinishedBillEntry(bill.order.id, null)}>{t("rental.closePayLater", "Tutup (bayar nanti di POS)")}</Button>
             </div>
             {payAmount < bill.balanceDue && (

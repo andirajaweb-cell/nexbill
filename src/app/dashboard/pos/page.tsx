@@ -85,6 +85,8 @@ export default function PosPage() {
   const [applyTax, setApplyTax] = useState(false);
   const [applyServiceCharge, setApplyServiceCharge] = useState(false);
   const [checkoutResult, setCheckoutResult] = useState<any>(null);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
   const [mergeSelection, setMergeSelection] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -179,49 +181,66 @@ export default function PosPage() {
   };
 
   const checkout = async () => {
-    if (cart.length === 0) return;
-    const orderRes = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        outletId: await getOutletId(),
-        items: cart,
-        discount,
-        voucherCode: voucherDiscount > 0 ? voucherCode : undefined,
-        applyTax,
-        applyServiceCharge,
-        source: "pos",
-      }),
-    });
-    const order = await orderRes.json();
-    if (!orderRes.ok) return showAlert(order.error);
+    // Guards against a double/triple-tap firing a second checkout before the first request even
+    // lands — the backend now also closes this race server-side for the payment step itself (see
+    // the advisory-lock comment on initiatePayment in lib/payments/index.ts), but this avoids
+    // creating a second duplicate ORDER too, and avoids the confusing "did that even register?"
+    // UX that prompts a repeat click in the first place.
+    if (cart.length === 0 || checkoutBusy) return;
+    setCheckoutBusy(true);
+    try {
+      const orderRes = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outletId: await getOutletId(),
+          items: cart,
+          discount,
+          voucherCode: voucherDiscount > 0 ? voucherCode : undefined,
+          applyTax,
+          applyServiceCharge,
+          source: "pos",
+        }),
+      });
+      const order = await orderRes.json();
+      if (!orderRes.ok) return showAlert(order.error);
 
-    const payRes = await fetch(`/api/orders/${order.id}/pay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method }),
-    });
-    const payment = await payRes.json();
-    setCheckoutResult({ order, payment });
-    setCart([]);
-    setDiscount(0);
-    setVoucherCode("");
-    setVoucherDiscount(0);
-    setVoucherMsg("");
-    loadOpenOrders();
+      const payRes = await fetch(`/api/orders/${order.id}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method }),
+      });
+      const payment = await payRes.json();
+      setCheckoutResult({ order, payment });
+      setCart([]);
+      setDiscount(0);
+      setVoucherCode("");
+      setVoucherDiscount(0);
+      setVoucherMsg("");
+      loadOpenOrders();
+    } finally {
+      setCheckoutBusy(false);
+    }
   };
 
   const payOpenOrder = async (orderId: string) => {
-    const res = await fetch(`/api/orders/${orderId}/pay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method }),
-    });
-    const payment = await res.json();
-    if (method === "cash") {
-      await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
+    if (payingOrderId) return; // same double-tap guard as checkout() above
+    setPayingOrderId(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method }),
+      });
+      const payment = await res.json();
+      if (!res.ok) return showAlert(payment.error);
+      if (method === "cash") {
+        await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
+      }
+      loadOpenOrders();
+    } finally {
+      setPayingOrderId(null);
     }
-    loadOpenOrders();
   };
 
   const splitOrder = async (orderId: string) => {
@@ -316,7 +335,7 @@ export default function PosPage() {
                   </label>
                   <div className="flex gap-1">
                     <Button variant="ghost" className="text-xs" onClick={() => splitOrder(o.id)}>{t("pos.split", "Split")}</Button>
-                    <Button variant="secondary" className="text-xs" onClick={() => payOpenOrder(o.id)}>{t("pos.payWithMethod", "Bayar ({method})").replace("{method}", method)}</Button>
+                    <Button variant="secondary" className="text-xs" onClick={() => payOpenOrder(o.id)} disabled={payingOrderId === o.id}>{payingOrderId === o.id ? t("pos.payBusy", "Memproses...") : t("pos.payWithMethod", "Bayar ({method})").replace("{method}", method)}</Button>
                   </div>
                 </div>
               ))}
@@ -424,8 +443,8 @@ export default function PosPage() {
           </select>
         </div>
 
-        <Button className="w-full" onClick={checkout} disabled={cart.length === 0}>
-          {t("pos.payButton", "Bayar {amount}").replace("{amount}", rupiah(estimatedTotal))}
+        <Button className="w-full" onClick={checkout} disabled={cart.length === 0 || checkoutBusy}>
+          {checkoutBusy ? t("pos.payBusy", "Memproses...") : t("pos.payButton", "Bayar {amount}").replace("{amount}", rupiah(estimatedTotal))}
         </Button>
 
         {checkoutResult && (
