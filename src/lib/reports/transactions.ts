@@ -1,13 +1,12 @@
 import { db } from "@/db/client";
 import {
   orders, orderItems, payments, customers, staffUsers, shifts,
-  rentalSessions, rentalUnits, products, membershipTiers,
+  rentalSessions, rentalUnits, products, membershipTiers, ppobTransactions,
 } from "@/db/schema";
 import { sql, inArray, eq } from "drizzle-orm";
 // Shared with the accounting engine instead of a hand-copied category list — see that constant's
 // own doc comment for the bug this used to cause (coffee/dessert sales misclassified here).
 import { FNB_CATEGORIES } from "@/lib/accounting/postings";
-import { computeProfitLoss } from "@/lib/accounting/reports";
 
 function dayRangeConditions(column: any, from?: string, to?: string) {
   const conditions = [];
@@ -37,32 +36,17 @@ function itemRevenueBucket(itemType: string, category?: string): "rental" | "fnb
 }
 
 /**
- * Maps a COA revenue account code to the same 4-way bucket the summary cards below show
- * (Rental/F&B/Produk/PPOB) — see the account ranges in lib/accounting/coa-data.ts. Used to source
- * those cards straight from the General Ledger (via computeProfitLoss) for the requested period
- * instead of re-deriving them from raw orders/orderItems filtered by `orders.createdAt` — those two
- * are NOT the same "today": a rental session started yesterday (or a bill amended mid-stay) but
- * paid/settled today posts its revenue to the GL with today's entryDate, so Laba Rugi's "Hari Ini"
- * correctly includes it, while an `orders.createdAt`-filtered query for "today" excludes it
- * entirely (it belongs to yesterday's created-orders window). That's what previously made this
- * page's Rental/F&B totals for "Hari Ini" come out lower than Laba Rugi's for the identical period.
- * Sourcing from the GL instead means these cards can never disagree with Laba Rugi again — same
- * underlying journal_lines rows, not a second independent calculation.
- *
- * Codes outside Rental/F&B/Produk/PPOB (Home Rental 48xx, Other Income 47xx, Contra Revenue 49xx)
- * intentionally return "other" and get excluded — those belong to their own dedicated reports
- * (Home Rental's own dashboard, Pendapatan Lain-lain), not this page's Rental/POS/F&B/PPOB scope,
- * matching this page's own subtitle. 46xx (service charge/tax/misc, e.g. the 4650 catch-all
- * postSalesJournal uses) folds into "product", matching that card's "Produk/Lainnya" label.
+ * NOTE ON DESIGN (Transaction Center vs Accounting): this page used to source its revenue-by-type
+ * cards from the General Ledger (via computeProfitLoss + a `glRevenueBucket` account-code mapper)
+ * so they'd never disagree with Laba Rugi. That was deliberately reverted — the user asked for the
+ * opposite guarantee here: every card on this page and the transaction table below it must come
+ * from the *same* orders dataset and the *same* [from, to] period (order.createdAt), so the cards
+ * are always exactly reconcilable against the rows actually displayed in the table, with zero
+ * mixing of transaction_created_at and revenue_recognition_date within one summary. Laba Rugi
+ * (computeProfitLoss, entryDate/posting_date-based) remains the correct, separate source of truth
+ * for the financial statements and is intentionally NOT used anywhere in this file anymore — see
+ * the summary-computation block in computeTransactionList for the full reconciliation contract.
  */
-export function glRevenueBucket(code: string): "rental" | "fnb" | "product" | "ppob" | "other" {
-  if (code.startsWith("41") || code === "4530") return "rental"; // base + member rental (41xx), member add-on (4530)
-  if (code.startsWith("435")) return "rental"; // non-member add-on rental (4351-4354)
-  if (code.startsWith("42") || code === "4510") return "fnb"; // F&B (42xx), member F&B (4510)
-  if (code.startsWith("44")) return "ppob";
-  if ((code.startsWith("43") && !code.startsWith("435")) || code === "4520" || code.startsWith("46")) return "product";
-  return "other";
-}
 
 /** Order-level type badge for the Transaction Center table/filter: an order that touches a rental
  * session is shown as "Rental" (even if F&B was added to the same bill — that's the whole point of
@@ -84,6 +68,40 @@ const PAYMENT_METHOD_GROUP: Record<string, string> = {
   bukupay: "E-Wallet",
   card: "Card",
 };
+
+/**
+ * Pure reconciliation contract for the Transaction Center summary cards. Extracted (same pattern
+ * as computeJournalBalance in accounting/journal.ts) so it's unit-testable without a DB and so a
+ * future edit to computeTransactionList can't silently drift the two invariants the user asked
+ * for apart:
+ *
+ *   1) SUM(total transaksi valid pada tabel) = Gross Sales
+ *   2) Gross Sales − Refund = Net Sales
+ *
+ * IMPORTANT DEVIATION FROM A LITERAL READING, DOCUMENTED ON PURPOSE: the request also said "Gross
+ * Sales − Discount − Refund = Net Sales". That third term is deliberately NOT applied here. Per
+ * recomputeBillTotals (lib/pos/bill.ts), order.total is already net of discount:
+ *   total = (subtotal − discount) + tax + serviceCharge
+ * Gross Sales is defined below as SUM(order.total) for every valid (non-cancelled) row — i.e. it
+ * is already discount-net. Subtracting discount a second time here would double-count it, which
+ * violates the same request's own explicit "tanpa double counting" requirement. Discount is still
+ * surfaced as its own informational card (see summary.discount) so nothing is hidden — it's simply
+ * not subtracted twice. If this resolution isn't what was intended, the fix is a one-line change
+ * to `netSales` below.
+ */
+export function reconcileSales(validTransactionTotals: number[], refund: number): {
+  grossSales: number;
+  netSales: number;
+  isReconciled: boolean;
+} {
+  const grossSales = validTransactionTotals.reduce((sum, total) => sum + total, 0);
+  const netSales = grossSales - refund;
+  // Guards against float drift (order.total/refund are stored as numbers, not fixed-point) rather
+  // than against a real computation error — grossSales/netSales are derived in the same expression
+  // they're checked against, so this is a tripwire for a future refactor, not a live risk today.
+  const isReconciled = Number.isFinite(grossSales) && Number.isFinite(netSales) && Math.abs(netSales - (grossSales - refund)) < 0.01;
+  return { grossSales, netSales, isReconciled };
+}
 
 export interface TransactionFilters {
   outletId: string;
@@ -192,37 +210,51 @@ export async function computeTransactionList(filters: TransactionFilters) {
     transactions = transactions.filter((t) => t.payments.some((p) => p.methodGroup === filters.paymentMethodGroup));
   }
 
-  // Summary is computed over the (pre-type-filter) period set for revenue-by-type breakdown to stay
-  // meaningful even when the user has a type filter active — but respects every other filter.
-  const summarySet = transactions;
-  const recognized = summarySet.filter((t) => t.status === "paid" || t.status === "partial");
-  const cancelled = summarySet.filter((t) => t.status === "cancelled");
+  // Summary cards are computed from THIS exact post-filter `transactions` array — the same rows
+  // the table renders — so every card reconciles against "seluruh baris yang tampil" under any
+  // filter combination (previously the revenue-by-type breakdown ignored the type filter on
+  // purpose; that's reversed now per the user's explicit request for single-dataset consistency).
+  const validTransactions = transactions.filter((t) => t.status !== "cancelled");
+  const cancelledTransactions = transactions.filter((t) => t.status === "cancelled");
+  // "Recognized" = has actual money in (partial/paid) — this is the ONLY set Cash/byPaymentMethod
+  // draws from. "Open"/"awaiting_payment" orders are valid transactions (they count toward Gross
+  // Sales/Total Transaksi below) but are never treated as cash received, per the user's explicit
+  // "transaksi Open tidak dianggap sebagai Cash yang diterima" requirement.
+  const recognized = transactions.filter((t) => t.status === "paid" || t.status === "partial");
 
-  // Revenue-by-type is sourced from the General Ledger (see glRevenueBucket's doc comment for why
-  // deriving it from raw orders/orderItems filtered by createdAt used to disagree with Laba Rugi)
-  // whenever a period is given — which /api/transactions always provides. Falls back to the old
-  // item-level derivation only if somehow called without one, so this never throws.
-  const revenueByType = { rental: 0, fnb: 0, product: 0, ppob: 0 };
-  let totalDiscount = 0;
-  if (from && to) {
-    const pl = await computeProfitLoss(outletId, from, to);
-    for (const r of pl.revenue) {
-      if (!r.isPostingAllowed) continue; // header rows recursively sum their own children — counting both would double it
-      const bucket = glRevenueBucket(r.code);
-      if (bucket === "other") continue; // Home Rental / Other Income / Contra Revenue — out of this page's scope, see glRevenueBucket
-      revenueByType[bucket] += r.balance;
+  // Rental/F&B/Produk revenue breakdown: item-level, createdAt-scoped, derived from the SAME
+  // validTransactions the Gross Sales figure below sums — never from Accounting/GL (computeProfitLoss)
+  // and never from a different date field (entryDate) or a different period. This intentionally
+  // reverses the earlier GL-sourced version of this file; Laba Rugi keeps its own, separate,
+  // posting_date-based computation and is not read anywhere in this module.
+  const revenueByType = { rental: 0, fnb: 0, product: 0 };
+  for (const t of validTransactions) {
+    for (const it of itemsByOrder.get(t.id) ?? []) {
+      const category = it.productId ? productCategoryById.get(it.productId) : undefined;
+      const bucket = itemRevenueBucket(it.itemType, category);
+      revenueByType[bucket] += it.lineTotal;
     }
-    totalDiscount = pl.totalDiscount;
-  } else {
-    for (const t of recognized) {
-      for (const it of itemsByOrder.get(t.id) ?? []) {
-        const category = it.productId ? productCategoryById.get(it.productId) : undefined;
-        const bucket = itemRevenueBucket(it.itemType, category);
-        revenueByType[bucket] += it.lineTotal;
-      }
-      revenueByType.product += (t.serviceCharge ?? 0) + (t.tax ?? 0);
-    }
-    totalDiscount = recognized.reduce((s, t) => s + t.discount, 0);
+    revenueByType.product += (t.serviceCharge ?? 0) + (t.tax ?? 0);
+  }
+  const totalDiscount = validTransactions.reduce((s, t) => s + t.discount, 0);
+  const totalTax = validTransactions.reduce((s, t) => s + t.tax, 0);
+
+  // PPOB is architecturally a separate module/table (ppobTransactions) that never produces rows in
+  // this orders-based table — so its revenue is sourced directly from ppobTransactions, scoped to
+  // the SAME outlet + [from, to] window on ITS OWN createdAt (never entryDate/GL), and explicitly
+  // kept OUT of Gross Sales/Net Sales/Total Transaksi below since those must reconcile exactly
+  // against the orders table this page renders. Zeroed out under filters that have no coherent
+  // ppobTransactions equivalent (type/paymentMethodGroup/status/customerId/min-max total are all
+  // order-table concepts), so this card never implies rows exist in the table that don't.
+  let ppobRevenue = 0;
+  if (!filters.type && !filters.paymentMethodGroup && !filters.status && !filters.customerId && filters.minTotal === undefined && filters.maxTotal === undefined) {
+    const ppobConditions = [sql`${ppobTransactions.outletId} = ${outletId}`, sql`${ppobTransactions.status} = 'success'`, ...dayRangeConditions(ppobTransactions.createdAt, from, to)];
+    if (filters.staffUserId) ppobConditions.push(sql`${ppobTransactions.staffUserId} = ${filters.staffUserId}`);
+    if (filters.shiftId) ppobConditions.push(sql`${ppobTransactions.shiftId} = ${filters.shiftId}`);
+    const ppobRows = await db.select({ providerFee: ppobTransactions.providerFee, feeAdmin: ppobTransactions.feeAdmin }).from(ppobTransactions).where(sql.join(ppobConditions, sql` AND `));
+    // Actual GL-booked PPOB revenue, matching buildPpobJournalLines in lib/ppob/engine.ts — NOT
+    // just feeAdmin (the shop's own margin), which would understate it.
+    ppobRevenue = ppobRows.reduce((s, r) => s + (r.providerFee ?? 0) + (r.feeAdmin ?? 0), 0);
   }
 
   const byPaymentMethodMap = new Map<string, number>();
@@ -233,27 +265,34 @@ export async function computeTransactionList(filters: TransactionFilters) {
     }
   }
 
-  const refundedAmount = summarySet.reduce((sum, t) => sum + t.payments.filter((p) => p.status === "refunded").reduce((s, p) => s + p.amount, 0), 0);
+  // Refund reduces Net Sales by the actual refunded nominal, scoped to the same validTransactions
+  // set (a cancelled order can't also carry a "refunded" payment in practice, but excluding
+  // cancelled rows here keeps this strictly aligned with "valid transactions" per the spec).
+  const refundedAmount = validTransactions.reduce((sum, t) => sum + t.payments.filter((p) => p.status === "refunded").reduce((s, p) => s + p.amount, 0), 0);
 
-  // Net of discount, same as Laba Rugi's own "Total Pendapatan" (computeProfitLoss.totalRevenue
-  // nets contra-revenue 4910-4950 straight into its sum) — not the sum of order.total, which would
-  // double-subtract discount that's already netted out of revenueByType above when sourced from the GL.
-  const totalRevenue = revenueByType.rental + revenueByType.fnb + revenueByType.product + revenueByType.ppob - totalDiscount;
-  const totalTax = recognized.reduce((s, t) => s + t.tax, 0);
+  // Gross Sales / Net Sales reconciliation — see reconcileSales' doc comment for the exact
+  // contract and the documented, deliberate deviation (no second discount subtraction).
+  const { grossSales, netSales, isReconciled } = reconcileSales(validTransactions.map((t) => t.total), refundedAmount);
+  if (!isReconciled && process.env.NODE_ENV !== "production") {
+    // Defensive tripwire only — reconcileSales computes both figures from the same inputs, so this
+    // should be unreachable; a failure here means someone changed reconcileSales' own arithmetic.
+    console.error("[transactions] Gross/Net Sales reconciliation failed", { grossSales, netSales, refundedAmount });
+  }
 
   const summary = {
-    totalTransactions: summarySet.length,
+    totalTransactions: validTransactions.length,
     paidTransactions: recognized.length,
-    cancelledTransactions: cancelled.length,
-    totalRevenue,
+    cancelledTransactions: cancelledTransactions.length,
+    grossSales,
     rentalRevenue: revenueByType.rental,
     fnbRevenue: revenueByType.fnb,
-    ppobRevenue: revenueByType.ppob,
+    ppobRevenue,
     productRevenue: revenueByType.product,
     discount: totalDiscount,
     tax: totalTax,
     refund: refundedAmount,
-    netSales: totalRevenue - refundedAmount,
+    netSales,
+    isReconciled,
     byPaymentMethod: Array.from(byPaymentMethodMap.entries()).map(([method, amount]) => ({ method, amount })),
   };
 

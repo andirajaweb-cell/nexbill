@@ -267,10 +267,11 @@ function TransactionListTab({ outletId }: { outletId: string }) {
 
       {s && (
         <>
-        <p className="text-xs text-neutral-600 -mb-1">{t("transactions.summaryScopeNote", "Kartu ringkasan di bawah mengikuti tanggal pengakuan pendapatan (sama dengan Laba Rugi di Accounting) — sesi rental yang dimulai di hari sebelumnya tapi baru dibayar/selesai pada periode ini akan terhitung di sini. Daftar transaksi mengikuti tanggal transaksi dibuat, jadi bisa berbeda cakupan dari kartu ringkasan.")}</p>
+        <p className="text-xs text-neutral-600 -mb-1">{t("transactions.summaryScopeNote", "Kartu ringkasan di bawah dihitung dari dataset dan periode transaksi yang sama persis dengan tabel di bawahnya (berdasarkan tanggal transaksi dibuat) — bukan dari laporan Accounting/Laba Rugi yang cakupan tanggalnya berbeda (tanggal pengakuan pendapatan). Gross Sales = total seluruh transaksi valid pada tabel, Net Sales = Gross Sales dikurangi Refund. PPOB Revenue dihitung terpisah dari modul PPOB (belum tercatat sebagai baris di tabel ini) dan tidak termasuk dalam Gross/Net Sales. Laporan laba rugi di Accounting tetap terpisah dan tidak berubah.")}</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           {[
             [t("transactions.stat.totalTransactions", "Total Transaksi"), s.totalTransactions, false],
+            [t("transactions.stat.grossSales", "Gross Sales"), rupiah(s.grossSales), false],
             [t("transactions.stat.netSales", "Net Sales"), rupiah(s.netSales), false],
             [t("transactions.stat.rentalRevenue", "Rental Revenue"), rupiah(s.rentalRevenue), false],
             [t("transactions.stat.fnbRevenue", "F&B Revenue"), rupiah(s.fnbRevenue), false],

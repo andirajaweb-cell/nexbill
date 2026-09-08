@@ -13,12 +13,14 @@ import { outletHour, outletDayStartUtc } from "@/lib/time/outlet-time";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 
 /**
- * Buckets a COA revenue account code into this dashboard's own revenue-by-source breakdown —
- * finer-grained than glRevenueBucket (lib/reports/transactions.ts) since this widget shows
- * regular-vs-member rental and add-ons as separate rows, and PPOB revenue split out on its own
- * (glRevenueBucket collapses these together into one "rental" bucket for Transaction Center's
- * simpler 4-way Rental/F&B/Produk/PPOB view). See the account ranges in lib/accounting/coa-data.ts
- * and the seed rows in lib/accounting/account-mapping.ts DEFAULT_MAPPING_SEED.
+ * Buckets a COA revenue account code into this dashboard's own revenue-by-source breakdown — this
+ * page's Laba Kotor/Estimasi Laba Bersih figures are, correctly, still sourced from the General
+ * Ledger (computeProfitLoss, entryDate/posting_date-scoped) since that's literally what those
+ * figures mean. Transaction Center (lib/reports/transactions.ts) deliberately does NOT use the GL
+ * or this bucketing anymore — its cards are sourced purely from the same orders/createdAt dataset
+ * as its own table instead, per a separate, explicit requirement that its summary cards always
+ * reconcile against the table regardless of accrual timing. See the account ranges in
+ * lib/accounting/coa-data.ts and the seed rows in lib/accounting/account-mapping.ts DEFAULT_MAPPING_SEED.
  */
 function dashboardRevenueBucket(code: string): "rentalReguler" | "rentalMember" | "addon" | "fnb" | "produk" | "ppob" | "lainLain" | "homeRental" | "other" {
   if (code === "4180") return "rentalMember";
@@ -127,8 +129,9 @@ export async function GET(req: NextRequest) {
     // orders.createdAt-filtered query for "today" excludes it entirely, since the order itself was
     // created yesterday. That's exactly what made this dashboard's "Pendapatan Hari Ini" (and its
     // revenue-by-source breakdown) disagree with its own "Laba Kotor"/"Estimasi Laba Bersih" cards
-    // on the very same page — the identical root cause, and identical fix, already applied to
-    // Transaction Center's summary cards (see glRevenueBucket in lib/reports/transactions.ts).
+    // on the very same page. (Transaction Center's summary cards used to be fixed the same way,
+    // but that was later deliberately reverted there — its cards must instead match its own
+    // createdAt-scoped table exactly; see the doc comment atop lib/reports/transactions.ts.)
     // dashboardRevenueBucket below is that same idea with finer buckets (regular vs member rental,
     // add-ons split out, PPOB) to match what this dashboard's breakdown widget displays.
     const revenueBySource = { rentalReguler: 0, rentalMember: 0, addon: 0, homeRental: 0, fnb: 0, produk: 0, ppob: 0, lainLain: 0 };

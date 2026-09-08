@@ -1,57 +1,45 @@
 import { describe, it, expect } from "vitest";
-import { glRevenueBucket } from "./transactions";
+import { reconcileSales } from "./transactions";
 
 /**
- * Task #63 — glRevenueBucket is what makes Transaction Center's summary cards agree with Laba
- * Rugi (both source from the same GL now — see the fix earlier this session and the long comment
- * above this function). A wrong bucket here would reintroduce exactly the kind of Transaction
- * Center vs Accounting mismatch the user originally reported, so every account-code range it
- * claims to handle gets a pinned test.
+ * Task: "Perbaiki logika halaman Transaksi..." — reconcileSales is the pure reconciliation
+ * contract behind Transaction Center's summary cards. It replaces glRevenueBucket (Task #63),
+ * which sourced those cards from the General Ledger; that approach was deliberately reversed so
+ * the cards always reconcile against the exact same createdAt-scoped dataset as the table instead
+ * of Accounting's entryDate-scoped one. See reconcileSales' own doc comment in transactions.ts for
+ * the full contract and the documented double-counting resolution.
  */
-describe("glRevenueBucket", () => {
-  it("buckets base and member rental revenue as rental", () => {
-    expect(glRevenueBucket("4105")).toBe("rental"); // PS3
-    expect(glRevenueBucket("4120")).toBe("rental"); // PS5
-    expect(glRevenueBucket("4180")).toBe("rental"); // member rental
-    expect(glRevenueBucket("4530")).toBe("rental"); // member add-on
+describe("reconcileSales", () => {
+  it("Gross Sales is the literal sum of every valid transaction's total", () => {
+    const { grossSales } = reconcileSales([100_000, 250_000, 75_000], 0);
+    expect(grossSales).toBe(425_000);
   });
 
-  it("buckets non-member add-on rental (435x) as rental, not product", () => {
-    expect(glRevenueBucket("4351")).toBe("rental");
-    expect(glRevenueBucket("4354")).toBe("rental");
+  it("Net Sales = Gross Sales - Refund, with no second discount subtraction", () => {
+    // order.total (recomputeBillTotals) is already net of discount: total = (subtotal - discount)
+    // + tax + serviceCharge. If discount were subtracted again here on top of refund, Net Sales
+    // would double-count it — exactly what the spec's "tanpa double counting" requirement forbids.
+    const { grossSales, netSales } = reconcileSales([100_000, 200_000], 30_000);
+    expect(grossSales).toBe(300_000);
+    expect(netSales).toBe(270_000); // 300,000 - 30,000 refund, NOT minus discount again
   });
 
-  it("buckets F&B revenue (42xx) and member F&B (4510) as fnb", () => {
-    expect(glRevenueBucket("4210")).toBe("fnb"); // food
-    expect(glRevenueBucket("4250")).toBe("fnb"); // dessert
-    expect(glRevenueBucket("4510")).toBe("fnb"); // member F&B
+  it("an empty valid-transaction set reconciles to zero, not NaN", () => {
+    const { grossSales, netSales, isReconciled } = reconcileSales([], 0);
+    expect(grossSales).toBe(0);
+    expect(netSales).toBe(0);
+    expect(isReconciled).toBe(true);
   });
 
-  it("buckets PPOB revenue (44xx) as ppob", () => {
-    expect(glRevenueBucket("4410")).toBe("ppob");
-    expect(glRevenueBucket("4480")).toBe("ppob");
+  it("refund can exceed gross sales (over-refund edge case) without breaking reconciliation", () => {
+    const { netSales, isReconciled } = reconcileSales([50_000], 80_000);
+    expect(netSales).toBe(-30_000);
+    expect(isReconciled).toBe(true);
   });
 
-  it("buckets retail product revenue (43xx excluding 435x), member product (4520), and 46xx as product", () => {
-    expect(glRevenueBucket("4310")).toBe("product"); // merchandise
-    expect(glRevenueBucket("4320")).toBe("product"); // accessory
-    expect(glRevenueBucket("4520")).toBe("product"); // member product
-    expect(glRevenueBucket("4650")).toBe("product"); // service charge/tax catch-all
-  });
-
-  it("does NOT let 435x (add-on rental) leak into product just because it starts with 43", () => {
-    expect(glRevenueBucket("4351")).not.toBe("product");
-    expect(glRevenueBucket("4353")).not.toBe("product");
-  });
-
-  it("excludes Home Rental (48xx), Other Income (47xx), and Contra Revenue (49xx) as 'other'", () => {
-    expect(glRevenueBucket("4830")).toBe("other"); // Home Rental PS5
-    expect(glRevenueBucket("4710")).toBe("other"); // Other Income
-    expect(glRevenueBucket("4910")).toBe("other"); // Diskon penjualan (contra-revenue)
-  });
-
-  it("falls back to 'other' for a code outside every known revenue range", () => {
-    expect(glRevenueBucket("9999")).toBe("other");
-    expect(glRevenueBucket("1112")).toBe("other"); // an asset account code, not revenue at all
+  it("isReconciled is true whenever grossSales/netSales were computed by this function itself", () => {
+    // A structural tripwire, not a live risk today — see the doc comment on reconcileSales for why.
+    const result = reconcileSales([10, 20, 30], 5);
+    expect(result.isReconciled).toBe(true);
   });
 });
