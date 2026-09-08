@@ -448,6 +448,18 @@ export const payments = pgTable(
     rawResponse: text("raw_response"),
     paidAt: text("paid_at"),
     expiresAt: text("expires_at"),
+    // "sale" (default): a normal checkout payment, settled via settleOrderAfterPayment straight
+    // into postSalesJournal/postReceivableSettlement's revenue recognition, as before.
+    // "deposit": a "bayar di muka" prepayment collected against a rental session whose real total
+    // isn't known yet (see recordDeposit()/confirmDeposit() in lib/payments/index.ts) — its cash
+    // is journaled as a Customer Deposit LIABILITY the moment it's collected (postDepositJournal
+    // in lib/accounting/postings.ts), not as revenue, per standard accrual accounting (you can't
+    // recognize rental revenue for time the customer hasn't used yet). depositJournalEntryId below
+    // tracks that liability posting so postSalesJournal knows, once the session actually finishes
+    // and revenue IS recognized, to reclassify the held liability into revenue instead of booking
+    // a second Kas line for cash that was already recorded — that would double-count it in the GL.
+    kind: text("kind", { enum: ["sale", "deposit"] }).notNull().default("sale"),
+    depositJournalEntryId: text("deposit_journal_entry_id"),
     ...timestamps,
   },
   (t) => [index("payments_order_idx").on(t.orderId)]
@@ -553,7 +565,7 @@ export const accountMappings = pgTable("account_mappings", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),
   module: text("module", {
-    enum: ["rental", "addon", "fnb", "fnb_cogs", "product_sale", "product_sale_cogs", "ppob", "expense", "asset", "asset_accum_depr", "depreciation", "payment", "product", "other", "other_income", "home_rental", "membership_fee"],
+    enum: ["rental", "addon", "fnb", "fnb_cogs", "product_sale", "product_sale_cogs", "ppob", "expense", "asset", "asset_accum_depr", "depreciation", "payment", "product", "other", "other_income", "home_rental", "membership_fee", "deposit"],
   }).notNull(),
   transactionKey: text("transaction_key").notNull(),
   accountId: text("account_id").notNull().references(() => accounts.id),

@@ -34,7 +34,8 @@ export type MappingModule =
   | "other"
   | "other_income"
   | "home_rental"
-  | "membership_fee";
+  | "membership_fee"
+  | "deposit";
 
 const mappingCache = new Map<string, Map<string, string>>(); // outletId -> `${module}:${key}` -> accountId
 
@@ -187,6 +188,12 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "home_rental", transactionKey: "late_fee", accountCode: "4890", label: "Home Rental — Late Fee" },
   { module: "home_rental", transactionKey: "damage_fee", accountCode: "4895", label: "Home Rental — Penggantian Kerusakan" },
   { module: "home_rental", transactionKey: "deposit", accountCode: "2135", label: "Home Rental — Security Deposit" },
+  // In-house rental prepay ("DP"/"bayar di muka") collected via recordDeposit()/confirmDeposit()
+  // in lib/payments/index.ts, before the session's real total is known. Posted as a LIABILITY
+  // at collection time (postDepositJournal in postings.ts) — not revenue — then consumed/
+  // reclassified into rental revenue once postSalesJournal recognizes the session. Distinct from
+  // "home_rental:deposit" (2135) above, which is a separate delivery-service security deposit.
+  { module: "deposit", transactionKey: "customer_deposit", accountCode: "2131", label: "Uang Muka Pelanggan (Customer Deposit)" },
 ];
 
 /**

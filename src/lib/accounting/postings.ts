@@ -296,17 +296,38 @@ export async function postSalesJournal(orderId: string) {
     revenueByAccount[otherAccountId] = (revenueByAccount[otherAccountId] ?? 0) + otherRevenue;
   }
 
+  // "recognizedLines" mixes two kinds of debit lines that both represent money already in
+  // hand for this order: ordinary Kas/Bank lines for ordinary payments, and — for a payment
+  // that was collected earlier as a rental "bayar di muka" deposit (kind === "deposit") — a
+  // debit to the Customer Deposit liability account instead. That deposit's cash was already
+  // journaled (Dr Kas / Cr Customer Deposit Liability) at collection time by postDepositJournal
+  // below; re-booking Dr Kas here a second time would double-count cash that was only ever
+  // received once. Debiting the liability here instead just reclassifies it: the money stops
+  // being "owed back/held" and becomes recognized revenue, which is exactly what should happen
+  // once the session/order it was held against is actually completed and billed.
   const cashLines: JournalLineInput[] = [];
   let totalFee = 0;
   let paidTotal = 0;
   for (const payment of successPayments) {
+    paidTotal += payment.amount;
+
+    if (payment.kind === "deposit" && payment.depositJournalEntryId) {
+      const depositLiabilityAccountId = await getMappedAccountId(order.outletId, "deposit", "customer_deposit", "2131");
+      cashLines.push({
+        accountId: depositLiabilityAccountId,
+        debit: round(payment.amount),
+        credit: 0,
+        description: `Pemakaian uang muka (DP) — ${payment.method}`,
+      });
+      continue; // fee (if any) for this payment was already booked in postDepositJournal — don't book it twice
+    }
+
     const cashBankAccountId = await getCashBankAccountIdForPaymentMethod(order.outletId, payment.method);
     const cashBankGlAccountId = await getCashBankGlAccountId(cashBankAccountId);
     await db.update(payments).set({ cashBankAccountId }).where(eq(payments.id, payment.id));
 
     const feeAmount = payment.feeAmount ?? 0;
     totalFee += feeAmount;
-    paidTotal += payment.amount;
     const netCash = payment.amount - feeAmount;
     cashLines.push({ accountId: cashBankGlAccountId, debit: round(netCash), credit: 0, description: `Kas/Bank diterima (${payment.method})` });
   }
@@ -314,10 +335,12 @@ export async function postSalesJournal(orderId: string) {
   // The reverse can also happen — most commonly a rental session's "bayar di
   // muka" deposit collected as an estimate at start time turning out larger
   // than the actual final bill (session stopped earlier than planned). Cap
-  // what's recognized as cash in the journal at order.total so the entry
-  // still balances; the true excess is change handed back to the customer
-  // at checkout, same as any ordinary cash-basis overpayment — it was never
-  // meant to be booked as revenue or held as a liability here.
+  // what's recognized (cash lines + consumed deposit liability) at order.total
+  // so the entry still balances; the true excess is change handed back to the
+  // customer at checkout, same as any ordinary cash-basis overpayment — it was
+  // never meant to be booked as revenue here (and if it came from a deposit,
+  // the un-consumed part of the liability is deliberately left on the books,
+  // still owed back to the customer, rather than force-cleared to zero).
   const grossCash = cashLines.reduce((s, l) => s + (l.debit ?? 0), 0);
   const cashExcess = Math.max(0, round(grossCash - order.total));
   if (cashExcess > 0 && cashLines.length > 0) {
@@ -386,6 +409,59 @@ export async function postSalesJournal(orderId: string) {
       ],
     });
   }
+}
+
+/**
+ * Posts the journal for a rental "bayar di muka" (DP/prepay) deposit at the moment it's
+ * collected — Dr Kas/Bank (net of any gateway fee) + Dr Biaya Payment Gateway (if any) /
+ * Cr Customer Deposit (2131, liability). This intentionally does NOT touch any revenue
+ * account: the customer hasn't consumed the rental time yet, so recognizing revenue here
+ * would be booking income for a service not yet rendered. The liability sits on the books
+ * until postSalesJournal (above) recognizes the session's real revenue and consumes it via
+ * a debit to the same 2131 account — see the "kind === 'deposit'" branch in that function's
+ * payment loop. Idempotent via payment.depositJournalEntryId: once set, calling this again
+ * for the same payment (e.g. a retried webhook/confirm call) is a no-op that just returns
+ * the existing journal id, exactly like postSalesJournal's own reference-based guard.
+ */
+export async function postDepositJournal(paymentId: string): Promise<string | undefined> {
+  const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+  if (!payment) throw new Error("Payment tidak ditemukan untuk posting jurnal deposit.");
+  if (payment.depositJournalEntryId) return payment.depositJournalEntryId; // idempotency guard
+  if (payment.status !== "success") return undefined; // nothing collected yet, nothing to post
+
+  const [order] = await db
+    .select({ outletId: orders.outletId, staffUserId: orders.staffUserId })
+    .from(orders)
+    .where(eq(orders.id, payment.orderId))
+    .limit(1);
+  if (!order) throw new Error("Order tidak ditemukan untuk posting jurnal deposit.");
+
+  const cashBankAccountId = await getCashBankAccountIdForPaymentMethod(order.outletId, payment.method);
+  const cashBankGlAccountId = await getCashBankGlAccountId(cashBankAccountId);
+  await db.update(payments).set({ cashBankAccountId }).where(eq(payments.id, paymentId));
+
+  const feeAmount = payment.feeAmount ?? 0;
+  const netCash = payment.amount - feeAmount;
+  const depositLiabilityAccountId = await getMappedAccountId(order.outletId, "deposit", "customer_deposit", "2131");
+
+  const lines: JournalLineInput[] = [
+    { accountId: cashBankGlAccountId, debit: round(netCash), credit: 0, description: `Kas/Bank DP diterima (${payment.method})` },
+    ...(feeAmount > 0 ? [{ accountCode: "6540", debit: round(feeAmount), credit: 0, description: "Biaya payment gateway" }] : []),
+    { accountId: depositLiabilityAccountId, debit: 0, credit: round(payment.amount), description: "Uang muka pelanggan (liability)" },
+  ];
+
+  const journalId = await postJournal({
+    outletId: order.outletId,
+    reference: `DEP-${paymentId.slice(0, 8)}`,
+    description: `DP diterima untuk order ${payment.orderId.slice(0, 8)} (${payment.method})`,
+    sourceType: "rental",
+    sourceId: payment.orderId,
+    staffUserId: order.staffUserId ?? undefined,
+    lines,
+  });
+
+  await db.update(payments).set({ depositJournalEntryId: journalId }).where(eq(payments.id, paymentId));
+  return journalId;
 }
 
 /**

@@ -8,7 +8,7 @@ import { manualGateway } from "./adapters/manual";
 import { db } from "@/db/client";
 import { payments, orders, receivables } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { postSalesJournal, postReceivableSettlement } from "@/lib/accounting/postings";
+import { postSalesJournal, postReceivableSettlement, postDepositJournal } from "@/lib/accounting/postings";
 import { applyLoyaltyAndSpending } from "@/lib/membership/loyalty";
 
 const registry: Record<PaymentMethod, PaymentGateway> = {
@@ -208,6 +208,7 @@ export async function recordDeposit(req: PaymentRequest) {
       method: req.method,
       amount: req.amount,
       status: result.status,
+      kind: "deposit",
       providerRef: result.providerRef,
       qrString: result.qrString,
       qrImageUrl: result.qrImageUrl,
@@ -219,7 +220,14 @@ export async function recordDeposit(req: PaymentRequest) {
   return row;
 }
 
-/** Confirms a still-pending deposit (e.g. cash DP, or a QRIS DP once scanned) — deliberately does NOT call settleOrderAfterPayment, same reasoning as recordDeposit(). */
+/**
+ * Confirms a still-pending deposit (e.g. cash DP, or a QRIS DP once scanned) — deliberately
+ * does NOT call settleOrderAfterPayment, same reasoning as recordDeposit(). Does, however, post
+ * the Customer Deposit LIABILITY journal (Dr Kas/Bank, Cr 2131) right away, best-effort: the cash
+ * is physically in hand the moment this flips to "success", and accounting principle (b) of the
+ * requested architecture — "Customer Deposit dicatat sebagai Liability sampai digunakan" — means
+ * that cash must appear on the books now, not silently wait until the session eventually stops.
+ */
 export async function confirmDeposit(paymentId: string) {
   const [existing] = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
   if (!existing) return null;
@@ -229,10 +237,25 @@ export async function confirmDeposit(paymentId: string) {
     .set({ status: "success", paidAt: new Date().toISOString() })
     .where(eq(payments.id, paymentId))
     .returning();
+  if (updated) {
+    try {
+      await postDepositJournal(updated.id);
+    } catch (err) {
+      console.error(`Gagal posting jurnal DP untuk payment ${updated.id}:`, err);
+    }
+  }
   return updated;
 }
 
-/** Idempotent: replaying this for an already-successful payment (double-click, retried webhook) is a safe no-op. */
+/**
+ * Idempotent: replaying this for an already-successful payment (double-click, retried webhook)
+ * is a safe no-op. A "deposit"-kind payment (see recordDeposit/confirmDeposit above) routes to
+ * postDepositJournal instead of settleOrderAfterPayment — same reasoning as confirmDeposit: a DP
+ * must never flip the order to "paid"/"partial" against its placeholder total or recognize
+ * revenue early, it only needs its cash journaled as a liability. In practice deposits are
+ * confirmed via confirmDeposit(), but an async gateway (QRIS DP) could route its success webhook
+ * through this generic path instead, so it needs to branch the same way defensively.
+ */
 export async function markPaymentSuccess(paymentId: string) {
   const [existing] = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
   if (!existing) return null;
@@ -244,11 +267,21 @@ export async function markPaymentSuccess(paymentId: string) {
     .where(eq(payments.id, paymentId))
     .returning();
 
-  if (payment) await settleOrderAfterPayment(payment.orderId, payment.id);
+  if (payment) {
+    if (payment.kind === "deposit") {
+      try {
+        await postDepositJournal(payment.id);
+      } catch (err) {
+        console.error(`Gagal posting jurnal DP untuk payment ${payment.id}:`, err);
+      }
+    } else {
+      await settleOrderAfterPayment(payment.orderId, payment.id);
+    }
+  }
   return payment;
 }
 
-/** Idempotent: a payment already in a terminal state (success/failed) ignores a replayed webhook. */
+/** Idempotent: a payment already in a terminal state (success/failed) ignores a replayed webhook. Branches deposit-kind payments to postDepositJournal instead of settleOrderAfterPayment — see markPaymentSuccess above. */
 export async function markPaymentByProviderRef(providerRef: string, status: "success" | "failed") {
   const [payment] = await db.select().from(payments).where(eq(payments.providerRef, providerRef)).limit(1);
   if (!payment) return null;
@@ -260,7 +293,17 @@ export async function markPaymentByProviderRef(providerRef: string, status: "suc
     .where(eq(payments.id, payment.id))
     .returning();
 
-  if (status === "success" && updated) await settleOrderAfterPayment(updated.orderId, updated.id);
+  if (status === "success" && updated) {
+    if (updated.kind === "deposit") {
+      try {
+        await postDepositJournal(updated.id);
+      } catch (err) {
+        console.error(`Gagal posting jurnal DP untuk payment ${updated.id}:`, err);
+      }
+    } else {
+      await settleOrderAfterPayment(updated.orderId, updated.id);
+    }
+  }
   return updated;
 }
 
