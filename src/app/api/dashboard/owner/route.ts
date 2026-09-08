@@ -11,8 +11,9 @@ import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
 import { outletHour, outletDayStartUtc } from "@/lib/time/outlet-time";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
-
-const FNB_CATEGORIES = new Set(["food", "drink", "coffee", "snack", "dessert"]);
+// Shared with the accounting engine (lib/accounting/postings.ts) instead of a locally hand-copied
+// list — see FNB_CATEGORIES' own doc comment there for why keeping a second copy here was a bug.
+import { FNB_CATEGORIES } from "@/lib/accounting/postings";
 
 export async function GET(req: NextRequest) {
   try {

@@ -64,10 +64,21 @@ async function isMemberCustomer(customerId?: string | null): Promise<boolean> {
   return !!customer?.membershipTierId;
 }
 
+/**
+ * The single canonical list of product categories that count as F&B for accounting purposes —
+ * exported so every other place in the app that needs "is this product category F&B" (the owner
+ * dashboard's revenue breakdown, Transaction Center's summary) imports this instead of keeping
+ * its own hand-copied list. Two other copies of this exact list used to exist independently
+ * (app/api/dashboard/owner/route.ts, lib/reports/transactions.ts) — one of them had silently
+ * drifted to omit "coffee"/"dessert", so a coffee or dessert sale (a real 4230/4250 F&B revenue
+ * account) showed up as generic "Produk" on the Transaction Center page instead of "F&B", not
+ * matching what Accounting actually recorded it as.
+ */
+export const FNB_CATEGORIES = new Set(["food", "drink", "coffee", "snack", "dessert"]);
+
 /** food/drink/coffee/snack/dessert -> matching F&B revenue+COGS mapping keys (module "fnb"/"fnb_cogs"). */
 function fnbMappingKey(category?: string): string | null {
-  if (category === "food" || category === "drink" || category === "coffee" || category === "snack" || category === "dessert") return category;
-  return null;
+  return category && FNB_CATEGORIES.has(category) ? category : null;
 }
 
 /** merchandise/accessory -> retail-sale mapping keys (module "product_sale"/"product_sale_cogs") — a physical

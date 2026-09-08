@@ -4,6 +4,9 @@ import {
   rentalSessions, rentalUnits, products, membershipTiers,
 } from "@/db/schema";
 import { sql, inArray, eq } from "drizzle-orm";
+// Shared with the accounting engine instead of a hand-copied category list — see that constant's
+// own doc comment for the bug this used to cause (coffee/dessert sales misclassified here).
+import { FNB_CATEGORIES } from "@/lib/accounting/postings";
 
 function dayRangeConditions(column: any, from?: string, to?: string) {
   const conditions = [];
@@ -12,12 +15,23 @@ function dayRangeConditions(column: any, from?: string, to?: string) {
   return conditions;
 }
 
-/** Same classification the accounting engine uses (see revenueAccountForItem in postings.ts) so
- * Transaction Center figures always agree with the books: rental items -> 4000, food/drink/snack -> 4100,
- * everything else (device rental, accessories, misc) -> 4200 "Lain-lain". */
-function itemRevenueBucket(description: string, category?: string): "rental" | "fnb" | "product" {
-  if (description.toLowerCase().startsWith("rental:")) return "rental";
-  if (category === "food" || category === "drink" || category === "snack") return "fnb";
+/**
+ * Same classification the accounting engine actually uses (see revenueAccountIdForItem in
+ * postings.ts): routed by the item's own `itemType` flag, not by sniffing its description text.
+ * This used to check `description.toLowerCase().startsWith("rental:")` instead — a redundant,
+ * independent re-implementation of the same routing decision postings.ts already makes via
+ * itemType, which happened to agree for the base rental line and per-hour accessory add-ons
+ * (both are given a "Rental:"-prefixed description on purpose) but was one wording change away
+ * from silently drifting out of sync with what actually got posted to the books. itemType is the
+ * authoritative flag set at item-creation time either way, so read that directly.
+ * rental (the base session charge) and accessory (per-hour add-on rentals) are both folded into
+ * the "rental" bucket here, matching the "Rental" filter/badge already shown in the Transaction
+ * Center UI — Accounting/the owner dashboard break these into separate COA accounts (4100 vs
+ * 4350) for more granular reporting, but Transaction Center only has one "Rental" type today.
+ */
+function itemRevenueBucket(itemType: string, category?: string): "rental" | "fnb" | "product" {
+  if (itemType === "rental" || itemType === "accessory") return "rental";
+  if (category && FNB_CATEGORIES.has(category)) return "fnb";
   return "product";
 }
 
@@ -25,9 +39,9 @@ function itemRevenueBucket(description: string, category?: string): "rental" | "
  * session is shown as "Rental" (even if F&B was added to the same bill — that's the whole point of
  * unified billing), a standalone food/drink/snack sale is "F&B", anything else is "Produk". PPOB has
  * no data source yet (separate module, not built) so it always returns zero rows for that type. */
-function classifyOrder(order: { rentalSessionId: string | null }, items: { productId: string | null; description: string; category?: string }[]): "rental" | "fnb" | "product" | "ppob" {
+function classifyOrder(order: { rentalSessionId: string | null }, items: { productId: string | null; itemType: string; category?: string }[]): "rental" | "fnb" | "product" | "ppob" {
   if (order.rentalSessionId) return "rental";
-  if (items.some((i) => itemRevenueBucket(i.description, i.category) === "fnb")) return "fnb";
+  if (items.some((i) => itemRevenueBucket(i.itemType, i.category) === "fnb")) return "fnb";
   return "product";
 }
 
@@ -155,13 +169,13 @@ export async function computeTransactionList(filters: TransactionFilters) {
   const recognized = summarySet.filter((t) => t.status === "paid" || t.status === "partial");
   const cancelled = summarySet.filter((t) => t.status === "cancelled");
 
-  // Revenue-by-type mirrors postings.ts exactly: per line item by rental:/category, plus service
+  // Revenue-by-type mirrors postings.ts exactly: per line item by itemType/category, plus service
   // charge + tax landing in the "product/lain-lain" bucket (same simplification as the accounting engine).
   const revenueByType = { rental: 0, fnb: 0, product: 0, ppob: 0 };
   for (const t of recognized) {
     for (const it of itemsByOrder.get(t.id) ?? []) {
       const category = it.productId ? productCategoryById.get(it.productId) : undefined;
-      const bucket = itemRevenueBucket(it.description, category);
+      const bucket = itemRevenueBucket(it.itemType, category);
       revenueByType[bucket] += it.lineTotal;
     }
     revenueByType.product += (t.serviceCharge ?? 0) + (t.tax ?? 0);
@@ -265,7 +279,7 @@ export async function computeCashierPerformance(outletId: string, from?: string,
     for (const o of recognized) {
       for (const it of itemsByOrder.get(o.id) ?? []) {
         const category = it.productId ? productCategoryById.get(it.productId) : undefined;
-        const bucketType = itemRevenueBucket(it.description, category);
+        const bucketType = itemRevenueBucket(it.itemType, category);
         if (bucketType === "rental") rentalTotal += it.lineTotal;
         else if (bucketType === "fnb") fnbTotal += it.lineTotal;
         else productTotal += it.lineTotal;
