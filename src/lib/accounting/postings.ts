@@ -47,7 +47,7 @@ function expenseAccountCode(category: string): string {
  * "other" (mapping module "rental"). ps2 intentionally stays lumped into "other" (4170) — it
  * wasn't asked to get its own account and is rare/legacy hardware. Only used for non-member
  * sessions — see isMemberCustomer(). */
-function rentalMappingKey(consoleType?: string | null): string {
+export function rentalMappingKey(consoleType?: string | null): string {
   if (consoleType === "ps3") return "ps3";
   if (consoleType === "ps4" || consoleType === "ps4_pro") return "ps4";
   if (consoleType === "ps5" || consoleType === "ps5_slim") return "ps5";
@@ -77,13 +77,13 @@ async function isMemberCustomer(customerId?: string | null, dbc: DbOrTx = db): P
 export const FNB_CATEGORIES = new Set(["food", "drink", "coffee", "snack", "dessert"]);
 
 /** food/drink/coffee/snack/dessert -> matching F&B revenue+COGS mapping keys (module "fnb"/"fnb_cogs"). */
-function fnbMappingKey(category?: string): string | null {
+export function fnbMappingKey(category?: string): string | null {
   return category && FNB_CATEGORIES.has(category) ? category : null;
 }
 
 /** merchandise/accessory -> retail-sale mapping keys (module "product_sale"/"product_sale_cogs") — a physical
  * item SOLD outright, as opposed to the per-hour rental "addon" flow below (same-sounding items, different flow). */
-function merchMappingKey(category?: string): string | null {
+export function merchMappingKey(category?: string): string | null {
   if (category === "merchandise" || category === "accessory") return category;
   return null;
 }

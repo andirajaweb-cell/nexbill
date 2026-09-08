@@ -47,6 +47,26 @@ export interface PostJournalInput {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
+export interface JournalBalanceCheck {
+  totalDebit: number;
+  totalCredit: number;
+  balanced: boolean;
+}
+
+/**
+ * Pure balance check for a resolved set of journal lines — no DB access, so it's the one piece of
+ * postJournal's core invariant ("every Journal Entry must balance: total debit = total credit")
+ * that's directly unit-testable without a database. Extracted for Task #63's test suite; postJournal
+ * below uses this same function so the tested logic and the enforced logic can never drift apart.
+ * The 1-rupiah tolerance absorbs floating-point rounding noise across many lines, not real
+ * imbalance — see journal.test.ts for the boundary cases this is meant to (and isn't meant to) allow.
+ */
+export function computeJournalBalance(lines: { debit?: number; credit?: number }[]): JournalBalanceCheck {
+  const totalDebit = round(lines.reduce((s, l) => s + round(l.debit ?? 0), 0));
+  const totalCredit = round(lines.reduce((s, l) => s + round(l.credit ?? 0), 0));
+  return { totalDebit, totalCredit, balanced: Math.abs(totalDebit - totalCredit) <= 1 };
+}
+
 /**
  * Post a balanced double-entry journal. Throws if debits != credits (within
  * a 1-rupiah rounding tolerance) — this is the single gate that keeps the
@@ -95,10 +115,9 @@ export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Pr
   // rather than accountCode — getAccountIdByCode already checked the latter.
   await assertPostableAccountIds(resolvedLines.map((l) => l.accountId), dbc);
 
-  const totalDebit = round(resolvedLines.reduce((s, l) => s + l.debit, 0));
-  const totalCredit = round(resolvedLines.reduce((s, l) => s + l.credit, 0));
+  const { totalDebit, totalCredit, balanced } = computeJournalBalance(resolvedLines);
 
-  if (Math.abs(totalDebit - totalCredit) > 1) {
+  if (!balanced) {
     throw new Error(
       `Journal tidak balance: total debit ${totalDebit} != total kredit ${totalCredit} (${input.description})`
     );

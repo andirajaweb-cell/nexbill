@@ -55,7 +55,7 @@ function itemRevenueBucket(itemType: string, category?: string): "rental" | "fnb
  * matching this page's own subtitle. 46xx (service charge/tax/misc, e.g. the 4650 catch-all
  * postSalesJournal uses) folds into "product", matching that card's "Produk/Lainnya" label.
  */
-function glRevenueBucket(code: string): "rental" | "fnb" | "product" | "ppob" | "other" {
+export function glRevenueBucket(code: string): "rental" | "fnb" | "product" | "ppob" | "other" {
   if (code.startsWith("41") || code === "4530") return "rental"; // base + member rental (41xx), member add-on (4530)
   if (code.startsWith("435")) return "rental"; // non-member add-on rental (4351-4354)
   if (code.startsWith("42") || code === "4510") return "fnb"; // F&B (42xx), member F&B (4510)
