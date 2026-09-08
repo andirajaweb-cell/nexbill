@@ -329,6 +329,23 @@ export interface CashierPerformanceRow {
   rank: number;
 }
 
+/**
+ * Cashier Performance (Performa Kasir tab) shares its orders/period query with computeTransactionList
+ * (Daftar Transaksi tab) above — same outletId + orders.createdAt window — but used to disagree with
+ * it on two counts, both of which silently UNDER-reported here relative to that tab's Total
+ * Transaksi/Gross Sales for the identical period:
+ *   1. This only ever counted "recognized" (paid/partial) orders — an Open or Awaiting Payment order
+ *      (a valid, non-cancelled transaction that Daftar Transaksi's Total Transaksi/Gross Sales DOES
+ *      include) was fully invisible here.
+ *   2. Any order with no staffUserId at all (e.g. a walk-up F&B sale rung up without a cashier
+ *      assigned) was dropped via `if (!o.staffUserId) continue` — it never appeared under ANY row,
+ *      vanishing from this tab's grand total entirely while still counting in Daftar Transaksi's.
+ * Both are fixed the same way Task "Perbaiki logika halaman Transaksi..." fixed the Daftar Transaksi
+ * tab's own cards: use the exact same "valid = non-cancelled" transaction set everywhere, and give
+ * unassigned orders their own explicit "Tanpa Kasir" row instead of silently dropping them — so
+ * SUM(transactionCount) and SUM(totalSales) across every row this function returns now always equals
+ * exactly the Total Transaksi / Gross Sales Daftar Transaksi shows for the same outlet/period.
+ */
 export async function computeCashierPerformance(outletId: string, from?: string, to?: string): Promise<CashierPerformanceRow[]> {
   const conditions = [sql`${orders.outletId} = ${outletId}`, ...dayRangeConditions(orders.createdAt, from, to)];
   const orderRows = await db.select().from(orders).where(sql.join(conditions, sql` AND `));
@@ -347,23 +364,23 @@ export async function computeCashierPerformance(outletId: string, from?: string,
   const shiftConditions = [sql`${shifts.outletId} = ${outletId}`, ...dayRangeConditions(shifts.openedAt, from, to)];
   const shiftRows = await db.select().from(shifts).where(sql.join(shiftConditions, sql` AND `));
 
-  const byStaff = new Map<string, { orders: typeof orderRows; }>();
+  const UNASSIGNED = "__unassigned__";
+  const byStaff = new Map<string, typeof orderRows>();
   for (const o of orderRows) {
-    if (!o.staffUserId) continue;
-    const cur = byStaff.get(o.staffUserId) ?? { orders: [] };
-    cur.orders.push(o);
-    byStaff.set(o.staffUserId, cur);
+    const key = o.staffUserId ?? UNASSIGNED;
+    const cur = byStaff.get(key) ?? [];
+    cur.push(o);
+    byStaff.set(key, cur);
   }
 
-  const rows: CashierPerformanceRow[] = [];
-  for (const staff of staffRows) {
-    const bucket = byStaff.get(staff.id);
-    if (!bucket || bucket.orders.length === 0) continue;
-    const recognized = bucket.orders.filter((o) => o.status === "paid" || o.status === "partial");
-    const cancelled = bucket.orders.filter((o) => o.status === "cancelled");
+  // Shared by every real staff row AND the synthetic "Tanpa Kasir" row below, so both use the
+  // identical valid-transaction/item-bucketing logic computeTransactionList's own summary cards use.
+  const buildRow = (staffUserId: string, staffName: string, staffOrders: typeof orderRows): CashierPerformanceRow => {
+    const valid = staffOrders.filter((o) => o.status !== "cancelled");
+    const cancelled = staffOrders.filter((o) => o.status === "cancelled");
 
     let rentalTotal = 0, fnbTotal = 0, productTotal = 0;
-    for (const o of recognized) {
+    for (const o of valid) {
       for (const it of itemsByOrder.get(o.id) ?? []) {
         const category = it.productId ? productCategoryById.get(it.productId) : undefined;
         const bucketType = itemRevenueBucket(it.itemType, category);
@@ -374,26 +391,38 @@ export async function computeCashierPerformance(outletId: string, from?: string,
       productTotal += (o.serviceCharge ?? 0) + (o.tax ?? 0);
     }
 
-    const totalSales = recognized.reduce((s, o) => s + o.total, 0);
-    const staffShifts = shiftRows.filter((s) => s.staffUserId === staff.id);
+    const totalSales = valid.reduce((s, o) => s + o.total, 0);
+    const staffShifts = staffUserId === UNASSIGNED ? [] : shiftRows.filter((s) => s.staffUserId === staffUserId);
 
-    rows.push({
-      staffUserId: staff.id,
-      staffName: staff.name,
-      transactionCount: recognized.length,
+    return {
+      staffUserId,
+      staffName,
+      transactionCount: valid.length,
       totalSales,
-      avgTransaction: recognized.length ? Math.round(totalSales / recognized.length) : 0,
+      avgTransaction: valid.length ? Math.round(totalSales / valid.length) : 0,
       rentalTotal,
       fnbTotal,
       productTotal,
       refundCount: 0, // refunds don't retain a staff-attributable count today (order.staffUserId is the creator, not necessarily the refunder) — informational placeholder
       refundValue: 0,
       voidCount: cancelled.length,
-      discountTotal: recognized.reduce((s, o) => s + o.discount, 0),
+      discountTotal: valid.reduce((s, o) => s + o.discount, 0),
       shiftsCount: staffShifts.length,
       totalVariance: staffShifts.reduce((s, sh) => s + (sh.variance ?? 0), 0),
       rank: 0,
-    });
+    };
+  };
+
+  const rows: CashierPerformanceRow[] = [];
+  for (const staff of staffRows) {
+    const staffOrders = byStaff.get(staff.id);
+    if (!staffOrders || staffOrders.length === 0) continue;
+    rows.push(buildRow(staff.id, staff.name, staffOrders));
+  }
+
+  const unassignedOrders = byStaff.get(UNASSIGNED);
+  if (unassignedOrders && unassignedOrders.length > 0) {
+    rows.push(buildRow(UNASSIGNED, "Tanpa Kasir", unassignedOrders));
   }
 
   rows.sort((a, b) => b.totalSales - a.totalSales);
