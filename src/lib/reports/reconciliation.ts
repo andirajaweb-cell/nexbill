@@ -12,6 +12,7 @@
  * route (app/api/accounting/reconciliation/route.ts) does all the fetching and hands plain arrays
  * in here.
  */
+import { outletDateYmd } from "@/lib/time/outlet-time";
 
 export interface ReconciliationTxInput {
   orderId: string;
@@ -77,14 +78,19 @@ export interface ReconciliationSummary {
 
 const AMOUNT_EPSILON = 1; // rupiah — guards float drift, not a real tolerance for a genuine mismatch
 
-/** UTC calendar-day slice of an ISO timestamp, e.g. "2026-09-08T23:58:00.000Z" -> "2026-09-08".
- * Deliberately simple (not outlet-timezone-aware) — this tool is comparing two ISO timestamps
- * that both ultimately derive from the same server clock (businessDate and entryDate are both
- * stamped by resolveOrderBusinessDate at the same instant for a correctly-posted order — see
- * postings.ts), so a day boundary drawn the same way for both sides is enough to detect real
- * drift without needing full outlet-timezone conversion here. */
+/**
+ * Outlet-local ("Asia/Jakarta") calendar day for an ISO timestamp — NOT a naive
+ * `iso.slice(0, 10)`. That naive slice compares UTC calendar days, which is wrong here for the
+ * same reason `.getHours()` is wrong elsewhere in this codebase (see the doc comment on
+ * outletDateYmd in lib/time/outlet-time.ts): a transaction at 03:46 WIB is stored as 20:46 UTC
+ * the PREVIOUS day, so a businessDate and entryDate a few hours apart in the same WIB morning
+ * used to get flagged as "date_mismatch" here purely from crossing the UTC midnight boundary,
+ * even though no merchant would ever see them as different days. Found via a real reconciliation
+ * run that showed 9 false-positive date_mismatch rows, every one of them in the 00:00-07:00 WIB
+ * window.
+ */
 function dayOf(iso: string): string {
-  return iso.slice(0, 10);
+  return outletDateYmd(new Date(iso));
 }
 
 /**

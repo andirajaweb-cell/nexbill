@@ -92,7 +92,15 @@ export async function GET(req: NextRequest) {
       .innerJoin(accounts, eq(journalLines.accountId, accounts.id))
       .where(and(...orphanConditions))
       .groupBy(journalEntries.sourceId);
-    const orphans: OrphanGlRow[] = orphanRows.filter((r) => r.orderId).map((r) => ({ orderId: r.orderId as string, glEntryDate: r.entryDate, glRevenue: r.netRevenue ?? 0 }));
+    // Excludes rows that net to (effectively) zero — a void journal entry plus its offsetting
+    // reversal (see voidJournal's doc comment in accounting/journal.ts) both carry the same
+    // sourceId and cancel out to exactly 0 when summed together, which used to show up here as a
+    // meaningless "Order Tak Ditemukan" row with Rp0 revenue: correctly reversed, nothing to
+    // investigate, pure noise. A real orphan always has real, non-zero revenue still live in the
+    // ledger.
+    const orphans: OrphanGlRow[] = orphanRows
+      .filter((r) => r.orderId && Math.round(r.netRevenue ?? 0) !== 0)
+      .map((r) => ({ orderId: r.orderId as string, glEntryDate: r.entryDate, glRevenue: r.netRevenue ?? 0 }));
 
     const { rows, summary } = reconcileOrders(txInputs, glByOrderId, orphans);
 

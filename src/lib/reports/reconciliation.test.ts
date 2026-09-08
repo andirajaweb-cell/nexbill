@@ -29,14 +29,26 @@ describe("reconcileOrders", () => {
     expect(summary.netAmountDelta).toBe(-100_000);
   });
 
-  it("a paid order whose GL entryDate lands on a different calendar day than its businessDate is date_mismatch", () => {
-    const t = tx({ businessDate: "2026-09-08T23:58:00.000Z" });
-    const gl = new Map<string, ReconciliationGlInput>([[t.orderId, { orderId: t.orderId, entryDate: "2026-09-09T00:15:00.000Z", netRevenue: 100_000 }]]);
+  it("a paid order whose GL entryDate lands on a different WIB calendar day than its businessDate is date_mismatch", () => {
+    // 16:00 UTC on the 8th = 23:00 WIB on the 8th; 18:00 UTC (same UTC date!) = 01:00 WIB on the
+    // 9th — genuinely different Asia/Jakarta calendar days despite sharing a UTC date, which is
+    // exactly the case a naive iso.slice(0, 10) comparison would miss entirely.
+    const t = tx({ businessDate: "2026-09-08T16:00:00.000Z" });
+    const gl = new Map<string, ReconciliationGlInput>([[t.orderId, { orderId: t.orderId, entryDate: "2026-09-08T18:00:00.000Z", netRevenue: 100_000 }]]);
     const { rows, summary } = reconcileOrders([t], gl, []);
     expect(rows[0].reconciliationStatus).toBe("date_mismatch");
     expect(summary.dateMismatch).toBe(1);
     // Same-day amounts agree, so this alone doesn't move the net rupiah delta.
     expect(summary.netAmountDelta).toBe(0);
+  });
+
+  it("does NOT flag date_mismatch for a genuinely same-WIB-day pair that happens to cross the UTC midnight boundary (the exact false positive a real reconciliation run surfaced: early-morning WIB transactions, 00:00-07:00, are stored the previous UTC day)", () => {
+    // 03:46 WIB on the 8th (20:46 UTC on the 7th) vs 11:29 WIB on the 8th (04:29 UTC on the 8th) —
+    // same WIB day, different UTC dates.
+    const t = tx({ businessDate: "2026-09-07T20:46:00.000Z", total: 2_000 });
+    const gl = new Map<string, ReconciliationGlInput>([[t.orderId, { orderId: t.orderId, entryDate: "2026-09-08T04:29:00.000Z", netRevenue: 2_000 }]]);
+    const { rows } = reconcileOrders([t], gl, []);
+    expect(rows[0].reconciliationStatus).toBe("match");
   });
 
   it("a paid order whose GL revenue doesn't match its total is amount_mismatch", () => {

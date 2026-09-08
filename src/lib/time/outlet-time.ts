@@ -82,3 +82,18 @@ export function outletDayStartUtc(date: Date = new Date()): Date {
 export function outletDayEndUtc(date: Date = new Date()): Date {
   return new Date(outletDayStartUtc(date).getTime() + 24 * 60 * 60 * 1000);
 }
+
+/**
+ * "YYYY-MM-DD" calendar day for `date` IN THE OUTLET'S TIMEZONE — the correct way to ask "is this
+ * the same day as that" for two UTC timestamps. A naive `isoString.slice(0, 10)` compares UTC
+ * calendar days instead, which is wrong for exactly the same reason `.getHours()` is wrong (see
+ * this file's top doc comment): a transaction at 03:46 WIB is 20:46 UTC the PREVIOUS day, so two
+ * timestamps a few hours apart in the same WIB morning can land on different UTC dates and look
+ * like a "different day" to a naive string-slice comparison even though no merchant would ever
+ * see it that way. Added for lib/reports/reconciliation.ts, which was doing exactly that naive
+ * slice and consequently flagging same-WIB-day orders as "date_mismatch" whenever one side of the
+ * comparison happened to fall in the 00:00-07:00 WIB window.
+ */
+export function outletDateYmd(date: Date): string {
+  return YMD_FORMATTER.format(date);
+}
