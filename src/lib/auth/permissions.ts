@@ -38,7 +38,9 @@ export type Permission =
   | "manage_feature_flags" // toggle Home Rental (and future) feature flags in Settings > Feature Management — owner/superuser only, enforced additionally by a hard role check server-side
   | "manage_membership" // sell/renew paid membership tiers (collects cash/QRIS, posts to accounting) — Membership & CRM tier/reward/voucher CRUD itself stays owner/superuser-only (see membership/page.tsx), this only gates the front-desk "Jual Keanggotaan" money-collecting action
   | "manage_cash_deposit" // record a cash pickup/deposit (till -> kas besar/saldo deposit virtual/kas kecil/prive/dividen)
-  | "void_cash_deposit"; // reverse an already-posted cash deposit
+  | "void_cash_deposit" // reverse an already-posted cash deposit
+  | "close_period" // lock an accounting period (month) so no new journal can post into it
+  | "reopen_period"; // unlock a previously-closed period — kept separate from close_period, higher trust tier (owner/superuser only), same segregation-of-duty pattern as manage_expenses/void_expense
 
 export const ALL_ROLES: StaffRole[] = ["superuser", "owner", "manager", "cashier", "accountant", "kitchen", "supervisor"];
 
@@ -55,7 +57,7 @@ export const PERMISSION_GROUPS: { group: string; permissions: Permission[] }[] =
   { group: "Inventori & Harga", permissions: ["manage_pricing_promo", "manage_inventory_purchasing"] },
   {
     group: "Accounting & Keuangan",
-    permissions: ["view_accounting", "post_manual_journal", "manage_coa", "manage_expenses", "approve_expenses", "void_expense", "manage_assets"],
+    permissions: ["view_accounting", "post_manual_journal", "manage_coa", "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "close_period", "reopen_period"],
   },
   { group: "Laporan & Perangkat", permissions: ["view_reports", "manage_devices"] },
 ];
@@ -90,6 +92,8 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   manage_membership: "Jual/Perpanjang Keanggotaan (terima pembayaran)",
   manage_cash_deposit: "Catat Setoran Kas (Kas Besar/Saldo Deposit/Kas Kecil/Prive/Dividen)",
   void_cash_deposit: "Batalkan Setoran Kas yang Sudah Diposting",
+  close_period: "Tutup Periode Akuntansi (Kunci Bulan)",
+  reopen_period: "Buka Kembali Periode Akuntansi yang Sudah Ditutup",
 };
 
 /**
@@ -111,7 +115,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
     "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing",
     "view_reports", "manage_devices", "manage_admin_data", "kitchen_display",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_settings", "manage_bookings", "manage_ppob", "manage_coa", "manage_other_income",
-    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit",
+    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit", "close_period", "reopen_period",
   ],
   // The self-service top role for an outlet/merchant to manage its own business — same
   // permission set as "superuser" (see StaffRole comment above for the rationale for keeping
@@ -121,7 +125,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
     "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing",
     "view_reports", "manage_devices", "manage_admin_data", "kitchen_display",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_settings", "manage_bookings", "manage_ppob", "manage_coa", "manage_other_income",
-    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit",
+    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit", "close_period", "reopen_period",
   ],
   manager: [
     "view_dashboard_owner", "view_accounting", "void_order_direct", "refund_order", "approve_requests",
@@ -133,7 +137,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
   // spending itself is a manager/owner call — no approve_expenses here.
   // manage_other_income is included since booking one-off, non-core income entries
   // correctly is squarely an accounting job, same rationale as post_manual_journal.
-  accountant: ["view_accounting", "post_manual_journal", "view_reports", "manage_expenses", "void_expense", "manage_assets", "manage_coa", "manage_other_income", "manage_cash_deposit", "void_cash_deposit"],
+  // close_period included (routine month-end close is core accountant work) but NOT
+  // reopen_period — undoing a close is a higher-trust action reserved for owner/superuser,
+  // same segregation-of-duty pattern as manage_expenses (accountant) vs approve_expenses (not).
+  accountant: ["view_accounting", "post_manual_journal", "view_reports", "manage_expenses", "void_expense", "manage_assets", "manage_coa", "manage_other_income", "manage_cash_deposit", "void_cash_deposit", "close_period"],
   // approve_requests already covers reviewing void/refund/shift-close-review approvals; adding
   // manage_cash_deposit lets a supervisor record their own pickup on the spot, since they're one
   // of the four roles a cashier can name as the receiver — but not void_cash_deposit, same trust

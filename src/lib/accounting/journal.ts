@@ -2,6 +2,7 @@ import { db, type DbOrTx } from "@/db/client";
 import { journalEntries, journalLines } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getAccountIdByCode, assertPostableAccountIds } from "./coa";
+import { isPeriodLocked, periodLabel } from "./periods";
 
 export type JournalSourceType =
   | "rental"
@@ -63,6 +64,21 @@ const round = (n: number) => Math.round(n * 100) / 100;
  * local transaction so the entry+lines pair is atomic even with no wrapping caller.
  */
 export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Promise<string> {
+  const entryDate = input.entryDate ?? new Date().toISOString();
+
+  // Task #62 (period locking): "accounting period yang sudah ditutup tidak boleh menerima
+  // posting baru." Checked here — the single choke point every posting function in the app
+  // routes through — so it's enforced everywhere with zero risk of some other posting path
+  // forgetting the check. A backdated correction into a closed period must go through
+  // reopenPeriod() first (owner/superuser only); the normal fix is to post the correction with
+  // today's date instead, landing in the current open period, which is what voidJournal already
+  // does by never overriding entryDate on its reversal entries.
+  if (await isPeriodLocked(input.outletId, entryDate, dbc)) {
+    throw new Error(
+      `Periode ${periodLabel(entryDate.slice(0, 7))} sudah ditutup — tidak bisa posting jurnal baru ke periode ini ("${input.description}"). Buka kembali periode tersebut dulu jika benar-benar perlu, atau posting koreksi dengan tanggal hari ini.`
+    );
+  }
+
   const resolvedLines = await Promise.all(
     input.lines.map(async (line) => {
       const accountId = line.accountId ?? (await getAccountIdByCode(input.outletId, line.accountCode!, dbc));
@@ -93,7 +109,7 @@ export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Pr
       .insert(journalEntries)
       .values({
         outletId: input.outletId,
-        entryDate: input.entryDate ?? new Date().toISOString(),
+        entryDate,
         reference: input.reference,
         description: input.description,
         sourceType: input.sourceType,

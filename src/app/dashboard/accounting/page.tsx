@@ -25,7 +25,7 @@ const inputClsSm = "w-full rounded-lg bg-neutral-800 border border-neutral-700 p
 function Field({ label, children }: { label: string; children: any }) {
   return <label className="space-y-1 block"><div className="text-xs text-neutral-500">{label}</div>{children}</label>;
 }
-const TABS = ["Chart of Accounts", "Account Mapping", "Jurnal", "Neraca Saldo", "Piutang (AR)", "Hutang (AP)", "Laba Rugi", "Neraca", "Arus Kas", "Migrasi Data"] as const;
+const TABS = ["Chart of Accounts", "Account Mapping", "Jurnal", "Neraca Saldo", "Piutang (AR)", "Hutang (AP)", "Laba Rugi", "Neraca", "Arus Kas", "Tutup Periode", "Migrasi Data"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
@@ -38,6 +38,7 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Laba Rugi": { key: "accounting.tab.profitLoss", fallback: "Laba Rugi" },
   "Neraca": { key: "accounting.tab.balanceSheet", fallback: "Neraca" },
   "Arus Kas": { key: "accounting.tab.cashFlow", fallback: "Arus Kas" },
+  "Tutup Periode": { key: "accounting.tab.periodLock", fallback: "Tutup Periode" },
   "Migrasi Data": { key: "accounting.tab.migration", fallback: "Migrasi Data" },
 };
 
@@ -48,7 +49,8 @@ export default function AccountingPage() {
   const { t } = useDashboardLang();
   const role = (user?.role ?? "cashier") as any;
   const isMigrationRole = role === "superuser" || role === "owner";
-  const visibleTabs = TABS.filter((tb) => tb !== "Migrasi Data" || isMigrationRole);
+  const canSeePeriodLock = hasPermission(role, "close_period") || hasPermission(role, "reopen_period");
+  const visibleTabs = TABS.filter((tb) => (tb !== "Migrasi Data" || isMigrationRole) && (tb !== "Tutup Periode" || canSeePeriodLock));
 
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
@@ -92,6 +94,8 @@ export default function AccountingPage() {
         <BalanceSheetTab outletId={outletId} />
       ) : tab === "Arus Kas" ? (
         <CashFlowTab outletId={outletId} />
+      ) : tab === "Tutup Periode" ? (
+        <PeriodLockTab />
       ) : (
         <DataMigrationTab outletId={outletId} />
       )}
@@ -1320,6 +1324,125 @@ function CashFlowTab({ outletId }: { outletId: string }) {
  * are Owner/Superuser-only (page-level gate above) since bulk-injecting
  * financial history is high-trust, one-time work.
  */
+/** Task #62 — close/reopen accounting periods (month granularity) so postJournal rejects any new posting dated inside a closed one. */
+function PeriodLockTab() {
+  const { t } = useDashboardLang();
+  const { user } = useAuth();
+  const role = (user?.role ?? "cashier") as any;
+  const canClose = hasPermission(role, "close_period");
+  const canReopen = hasPermission(role, "reopen_period");
+
+  const [periods, setPeriods] = useState<any[]>([]);
+  const [monthInput, setMonthInput] = useState(new Date().toISOString().slice(0, 7));
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    fetchJsonArray("/api/accounting/periods").then(setPeriods);
+  };
+  useEffect(load, []);
+
+  const monthLabel = (period: string) => {
+    const [y, m] = period.split("-");
+    const idx = Number(m) - 1;
+    const names = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    return idx >= 0 && idx < 12 ? `${names[idx]} ${y}` : period;
+  };
+
+  const doClose = async () => {
+    const ok = await showConfirm(
+      t("accounting.periodLock.confirmClose", 'Tutup periode "{period}"? Setelah ditutup, tidak ada jurnal baru (otomatis maupun manual) yang bisa diposting dengan tanggal di dalam periode ini.').replace("{period}", monthLabel(monthInput))
+    );
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/accounting/periods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ period: monthInput, note: note || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setNote("");
+      load();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const doReopen = async (period: string) => {
+    const reason = prompt(t("accounting.periodLock.reopenPrompt", 'Alasan membuka kembali periode "{period}"?').replace("{period}", monthLabel(period)));
+    if (reason === null) return;
+    const res = await fetch("/api/accounting/periods/reopen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ period, note: reason || undefined }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showAlert(data.error);
+    load();
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-amber-500/30">
+        <h2 className="font-medium mb-1">{t("accounting.periodLock.heading", "Tutup Periode Akuntansi")}</h2>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "accounting.periodLock.description",
+            "Setelah sebuah periode (bulan) ditutup, tidak ada jurnal baru yang bisa diposting dengan tanggal di dalam periode itu — baik otomatis (penjualan, expense, dst.) maupun manual. Ini menjaga laporan keuangan bulan yang sudah dilaporkan tidak berubah lagi setelahnya. Kalau ada koreksi yang perlu dicatat setelah periode ditutup, posting koreksinya dengan tanggal hari ini (periode berjalan), bukan membuka kembali periode lama, kecuali benar-benar diperlukan."
+          )}
+        </p>
+      </Card>
+
+      {canClose && (
+        <Card className="space-y-3">
+          <h2 className="font-medium text-sm">{t("accounting.periodLock.closeHeading", "Tutup Periode Baru")}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Field label={t("accounting.periodLock.fieldMonth", "Bulan")}>
+              <input type="month" className={inputClsSm} value={monthInput} onChange={(e) => setMonthInput(e.target.value)} />
+            </Field>
+            <Field label={t("accounting.periodLock.fieldNote", "Catatan (opsional)")}>
+              <input className={inputClsSm} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("accounting.periodLock.placeholderNote", "mis. Sudah dilaporkan ke owner")} />
+            </Field>
+          </div>
+          <Button onClick={doClose} disabled={saving}>{saving ? t("accounting.common.saving", "Menyimpan...") : t("accounting.periodLock.closeButton", "Tutup Periode Ini")}</Button>
+        </Card>
+      )}
+
+      <Card>
+        <h2 className="font-medium mb-2 text-sm">{t("accounting.periodLock.historyHeading", "Riwayat Periode")}</h2>
+        {periods.length === 0 && <p className="text-sm text-neutral-500">{t("accounting.periodLock.emptyState", "Belum ada periode yang pernah ditutup — semua periode masih terbuka.")}</p>}
+        <div className="space-y-2">
+          {periods.map((p) => (
+            <div key={p.id} className="flex items-center justify-between border-b border-neutral-800 pb-2 last:border-0">
+              <div>
+                <div className="text-sm font-medium">{monthLabel(p.period)}</div>
+                <div className="text-xs text-neutral-500">
+                  {p.status === "closed"
+                    ? t("accounting.periodLock.statusClosedAt", "Ditutup {date}").replace("{date}", p.closedAt ? new Date(p.closedAt).toLocaleString("id-ID") : "-")
+                    : t("accounting.periodLock.statusReopenedAt", "Dibuka kembali {date}").replace("{date}", p.reopenedAt ? new Date(p.reopenedAt).toLocaleString("id-ID") : "-")}
+                  {p.note ? ` — ${p.note}` : ""}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-1 rounded-full ${p.status === "closed" ? "bg-red-500/10 text-red-400" : "bg-emerald-500/10 text-emerald-400"}`}>
+                  {p.status === "closed" ? t("accounting.periodLock.badgeClosed", "Tertutup") : t("accounting.periodLock.badgeOpen", "Terbuka")}
+                </span>
+                {p.status === "closed" && canReopen && (
+                  <button className="text-xs text-amber-400 hover:underline" onClick={() => doReopen(p.period)}>
+                    {t("accounting.periodLock.reopenButton", "Buka Kembali")}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function DataMigrationTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   return (

@@ -616,6 +616,31 @@ export const journalLines = pgTable(
   (t) => [index("journal_lines_entry_idx").on(t.journalEntryId), index("journal_lines_account_idx").on(t.accountId)]
 );
 
+/**
+ * Task #62 (period locking): one row per outlet+period ("YYYY-MM") that has ever been touched —
+ * a period with NO row is implicitly open (the default state; most periods never get a row at
+ * all). Closing a period inserts/updates a row to status "closed"; reopening flips it back to
+ * "open" rather than deleting the row, so the close/reopen history (who, when, why) survives for
+ * audit purposes. postJournal (accounting/journal.ts) checks this via isPeriodLocked() before
+ * writing any new entry — see lib/accounting/periods.ts.
+ */
+export const accountingPeriods = pgTable(
+  "accounting_periods",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    period: text("period").notNull(), // "YYYY-MM"
+    status: text("status", { enum: ["open", "closed"] }).notNull().default("closed"),
+    closedBy: text("closed_by").references(() => staffUsers.id),
+    closedAt: text("closed_at"),
+    reopenedBy: text("reopened_by").references(() => staffUsers.id),
+    reopenedAt: text("reopened_at"),
+    note: text("note"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("accounting_periods_outlet_period_idx").on(t.outletId, t.period)]
+);
+
 export const cashBankAccounts = pgTable("cash_bank_accounts", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),
