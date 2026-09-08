@@ -3,7 +3,7 @@ import { db } from "@/db/client";
 import {
   orders, orderItems, payments, expenses, rentalUnits, rentalSessions,
   products, customers, receivables, purchaseInvoices,
-  bookings, cashBankAccounts, ppobTransactions, outlets,
+  bookings, cashBankAccounts, outlets,
 } from "@/db/schema";
 import { sql, eq, and, inArray } from "drizzle-orm";
 import { computeProfitLoss, computeTrialBalance } from "@/lib/accounting/reports";
@@ -11,9 +11,26 @@ import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
 import { outletHour, outletDayStartUtc } from "@/lib/time/outlet-time";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
-// Shared with the accounting engine (lib/accounting/postings.ts) instead of a locally hand-copied
-// list — see FNB_CATEGORIES' own doc comment there for why keeping a second copy here was a bug.
-import { FNB_CATEGORIES } from "@/lib/accounting/postings";
+
+/**
+ * Buckets a COA revenue account code into this dashboard's own revenue-by-source breakdown —
+ * finer-grained than glRevenueBucket (lib/reports/transactions.ts) since this widget shows
+ * regular-vs-member rental and add-ons as separate rows, and PPOB revenue split out on its own
+ * (glRevenueBucket collapses these together into one "rental" bucket for Transaction Center's
+ * simpler 4-way Rental/F&B/Produk/PPOB view). See the account ranges in lib/accounting/coa-data.ts
+ * and the seed rows in lib/accounting/account-mapping.ts DEFAULT_MAPPING_SEED.
+ */
+function dashboardRevenueBucket(code: string): "rentalReguler" | "rentalMember" | "addon" | "fnb" | "produk" | "ppob" | "lainLain" | "homeRental" | "other" {
+  if (code === "4180") return "rentalMember";
+  if (code.startsWith("41")) return "rentalReguler";
+  if (code.startsWith("435") || code === "4530") return "addon"; // non-member (4351-4354) + member (4530) add-on rental
+  if (code.startsWith("42") || code === "4510") return "fnb"; // base F&B (42xx) + member F&B (4510)
+  if ((code.startsWith("43") && !code.startsWith("435")) || code === "4520") return "produk"; // retail merchandise/accessory (43xx excl. 435x) + member product (4520)
+  if (code.startsWith("44")) return "ppob"; // PPOB revenue == providerFee + feeAdmin, per buildPpobJournalLines in lib/ppob/engine.ts
+  if (code.startsWith("46")) return "lainLain"; // service charge/tax/misc catch-all (postSalesJournal uses 4650)
+  if (code.startsWith("48")) return "homeRental"; // Home Rental (Sewa Dibawa Pulang) — a fully separate module, doesn't come from orders/orderItems at all
+  return "other"; // 47xx Other Income (its own dashboard), 49xx Contra Revenue (discount — netted into lainLain separately, see below)
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,7 +54,7 @@ export async function GET(req: NextRequest) {
 
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // ---- Revenue today (split rental vs POS/F&B by whether the order is tied to a rental session) ----
+    // ---- Wave 1: independent queries this route needs, run concurrently ----
     // This route used to run ~20 db calls one after another — every await here waited for the
     // previous round-trip through the Supabase pooler to finish before starting the next, even
     // though most of these queries don't actually depend on each other. Polled every 30s by
@@ -61,7 +78,6 @@ export async function GET(req: NextRequest) {
       openReceivables,
       openPurchaseInvoices,
       openPayableExpenses,
-      ppobToday,
       bankAccounts,
       trialBalance,
       pl,
@@ -83,7 +99,6 @@ export async function GET(req: NextRequest) {
       db.select().from(receivables).where(sql`${receivables.outletId} = ${outletId} AND ${receivables.status} NOT IN ('paid','written_off')`),
       db.select().from(purchaseInvoices).where(sql`${purchaseInvoices.outletId} = ${outletId} AND ${purchaseInvoices.status} != 'paid'`),
       db.select().from(expenses).where(sql`${expenses.outletId} = ${outletId} AND ${expenses.recordAsPayable} = true AND ${expenses.status} = 'approved'`),
-      db.select({ feeAdmin: ppobTransactions.feeAdmin }).from(ppobTransactions).where(sql`${ppobTransactions.outletId} = ${outletId} AND ${ppobTransactions.createdAt} >= ${dayStartIso}`),
       db.select().from(cashBankAccounts).where(and(eq(cashBankAccounts.outletId, outletId), eq(cashBankAccounts.type, "bank"))),
       // Saldo Kas/Rekening is a balance-sheet figure — it has to stay a true all-time running
       // balance (every rupiah in/out since day one), NOT bounded to today/this-month, or the
@@ -101,81 +116,51 @@ export async function GET(req: NextRequest) {
       isFeatureEnabled(outletId, "HOME_RENTAL_ENABLED"),
     ]);
 
-    const revenueRental = paidOrdersToday.filter((o) => o.rentalSessionId).reduce((s, o) => s + o.total, 0);
-    const revenuePos = paidOrdersToday.filter((o) => !o.rentalSessionId).reduce((s, o) => s + o.total, 0);
-    const omzet = revenueRental + revenuePos;
-
     const orderIdsToday = paidOrdersToday.map((o) => o.id);
-    const rentalSessionIdsToday = Array.from(new Set(paidOrdersToday.map((o) => o.rentalSessionId).filter((id): id is string => !!id)));
 
-    // ---- Wave 2: only depends on paidOrdersToday (wave 1) ----
-    const [itemsToday, cashPaymentsToday, sessionsForOrdersToday] = await Promise.all([
-      orderIdsToday.length ? db.select().from(orderItems).where(inArray(orderItems.orderId, orderIdsToday)) : Promise.resolve([]),
-      orderIdsToday.length ? db.select().from(payments).where(and(inArray(payments.orderId, orderIdsToday), eq(payments.method, "cash"), eq(payments.status, "success"))) : Promise.resolve([]),
-      rentalSessionIdsToday.length ? db.select().from(rentalSessions).where(inArray(rentalSessions.id, rentalSessionIdsToday)) : Promise.resolve([]),
-    ]);
-
-    // ---- Revenue F&B vs "produk lain" (sewa alat/lain-lain), split by item-level product category ----
-    // NOTE: this is item-level subtotal (qty x unitPrice) before order-level tax/discount/service-charge
-    // allocation, so revenueFnb + revenueProduk won't exactly equal revenuePos when those apply — it's a
-    // category breakdown, not a re-derivation of the exact paid total.
-    const itemProductIds = Array.from(new Set(itemsToday.map((i) => i.productId).filter((id): id is string => !!id)));
-    const itemProducts = itemProductIds.length
-      ? await db.select({ id: products.id, category: products.category }).from(products).where(inArray(products.id, itemProductIds))
-      : [];
-    const categoryByProductId = new Map(itemProducts.map((p) => [p.id, p.category]));
-
-    let revenueFnb = 0;
-    let revenueProduk = 0;
-    for (const item of itemsToday) {
-      if (!item.productId) continue; // rental line items have no productId, already counted in revenueRental
-      const category = categoryByProductId.get(item.productId);
-      if (category && FNB_CATEGORIES.has(category)) revenueFnb += item.lineTotal;
-      else revenueProduk += item.lineTotal;
-    }
-
-    // ---- Full revenue-by-source breakdown (mirrors the accounting engine's routing in
-    // postings.ts: rental split member/reguler by session.customerId membership, accessory
-    // add-ons kept separate from the base rental charge, F&B vs retail product by category,
-    // plus PPOB margin — which lives in a completely separate table, not orders/orderItems). ----
-    const sessionByIdToday = new Map(sessionsForOrdersToday.map((s) => [s.id, s]));
-    const customerIdsForSessionsToday = Array.from(new Set(sessionsForOrdersToday.map((s) => s.customerId).filter((id): id is string => !!id)));
-    const sessionCustomersToday = customerIdsForSessionsToday.length
-      ? await db.select({ id: customers.id, membershipTierId: customers.membershipTierId }).from(customers).where(inArray(customers.id, customerIdsForSessionsToday))
-      : [];
-    const isMemberByCustomerId = new Map(sessionCustomersToday.map((c) => [c.id, !!c.membershipTierId]));
-    const orderByIdToday = new Map(paidOrdersToday.map((o) => [o.id, o]));
-
+    // ---- Revenue today, sourced from the General Ledger (the same computeProfitLoss("Hari Ini")
+    // this route's own grossProfit/netProfit below already use) instead of re-deriving it from
+    // raw orders/orderItems filtered by orders.createdAt. Those two are NOT the same "today": a
+    // rental session started yesterday (or a bill amended mid-stay) but paid/settled today posts
+    // its revenue to the GL with today's entryDate — correctly included in grossProfit/netProfit
+    // (already GL-sourced via `pl`) and in Accounting > Laba Rugi's "Hari Ini" — but an
+    // orders.createdAt-filtered query for "today" excludes it entirely, since the order itself was
+    // created yesterday. That's exactly what made this dashboard's "Pendapatan Hari Ini" (and its
+    // revenue-by-source breakdown) disagree with its own "Laba Kotor"/"Estimasi Laba Bersih" cards
+    // on the very same page — the identical root cause, and identical fix, already applied to
+    // Transaction Center's summary cards (see glRevenueBucket in lib/reports/transactions.ts).
+    // dashboardRevenueBucket below is that same idea with finer buckets (regular vs member rental,
+    // add-ons split out, PPOB) to match what this dashboard's breakdown widget displays.
     const revenueBySource = { rentalReguler: 0, rentalMember: 0, addon: 0, homeRental: 0, fnb: 0, produk: 0, ppob: 0, lainLain: 0 };
-    for (const item of itemsToday) {
-      if (item.itemType === "rental") {
-        const order = orderByIdToday.get(item.orderId);
-        const session = order?.rentalSessionId ? sessionByIdToday.get(order.rentalSessionId) : null;
-        const isMember = session?.customerId ? !!isMemberByCustomerId.get(session.customerId) : false;
-        if (isMember) revenueBySource.rentalMember += item.lineTotal;
-        else revenueBySource.rentalReguler += item.lineTotal;
-      } else if (item.itemType === "accessory") {
-        revenueBySource.addon += item.lineTotal;
-      } else if (item.itemType === "product" && item.productId) {
-        const category = categoryByProductId.get(item.productId);
-        if (category && FNB_CATEGORIES.has(category)) revenueBySource.fnb += item.lineTotal;
-        else revenueBySource.produk += item.lineTotal;
-      } else {
-        revenueBySource.lainLain += item.lineTotal;
-      }
+    for (const r of pl.revenue) {
+      if (!r.isPostingAllowed) continue;
+      const bucket = dashboardRevenueBucket(r.code);
+      if (bucket === "other") continue; // 47xx Other Income (its own dashboard/report), 49xx Contra Revenue (netted into lainLain below instead)
+      revenueBySource[bucket] += r.balance;
     }
-    // Service charge + tax post to the same "Lain-lain" bucket as postSalesJournal (postings.ts).
-    revenueBySource.lainLain += paidOrdersToday.reduce((s, o) => s + (o.serviceCharge ?? 0) + (o.tax ?? 0), 0);
-    revenueBySource.ppob = ppobToday.reduce((s, t) => s + (t.feeAdmin ?? 0), 0);
-    // Home Rental revenue doesn't come from orders/orderItems at all (it's a fully separate
-    // module — homeRentalRentals, see lib/home-rental/rentals.ts), so unlike every other bucket
-    // above it's pulled straight from the GL (pl.revenue, already computed for this same "today"
-    // window) instead of a hand-rolled query: account family 4800 HOME RENTAL REVENUE. This also
-    // guarantees it always ties out exactly to the Laba Rugi report, the same report this
-    // breakdown is meant to summarize on the dashboard.
-    revenueBySource.homeRental = pl.revenue.filter((r) => r.code.startsWith("48") && r.isPostingAllowed).reduce((s, r) => s + r.balance, 0);
+    // Nets the day's discount out of the catch-all bucket so the buckets' own sum ties back
+    // exactly to pl.totalRevenue (already net of discount) — same netting pattern used for
+    // Transaction Center's summary cards in lib/reports/transactions.ts.
+    revenueBySource.lainLain -= pl.totalDiscount;
 
     const revenueBySourceTotal = Object.values(revenueBySource).reduce((s, v) => s + v, 0);
+    const omzet = pl.totalRevenue;
+    const revenueRental = revenueBySource.rentalReguler + revenueBySource.rentalMember + revenueBySource.addon;
+    const revenueFnb = revenueBySource.fnb;
+    const revenueProduk = revenueBySource.produk;
+
+    // ---- Wave 2: only depends on paidOrdersToday (wave 1) — itemsToday/cashPaymentsToday still
+    // drive operational (not financial-summary) widgets below: top products sold today and cash
+    // physically received today, both legitimately scoped to "orders created today" rather than
+    // "revenue recognized today" (an item rung up on an order created today is today's operational
+    // activity regardless of which day its cash ultimately gets journaled). No longer needs
+    // rentalSessions/customers for a member-vs-regular split — that now comes straight from the
+    // GL above (accounts 4180/4530/4510/4520), removing what was a hand-rolled re-derivation of
+    // logic the accounting engine (postings.ts) already owns.
+    const [itemsToday, cashPaymentsToday] = await Promise.all([
+      orderIdsToday.length ? db.select().from(orderItems).where(inArray(orderItems.orderId, orderIdsToday)) : Promise.resolve([]),
+      orderIdsToday.length ? db.select().from(payments).where(and(inArray(payments.orderId, orderIdsToday), eq(payments.method, "cash"), eq(payments.status, "success"))) : Promise.resolve([]),
+    ]);
 
     // ---- Target penjualan (BEP) — manual monthly figure set by superuser in Settings, split
     // into a daily figure at read time by dividing by the number of days in the current month.
