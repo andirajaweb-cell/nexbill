@@ -1,0 +1,10 @@
+﻿feat: view/edit/delete Belanja Supplier + purchase invoices with role gate
+
+- Add manage_supplier_purchase_history permission (owner/superuser/supervisor/manager only)
+- Schema: stockMovements.unitCost, purchaseInvoices.status=cancelled, new purchaseInvoiceItems table (needs drizzle-kit push)
+- lib/inventory/cost-replay.ts: pure WAC replay to recompute costPrice after invoice void/edit (unit tested)
+- lib/inventory/purchase-invoice-correction.ts: reverse/void/edit-in-place for ALL purchase invoices (standalone + PO-linked), rolls back PO qtyReceived, preserves paid status across edits
+- New API routes GET/PATCH/DELETE /api/purchase-invoices/[id], gated behind manage_supplier_purchase_history
+- recordSupplierPurchase/receivePurchaseOrder now populate purchaseInvoiceItems and accept explicit cashBankAccountId
+- UI: View/Edit/Delete controls, cash/bank source dropdown, submit busy-guard + saved confirmation to prevent duplicate BLJ-* entries (the exact bug reported via screenshot)
+- i18n strings added across 6 languages

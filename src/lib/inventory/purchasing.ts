@@ -3,6 +3,7 @@ import {
   purchaseOrders,
   purchaseOrderItems,
   purchaseInvoices,
+  purchaseInvoiceItems,
   purchasePayments,
   purchaseReturns,
   products,
@@ -65,6 +66,7 @@ export async function receivePurchaseOrder(
 
   let receivedAmount = 0;
   let anyPartial = false;
+  const receivedLines: { productId: string; qty: number; unitCost: number; landedUnitCost: number }[] = [];
 
   for (const item of items) {
     const qtyToReceive = receivedQtyByItemId ? (receivedQtyByItemId[item.id] ?? 0) : item.qtyOrdered - item.qtyReceived;
@@ -91,6 +93,12 @@ export async function receivePurchaseOrder(
 
     receivedAmount += qtyToReceive * item.unitCost;
     if (item.qtyReceived + qtyToReceive < item.qtyOrdered) anyPartial = true;
+
+    // Stashed here, inserted below once we know the invoice id (a PO receipt may span several
+    // invoices over time, so purchaseInvoiceItems must be tied to this specific invoice, not the
+    // PO or the item). See the schema doc comment on purchaseInvoiceItems for why this exists
+    // alongside purchaseOrderItems.
+    receivedLines.push({ productId: item.productId, qty: qtyToReceive, unitCost: item.unitCost, landedUnitCost: item.unitCost });
   }
 
   const updatedItems = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
@@ -114,6 +122,15 @@ export async function receivePurchaseOrder(
         status: "unpaid",
       })
       .returning();
+    for (const line of receivedLines) {
+      await db.insert(purchaseInvoiceItems).values({
+        purchaseInvoiceId: inv.id,
+        productId: line.productId,
+        qty: line.qty,
+        unitCost: line.unitCost,
+        landedUnitCost: line.landedUnitCost,
+      });
+    }
     await postPurchaseInvoiceJournal(inv.id);
     invoice = inv;
   }
@@ -185,6 +202,10 @@ export interface RecordSupplierPurchaseInput {
   /** Most "belanja" trips are paid cash on the spot — defaults to true. Pass false to book it as payable (hutang) instead. */
   paidNow?: boolean;
   paymentMethod?: string;
+  /** Explicit kas/bank source the user picked in the dropdown (see cashBankAccounts) — when given, used as-is instead of
+   *  auto-resolving one from paymentMethod via getCashBankAccountIdForPaymentMethod. Lets a shop with several cash drawers
+   *  or bank accounts record which one actually paid for this purchase, instead of always guessing "the" cash account. */
+  cashBankAccountId?: string;
   staffUserId?: string;
 }
 
@@ -243,6 +264,13 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
       `Belanja supplier ${invoiceNumber}${additionalCostsTotal > 0 ? " (termasuk ongkos transport/parkir/lain-lain)" : ""}`,
       input.staffUserId
     );
+    await db.insert(purchaseInvoiceItems).values({
+      purchaseInvoiceId: invoice.id,
+      productId: line.productId,
+      qty: line.qty,
+      unitCost: line.unitCost,
+      landedUnitCost: line.landedUnitCost,
+    });
   }
 
   // Dr 1200 Persediaan (grandTotal — goods + landed costs) / Cr 2000 Hutang Usaha.
@@ -251,7 +279,7 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
   let payment = null;
   if (input.paidNow !== false) {
     const method = input.paymentMethod ?? "cash";
-    const cashBankAccountId = await getCashBankAccountIdForPaymentMethod(input.outletId, method);
+    const cashBankAccountId = input.cashBankAccountId || (await getCashBankAccountIdForPaymentMethod(input.outletId, method));
     // Immediately settles the payable just posted above — net effect Dr 1200 / Cr Kas,Bank.
     payment = await payPurchaseInvoice(invoice.id, grandTotal, method, cashBankAccountId, input.staffUserId);
   }

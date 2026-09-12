@@ -369,6 +369,18 @@ export const stockMovements = pgTable(
     productId: text("product_id").notNull().references(() => products.id),
     type: text("type", { enum: ["purchase_in", "sale_out", "adjustment", "waste"] }).notNull(),
     qty: integer("qty").notNull(),
+    // The landed unit cost this specific movement blended into (purchase_in) or was valued at
+    // (a correcting/reversal adjustment) — nullable because historical rows predate this column
+    // and never had a cost recorded per-movement, only as a transient input to the one rolling
+    // products.costPrice weighted average (see receiveStockForItem in lib/inventory/stock.ts),
+    // which the OLD blend inputs are lost the moment a later purchase overwrites it. Added so a
+    // purchase invoice can be voided or edited later and products.costPrice recomputed correctly
+    // via a full chronological replay of this product's movements (see replayCostPrice in
+    // lib/inventory/cost-replay.ts) instead of guessing. A movement with unitCost NULL (legacy, or
+    // any non-purchase movement type) is treated by that replay as "cost unknown" — for an inflow
+    // that means blending in at whatever the running average already was at that point (a neutral,
+    // non-corrupting assumption), never as if it cost 0.
+    unitCost: doublePrecision("unit_cost"),
     note: text("note"),
     refOrderId: text("ref_order_id"),
     staffUserId: text("staff_user_id").references(() => staffUsers.id),
@@ -1134,11 +1146,45 @@ export const purchaseInvoices = pgTable(
     dueDate: text("due_date"),
     amount: doublePrecision("amount").notNull(),
     paidAmount: doublePrecision("paid_amount").notNull().default(0),
-    status: text("status", { enum: ["unpaid", "partial", "paid"] }).notNull().default("unpaid"),
+    // "cancelled": added for the void/edit-history feature (see purchase-invoice-correction.ts) —
+    // an invoice a manager+ role voided (or the automatic reverse-half of an in-place edit).
+    // Never a real "un-posting"; its stock/payment/journal effects are all explicitly reversed
+    // first (reversal stock movements, voided journals, purchaseOrderItems.qtyReceived rolled
+    // back if PO-linked) and the row stays in history for audit purposes, distinguishable at a
+    // glance from a normal unpaid/partial/paid invoice.
+    status: text("status", { enum: ["unpaid", "partial", "paid", "cancelled"] }).notNull().default("unpaid"),
     journalEntryId: text("journal_entry_id"),
     ...timestamps,
   },
   (t) => [index("purchase_invoices_outlet_status_idx").on(t.outletId, t.status)]
+);
+
+// Per-product line items for a purchase invoice — the canonical "what's actually in this
+// invoice" record, added for the View/Edit/Delete feature (see
+// lib/inventory/purchase-invoice-correction.ts). Before this, a Belanja Supplier invoice's
+// composition could only be reverse-engineered indirectly from stockMovements rows sharing its
+// id as refOrderId — workable for the stock/cost-replay math (which still uses that), but fragile
+// and indirect for a UI that needs to show/edit "which products, what qty, what price" directly.
+// A formal PO-received invoice (receivePurchaseOrder) populates this too, even though
+// purchaseOrderItems already exists — that table is keyed to the PO (which can span several
+// partial-delivery invoices), not to any one invoice, so it can't answer "what did THIS invoice
+// cover" on its own.
+// Nullable/absent for any invoice created before this table existed — View/Edit/Delete degrade
+// gracefully for those (see the doc comment on reverseInvoiceEffects), never crash.
+export const purchaseInvoiceItems = pgTable(
+  "purchase_invoice_items",
+  {
+    id: id(),
+    purchaseInvoiceId: text("purchase_invoice_id").notNull().references(() => purchaseInvoices.id),
+    productId: text("product_id").notNull().references(() => products.id),
+    qty: integer("qty").notNull(),
+    /** Price paid to the supplier per unit, before landed-cost proration — matches SupplierPurchaseItemInput.unitCost / purchaseOrderItems.unitCost. */
+    unitCost: doublePrecision("unit_cost").notNull(),
+    /** unitCost + this line's prorated share of transport/parking/other incidental costs — what actually got blended into products.costPrice. Equals unitCost for a formal PO receipt (no incidental-cost proration there). */
+    landedUnitCost: doublePrecision("landed_unit_cost").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("purchase_invoice_items_invoice_idx").on(t.purchaseInvoiceId)]
 );
 
 export const purchasePayments = pgTable("purchase_payments", {

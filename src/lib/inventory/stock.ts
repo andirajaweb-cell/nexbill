@@ -54,9 +54,10 @@ export async function receiveStockForItem(
   landedUnitCost: number,
   refId: string,
   note: string,
-  staffUserId?: string
+  staffUserId?: string,
+  dbc: DbOrTx = db
 ) {
-  const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+  const [product] = await dbc.select().from(products).where(eq(products.id, productId)).limit(1);
   if (!product) throw new Error("Produk tidak ditemukan.");
 
   const existingQty = Math.max(0, product.stockQty);
@@ -65,8 +66,8 @@ export async function receiveStockForItem(
   const newQty = existingQty + qty;
   const newCostPrice = newQty > 0 ? (existingValue + incomingValue) / newQty : landedUnitCost;
 
-  await db.insert(stockMovements).values({ productId, type: "purchase_in", qty, note, refOrderId: refId, staffUserId });
-  await db
+  await dbc.insert(stockMovements).values({ productId, type: "purchase_in", qty, unitCost: landedUnitCost, note, refOrderId: refId, staffUserId });
+  await dbc
     .update(products)
     .set({ stockQty: sql`${products.stockQty} + ${qty}`, costPrice: Math.round(newCostPrice * 100) / 100 })
     .where(eq(products.id, productId));

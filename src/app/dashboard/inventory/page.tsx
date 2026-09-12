@@ -917,10 +917,17 @@ function SupplierTab({ outletId }: { outletId: string }) {
 function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
+  const { user } = useAuth();
+  // Gate: exactly owner/superuser/supervisor/manager by default (see DEFAULT_ROLE_PERMISSIONS in
+  // permissions.ts) — narrower than manage_inventory_purchasing (which also covers product/recipe/
+  // PO CRUD and isn't granted to supervisor), specifically for the View/Edit/Delete history
+  // capability the user asked for on this tab.
+  const canManageHistory = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_supplier_purchase_history");
   const [invoices, setInvoices] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [recipeProductIds, setRecipeProductIds] = useState<Set<string>>(new Set());
+  const [cashBankAccounts, setCashBankAccounts] = useState<any[]>([]);
   const [supplierId, setSupplierId] = useState("");
   const [itemForm, setItemForm] = useState({ productId: "", qty: 1, unitCost: 0 });
   const [cart, setCart] = useState<{ productId: string; qty: number; unitCost: number }[]>([]);
@@ -928,7 +935,17 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const [parkingCost, setParkingCost] = useState(0);
   const [otherCost, setOtherCost] = useState(0);
   const [paidNow, setPaidNow] = useState(true);
+  const [cashBankAccountId, setCashBankAccountId] = useState("");
   const [lastResult, setLastResult] = useState<any>(null);
+  // Double/triple-tap on "Simpan Belanja" with no busy guard previously created several identical
+  // BLJ-* invoices for the same purchase (the exact bug the user reported with a screenshot) —
+  // `submitting` disables the button for the duration of the request, and a themed showAlert
+  // confirms the save so the user isn't left guessing whether their first click registered.
+  const [submitting, setSubmitting] = useState(false);
+  const [viewing, setViewing] = useState<{ invoice: any; lines: any[]; isLegacy: boolean } | null>(null);
+  const [editing, setEditing] = useState<{ invoiceId: string; invoiceNumber: string; cart: { productId: string; qty: number; unitCost: number }[]; reason: string } | null>(null);
+  const [editItemForm, setEditItemForm] = useState({ productId: "", qty: 1, unitCost: 0 });
+  const [busyInvoiceId, setBusyInvoiceId] = useState<string | null>(null);
 
   const load = () => fetchJsonArray(`/api/purchase-invoices?outletId=${outletId}`).then(setInvoices);
   useEffect(() => {
@@ -936,6 +953,10 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
     fetchJsonArray(`/api/suppliers?outletId=${outletId}`).then(setSuppliers);
     fetchJsonArray("/api/products").then(setProducts);
     fetchJsonArray("/api/recipes").then((rows) => setRecipeProductIds(new Set(rows.map((r: any) => r.productId))));
+    fetchJsonArray(`/api/cash-bank-accounts?outletId=${outletId}`).then((rows) => {
+      setCashBankAccounts(rows);
+      setCashBankAccountId((prev) => prev || rows.find((r: any) => r.isDefault)?.id || rows[0]?.id || "");
+    });
   }, [outletId]);
 
   // Any active product NOT made via a recipe/BOM is fair game to "buy" here — this used to be
@@ -960,21 +981,100 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const removeFromCart = (i: number) => setCart((prev) => prev.filter((_, idx) => idx !== i));
 
   const submit = async () => {
+    if (submitting) return; // busy guard — see the `submitting` state doc comment above
     if (!supplierId) return showAlert(t("inventory.supplierPurchase.chooseSupplierAlert", "Pilih supplier dulu."));
     if (cart.length === 0) return showAlert(t("inventory.supplierPurchase.needItemAlert", "Tambah minimal 1 item belanja."));
-    const res = await fetch("/api/supplier-purchases", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ outletId, supplierId, items: cart, transportCost, parkingCost, otherCost, paidNow }),
-    });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
-    setLastResult(data);
-    setCart([]);
-    setTransportCost(0);
-    setParkingCost(0);
-    setOtherCost(0);
-    load();
+    if (paidNow && cashBankAccounts.length > 0 && !cashBankAccountId) {
+      return showAlert(t("inventory.supplierPurchase.chooseCashBankAlert", "Pilih sumber kas/bank yang dipakai untuk membayar belanja ini."));
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/supplier-purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outletId, supplierId, items: cart, transportCost, parkingCost, otherCost, paidNow, cashBankAccountId: paidNow ? cashBankAccountId : undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setLastResult(data);
+      setCart([]);
+      setTransportCost(0);
+      setParkingCost(0);
+      setOtherCost(0);
+      load();
+      // Explicit "saved" confirmation the user asked for, on top of the result card below — the
+      // double-tap bug happened because nothing told the user their first click had already
+      // worked, so they kept clicking.
+      await showAlert(t("inventory.supplierPurchase.savedNotification", "Belanja {invoiceNumber} berhasil tersimpan.").replace("{invoiceNumber}", data.invoice.invoiceNumber));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openView = async (invoiceId: string) => {
+    const data = await fetchJsonObject<{ invoice: any; lines: any[]; isLegacy: boolean }>(`/api/purchase-invoices/${invoiceId}`);
+    if (data) setViewing(data);
+  };
+
+  const openEdit = async (invoiceId: string, invoiceNumber: string) => {
+    const data = await fetchJsonObject<{ invoice: any; lines: any[]; isLegacy: boolean }>(`/api/purchase-invoices/${invoiceId}`);
+    if (!data) return;
+    if (data.isLegacy) {
+      return showAlert(t("inventory.supplierPurchase.legacyNoEdit", "Invoice ini dibuat sebelum fitur edit tersedia, jadi rinciannya tidak bisa dipastikan ulang — hanya bisa dilihat atau dibatalkan."));
+    }
+    setEditing({ invoiceId, invoiceNumber, cart: data.lines.map((l: any) => ({ productId: l.productId, qty: l.qty, unitCost: l.unitCost })), reason: "" });
+  };
+
+  const addEditItem = () => {
+    if (!editing || !editItemForm.productId || !editItemForm.qty || editItemForm.unitCost <= 0) return;
+    setEditing({ ...editing, cart: [...editing.cart, { ...editItemForm }] });
+    setEditItemForm({ productId: "", qty: 1, unitCost: 0 });
+  };
+  const removeEditItem = (i: number) => {
+    if (!editing) return;
+    setEditing({ ...editing, cart: editing.cart.filter((_, idx) => idx !== i) });
+  };
+
+  const submitEdit = async () => {
+    if (!editing || busyInvoiceId) return;
+    if (editing.cart.length === 0) return showAlert(t("inventory.supplierPurchase.needItemAlert", "Tambah minimal 1 item belanja."));
+    setBusyInvoiceId(editing.invoiceId);
+    try {
+      const lines = editing.cart.map((c) => ({ productId: c.productId, qty: c.qty, unitCost: c.unitCost, landedUnitCost: c.unitCost }));
+      const res = await fetch(`/api/purchase-invoices/${editing.invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lines, reason: editing.reason || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setEditing(null);
+      load();
+      await showAlert(t("inventory.supplierPurchase.editSaved", "Koreksi invoice {invoiceNumber} tersimpan.").replace("{invoiceNumber}", editing.invoiceNumber));
+    } finally {
+      setBusyInvoiceId(null);
+    }
+  };
+
+  const deleteInvoice = async (invoiceId: string, invoiceNumber: string) => {
+    const ok = await showConfirm(
+      t("inventory.supplierPurchase.confirmDelete", 'Batalkan invoice "{n}"? Stok, HPP, dan jurnal yang terkait akan dikembalikan seperti sebelum invoice ini dibuat. Tidak bisa dibatalkan lagi setelah ini.').replace("{n}", invoiceNumber),
+      { tone: "danger" }
+    );
+    if (!ok) return;
+    setBusyInvoiceId(invoiceId);
+    try {
+      const res = await fetch(`/api/purchase-invoices/${invoiceId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Dibatalkan dari tab Belanja Supplier" }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      load();
+    } finally {
+      setBusyInvoiceId(null);
+    }
   };
 
   return (
@@ -1037,7 +1137,25 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
           <input type="checkbox" checked={paidNow} onChange={(e) => setPaidNow(e.target.checked)} /> {t("inventory.supplierPurchase.paidNowLabel", "Dibayar cash sekarang (uncheck = hutang ke supplier)")}
         </label>
 
-        <Button onClick={submit}>{t("inventory.supplierPurchase.saveButton", "Simpan Belanja — {amount}").replace("{amount}", rupiah(grandTotal))}</Button>
+        {paidNow && (
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">{t("inventory.supplierPurchase.cashSourceLabel", "Sumber kas/bank yang dipakai bayar")}</label>
+            {cashBankAccounts.length > 0 ? (
+              <SearchableSelect
+                value={cashBankAccountId}
+                onChange={setCashBankAccountId}
+                placeholder={t("inventory.supplierPurchase.cashSourcePlaceholder", "Pilih akun kas/bank")}
+                options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+              />
+            ) : (
+              <div className="text-xs text-amber-400">{t("inventory.supplierPurchase.noCashBankHint", "Belum ada akun kas/bank dikonfigurasi — akan pakai default sistem.")}</div>
+            )}
+          </div>
+        )}
+
+        <Button onClick={submit} disabled={submitting}>
+          {submitting ? t("inventory.supplierPurchase.saving", "Menyimpan...") : t("inventory.supplierPurchase.saveButton", "Simpan Belanja — {amount}").replace("{amount}", rupiah(grandTotal))}
+        </Button>
       </Card>
 
       {lastResult && (
@@ -1052,14 +1170,98 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
         </Card>
       )}
 
+      {viewing && (
+        <Card className="space-y-2 border-cyan-500/40 text-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-sm">{t("inventory.supplierPurchase.viewHeading", "Detail Invoice {invoiceNumber}").replace("{invoiceNumber}", viewing.invoice.invoiceNumber ?? viewing.invoice.id.slice(0, 8))}</h3>
+            <button className="text-neutral-500" onClick={() => setViewing(null)}>{t("accounting.common.cancel", "Batal")}</button>
+          </div>
+          {viewing.isLegacy && <div className="text-amber-400">{t("inventory.supplierPurchase.legacyHint", "Invoice lama — rincian item direkonstruksi dari catatan stok, bukan data invoice asli.")}</div>}
+          <div className="space-y-1">
+            {viewing.lines.map((l, i) => (
+              <div key={i} className="flex justify-between">
+                <span>{products.find((p) => p.id === l.productId)?.name ?? l.productId} x{l.qty}</span>
+                <span>{rupiah(l.unitCost)} → {t("inventory.supplierPurchase.landedCostShort", "HPP")} {rupiah(l.landedUnitCost)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between font-semibold pt-1 border-t border-neutral-700"><span>{t("inventory.supplierPurchase.totalLabel", "Total Belanja")}</span><span>{rupiah(viewing.invoice.amount)}</span></div>
+        </Card>
+      )}
+
+      {editing && (
+        <Card className="space-y-3 border-amber-500/40 text-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-sm">{t("inventory.supplierPurchase.editHeading", "Edit Invoice {invoiceNumber}").replace("{invoiceNumber}", editing.invoiceNumber)}</h3>
+            <button className="text-neutral-500" onClick={() => setEditing(null)}>{t("accounting.common.cancel", "Batal")}</button>
+          </div>
+          <p className="text-neutral-500">{t("inventory.supplierPurchase.editHint", "Ubah item/qty/harga di bawah lalu simpan — stok, HPP, dan jurnal lama akan otomatis dikoreksi.")}</p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <SearchableSelect
+              className="col-span-2"
+              value={editItemForm.productId}
+              onChange={(v) => setEditItemForm({ ...editItemForm, productId: v })}
+              placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
+              options={resaleProducts.map((p) => ({ value: p.id, label: p.name }))}
+            />
+            <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2" placeholder={t("inventory.placeholder.qty", "Qty")} value={editItemForm.qty} onChange={(e) => setEditItemForm({ ...editItemForm, qty: Number(e.target.value) })} />
+            <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2" placeholder={t("inventory.placeholder.unitCost", "Harga beli/unit")} value={editItemForm.unitCost || ""} onChange={(e) => setEditItemForm({ ...editItemForm, unitCost: Number(e.target.value) })} />
+          </div>
+          <Button variant="secondary" className="text-xs" onClick={addEditItem}>{t("inventory.action.addItem", "+ Tambah Item")}</Button>
+
+          <div className="rounded-lg border border-neutral-700 p-2 space-y-1">
+            {editing.cart.map((c, i) => (
+              <div key={i} className="flex justify-between items-center">
+                <span>{products.find((p) => p.id === c.productId)?.name} x{c.qty} @ {rupiah(c.unitCost)} = {rupiah(c.qty * c.unitCost)}</span>
+                <button className="text-red-400" onClick={() => removeEditItem(i)}>{t("inventory.cart.removeItem", "Hapus")}</button>
+              </div>
+            ))}
+            {editing.cart.length === 0 && <div className="text-neutral-500">{t("inventory.supplierPurchase.editEmptyCart", "Belum ada item.")}</div>}
+          </div>
+
+          <input
+            className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2"
+            placeholder={t("inventory.supplierPurchase.editReasonPlaceholder", "Alasan koreksi (opsional)")}
+            value={editing.reason}
+            onChange={(e) => setEditing({ ...editing, reason: e.target.value })}
+          />
+
+          <div className="flex gap-2">
+            <Button onClick={submitEdit} disabled={busyInvoiceId === editing.invoiceId}>
+              {busyInvoiceId === editing.invoiceId ? t("accounting.common.processing", "Memproses...") : t("inventory.supplierPurchase.saveEditButton", "Simpan Koreksi")}
+            </Button>
+            <Button variant="ghost" onClick={() => setEditing(null)}>{t("accounting.common.cancel", "Batal")}</Button>
+          </div>
+        </Card>
+      )}
+
       <div className="space-y-2">
         {invoices.map((inv) => (
-          <Card key={inv.id} className="flex items-center justify-between">
+          <Card key={inv.id} className="flex items-center justify-between gap-2">
             <div>
               <div className="text-sm font-medium">{inv.invoiceNumber ?? `INV #${inv.id.slice(0, 8)}`} — {rupiah(inv.amount)}</div>
               <div className="text-xs text-neutral-500">{new Date(inv.invoiceDate).toLocaleDateString("id-ID")}</div>
             </div>
-            <Badge status={inv.status === "paid" ? "available" : inv.status === "partial" ? "pending" : "maintenance"}>{inv.status}</Badge>
+            <div className="flex items-center gap-2">
+              <Badge status={inv.status === "cancelled" ? "failed" : inv.status === "paid" ? "available" : inv.status === "partial" ? "pending" : "maintenance"}>{inv.status}</Badge>
+              {/* View/Edit/Delete are all gated together behind manage_supplier_purchase_history
+                  (owner/superuser/supervisor/manager only) — per the user's explicit request,
+                  this is NOT open to every staff role like most other "Lihat" buttons in the app. */}
+              {canManageHistory && (
+                <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => openView(inv.id)}>{t("inventory.supplierPurchase.viewButton", "Lihat")}</Button>
+              )}
+              {canManageHistory && inv.status !== "cancelled" && (
+                <>
+                  <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => openEdit(inv.id, inv.invoiceNumber ?? inv.id.slice(0, 8))} disabled={busyInvoiceId === inv.id}>
+                    {t("inventory.supplierPurchase.editButton", "Edit")}
+                  </Button>
+                  <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => deleteInvoice(inv.id, inv.invoiceNumber ?? inv.id.slice(0, 8))} disabled={busyInvoiceId === inv.id}>
+                    {busyInvoiceId === inv.id ? t("accounting.common.processing", "Memproses...") : t("inventory.supplierPurchase.deleteButton", "Hapus")}
+                  </Button>
+                </>
+              )}
+            </div>
           </Card>
         ))}
       </div>

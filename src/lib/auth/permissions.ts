@@ -21,6 +21,7 @@ export type Permission =
   | "approve_requests"
   | "manage_pricing_promo"
   | "manage_inventory_purchasing"
+  | "manage_supplier_purchase_history" // view/edit/void a purchase invoice's history (Belanja Supplier + PO-received invoices) — narrower than manage_inventory_purchasing so granting it doesn't also hand out product/recipe/PO CRUD
   | "view_reports"
   | "manage_devices"
   | "kitchen_display"
@@ -54,7 +55,7 @@ export const PERMISSION_GROUPS: { group: string; permissions: Permission[] }[] =
   { group: "Pendapatan Lain-lain", permissions: ["manage_other_income"] },
   { group: "Setoran Kas", permissions: ["manage_cash_deposit", "void_cash_deposit"] },
   { group: "Home Rental (Sewa Dibawa Pulang)", permissions: ["manage_home_rental", "manage_feature_flags"] },
-  { group: "Inventori & Harga", permissions: ["manage_pricing_promo", "manage_inventory_purchasing"] },
+  { group: "Inventori & Harga", permissions: ["manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history"] },
   {
     group: "Accounting & Keuangan",
     permissions: ["view_accounting", "post_manual_journal", "manage_coa", "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "close_period", "reopen_period"],
@@ -74,6 +75,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   approve_requests: "Setujui/Tolak Permintaan Approval",
   manage_pricing_promo: "Kelola Harga & Promo",
   manage_inventory_purchasing: "Kelola Inventori & Pembelian",
+  manage_supplier_purchase_history: "Lihat/Edit/Hapus Riwayat Belanja Supplier",
   view_reports: "Lihat Laporan",
   manage_devices: "Kontrol Perangkat",
   kitchen_display: "Akses Kitchen Display",
@@ -112,7 +114,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
   // see the StaffRole comment above for why there are two identically-powerful roles.
   superuser: [
     "view_dashboard_owner", "manage_staff", "view_accounting", "post_manual_journal",
-    "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing",
+    "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history",
     "view_reports", "manage_devices", "manage_admin_data", "kitchen_display",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_settings", "manage_bookings", "manage_ppob", "manage_coa", "manage_other_income",
     "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit", "close_period", "reopen_period",
@@ -122,14 +124,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
   // them as two separate role names).
   owner: [
     "view_dashboard_owner", "manage_staff", "view_accounting", "post_manual_journal",
-    "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing",
+    "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history",
     "view_reports", "manage_devices", "manage_admin_data", "kitchen_display",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_settings", "manage_bookings", "manage_ppob", "manage_coa", "manage_other_income",
     "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit", "close_period", "reopen_period",
   ],
   manager: [
     "view_dashboard_owner", "view_accounting", "void_order_direct", "refund_order", "approve_requests",
-    "manage_pricing_promo", "manage_inventory_purchasing", "view_reports", "manage_devices",
+    "manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history", "view_reports", "manage_devices",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_bookings", "manage_ppob", "manage_other_income",
     "manage_home_rental", "manage_membership", "manage_cash_deposit", "void_cash_deposit",
   ],
@@ -145,7 +147,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
   // manage_cash_deposit lets a supervisor record their own pickup on the spot, since they're one
   // of the four roles a cashier can name as the receiver — but not void_cash_deposit, same trust
   // tier as manage_expenses (which supervisor also lacks).
-  supervisor: ["approve_requests", "manage_pricing_promo", "view_reports", "manage_devices", "manage_bookings", "manage_home_rental", "manage_membership", "manage_cash_deposit"],
+  supervisor: ["approve_requests", "manage_pricing_promo", "manage_supplier_purchase_history", "view_reports", "manage_devices", "manage_bookings", "manage_home_rental", "manage_membership", "manage_cash_deposit"],
   // Can create + pay expenses under the outlet's approval threshold directly, handle
   // the front-desk booking flow, and record PPOB sales (top-up/token/pulsa/tarik tunai)
   // at the counter — this is core cashier-facing work, not a manager-gated action.
