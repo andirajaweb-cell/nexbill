@@ -84,15 +84,6 @@ export default function PaymentsPage() {
       {outletId && <MethodsPanel outletId={outletId} methods={methods} canManage={canManage} onChanged={load} />}
 
       {outletId && canManage && <IpaymuQuickAdd outletId={outletId} methods={methods} onChanged={load} />}
-
-      <Card>
-        <h2 className="font-medium mb-2">{t("payments.webhookTitle", "Webhook URLs (gateway QRIS/e-wallet live)")}</h2>
-        <p className="text-xs text-neutral-500 mb-2">{t("payments.webhookDesc", "Kalau ada metode yang disambungkan ke Fastpay/BukuPay dengan kredensial live (isi env FASTPAY_*/BUKUPAY_*), daftarkan URL ini di dashboard masing-masing gateway:")}</p>
-        <ul className="text-xs font-mono text-neutral-400 space-y-1">
-          <li>https://domain-kamu.com/api/payments/webhook/fastpay</li>
-          <li>https://domain-kamu.com/api/payments/webhook/bukupay</li>
-        </ul>
-      </Card>
     </div>
   );
 }
@@ -227,7 +218,7 @@ function IpaymuQuickAdd({ outletId, methods, onChanged }: { outletId: string; me
   return (
     <Card className="space-y-2">
       <h2 className="font-medium">{t("payments.ipaymu.title", "Aktifkan Kanal iPaymu")}</h2>
-      <p className="text-xs text-neutral-500">{t("payments.ipaymu.desc", "Klik untuk menambah kanal iPaymu ke daftar metode pembayaran outlet ini dengan key yang sudah pasti benar (jangan tambah manual lewat form di atas — resiko salah ketik key, kanal jadi tidak tersambung ke iPaymu). Setelah ditambah, kanal langsung muncul sebagai pilihan di kasir POS/Rental. Transaksi nyata baru berjalan setelah kredensial IPAYMU_VA/IPAYMU_API_KEY di server valid untuk mode (sandbox/produksi) yang aktif — selama belum valid, kanal ini berjalan dalam mode simulasi (mock).")}</p>
+      <p className="text-xs text-neutral-500">{t("payments.ipaymu.desc", "Klik untuk menambah kanal iPaymu ke daftar metode pembayaran outlet ini dengan key yang sudah pasti benar (jangan tambah manual lewat form di atas — resiko salah ketik key, kanal jadi tidak tersambung ke iPaymu). Setelah ditambah, kanal langsung muncul sebagai pilihan di kasir POS/Rental dan siap menerima pembayaran sungguhan dari pelanggan. Kalau ada kanal yang belum bisa dipakai untuk transaksi asli, hubungi tim support NEXBILL.")}</p>
       <div className="flex flex-wrap gap-2 pt-1">
         {IPAYMU_QUICK_ADD.map(({ key, label }) => {
           const added = existingKeys.has(key);

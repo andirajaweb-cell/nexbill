@@ -37,6 +37,17 @@ export default function PlatformIpaymuPage() {
         <IpaymuConnectionTest />
         <IpaymuChannelStatusPanel />
       </Card>
+
+      <Card>
+        <h2 className="font-medium mb-2">Webhook URLs (gateway lain — Fastpay/BukuPay)</h2>
+        <p className="text-xs text-neutral-500 mb-2">
+          Moved here from dashboard/payments/page.tsx on 2026-09-13 — outlets can never act on this (registering a URL in Fastpay/BukuPay's own merchant dashboard, and setting FASTPAY_*/BUKUPAY_* server env vars, are both platform-level tasks), so it never belonged on an outlet-facing page. Kalau ada gateway alternatif yang disambungkan dengan kredensial live, daftarkan URL ini di dashboard masing-masing gateway:
+        </p>
+        <ul className="text-xs font-mono text-neutral-400 space-y-1">
+          <li>https://dashboard.nexbill.id/api/payments/webhook/fastpay</li>
+          <li>https://dashboard.nexbill.id/api/payments/webhook/bukupay</li>
+        </ul>
+      </Card>
     </div>
   );
 }

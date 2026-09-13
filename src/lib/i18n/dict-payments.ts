@@ -16,24 +16,6 @@ registerDict({
     vi: "Các phương thức thanh toán mà thu ngân có thể chọn tại POS, Cho thuê và Thu nhập khác. Thêm, đổi tên, vô hiệu hóa hoặc xóa tùy theo nhu cầu của cửa hàng — thay đổi có hiệu lực ngay trên màn hình thu ngân. Bạn cũng có thể đặt Phí (%) cho từng phương thức (vd. phí MDR của QRIS) — phí này sẽ tự động bị trừ vào tiền mặt/ngân hàng cho mỗi giao dịch qua phương thức đó và được ghi nhận là chi phí trong sổ nhật ký.",
   },
 
-  // --- Webhook info card ---
-  "payments.webhookTitle": {
-    id: "Webhook URLs (gateway QRIS/e-wallet live)",
-    en: "Webhook URLs (live QRIS/e-wallet gateway)",
-    ms: "URL Webhook (gateway QRIS/e-wallet live)",
-    th: "Webhook URL (เกตเวย์ QRIS/e-wallet แบบใช้งานจริง)",
-    fil: "Webhook URLs (live na QRIS/e-wallet gateway)",
-    vi: "URL Webhook (cổng QRIS/ví điện tử live)",
-  },
-  "payments.webhookDesc": {
-    id: "Kalau ada metode yang disambungkan ke Fastpay/BukuPay dengan kredensial live (isi env FASTPAY_*/BUKUPAY_*), daftarkan URL ini di dashboard masing-masing gateway:",
-    en: "If any method is connected to Fastpay/BukuPay with live credentials (FASTPAY_*/BUKUPAY_* env vars set), register these URLs in each gateway's dashboard:",
-    ms: "Jika ada kaedah yang disambungkan ke Fastpay/BukuPay dengan kredensial live (env FASTPAY_*/BUKUPAY_* diisi), daftarkan URL ini di papan pemuka setiap gateway:",
-    th: "หากมีวิธีการชำระเงินที่เชื่อมต่อกับ Fastpay/BukuPay ด้วยข้อมูลรับรองแบบใช้งานจริง (ตั้งค่า env FASTPAY_*/BUKUPAY_* แล้ว) ให้ลงทะเบียน URL เหล่านี้ในแดชบอร์ดของแต่ละเกตเวย์:",
-    fil: "Kung may paraan na naka-connect sa Fastpay/BukuPay gamit ang live credentials (naka-set ang env FASTPAY_*/BUKUPAY_*), irehistro ang mga URL na ito sa dashboard ng bawat gateway:",
-    vi: "Nếu có phương thức được kết nối với Fastpay/BukuPay bằng thông tin xác thực live (đã thiết lập biến môi trường FASTPAY_*/BUKUPAY_*), hãy đăng ký các URL này trong dashboard của từng cổng thanh toán:",
-  },
-
   // --- Kind descriptions (table + KIND_LABEL) ---
   "payments.kind.cash": {
     id: "Tunai (hitung fisik saat tutup shift)",
@@ -142,12 +124,12 @@ registerDict({
     vi: "Kích hoạt kênh iPaymu",
   },
   "payments.ipaymu.desc": {
-    id: "Klik untuk menambah kanal iPaymu ke daftar metode pembayaran outlet ini dengan key yang sudah pasti benar (jangan tambah manual lewat form di atas — resiko salah ketik key, kanal jadi tidak tersambung ke iPaymu). Setelah ditambah, kanal langsung muncul sebagai pilihan di kasir POS/Rental. Transaksi nyata baru berjalan setelah kredensial IPAYMU_VA/IPAYMU_API_KEY di server valid untuk mode (sandbox/produksi) yang aktif — selama belum valid, kanal ini berjalan dalam mode simulasi (mock).",
-    en: "Click to add an iPaymu channel to this outlet's payment method list with a guaranteed-correct key (don't add these manually via the form above — a typo in the key means the channel silently never connects to iPaymu). Once added, the channel appears immediately as an option at POS/Rental checkout. Real transactions only go through once the server's IPAYMU_VA/IPAYMU_API_KEY credentials are valid for the active mode (sandbox/production) — until then, these channels run in simulated (mock) mode.",
-    ms: "Klik untuk menambah saluran iPaymu ke senarai kaedah pembayaran outlet ini dengan key yang dijamin betul (jangan tambah secara manual melalui borang di atas — risiko silap taip key, saluran tidak tersambung ke iPaymu). Selepas ditambah, saluran terus muncul sebagai pilihan di kaunter POS/Sewa. Transaksi sebenar hanya berjalan selepas kredensial IPAYMU_VA/IPAYMU_API_KEY di pelayan sah untuk mod (sandbox/produksi) yang aktif — sementara itu, saluran ini berjalan dalam mod simulasi (mock).",
-    th: "คลิกเพื่อเพิ่มช่องทาง iPaymu ลงในรายการวิธีการชำระเงินของสาขานี้ด้วยคีย์ที่ถูกต้องแน่นอน (อย่าเพิ่มด้วยตนเองผ่านแบบฟอร์มด้านบน — เสี่ยงพิมพ์คีย์ผิด ช่องทางจะไม่เชื่อมต่อกับ iPaymu อย่างเงียบๆ) หลังเพิ่มแล้ว ช่องทางจะปรากฏเป็นตัวเลือกที่หน้าขาย POS/เช่าทันที ธุรกรรมจริงจะทำงานได้ก็ต่อเมื่อข้อมูลรับรอง IPAYMU_VA/IPAYMU_API_KEY บนเซิร์ฟเวอร์ถูกต้องสำหรับโหมดที่ใช้งานอยู่ (sandbox/production) — ก่อนหน้านั้นช่องทางเหล่านี้จะทำงานในโหมดจำลอง (mock)",
-    fil: "I-click para magdagdag ng channel ng iPaymu sa listahan ng paraan ng pagbabayad ng outlet na ito gamit ang tiyak-na-tamang key (huwag idagdag ito nang manual sa form sa itaas — kung magkamali sa pagta-type ng key, tahimik na hindi makokonekta ang channel sa iPaymu). Pagkatapos idagdag, agad itong lalabas bilang opsyon sa POS/Rental checkout. Tatakbo lang ang tunay na transaksyon kapag valid na ang IPAYMU_VA/IPAYMU_API_KEY credentials sa server para sa aktibong mode (sandbox/production) — hanggang hindi pa valid, gumagana ang mga channel na ito sa mock mode.",
-    vi: "Nhấp để thêm kênh iPaymu vào danh sách phương thức thanh toán của cửa hàng này với key chắc chắn chính xác (đừng thêm thủ công qua form ở trên — gõ sai key sẽ khiến kênh âm thầm không kết nối được với iPaymu). Sau khi thêm, kênh sẽ ngay lập tức xuất hiện như một lựa chọn tại POS/Cho thuê. Giao dịch thật chỉ hoạt động khi thông tin xác thực IPAYMU_VA/IPAYMU_API_KEY trên server hợp lệ cho chế độ đang hoạt động (sandbox/production) — trước đó, các kênh này chạy ở chế độ giả lập (mock).",
+    id: "Klik untuk menambah kanal iPaymu ke daftar metode pembayaran outlet ini dengan key yang sudah pasti benar (jangan tambah manual lewat form di atas — resiko salah ketik key, kanal jadi tidak tersambung ke iPaymu). Setelah ditambah, kanal langsung muncul sebagai pilihan di kasir POS/Rental dan siap menerima pembayaran sungguhan dari pelanggan. Kalau ada kanal yang belum bisa dipakai untuk transaksi asli, hubungi tim support NEXBILL.",
+    en: "Click to add an iPaymu channel to this outlet's payment method list with a guaranteed-correct key (don't add these manually via the form above — a typo in the key means the channel silently never connects to iPaymu). Once added, the channel appears immediately as an option at POS/Rental checkout and is ready to accept real customer payments. If a channel isn't yet accepting real transactions, contact NEXBILL support.",
+    ms: "Klik untuk menambah saluran iPaymu ke senarai kaedah pembayaran outlet ini dengan key yang dijamin betul (jangan tambah secara manual melalui borang di atas — risiko silap taip key, saluran tidak tersambung ke iPaymu). Selepas ditambah, saluran terus muncul sebagai pilihan di kaunter POS/Sewa dan sedia menerima bayaran sebenar daripada pelanggan. Jika ada saluran yang belum boleh digunakan untuk transaksi sebenar, hubungi pasukan sokongan NEXBILL.",
+    th: "คลิกเพื่อเพิ่มช่องทาง iPaymu ลงในรายการวิธีการชำระเงินของสาขานี้ด้วยคีย์ที่ถูกต้องแน่นอน (อย่าเพิ่มด้วยตนเองผ่านแบบฟอร์มด้านบน — เสี่ยงพิมพ์คีย์ผิด ช่องทางจะไม่เชื่อมต่อกับ iPaymu อย่างเงียบๆ) หลังเพิ่มแล้ว ช่องทางจะปรากฏเป็นตัวเลือกที่หน้าขาย POS/เช่าทันทีและพร้อมรับชำระเงินจริงจากลูกค้า หากมีช่องทางใดยังใช้ทำธุรกรรมจริงไม่ได้ กรุณาติดต่อทีมซัพพอร์ตของ NEXBILL",
+    fil: "I-click para magdagdag ng channel ng iPaymu sa listahan ng paraan ng pagbabayad ng outlet na ito gamit ang tiyak-na-tamang key (huwag idagdag ito nang manual sa form sa itaas — kung magkamali sa pagta-type ng key, tahimik na hindi makokonekta ang channel sa iPaymu). Pagkatapos idagdag, agad itong lalabas bilang opsyon sa POS/Rental checkout at handa nang tumanggap ng tunay na bayad mula sa customer. Kung may channel na hindi pa tumatanggap ng tunay na transaksyon, makipag-ugnayan sa NEXBILL support.",
+    vi: "Nhấp để thêm kênh iPaymu vào danh sách phương thức thanh toán của cửa hàng này với key chắc chắn chính xác (đừng thêm thủ công qua form ở trên — gõ sai key sẽ khiến kênh âm thầm không kết nối được với iPaymu). Sau khi thêm, kênh sẽ ngay lập tức xuất hiện như một lựa chọn tại POS/Cho thuê và sẵn sàng nhận thanh toán thật từ khách hàng. Nếu có kênh nào chưa nhận được giao dịch thật, hãy liên hệ đội hỗ trợ NEXBILL.",
   },
   "payments.ipaymu.added": { id: "Sudah ditambah", en: "Already added", ms: "Sudah ditambah", th: "เพิ่มแล้ว", fil: "Naidagdag na", vi: "Đã thêm" },
   "payments.ipaymu.add": { id: "+ Tambah", en: "+ Add", ms: "+ Tambah", th: "+ เพิ่ม", fil: "+ Idagdag", vi: "+ Thêm" },
