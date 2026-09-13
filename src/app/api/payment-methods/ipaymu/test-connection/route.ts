@@ -1,27 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth/session";
-import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
-import { checkIpaymuConnection } from "@/lib/payments/adapters/ipaymu";
-import { describeError } from "@/lib/api/error";
 
 /**
- * "Test Koneksi iPaymu" button on the Pembayaran page — calls iPaymu's own Check Balance API with
- * the server's configured credentials, so an owner/manager can confirm the integration is actually
- * authenticating against iPaymu right now, not just that a channel has been added to the payment
- * methods list (adding a channel works even in mock mode, when nothing has been tried against
- * iPaymu at all — see checkIpaymuConnection's own doc comment).
+ * MOVED 2026-09-13 to /api/platform-admin/ipaymu/test-connection — see that route's doc comment.
+ * IPAYMU_VA/IPAYMU_API_KEY are ONE shared platform-wide credential, not scoped to an outlet, so an
+ * outlet Owner hitting this URL was never their own data to see. Kept as a 410 stub (instead of
+ * deleting the file outright) so this old path fails safely/obviously rather than 404ing silently
+ * or — worse — still working, if anything cached still points at it. Delete this file entirely
+ * once confirmed nothing references it anymore.
  */
 export async function POST() {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
-    if (!hasPermission(session.role as StaffRole, "manage_settings")) {
-      return NextResponse.json({ error: "Role kamu tidak punya izin mengelola pengaturan pembayaran." }, { status: 403 });
-    }
-
-    const result = await checkIpaymuConnection();
-    return NextResponse.json(result);
-  } catch (err: unknown) {
-    return NextResponse.json({ error: describeError(err) }, { status: 500 });
-  }
+  return NextResponse.json({ error: "Endpoint ini sudah dipindah ke Platform Admin — tidak lagi bisa diakses dari outlet." }, { status: 410 });
 }
