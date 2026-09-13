@@ -11,7 +11,7 @@ import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { ShoppingCart, Plus, Minus, Zap, Wrench, Tv, Sparkles, Share2, Timer, LayoutDashboard, FileText, Wallet, TrendingUp, Receipt } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Zap, Wrench, Tv, Package, Sparkles, Share2, Timer, LayoutDashboard, FileText, Wallet, TrendingUp, Receipt } from "lucide-react";
 import { BillingFaq } from "@/components/billing/BillingFaq";
 import { BillingProfileTab } from "@/components/billing/BillingProfileTab";
 import { DepositTab } from "@/components/billing/DepositTab";
@@ -186,6 +186,7 @@ const INVOICE_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }>
   group_renewal: { key: "billing.invoiceType.groupRenewal", fallback: "Tagihan Gabungan Multi-Outlet" },
   ai_addon: { key: "billing.invoiceType.aiAddon", fallback: "AI Add-on" },
   deposit_topup: { key: "billing.invoiceType.depositTopup", fallback: "Top Up Saldo Deposit" },
+  product_order: { key: "billing.invoiceType.productOrder", fallback: "Belanja Toko" },
 };
 
 const INVOICE_STATUS_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
@@ -233,7 +234,7 @@ export default function BillingPage() {
 
   const [data, setData] = useState<BillingResponse | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
-  const [tab, setTab] = useState<"dashboard" | "profile" | "deposit" | "invoices" | "usage">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "toko" | "profile" | "deposit" | "invoices" | "usage">("dashboard");
 
   // --- Clock Ticker untuk Countdown Jangka Waktu Pembayaran ---
   useEffect(() => {
@@ -509,14 +510,21 @@ export default function BillingPage() {
   
   const safeInvoices = invoices ?? [];
   const unpaidInvoices = safeInvoices.filter((i) => i.status === "unpaid");
-  
+  // "product_order" (Toko tab, added 2026-09-13) is deliberately excluded from the checks below —
+  // it's a standalone hardware/merchandise purchase, unrelated to the subscription-fee checkout or
+  // renewal flow. Without this split, an outlet with an unrelated unpaid Toko order would have the
+  // first-checkout cart hidden and "Perpanjang Sekarang" disabled for no good reason (both gates
+  // only care about subscription-related tagihan; the "Tagihan Belum Lunas" card below still shows
+  // and lets them pay EVERY unpaid invoice, product_order included).
+  const unpaidSubscriptionInvoices = unpaidInvoices.filter((i) => i.type !== "product_order");
+
   const grandTotal = (catalogPlan?.priceCurrent ?? 0) + cartTotal + (selectedRate?.price ?? 0);
-  
+
   const daysToExpiry = sub.currentPeriodEnd && now !== null
-    ? Math.ceil((new Date(sub.currentPeriodEnd).getTime() - now) / 86_400_000) 
+    ? Math.ceil((new Date(sub.currentPeriodEnd).getTime() - now) / 86_400_000)
     : null;
-    
-  const canRenewNow = (sub.status === "active" || sub.status === "grace") && unpaidInvoices.length === 0;
+
+  const canRenewNow = (sub.status === "active" || sub.status === "grace") && unpaidSubscriptionInvoices.length === 0;
   
   const grouped = (products ?? []).reduce<Record<string, ProductData[]>>((acc, p) => {
     if (!acc[p.category]) acc[p.category] = [];
@@ -538,6 +546,7 @@ export default function BillingPage() {
       <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/5 p-1">
         {([
           { id: "dashboard", label: t("billing.tab.dashboard", "Dashboard"), Icon: LayoutDashboard },
+          { id: "toko", label: t("billing.tab.toko", "Toko"), Icon: ShoppingCart },
           { id: "profile", label: t("billing.tab.profile", "Profil Billing"), Icon: FileText },
           { id: "deposit", label: t("billing.tab.deposit", "Saldo Deposit"), Icon: Wallet },
           { id: "invoices", label: t("billing.tab.invoices", "Riwayat Faktur"), Icon: Receipt },
@@ -556,6 +565,18 @@ export default function BillingPage() {
         ))}
       </div>
 
+      {tab === "toko" && (
+        <ProductStoreTab
+          products={products}
+          money={money}
+          t={t}
+          onOrderCreated={async () => {
+            await load();
+            setTab("dashboard");
+            showAlert(t("billing.toko.orderCreated", "Pesanan dibuat — selesaikan pembayarannya di kartu \"Tagihan Belum Lunas\" pada tab Dashboard."));
+          }}
+        />
+      )}
       {tab === "profile" && <BillingProfileTab />}
       {tab === "deposit" && (
         <DepositTab
@@ -740,7 +761,7 @@ export default function BillingPage() {
         </Card>
       )}
 
-      {!isPaid && canManage && unpaidInvoices.length === 0 && (
+      {!isPaid && canManage && unpaidSubscriptionInvoices.length === 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
             <Card className="p-4">
@@ -1140,6 +1161,377 @@ export default function BillingPage() {
           {t("billing.footer.refundPolicy", "Kebijakan Refund & Pembatalan")}
         </a>
       </p>
+    </div>
+  );
+}
+
+const STORE_CATEGORY_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
+  smart_plug: { key: "billing.category.product", fallback: "Smart Plug" },
+  installation_service: { key: "billing.category.installationService", fallback: "Jasa Instalasi" },
+  other_product: { key: "billing.toko.category.otherProduct", fallback: "Produk Lain" },
+};
+const STORE_CATEGORY_ICON: Record<string, React.ElementType> = {
+  smart_plug: Zap,
+  installation_service: Wrench,
+  other_product: Package,
+};
+const STORE_CATEGORIES = ["smart_plug", "other_product", "installation_service"] as const;
+
+/**
+ * "Toko" tab — standalone purchase of NEXBILL's physical products/services, entirely separate from
+ * the subscription checkout above (added 2026-09-13, per the owner's explicit request: "etalase
+ * terpisah dengan transaksi langganan"). Deliberately mounted regardless of isPaid/isLocked — a
+ * self-contained component with its OWN cart/shipping state (not shared with the first-checkout
+ * etalase's state in the parent BillingPage) so the two flows never interfere with each other, and
+ * posts to /api/subscription/products/checkout (checkoutProductOrder), never
+ * /api/subscription/checkout. Mirrors that other flow's Biteship shipping UX (search destination
+ * area, cek ongkos kirim, pick a courier) since the underlying pricing logic is shared
+ * (priceShippingIfNeeded in lib/subscription/service.ts) — only extra_console is excluded from
+ * this catalog since it's a subscription-plan-capacity concept, not a Toko purchase.
+ */
+function ProductStoreTab({
+  products,
+  money,
+  t,
+  onOrderCreated,
+}: {
+  products: ProductData[];
+  money: (idr: number) => string;
+  t: (key: string, fallback?: string) => string;
+  onOrderCreated: () => Promise<void>;
+}) {
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [installName, setInstallName] = useState("");
+  const [installPhone, setInstallPhone] = useState("");
+  const [installAddress, setInstallAddress] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const [areaQuery, setAreaQuery] = useState("");
+  const [areaResults, setAreaResults] = useState<ShippingArea[]>([]);
+  const [areaSearching, setAreaSearching] = useState(false);
+  const [selectedArea, setSelectedArea] = useState<ShippingArea | null>(null);
+  const [rateOptions, setRateOptions] = useState<ShippingRateOption[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [ratesError, setRatesError] = useState("");
+  const [selectedRate, setSelectedRate] = useState<ShippingRateOption | null>(null);
+
+  const storeProducts = (products ?? []).filter((p) => (STORE_CATEGORIES as readonly string[]).includes(p.category));
+  const grouped = storeProducts.reduce<Record<string, ProductData[]>>((acc, p) => {
+    (acc[p.category] ??= []).push(p);
+    return acc;
+  }, {});
+
+  const setQty = (productId: string, qty: number) => {
+    setCart((prev) => {
+      const next = { ...prev };
+      if (qty <= 0) delete next[productId];
+      else next[productId] = qty;
+      return next;
+    });
+    setRateOptions([]);
+    setSelectedRate(null);
+  };
+
+  useEffect(() => {
+    if (areaQuery.trim().length < 3) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      setAreaSearching(true);
+      try {
+        const res = await fetch(`/api/shipping/areas?q=${encodeURIComponent(areaQuery)}`);
+        const out = await res.json();
+        if (!cancelled) setAreaResults(res.ok ? out.areas ?? [] : []);
+      } catch {
+        if (!cancelled) setAreaResults([]);
+      } finally {
+        if (!cancelled) setAreaSearching(false);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [areaQuery]);
+
+  const cartTotal = Object.entries(cart).reduce((sum, [productId, qty]) => {
+    const p = storeProducts.find((x) => x.id === productId);
+    return p ? sum + p.price * qty : sum;
+  }, 0);
+
+  const wantsInstall = Object.entries(cart).some(([productId, qty]) => {
+    const p = storeProducts.find((x) => x.id === productId);
+    return p?.category === "installation_service" && qty > 0;
+  });
+
+  const hasShippableItem = Object.entries(cart).some(([productId, qty]) => {
+    const p = storeProducts.find((x) => x.id === productId);
+    return (p?.category === "smart_plug" || p?.category === "other_product") && qty > 0;
+  });
+
+  const grandTotal = cartTotal + (selectedRate?.price ?? 0);
+
+  const checkShippingRates = async () => {
+    if (!selectedArea) return;
+    setRatesLoading(true);
+    setRatesError("");
+    setSelectedRate(null);
+    try {
+      const items = Object.entries(cart)
+        .filter(([, qty]) => qty > 0)
+        .map(([productId, qty]) => ({ productId, qty }));
+      const res = await fetch("/api/shipping/rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destinationAreaId: selectedArea.id, items }),
+      });
+      const out = await res.json();
+      if (!res.ok) {
+        setRatesError(out.error ?? t("billing.alert.fetchRatesFailed", "Gagal mengambil ongkos kirim."));
+        setRateOptions([]);
+        return;
+      }
+      setRateOptions(out.options ?? []);
+      if ((out.options ?? []).length === 0) setRatesError(t("billing.alert.noCourierAvailable", "Belum ada kurir yang aktif untuk rute ini — hubungi NEXBILL."));
+    } finally {
+      setRatesLoading(false);
+    }
+  };
+
+  const doCheckout = async () => {
+    if (Object.keys(cart).length === 0) return showAlert(t("billing.toko.emptyCart", "Keranjang Toko masih kosong."));
+    if (hasShippableItem && !selectedRate) {
+      return showAlert(t("billing.alert.selectCourierFirst", 'Pilih kurir pengiriman untuk Smart Plug dulu (klik "Cek Ongkos Kirim" di bawah keranjang).'));
+    }
+    setBusy(true);
+    try {
+      const items = Object.entries(cart).map(([productId, qty]) => ({ productId, qty }));
+      const res = await fetch("/api/subscription/products/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items,
+          installContactName: installName,
+          installContactPhone: installPhone,
+          shippingAddress: installAddress,
+          shippingDestinationAreaId: selectedArea?.id,
+          shippingDestinationAreaLabel: selectedArea?.name,
+          shippingCourierCode: selectedRate?.courierCode,
+          shippingCourierServiceName: selectedRate?.courierServiceName,
+        }),
+      });
+      const out = await res.json();
+      if (!res.ok) return showAlert(out.error);
+      setCart({});
+      setSelectedArea(null);
+      setAreaQuery("");
+      setRateOptions([]);
+      setSelectedRate(null);
+      setInstallName("");
+      setInstallPhone("");
+      setInstallAddress("");
+      await onOrderCreated();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 px-4 py-2.5 text-xs text-cyan-200">
+        {t(
+          "billing.toko.intro",
+          "Belanja produk fisik NEXBILL (Smart Plug, produk lain) kapan saja — terpisah dari tagihan langganan, bisa dibeli meskipun akses NEXBILL sedang terkunci."
+        )}
+      </div>
+
+      {storeProducts.length === 0 ? (
+        <Card className="p-4 text-sm text-neutral-500">{t("billing.toko.empty", "Belum ada produk di Toko.")}</Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-4">
+            {STORE_CATEGORIES.map((cat) => {
+              const items = grouped[cat] ?? [];
+              if (items.length === 0) return null;
+              const meta = STORE_CATEGORY_LABEL_KEYS[cat];
+              const Icon = STORE_CATEGORY_ICON[cat] ?? ShoppingCart;
+              return (
+                <Card key={cat} className="p-4 space-y-3">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Icon size={16} className="text-cyan-400" /> {t(meta.key, meta.fallback)}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {items.map((p) => (
+                      <div key={p.id} className="rounded-lg border border-white/10 p-3 space-y-2">
+                        {(cat === "smart_plug" || cat === "other_product") && (
+                          p.imageUrl ? (
+                            <img src={p.imageUrl} alt={p.name} className="w-full aspect-square object-cover rounded-lg border border-white/10 bg-black/20" />
+                          ) : (
+                            <div className="w-full aspect-square rounded-lg border border-dashed border-white/10 flex items-center justify-center text-neutral-700">
+                              <Icon size={24} />
+                            </div>
+                          )
+                        )}
+                        <div className="text-sm font-medium">{p.name}</div>
+                        {p.description && <div className="text-xs text-neutral-500">{p.description}</div>}
+                        <div className="text-sm text-cyan-300 font-semibold">{money(p.price)}</div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10"
+                            onClick={() => setQty(p.id, Math.max(0, (cart[p.id] ?? 0) - 1))}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span className="w-8 text-center text-sm">{cart[p.id] ?? 0}</span>
+                          <button
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10"
+                            onClick={() => setQty(p.id, (cart[p.id] ?? 0) + 1)}
+                          >
+                            <Plus size={12} />
+                          </button>
+                          <Button
+                            variant="secondary"
+                            className="text-xs ml-auto"
+                            onClick={() => setQty(p.id, (cart[p.id] ?? 0) === 0 ? 1 : (cart[p.id] ?? 0))}
+                          >
+                            {t("billing.shop.addToCart", "+ Keranjang")}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              );
+            })}
+
+            {(wantsInstall || hasShippableItem) && (
+              <Card className="p-4 space-y-3">
+                <div>
+                  <div className="font-semibold text-sm">{hasShippableItem ? t("billing.install.headingWithShipping", "Alamat Pengiriman & Instalasi") : t("billing.install.headingInstallOnly", "Detail Instalasi")}</div>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    {hasShippableItem && wantsInstall && t("billing.install.noteShippingAndInstall", "Wajib diisi karena ada Smart Plug di keranjang — juga dipakai vendor Jasa Instalasi untuk menghubungi kontak ini.")}
+                    {hasShippableItem && !wantsInstall && t("billing.toko.noteShippingOnly", "Wajib diisi karena ada produk fisik di keranjang — barang dikirim ke alamat ini.")}
+                    {!hasShippableItem && wantsInstall && t("billing.install.noteInstallOnly", 'Diisi karena "Jasa Instalasi" ada di keranjang — vendor akan menghubungi kontak ini.')}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm" placeholder={t("billing.install.placeholderName", "Nama Penerima")} value={installName} onChange={(e) => setInstallName(e.target.value)} />
+                  <input className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm" placeholder={t("billing.install.placeholderPhone", "No. WhatsApp Penerima")} value={installPhone} onChange={(e) => setInstallPhone(e.target.value)} />
+                  <input className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm" placeholder={t("billing.install.placeholderAddress", "Alamat lengkap (jalan, no. rumah, RT/RW)")} value={installAddress} onChange={(e) => setInstallAddress(e.target.value)} />
+                </div>
+
+                {hasShippableItem && (
+                  <div className="space-y-2 pt-1 border-t border-white/10">
+                    <div className="text-xs font-medium text-neutral-300">{t("billing.install.destinationLabel", "Kecamatan/Kota Tujuan (untuk hitung ongkos kirim)")}</div>
+                    <div className="relative">
+                      <input
+                        className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                        placeholder={t("billing.install.destinationPlaceholder", "Ketik nama kecamatan/kota, mis. Cilandak...")}
+                        value={selectedArea ? selectedArea.name : areaQuery}
+                        onChange={(e) => {
+                          setSelectedArea(null);
+                          setAreaQuery(e.target.value);
+                        }}
+                      />
+                      {!selectedArea && areaQuery.trim().length >= 3 && (areaSearching || areaResults.length > 0) && (
+                        <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-[#0b0f1e] shadow-xl">
+                          {areaSearching && <div className="px-3 py-2 text-xs text-neutral-500">{t("billing.install.searching", "Mencari...")}</div>}
+                          {!areaSearching &&
+                            areaResults.map((a) => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-white/5"
+                                onClick={() => {
+                                  setSelectedArea(a);
+                                  setAreaQuery("");
+                                  setAreaResults([]);
+                                }}
+                              >
+                                {a.name}
+                              </button>
+                            ))}
+                          {!areaSearching && areaResults.length === 0 && <div className="px-3 py-2 text-xs text-neutral-600">{t("billing.install.notFound", "Tidak ditemukan.")}</div>}
+                        </div>
+                      )}
+                    </div>
+
+                    <Button variant="secondary" className="text-xs" onClick={checkShippingRates} disabled={!selectedArea || ratesLoading}>
+                      {ratesLoading ? t("billing.common.checking", "Mengecek...") : t("billing.install.checkShipping", "Cek Ongkos Kirim")}
+                    </Button>
+
+                    {ratesError && <div className="text-xs text-rose-400">{ratesError}</div>}
+
+                    {rateOptions.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        {rateOptions.map((o) => {
+                          const key = `${o.courierCode}-${o.courierServiceCode}`;
+                          const active = selectedRate && selectedRate.courierCode === o.courierCode && selectedRate.courierServiceName === o.courierServiceName;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => setSelectedRate(o)}
+                              className={`w-full flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs ${
+                                active ? "border-cyan-400/50 bg-cyan-400/10" : "border-white/10 hover:bg-white/5"
+                              }`}
+                            >
+                              <span>
+                                <span className="font-medium text-neutral-200">{o.courierName} — {o.courierServiceName}</span>
+                                <span className="text-neutral-500"> · {o.duration}</span>
+                              </span>
+                              <span className="font-semibold text-cyan-300 shrink-0">{money(o.price)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+
+          <div className="lg:col-span-1">
+            <Card className="p-4 space-y-3 sticky top-4">
+              <div className="flex items-center gap-2 font-semibold">
+                <ShoppingCart size={16} className="text-cyan-400" /> {t("billing.cart.heading", "Keranjang")}
+              </div>
+              <div className="text-sm space-y-1">
+                {Object.entries(cart).filter(([, qty]) => qty > 0).map(([productId, qty]) => {
+                  const p = storeProducts.find((x) => x.id === productId);
+                  if (!p) return null;
+                  return (
+                    <div key={productId} className="flex justify-between">
+                      <span className="text-neutral-400">{p.name} x{qty}</span>
+                      <span>{money(p.price * qty)}</span>
+                    </div>
+                  );
+                })}
+                {Object.keys(cart).length === 0 && (
+                  <div className="text-xs text-neutral-600">{t("billing.toko.cartEmpty", "Belum ada item di keranjang — browse Toko di sebelah kiri.")}</div>
+                )}
+                {hasShippableItem && (
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">{t("billing.cart.shippingLabel", "Ongkos Kirim")}{selectedRate ? ` (${selectedRate.courierName})` : ""}</span>
+                    <span>{selectedRate ? money(selectedRate.price) : t("billing.cart.shippingNotSelected", "Belum dipilih")}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold border-t border-white/10 pt-2 mt-2">
+                  <span>{t("billing.cart.total", "Total")}</span>
+                  <span className="text-cyan-300">{money(grandTotal)}</span>
+                </div>
+              </div>
+              <Button className="w-full" onClick={doCheckout} disabled={busy || Object.keys(cart).length === 0}>
+                {busy ? t("billing.common.processing", "Memproses...") : t("billing.cart.checkout", "Checkout")}
+              </Button>
+              <p className="text-[11px] text-neutral-600">
+                {t("billing.toko.footnote", "Setelah checkout, tagihan terpisah dari langganan akan muncul di kartu \"Tagihan Belum Lunas\" pada tab Dashboard — bayar lewat Cash/QRIS/VA/iPaymu.")}
+              </p>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

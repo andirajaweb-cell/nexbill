@@ -151,6 +151,10 @@ export async function startRentalSession(input: StartSessionInput) {
 
   let plannedMinutes = input.plannedMinutes ?? null;
   let ratePerHour = rate.finalRate;
+  // Frozen at session start, same rationale as plannedMinutes right below — see the doc comment on
+  // rentalSessions.promoPackagePrice in db/schema.ts for the bug this prevents (a promo's price
+  // edited in Settings > Promo while a session is running silently changing an already-agreed bill).
+  let promoPackagePrice: number | null = null;
 
   // Bundled F&B items (e.g. "Paket Hemat: 2 Jam PS4 + 1 Kentang Goreng + 1 Es Teh") — fetched here
   // (before the unit's atomic claim below) so a bad bundle row can't leave the unit half-claimed;
@@ -159,6 +163,7 @@ export async function startRentalSession(input: StartSessionInput) {
   if (input.promoId) {
     const [promo] = await db.select().from(promos).where(eq(promos.id, input.promoId)).limit(1);
     if (promo?.durationMinutes) plannedMinutes = promo.durationMinutes;
+    if (promo?.packagePrice != null) promoPackagePrice = promo.packagePrice;
     if (promo) {
       const rows = await db
         .select({ productId: promoBundleItems.productId, qty: promoBundleItems.qty, name: products.name })
@@ -198,6 +203,7 @@ export async function startRentalSession(input: StartSessionInput) {
         ratePerHour,
         status: "running",
         promoId: input.promoId,
+        promoPackagePrice,
         bookingId: input.bookingId,
         staffUserId: input.staffUserId,
         shiftId: input.shiftId,
@@ -335,14 +341,14 @@ export async function extendRentalSession(sessionId: string, additionalMinutes: 
 }
 
 /**
- * Stop a session: computes the final bill (package + rounded overtime, or
- * plain rounded hourly), frees the unit + powers off its TV/console, and
- * finalizes the SAME unified bill that was opened back when the session
- * started (openBillForSession) — inserting/updating its "Rental: ..." line
- * item — rather than creating a new order. Any F&B added during the session
- * is already sitting on that bill, so this just adds the rental charge
- * alongside it. The kasir applies discount/voucher/tax at checkout via
- * updateBillCheckoutOptions(), then takes payment against this one order.
+ * Stop a session: computes the final bill (flat package price with NO overtime for promo/package
+ * sessions — see the no-overtime policy doc comment inline below for why — or plain rounded hourly
+ * for a non-package session), frees the unit + powers off its TV/console, and finalizes the SAME
+ * unified bill that was opened back when the session started (openBillForSession) —
+ * inserting/updating its "Rental: ..." line item — rather than creating a new order. Any F&B added
+ * during the session is already sitting on that bill, so this just adds the rental charge alongside
+ * it. The kasir applies discount/voucher/tax at checkout via updateBillCheckoutOptions(), then takes
+ * payment against this one order.
  */
 export async function stopRentalSession(sessionId: string) {
   const [session] = await db.select().from(rentalSessions).where(eq(rentalSessions.id, sessionId)).limit(1);
@@ -367,12 +373,40 @@ export async function stopRentalSession(sessionId: string) {
 
   if (session.promoId) {
     const [promo] = await db.select().from(promos).where(eq(promos.id, session.promoId)).limit(1);
-    const allowedMinutes = (promo?.durationMinutes ?? session.plannedMinutes ?? 0) + session.extendedMinutes;
+    // Prefer what was FROZEN at session start (session.plannedMinutes / session.promoPackagePrice)
+    // over the promo row's CURRENT/live values — see the doc comment on rentalSessions.
+    // promoPackagePrice in db/schema.ts. A promo's price/duration can legitimately be edited in
+    // Settings > Promo at any time (e.g. a routine price update) while other sessions are still
+    // running against the OLD terms; without this, those in-flight sessions would silently get
+    // billed using whatever the promo says NOW, not what the customer actually agreed to when they
+    // started. The live promo row is only consulted as a fallback, for sessions started before this
+    // column existed (promoPackagePrice is null) or where plannedMinutes was never set.
+    const allowedMinutes = (session.plannedMinutes ?? promo?.durationMinutes ?? 0) + session.extendedMinutes;
     const overtimeMinutesRaw = Math.max(0, elapsedMinutesRaw - allowedMinutes);
     const overtimeRounded = roundUpMinutes(overtimeMinutesRaw, roundingMinutes);
-    const overtimeCost = Math.round((overtimeRounded / 60) * session.ratePerHour);
-    subtotal = (promo?.packagePrice ?? 0) + overtimeCost;
-    billingNote = `Paket ${promo?.name ?? ""} (${allowedMinutes} menit)${overtimeRounded > 0 ? ` + overtime ${overtimeRounded} menit` : ""}`;
+    const packagePrice = session.promoPackagePrice ?? promo?.packagePrice ?? 0;
+    // POLICY (explicit decision, confirmed with the owner 2026-09-13): package/promo sessions are
+    // billed a FLAT packagePrice — overtime is never added, no matter how much later the session
+    // actually stops than its allowed time. This used to add
+    // `overtimeCost = Math.round((overtimeRounded / 60) * session.ratePerHour)`, but that produced
+    // a real billing bug: overtimeRounded is rounded UP to a full billingRoundingMinutes increment
+    // (roundUpMinutes never rounds down — see its own doc comment in pricing.ts), so a session that
+    // finished even a few SECONDS late — e.g. the up-to-~15s gap before runSessionAutoStop's poll
+    // (lib/rental/scheduler.ts) notices plannedMinutes ran out and calls this function — got billed
+    // a FULL rounding increment (typically 15 minutes = Rp15.000+) of overtime for zero actual
+    // extra playtime. The fix is to stop charging overtime at all: runSessionAutoStop already
+    // powers the unit's device off the moment allowed time runs out, so in normal operation the
+    // customer physically can't keep playing past their package+extension time anyway.
+    // IMPORTANT OPERATIONAL DEPENDENCY this policy relies on: runSessionAutoStop must actually be
+    // running continuously in production (`npm run scheduler` / scripts/booking-scheduler.ts, or an
+    // external cron hitting POST /api/bookings/scheduler/run every ~15-60s) AND the unit must be
+    // linked to a controllable device on Kontrol Perangkat. If either isn't true for a given
+    // unit/outlet, a session can keep running (TV still on) past its allowed time and this will now
+    // bill NO extra charge for that overrun — a known, explicitly accepted trade-off, not an
+    // oversight. overtimeRounded is kept only for the informational billingNote below (so staff can
+    // still see a session ran long), never for pricing.
+    subtotal = packagePrice;
+    billingNote = `Paket ${promo?.name ?? ""} (${allowedMinutes} menit)${overtimeRounded > 0 ? ` — berhenti ${overtimeRounded} menit setelah waktu paket habis, tidak ada biaya tambahan (kebijakan no-overtime)` : ""}`;
   } else {
     const roundedMinutes = roundUpMinutes(elapsedMinutesRaw, roundingMinutes);
     subtotal = Math.round((roundedMinutes / 60) * session.ratePerHour);

@@ -17,8 +17,13 @@ export const ANDROID_TV_PROTOCOLS: DeviceProtocol[] = ["android_tv_adb", "androi
 /** Reminder checkpoints the daily scheduler fires before trialEndsAt, in days-remaining. */
 export const TRIAL_REMINDER_DAYS = [5, 2, 0] as const;
 
-/** Days after currentPeriodEnd a renewal invoice may go unpaid before status flips from "grace" to "suspended". */
-export const RENEWAL_GRACE_DAYS = 5;
+/**
+ * Days after currentPeriodEnd a renewal invoice may go unpaid before status flips from "grace" to
+ * "suspended" (full lockout except /dashboard/billing). Explicit business decision (2026-09-13):
+ * 7 days, not 5 — was 5 before that date; see GracePaymentReminderPopup.tsx for the daily in-app
+ * reminder shown throughout this window.
+ */
+export const RENEWAL_GRACE_DAYS = 7;
 
 /** How many days before currentPeriodEnd the scheduler generates + sends the next renewal invoice. */
 export const RENEWAL_INVOICE_LEAD_DAYS = 7;

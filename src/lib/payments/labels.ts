@@ -18,6 +18,18 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   bukupay: "BukuPay",
   transfer: "Transfer Bank",
   card: "Kartu Debit/Kredit (EDC)",
+  ipaymu_qris: "QRIS (iPaymu)",
+  ipaymu_va_bca: "VA BCA (iPaymu)",
+  ipaymu_va_bni: "VA BNI (iPaymu)",
+  ipaymu_va_mandiri: "VA Mandiri (iPaymu)",
+  ipaymu_va_bri: "VA BRI (iPaymu)",
+  ipaymu_va_permata: "VA Permata (iPaymu)",
+  ipaymu_dana: "DANA (iPaymu)",
+  ipaymu_shopeepay: "ShopeePay (iPaymu)",
+  ipaymu_alfamart: "Alfamart (iPaymu)",
+  ipaymu_indomaret: "Indomaret (iPaymu)",
+  ipaymu_hosted: "iPaymu (Pilih Kanal)",
+  ipaymu_crossborder: "Kartu Internasional (iPaymu)",
 };
 
 /** Every payment method, in a stable display order, ready to drop into a <select>/button-group. */

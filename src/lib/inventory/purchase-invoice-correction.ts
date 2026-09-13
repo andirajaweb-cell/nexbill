@@ -1,6 +1,16 @@
 import { db, type DbOrTx } from "@/db/client";
-import { eq, and, sql } from "drizzle-orm";
-import { purchaseInvoices, purchaseInvoiceItems, purchasePayments, purchaseOrderItems, stockMovements, products } from "@/db/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
+import {
+  purchaseInvoices,
+  purchaseInvoiceItems,
+  purchasePayments,
+  purchaseOrderItems,
+  purchaseReturns,
+  stockMovements,
+  products,
+  journalEntries,
+  journalLines,
+} from "@/db/schema";
 import { voidJournal } from "@/lib/accounting/journal";
 import { postPurchaseInvoiceJournal } from "@/lib/accounting/postings";
 import { payPurchaseInvoice } from "@/lib/inventory/purchasing";
@@ -275,4 +285,91 @@ export async function editPurchaseInvoiceLines(purchaseInvoiceId: string, newLin
   }
 
   return { invoice, journalId };
+}
+
+/**
+ * TRUE hard delete — removes an already-cancelled purchase invoice's row, its purchaseInvoiceItems,
+ * its stockMovements, its purchasePayments, and every journalEntries/journalLines row tied to it
+ * (the original posting AND its [VOID] reversal) from the database entirely. Nothing is left behind
+ * in the live tables — this is a deliberate exception to the never-hard-delete-financial-history
+ * rule used everywhere else in this codebase (voidJournal, "failed" payment status, etc.), added
+ * only because the user explicitly asked for it after being shown the tradeoff (see the two
+ * AskUserQuestion confirmations this was built from — including the choice to remove the ledger
+ * (journal) rows too, not just the invoice).
+ *
+ * Restricted to owner/superuser via permanently_delete_purchase_history (deliberately narrower
+ * than manage_supplier_purchase_history's 4 roles — irreversible + touches the ledger).
+ *
+ * Guardrails:
+ * - Only allowed when the invoice is ALREADY "cancelled" (i.e. voidPurchaseInvoice ran first) —
+ *   its financial effects are already fully reversed/net-zero, so removing the now-inert rows
+ *   doesn't change any balance. Refuses on any other status.
+ * - Refuses if any purchaseReturns row still references this invoice (rare edge case) rather than
+ *   silently deleting a return's parent out from under it.
+ * - A full snapshot of everything being removed is written to audit_logs BEFORE deletion — that
+ *   audit_logs row is NOT deleted, so "someone permanently deleted invoice X, here's exactly what
+ *   was in it" remains discoverable even though the live invoice/journal rows are gone. This is a
+ *   deliberate middle ground: the user asked for the ledger rows themselves gone, not for erasing
+ *   that the deletion ever happened.
+ */
+export async function permanentlyDeletePurchaseInvoice(purchaseInvoiceId: string, staffUserId: string | undefined) {
+  const { snapshot } = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${purchaseInvoiceId}))`);
+
+    const [invoice] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
+    if (!invoice) throw new Error("Invoice tidak ditemukan.");
+    if (invoice.status !== "cancelled") {
+      throw new Error('Hanya invoice yang sudah "dibatalkan" (Hapus biasa) yang bisa dihapus permanen. Batalkan dulu, baru bisa dihapus permanen.');
+    }
+
+    const blockingReturns = await tx.select({ id: purchaseReturns.id }).from(purchaseReturns).where(eq(purchaseReturns.purchaseInvoiceId, purchaseInvoiceId));
+    if (blockingReturns.length > 0) {
+      throw new Error("Invoice ini punya retur pembelian terkait — tidak bisa dihapus permanen selama retur itu masih ada.");
+    }
+
+    const items = await tx.select().from(purchaseInvoiceItems).where(eq(purchaseInvoiceItems.purchaseInvoiceId, purchaseInvoiceId));
+    const movements = await tx.select().from(stockMovements).where(eq(stockMovements.refOrderId, purchaseInvoiceId));
+    const payments = await tx.select().from(purchasePayments).where(eq(purchasePayments.purchaseInvoiceId, purchaseInvoiceId));
+
+    // Every journal entry tied to this invoice OR any of its payments — sourceId matches invoice.id
+    // (the invoice's own Dr Persediaan/Cr Hutang posting AND its [VOID] reversal, since voidJournal
+    // re-uses the same sourceId) or a payment's id (Dr Hutang/Cr Kas posting + its [VOID] reversal).
+    const sourceIds = [purchaseInvoiceId, ...payments.map((p) => p.id)];
+    const relatedJournalEntries = await tx.select().from(journalEntries).where(inArray(journalEntries.sourceId, sourceIds));
+    const journalEntryIds = relatedJournalEntries.map((j) => j.id);
+
+    if (journalEntryIds.length > 0) {
+      await tx.delete(journalLines).where(inArray(journalLines.journalEntryId, journalEntryIds));
+      await tx.delete(journalEntries).where(inArray(journalEntries.id, journalEntryIds));
+    }
+    if (payments.length > 0) {
+      await tx.delete(purchasePayments).where(eq(purchasePayments.purchaseInvoiceId, purchaseInvoiceId));
+    }
+    if (movements.length > 0) {
+      await tx.delete(stockMovements).where(eq(stockMovements.refOrderId, purchaseInvoiceId));
+    }
+    if (items.length > 0) {
+      await tx.delete(purchaseInvoiceItems).where(eq(purchaseInvoiceItems.purchaseInvoiceId, purchaseInvoiceId));
+    }
+    await tx.delete(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId));
+
+    return { snapshot: { invoice, items, movements, payments, journalEntries: relatedJournalEntries } };
+  });
+
+  // Deliberately AFTER the transaction commits, not before/inside — logAudit always writes via
+  // the plain `db` connection (it has no tx-aware variant), so calling it inside the transaction
+  // above would record "permanently deleted" even if the transaction then rolled back (e.g. the
+  // returns guard firing) — the audit trail must never claim a deletion happened before it
+  // actually, durably did.
+  await logAudit({
+    outletId: snapshot.invoice.outletId,
+    staffUserId,
+    action: "permanently_delete_purchase_invoice",
+    entityType: "purchase_invoice",
+    entityId: snapshot.invoice.id,
+    before: snapshot,
+    after: null,
+  });
+
+  return { deletedInvoiceId: purchaseInvoiceId };
 }

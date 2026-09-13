@@ -923,6 +923,10 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   // PO CRUD and isn't granted to supervisor), specifically for the View/Edit/Delete history
   // capability the user asked for on this tab.
   const canManageHistory = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_supplier_purchase_history");
+  // Narrower than canManageHistory — owner/superuser only by default. Hard-deletes the row +
+  // journal entries entirely, only ever offered on an invoice that's already "cancelled" (see
+  // permanentlyDeletePurchaseInvoice for why that guard matters).
+  const canPermanentlyDelete = hasPermission((user?.role ?? "cashier") as StaffRole, "permanently_delete_purchase_history");
   const [invoices, setInvoices] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -1069,6 +1073,26 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: "Dibatalkan dari tab Belanja Supplier" }),
       });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      load();
+    } finally {
+      setBusyInvoiceId(null);
+    }
+  };
+
+  const purgeInvoice = async (invoiceId: string, invoiceNumber: string) => {
+    const ok = await showConfirm(
+      t(
+        "inventory.supplierPurchase.confirmPurge",
+        'Hapus PERMANEN invoice "{n}"? Ini beda dari "Hapus" biasa — baris invoice, item, stock movement, DAN jurnal akuntansinya (termasuk jurnal void-nya) akan hilang total dari database, tidak bisa dilihat atau dikembalikan lagi selamanya. Hanya gunakan untuk data duplikat/salah input yang sudah dipastikan tidak diperlukan.'
+      ).replace("{n}", invoiceNumber),
+      { tone: "danger" }
+    );
+    if (!ok) return;
+    setBusyInvoiceId(invoiceId);
+    try {
+      const res = await fetch(`/api/purchase-invoices/${invoiceId}/purge`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
       load();
@@ -1260,6 +1284,14 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
                     {busyInvoiceId === inv.id ? t("accounting.common.processing", "Memproses...") : t("inventory.supplierPurchase.deleteButton", "Hapus")}
                   </Button>
                 </>
+              )}
+              {/* Hard delete — owner/superuser only, and only once the invoice is already
+                  "cancelled" (voided via the regular Hapus above). Separate, narrower gate than
+                  canManageHistory since this touches journal entries and can't be undone. */}
+              {canPermanentlyDelete && inv.status === "cancelled" && (
+                <Button variant="ghost" className="text-xs px-2 py-1 text-red-500 border border-red-500/30" onClick={() => purgeInvoice(inv.id, inv.invoiceNumber ?? inv.id.slice(0, 8))} disabled={busyInvoiceId === inv.id}>
+                  {busyInvoiceId === inv.id ? t("accounting.common.processing", "Memproses...") : t("inventory.supplierPurchase.purgeButton", "Hapus Permanen")}
+                </Button>
               )}
             </div>
           </Card>

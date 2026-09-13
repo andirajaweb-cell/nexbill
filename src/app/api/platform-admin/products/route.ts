@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     if (!body.category || !body.name || body.price === undefined) {
       return NextResponse.json({ error: "category, name, dan price wajib diisi." }, { status: 400 });
     }
-    if (!["smart_plug", "installation_service", "extra_console"].includes(body.category)) {
+    if (!["smart_plug", "installation_service", "extra_console", "other_product"].includes(body.category)) {
       return NextResponse.json({ error: "category tidak valid." }, { status: 400 });
     }
     const toNullableNumber = (v: unknown) => (v === "" || v === undefined || v === null ? null : Number(v));

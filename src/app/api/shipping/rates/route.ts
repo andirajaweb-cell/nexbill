@@ -8,10 +8,11 @@ import { getRates } from "@/lib/shipping/biteship";
 import { describeError } from "@/lib/api/error";
 
 /**
- * Prices shipping for whatever Smart Plug items are currently in the merchant's cart, to a
- * destination area they picked from the /api/shipping/areas autocomplete. Body:
- * { destinationAreaId: string, items: [{ productId, qty }] } — non-smart_plug items (installation
- * service, extra console) are silently ignored here since they never ship.
+ * Prices shipping for whatever physical items (Smart Plug, or a generic "other_product" bought via
+ * the standalone Toko tab — see checkoutProductOrder in lib/subscription/service.ts) are currently
+ * in the merchant's cart, to a destination area they picked from the /api/shipping/areas
+ * autocomplete. Body: { destinationAreaId: string, items: [{ productId, qty }] } — non-physical
+ * items (installation service, extra console) are silently ignored here since they never ship.
  *
  * Gated the same as checkout itself (manage_settings) since this is part of the money-affecting
  * checkout flow, not a passive lookup like /api/shipping/areas.
@@ -41,13 +42,13 @@ export async function POST(req: NextRequest) {
     const items = requested
       .map((r) => {
         const p = productMap.get(r.productId);
-        if (!p || p.category !== "smart_plug" || !p.isActive) return null;
+        if (!p || !p.isActive || (p.category !== "smart_plug" && p.category !== "other_product")) return null;
         const qty = Math.max(1, Math.round(Number(r.qty) || 0));
         return { name: p.name, value: p.price, weight: p.weightGrams, quantity: qty, length: p.lengthCm, width: p.widthCm, height: p.heightCm };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
-    if (items.length === 0) return NextResponse.json({ error: "Tidak ada Smart Plug di keranjang." }, { status: 400 });
+    if (items.length === 0) return NextResponse.json({ error: "Tidak ada produk fisik (Smart Plug/produk lain) di keranjang." }, { status: 400 });
 
     const options = await getRates(destinationAreaId, items);
     return NextResponse.json({ options });

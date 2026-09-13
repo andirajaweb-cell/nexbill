@@ -18,7 +18,7 @@ import { eq, and, sql, inArray, lte, desc, gte } from "drizzle-orm";
 import { DeviceProtocol } from "@/lib/devices/types";
 import { cashGateway } from "@/lib/payments/adapters/cash";
 import { fastpayGateway } from "@/lib/payments/adapters/fastpay";
-import { ipaymuCrossBorderGateway, ipaymuHostedGateway } from "@/lib/payments/adapters/ipaymu-crossborder";
+import { ipaymuCrossBorderGateway, ipaymuHostedGateway } from "@/lib/payments/adapters/ipaymu";
 import { VaBankMethod } from "@/lib/payments/types";
 import { resolveBillingCurrencyForOutlet, convertIdrToCurrency } from "@/lib/market-risk/currency";
 import { getRates } from "@/lib/shipping/biteship";
@@ -832,12 +832,60 @@ export interface CartCheckoutInput {
 }
 
 interface CartLineItem {
-  category: "subscription" | "smart_plug" | "installation_service" | "extra_console" | "shipping";
+  category: "subscription" | "smart_plug" | "installation_service" | "extra_console" | "other_product" | "shipping";
   productId: string | null; // null for the subscription-fee and shipping lines
   name: string;
   qty: number;
   unitPrice: number;
   amount: number;
+}
+
+/**
+ * Shared shipping-pricing helper for both checkoutCart (bundled first-checkout) and
+ * checkoutProductOrder (standalone "Toko" tab, added 2026-09-13) — re-verifies the Biteship rate
+ * for whichever smart_plug items are in the cart, entirely server-side. Price is NEVER trusted
+ * from the client: re-fetch rates here with the merchant's chosen destination + weight-derived
+ * items, then look up the exact courier+service they picked in that fresh response. If it's gone
+ * (price changed, courier deactivated, etc.) checkout fails with a clear message rather than
+ * silently charging a stale/tampered number. Returns `line: null` (nothing to charge or ship) when
+ * the cart has no smart_plug items at all.
+ */
+async function priceShippingIfNeeded(
+  requestedItems: { productId: string; qty: number }[],
+  productMap: Map<string, typeof platformProducts.$inferSelect>,
+  input: { shippingDestinationAreaId?: string; shippingCourierCode?: string; shippingCourierServiceName?: string }
+): Promise<{ shippingCost: number; line: CartLineItem | null }> {
+  const smartPlugRateItems = requestedItems
+    .map((item) => {
+      const product = productMap.get(item.productId);
+      // Both physical-goods categories ship — "smart_plug" (the original case) and "other_product"
+      // (added 2026-09-13 for the standalone Toko tab's generic merchandise). installation_service
+      // and extra_console are never physical, so they're excluded here same as before.
+      if (!product || !product.isActive || (product.category !== "smart_plug" && product.category !== "other_product")) return null;
+      return {
+        name: product.name,
+        value: product.price,
+        weight: product.weightGrams,
+        quantity: Math.max(1, Math.round(Number(item.qty))),
+        length: product.lengthCm,
+        width: product.widthCm,
+        height: product.heightCm,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  if (smartPlugRateItems.length === 0) return { shippingCost: 0, line: null };
+
+  if (!input.shippingDestinationAreaId) throw new Error("Alamat pengiriman wajib diisi untuk pembelian Smart Plug.");
+  if (!input.shippingCourierCode || !input.shippingCourierServiceName) throw new Error("Pilih kurir pengiriman untuk Smart Plug terlebih dahulu.");
+  const options = await getRates(input.shippingDestinationAreaId, smartPlugRateItems);
+  const match = options.find((o) => o.courierCode === input.shippingCourierCode && o.courierServiceName === input.shippingCourierServiceName);
+  if (!match) throw new Error("Opsi kurir yang dipilih sudah tidak tersedia lagi — cek ulang ongkos kirim dan pilih ulang.");
+  const shippingCost = match.price;
+  return {
+    shippingCost,
+    line: { category: "shipping", productId: null, name: `Ongkos Kirim — ${match.courierName} ${match.courierServiceName}`, qty: 1, unitPrice: shippingCost, amount: shippingCost },
+  };
 }
 
 /**
@@ -889,42 +937,9 @@ export async function checkoutCart(input: CartCheckoutInput) {
     }
 
     // ---- Shipping (Biteship) — only when the cart actually has physical Smart Plug units ----
-    // Price is NEVER trusted from the client: re-fetch rates here with the merchant's chosen
-    // destination + weight-derived items, then look up the exact courier+service they picked in
-    // that fresh response. If it's gone (price changed, courier deactivated, etc.) checkout fails
-    // with a clear message rather than silently charging a stale/tampered number.
-    const smartPlugRateItems = requestedItems
-      .map((item) => {
-        const product = productMap.get(item.productId);
-        if (!product || !product.isActive || product.category !== "smart_plug") return null;
-        return {
-          name: product.name,
-          value: product.price,
-          weight: product.weightGrams,
-          quantity: Math.max(1, Math.round(Number(item.qty))),
-          length: product.lengthCm,
-          width: product.widthCm,
-          height: product.heightCm,
-        };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
-
-    if (smartPlugRateItems.length > 0) {
-      if (!input.shippingDestinationAreaId) throw new Error("Alamat pengiriman wajib diisi untuk pembelian Smart Plug.");
-      if (!input.shippingCourierCode || !input.shippingCourierServiceName) throw new Error("Pilih kurir pengiriman untuk Smart Plug terlebih dahulu.");
-      const options = await getRates(input.shippingDestinationAreaId, smartPlugRateItems);
-      const match = options.find((o) => o.courierCode === input.shippingCourierCode && o.courierServiceName === input.shippingCourierServiceName);
-      if (!match) throw new Error("Opsi kurir yang dipilih sudah tidak tersedia lagi — cek ulang ongkos kirim dan pilih ulang.");
-      shippingCost = match.price;
-      lines.push({
-        category: "shipping",
-        productId: null,
-        name: `Ongkos Kirim — ${match.courierName} ${match.courierServiceName}`,
-        qty: 1,
-        unitPrice: shippingCost,
-        amount: shippingCost,
-      });
-    }
+    const shipping = await priceShippingIfNeeded(requestedItems, productMap, input);
+    shippingCost = shipping.shippingCost;
+    if (shipping.line) lines.push(shipping.line);
   }
 
   const total = round(lines.reduce((s, l) => s + l.amount, 0));
@@ -973,6 +988,115 @@ export async function checkoutCart(input: CartCheckoutInput) {
   }
 
   await logEvent(input.outletId, sub.id, "checkout_started", `Cart checkout — ${invoiceNumber}, total Rp${total}`);
+  return invoice;
+}
+
+export interface ProductCheckoutInput {
+  outletId: string;
+  items: { productId: string; qty: number }[]; // free-form — merchant picks whatever quantity they want
+  installContactName?: string;
+  installContactPhone?: string;
+  shippingAddress?: string;
+  shippingDestinationAreaId?: string;
+  shippingDestinationAreaLabel?: string;
+  shippingCourierCode?: string;
+  shippingCourierServiceName?: string;
+}
+
+/**
+ * "Toko" tab checkout (added 2026-09-13, per the owner's explicit request) — buys NEXBILL's
+ * physical products (Smart Plug, other merchandise) and/or services on their own, WITHOUT the
+ * subscription-fee line checkoutCart always bundles in. Deliberately usable regardless of the
+ * outlet's subscription status — including trial, trial_expired, suspended, or cancelled — since
+ * buying hardware has nothing to do with software access; the owner's own explicit choice was
+ * "selalu bisa, termasuk saat terkunci". So this function, unlike checkoutCart and startCheckout,
+ * never reads or writes `subscriptions.status`/`planId` at all — getOrCreateSubscription() below is
+ * called ONLY to obtain sub.id for the invoice's required subscriptionId foreign key.
+ *
+ * Produces its own `subscriptionInvoices` row (type "product_order", never "cart_order") so it's
+ * cleanly distinguishable in reporting/COGS AND so it's excluded from the pending_payment
+ * activation unpaid-invoice count in confirmInvoicePayment — an outlet mid first-checkout who also
+ * orders a t-shirt here must not have their access activation blocked on the t-shirt invoice too.
+ *
+ * Same accounting isolation rule as checkoutCart applies here: never posts to the outlet's own
+ * journal — this is NEXBILL's own revenue, tracked only in subscriptionInvoices.
+ */
+export async function checkoutProductOrder(input: ProductCheckoutInput) {
+  const sub = await getOrCreateSubscription(input.outletId);
+
+  const requestedItems = (input.items ?? []).filter((i) => i.productId && Number(i.qty) > 0);
+  if (requestedItems.length === 0) throw new Error("Keranjang kosong — pilih minimal satu produk.");
+
+  const productIds = requestedItems.map((i) => i.productId);
+  const products = await db.select().from(platformProducts).where(inArray(platformProducts.id, productIds));
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
+  const lines: CartLineItem[] = [];
+  for (const item of requestedItems) {
+    const product = productMap.get(item.productId);
+    if (!product || !product.isActive) continue; // silently skip a stale/removed cart entry rather than failing the whole checkout
+    const qty = Math.max(1, Math.round(Number(item.qty)));
+    lines.push({
+      category: product.category as CartLineItem["category"],
+      productId: product.id,
+      name: product.name,
+      qty,
+      unitPrice: product.price,
+      amount: round(qty * product.price),
+    });
+  }
+  if (lines.length === 0) throw new Error("Semua produk di keranjang sudah tidak tersedia — muat ulang etalase dan coba lagi.");
+
+  const { shippingCost, line: shippingLine } = await priceShippingIfNeeded(requestedItems, productMap, input);
+  if (shippingLine) lines.push(shippingLine);
+
+  const total = round(lines.reduce((s, l) => s + l.amount, 0));
+  const invoiceNumber = await generateInvoiceNumber();
+  const [invoice] = await db
+    .insert(subscriptionInvoices)
+    .values({
+      invoiceNumber,
+      outletId: input.outletId,
+      subscriptionId: sub.id,
+      type: "product_order",
+      description: `Belanja Produk NEXBILL — ${lines.length} item`,
+      qty: 1,
+      unitPrice: total,
+      amount: total,
+      lineItemsJson: JSON.stringify(lines),
+      status: "unpaid",
+      dueDate: addDaysIso(new Date().toISOString(), 3),
+    })
+    .returning();
+  await logEvent(input.outletId, sub.id, "invoice_created", `${invoiceNumber} — belanja produk ${lines.length} item (Rp${total})`);
+
+  const smartPlugQty = lines.filter((l) => l.category === "smart_plug").reduce((s, l) => s + l.qty, 0);
+  const otherProductQty = lines.filter((l) => l.category === "other_product").reduce((s, l) => s + l.qty, 0);
+  const wantsInstall = lines.some((l) => l.category === "installation_service");
+  // Fires for EITHER physical category — a pure "other_product" order (no smart_plug at all) still
+  // needs a fulfillment record for NEXBILL to know where to ship it, even though `qty` here only
+  // ever tracks the smart_plug count specifically (it feeds the "N smart plug terdaftar" line on
+  // the Billing page — see confirmInvoicePayment, which reads smartPlugQty straight from
+  // lineItemsJson, never from this row's qty column, so leaving other_product out of it is safe).
+  if (smartPlugQty > 0 || otherProductQty > 0) {
+    await db.insert(smartPlugOrders).values({
+      outletId: input.outletId,
+      subscriptionInvoiceId: invoice.id,
+      qty: smartPlugQty,
+      installRequested: wantsInstall,
+      installStatus: wantsInstall ? "requested" : "not_requested",
+      contactName: input.installContactName,
+      contactPhone: input.installContactPhone,
+      shippingAddress: input.shippingAddress,
+      shippingAreaId: input.shippingDestinationAreaId ?? null,
+      shippingAreaLabel: input.shippingDestinationAreaLabel ?? null,
+      shippingCourierCode: input.shippingCourierCode ?? null,
+      shippingCourierServiceName: input.shippingCourierServiceName ?? null,
+      shippingCost,
+    });
+  }
+
+  await logEvent(input.outletId, sub.id, "checkout_started", `Toko checkout — ${invoiceNumber}, total Rp${total}`);
   return invoice;
 }
 
@@ -1282,10 +1406,13 @@ export async function confirmInvoicePayment(invoiceId: string) {
     return updated;
   }
 
-  // A paid cart_order invoice may have bought smart plug hardware (free-form qty, not tied to
-  // sub.smartPlugRequiredQty) — fulfill that qty onto the subscription's owned count right away,
-  // whether this is the very first checkout or a later top-up purchase while already active.
-  if (invoice.type === "cart_order" && invoice.lineItemsJson) {
+  // A paid cart_order OR product_order invoice may have bought smart plug hardware (free-form qty,
+  // not tied to sub.smartPlugRequiredQty) — fulfill that qty onto the subscription's owned count
+  // right away, whether this is the very first checkout, a later top-up while already active, or
+  // a standalone "Toko" purchase (product_order, added 2026-09-13) made regardless of subscription
+  // status. Both types share the exact same lineItemsJson shape (CartLineItem[]), so one branch
+  // handles both.
+  if ((invoice.type === "cart_order" || invoice.type === "product_order") && invoice.lineItemsJson) {
     try {
       const lines = JSON.parse(invoice.lineItemsJson) as CartLineItem[];
       const smartPlugQty = lines.filter((l) => l.category === "smart_plug").reduce((s, l) => s + l.qty, 0);
@@ -1321,10 +1448,22 @@ export async function confirmInvoicePayment(invoiceId: string) {
   }
 
   if (sub.status === "pending_payment") {
+    // Scoped to invoice types that actually gate activation (the first-checkout's mandatory
+    // subscription_fee/cart_order invoice) — deliberately EXCLUDES "product_order" (added
+    // 2026-09-13 for the standalone "Toko" tab), since buying hardware there has nothing to do
+    // with subscription access. Without this filter, an outlet mid first-checkout who also placed
+    // an unrelated Toko order would stay stuck in "pending_payment" forever if they paid the
+    // subscription invoice but left the Toko order unpaid a while longer (or vice versa).
     const [{ n: unpaidCount }] = (await db
       .select({ n: sql<number>`count(*)` })
       .from(subscriptionInvoices)
-      .where(and(eq(subscriptionInvoices.subscriptionId, sub.id), eq(subscriptionInvoices.status, "unpaid")))) as { n: number }[];
+      .where(
+        and(
+          eq(subscriptionInvoices.subscriptionId, sub.id),
+          eq(subscriptionInvoices.status, "unpaid"),
+          inArray(subscriptionInvoices.type, ["subscription_fee", "cart_order"])
+        )
+      )) as { n: number }[];
     if (unpaidCount === 0) {
       const now = new Date().toISOString();
       await db

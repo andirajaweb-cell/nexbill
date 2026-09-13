@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -56,6 +56,52 @@ const PRESET_KEY: Record<PeriodPreset, string> = {
   last_year: "transactions.preset.lastYear",
   custom: "transactions.preset.custom",
 };
+
+/** Same as row.businessDate/createdAt formatting elsewhere on this page, but including seconds —
+ * a cashier double-entering the same sale typically does so within seconds of the first, so the
+ * default minute-precision display can make two genuinely distinct transactions look identical. */
+function formatDateTimeWithSeconds(iso: string): string {
+  return new Date(iso).toLocaleString("id-ID", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+}
+
+/**
+ * Pure, client-side "mirip transaksi lain" (possible-duplicate) heuristic — flags rows that share
+ * the same cashier, the exact same total, and the exact same item breakdown (qty+description,
+ * order-independent) as another row in the same loaded table, within a short time window. This is
+ * deliberately a soft signal for the owner to go double-check (via "Detail"), never an automatic
+ * void/block — a legitimate regular customer buying the identical order twice in a row (e.g. two
+ * separate rental sessions rung up back to back) would also match, so this only ever adds a badge,
+ * it never hides or alters a row.
+ */
+const DUPLICATE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+function itemsSignature(items: { qty: number; description: string }[]): string {
+  return items.map((i) => `${i.qty}x${i.description}`).sort().join("|");
+}
+function computeDuplicateFlags(rows: any[]): Set<string> {
+  const flagged = new Set<string>();
+  const byKey = new Map<string, any[]>();
+  for (const row of rows) {
+    if (row.status === "cancelled") continue; // already void/cancelled — not a "did this double-charge the customer" risk
+    const key = `${row.staffUserId ?? "-"}|${row.total}|${itemsSignature(row.items ?? [])}`;
+    const list = byKey.get(key) ?? [];
+    list.push(row);
+    byKey.set(key, list);
+  }
+  for (const list of byKey.values()) {
+    if (list.length < 2) continue;
+    const withTime = list.map((r) => ({ id: r.id, t: new Date(r.businessDate ?? r.createdAt).getTime() })).sort((a, b) => a.t - b.t);
+    for (let i = 1; i < withTime.length; i++) {
+      if (withTime[i].t - withTime[i - 1].t <= DUPLICATE_WINDOW_MS) {
+        flagged.add(withTime[i].id);
+        flagged.add(withTime[i - 1].id);
+      }
+    }
+  }
+  return flagged;
+}
 
 function toLocalIso(d: Date) {
   return d.toISOString();
@@ -195,6 +241,7 @@ function TransactionListTab({ outletId }: { outletId: string }) {
 
   const rows = (data?.transactions ?? []).filter((t) => !customerQuery.trim() || (t.customerName ?? "").toLowerCase().includes(customerQuery.trim().toLowerCase()));
   const s = data?.summary;
+  const duplicateFlags = useMemo(() => computeDuplicateFlags(rows), [rows]);
 
   const doAction = async (id: string, kind: "refund" | "void") => {
     const reason = prompt(kind === "refund" ? t("transactions.prompt.refundReason", "Alasan refund?") : t("transactions.prompt.voidReason", "Alasan void?")) ?? "";
@@ -314,18 +361,33 @@ function TransactionListTab({ outletId }: { outletId: string }) {
                     className="py-2 whitespace-nowrap"
                     title={
                       row.businessDate && row.businessDate !== row.createdAt
-                        ? `${t("transactions.col.timeCreatedTooltip", "Order dibuat")}: ${new Date(row.createdAt).toLocaleString("id-ID")}`
+                        ? `${t("transactions.col.timeCreatedTooltip", "Order dibuat")}: ${formatDateTimeWithSeconds(row.createdAt)}`
                         : undefined
                     }
                   >
-                    {new Date(row.businessDate ?? row.createdAt).toLocaleString("id-ID")}
+                    <div>{formatDateTimeWithSeconds(row.businessDate ?? row.createdAt)}</div>
+                    <div className="text-[10px] text-neutral-600 font-mono">#{row.id.slice(0, 8)}</div>
                   </td>
                   <td>{row.staffName}</td>
                   <td><Badge status="unknown">{typeLabel(t, row.type)}</Badge></td>
                   <td>{row.customerName ?? "-"}{row.memberTier ? ` (${row.memberTier})` : ""}</td>
                   <td>{row.unitName ?? "-"}</td>
-                  <td className="max-w-[220px] truncate text-xs text-neutral-400" title={row.items.map((i: any) => `${i.qty}x ${i.description}`).join(", ")}>
-                    {row.items.map((i: any) => `${i.qty}x ${i.description}`).join(", ") || "-"}
+                  <td className="max-w-[260px] text-xs text-neutral-400">
+                    {row.items.length === 0 ? "-" : (
+                      <ul className="space-y-0.5">
+                        {row.items.map((i: any, idx: number) => (
+                          <li key={idx} className="leading-snug">{i.qty}x {i.description}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {duplicateFlags.has(row.id) && (
+                      <span
+                        className="inline-block mt-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400"
+                        title={t("transactions.duplicate.tooltip", "Kasir, item, dan total sama persis dengan transaksi lain dalam rentang waktu berdekatan — cek kemungkinan transaksi ini terinput dua kali sebelum dianggap valid.")}
+                      >
+                        ⚠ {t("transactions.duplicate.badge", "Mirip Ganda")}
+                      </span>
+                    )}
                   </td>
                   <td className="font-medium">{rupiah(row.total)}</td>
                   <td className="text-xs">{row.payments.map((p: any) => p.methodGroup).join(", ") || "-"}</td>
@@ -358,15 +420,123 @@ function TransactionListTab({ outletId }: { outletId: string }) {
         )}
       </Card>
 
-      {detailId && <TransactionDetailModal id={detailId} onClose={() => setDetailId(null)} />}
+      {detailId && (
+        <TransactionDetailModal
+          id={detailId}
+          outletId={outletId}
+          canEditPayment={isSuperuser}
+          onClose={() => setDetailId(null)}
+          onChanged={load}
+        />
+      )}
     </div>
   );
 }
 
-function TransactionDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+function TransactionDetailModal({ id, outletId, canEditPayment, onClose, onChanged }: { id: string; outletId: string; canEditPayment: boolean; onClose: () => void; onChanged: () => void }) {
   const { t } = useDashboardLang();
   const [detail, setDetail] = useState<any>(null);
-  useEffect(() => { fetchJsonObject(`/api/transactions/${id}`).then(setDetail); }, [id]);
+  const [methodOptions, setMethodOptions] = useState<{ key: string; label: string }[]>([]);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState("");
+  const [paymentAmountInput, setPaymentAmountInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  // Tracks the SPECIFIC order item being edited/deleted (not just "is something being edited") —
+  // a merged order (mergeOrders in lib/pos/split-merge.ts) can carry several itemType:"rental"
+  // lines at once (one per originating TV/session that got combined into one payable bill), so a
+  // single shared boolean here would always act on whichever line happened to be first, regardless
+  // of which row's "Koreksi Nominal"/"Hapus" link was actually clicked.
+  const [editingRentalItemId, setEditingRentalItemId] = useState<string | null>(null);
+  const [rentalAmountInput, setRentalAmountInput] = useState("");
+  const [savingRentalAmount, setSavingRentalAmount] = useState(false);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+
+  const loadDetail = () => fetchJsonObject(`/api/transactions/${id}`).then(setDetail);
+  useEffect(() => { loadDetail(); }, [id]);
+  useEffect(() => {
+    if (canEditPayment) fetchJsonArray(`/api/payment-methods?outletId=${outletId}`).then((rows: any[]) => setMethodOptions(rows.map((m) => ({ key: m.key, label: m.label }))));
+  }, [canEditPayment, outletId]);
+
+  const startEditPayment = (p: any) => { setEditingPaymentId(p.id); setSelectedMethod(p.method); setPaymentAmountInput(String(p.amount)); };
+  const cancelEditPayment = () => { setEditingPaymentId(null); setSelectedMethod(""); setPaymentAmountInput(""); };
+  const savePaymentMethod = async (paymentId: string, originalMethod: string, originalAmount: number) => {
+    const amount = Number(paymentAmountInput);
+    if (!Number.isFinite(amount) || amount < 0) return showAlert(t("transactions.payment.invalidAmount", "Nominal pembayaran tidak valid."));
+    const methodChanged = selectedMethod && selectedMethod !== originalMethod;
+    const amountChanged = Math.round(amount) !== Math.round(originalAmount);
+    if (!methodChanged && !amountChanged) return;
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {};
+      if (methodChanged) body.method = selectedMethod;
+      if (amountChanged) body.amount = amount;
+      const res = await fetch(`/api/transactions/${id}/payments/${paymentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      // res.json() throws (not caught below without this) if the server responded with something
+      // that isn't valid JSON — e.g. a 404/500 HTML error page from a stale/incomplete deploy —
+      // which previously failed completely silently (no dialog, no console-visible feedback to the
+      // cashier/owner) since there was no catch block at all below.
+      const out = await res.json().catch(() => ({ error: `Server merespons status ${res.status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.` }));
+      if (!res.ok) return showAlert(out.error ?? `Gagal (status ${res.status}).`);
+      cancelEditPayment();
+      await loadDetail();
+      onChanged();
+      showAlert(t("transactions.payment.correctSuccess", "Pembayaran berhasil dikoreksi."));
+    } catch (err: any) {
+      showAlert(`Gagal menyimpan koreksi: ${err?.message ?? "kesalahan tidak diketahui"}. Cek koneksi internet lalu coba lagi.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEditRentalAmount = (item: { id: string; lineTotal: number }) => { setEditingRentalItemId(item.id); setRentalAmountInput(String(item.lineTotal)); };
+  const cancelEditRentalAmount = () => { setEditingRentalItemId(null); setRentalAmountInput(""); };
+  const saveRentalAmount = async () => {
+    if (!editingRentalItemId) return;
+    const amount = Number(rentalAmountInput);
+    if (!Number.isFinite(amount) || amount < 0) return showAlert(t("transactions.rental.invalidAmount", "Nominal tidak valid."));
+    setSavingRentalAmount(true);
+    try {
+      const res = await fetch(`/api/transactions/${id}/rental-charge`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, orderItemId: editingRentalItemId }),
+      });
+      // Same defensive JSON-parse + catch as savePaymentMethod above — see its comment for why this
+      // is needed (a non-JSON response, e.g. from a stale/incomplete deploy, used to fail silently).
+      const out = await res.json().catch(() => ({ error: `Server merespons status ${res.status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.` }));
+      if (!res.ok) return showAlert(out.error ?? `Gagal (status ${res.status}).`);
+      cancelEditRentalAmount();
+      await loadDetail();
+      onChanged();
+      showAlert(t("transactions.rental.correctSuccess", "Nominal rental berhasil dikoreksi."));
+    } catch (err: any) {
+      showAlert(`Gagal menyimpan koreksi: ${err?.message ?? "kesalahan tidak diketahui"}. Cek koneksi internet lalu coba lagi.`);
+    } finally {
+      setSavingRentalAmount(false);
+    }
+  };
+
+  const deleteItem = async (item: { id: string; description: string; lineTotal: number }) => {
+    if (!await showConfirm(t("transactions.item.confirmDelete", "Hapus item \"{desc}\" ({amount}) dari transaksi ini? Sistem otomatis membatalkan & memposting ulang jurnal penjualan order ini tanpa item ini. Tidak bisa dibatalkan.").replace("{desc}", item.description).replace("{amount}", rupiah(item.lineTotal)))) return;
+    setDeletingItemId(item.id);
+    try {
+      const res = await fetch(`/api/transactions/${id}/items/${item.id}`, { method: "DELETE" });
+      const out = await res.json().catch(() => ({ error: `Server merespons status ${res.status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.` }));
+      if (!res.ok) return showAlert(out.error ?? `Gagal (status ${res.status}).`);
+      if (editingRentalItemId === item.id) cancelEditRentalAmount();
+      await loadDetail();
+      onChanged();
+      showAlert(t("transactions.item.deleteSuccess", "Item berhasil dihapus dari transaksi."));
+    } catch (err: any) {
+      showAlert(`Gagal menghapus item: ${err?.message ?? "kesalahan tidak diketahui"}. Cek koneksi internet lalu coba lagi.`);
+    } finally {
+      setDeletingItemId(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -392,12 +562,58 @@ function TransactionDetailModal({ id, onClose }: { id: string; onClose: () => vo
               <h3 className="text-xs uppercase text-neutral-500 mb-1">{t("transactions.col.item", "Item")}</h3>
               <table className="w-full text-xs">
                 <tbody>
-                  {detail.items.map((it: any) => (
-                    <tr key={it.id} className="border-b border-neutral-800">
-                      <td className="py-1">{it.qty}x {it.description}</td>
-                      <td className="text-right">{rupiah(it.lineTotal)}</td>
-                    </tr>
-                  ))}
+                  {detail.items.map((it: any) => {
+                    const isRental = it.itemType === "rental";
+                    const isCancelled = it.kitchenStatus === "cancelled";
+                    const activeCount = detail.items.filter((x: any) => x.kitchenStatus !== "cancelled").length;
+                    const isEditingThis = editingRentalItemId === it.id;
+                    const isDeletingThis = deletingItemId === it.id;
+                    return (
+                      <Fragment key={it.id}>
+                        <tr className={`border-b border-neutral-800 ${isCancelled ? "opacity-40" : ""}`}>
+                          <td className="py-1">
+                            <span className={isCancelled ? "line-through" : ""}>{it.qty}x {it.description}</span>
+                            {isCancelled && <span className="ml-2 text-[10px] text-red-400">{t("transactions.item.deletedTag", "(dihapus)")}</span>}
+                            {!isCancelled && isRental && canEditPayment && !isEditingThis && (
+                              <button className="ml-2 text-cyan-400 hover:text-cyan-300 underline decoration-dotted" onClick={() => startEditRentalAmount(it)}>
+                                {t("transactions.rental.editAmount", "Koreksi Nominal")}
+                              </button>
+                            )}
+                            {!isCancelled && canEditPayment && activeCount > 1 && (
+                              <button className="ml-2 text-red-400 hover:text-red-300 underline decoration-dotted disabled:opacity-50" disabled={isDeletingThis} onClick={() => deleteItem(it)}>
+                                {t("transactions.item.delete", "Hapus")}
+                              </button>
+                            )}
+                          </td>
+                          <td className="text-right">{rupiah(it.lineTotal)}</td>
+                        </tr>
+                        {isEditingThis && (
+                          <tr>
+                            <td colSpan={2}>
+                              <div className="mt-2 mb-2 bg-neutral-800/60 rounded-lg p-2 space-y-1.5">
+                                <p className="text-[11px] text-neutral-500">{t("transactions.rental.editHint", "Untuk memperbaiki tagihan rental yang salah (mis. karena harga paket promo berubah saat sesi masih berjalan). Sistem otomatis membatalkan & memposting ulang jurnal penjualan order ini dengan nominal yang benar.")}</p>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs flex-1"
+                                    value={rentalAmountInput}
+                                    onChange={(e) => setRentalAmountInput(e.target.value)}
+                                  />
+                                  <Button className="text-xs" disabled={savingRentalAmount} onClick={saveRentalAmount}>
+                                    {t("transactions.payment.saveMethod", "Simpan")}
+                                  </Button>
+                                  <Button variant="ghost" className="text-xs" onClick={cancelEditRentalAmount}>
+                                    {t("transactions.payment.cancelEdit", "Batal")}
+                                  </Button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
               <div className="flex justify-between mt-2 text-xs text-neutral-400"><span>{t("transactions.detail.subtotal", "Subtotal")}</span><span>{rupiah(detail.order.subtotal)}</span></div>
@@ -409,11 +625,54 @@ function TransactionDetailModal({ id, onClose }: { id: string; onClose: () => vo
 
             <div>
               <h3 className="text-xs uppercase text-neutral-500 mb-1">{t("transactions.detail.paymentHeading", "Pembayaran")}</h3>
-              {detail.payments.map((p: any) => (
-                <div key={p.id} className="flex justify-between text-xs text-neutral-400">
-                  <span>{p.method} · {p.status}</span><span>{rupiah(p.amount)}</span>
-                </div>
-              ))}
+              {canEditPayment && (
+                <p className="text-[11px] text-neutral-600 mb-2">{t("transactions.payment.editHint", "Untuk memperbaiki kasir yang salah pilih metode (mis. tercatat QRIS padahal terima Cash) atau nominal yang sudah tidak cocok dengan total setelah koreksi lain. Sistem otomatis membatalkan & memposting ulang jurnal penjualan order ini dengan data yang benar.")}</p>
+              )}
+              {detail.payments.map((p: any) => {
+                const canEditThis = canEditPayment && p.status === "success" && p.kind !== "deposit";
+                const isEditing = editingPaymentId === p.id;
+                const amountNum = Number(paymentAmountInput);
+                const noChange = isEditing && selectedMethod === p.method && Number.isFinite(amountNum) && Math.round(amountNum) === Math.round(p.amount);
+                return (
+                  <div key={p.id} className="text-xs text-neutral-400 mb-1.5">
+                    <div className="flex justify-between items-center">
+                      <span>{p.method} · {p.status}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{rupiah(p.amount)}</span>
+                        {canEditThis && !isEditing && (
+                          <button className="text-cyan-400 hover:text-cyan-300 underline decoration-dotted" onClick={() => startEditPayment(p)}>
+                            {t("transactions.payment.editMethod", "Koreksi")}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {isEditing && (
+                      <div className="flex flex-wrap items-center gap-2 mt-1 bg-neutral-800/60 rounded-lg p-2">
+                        <select
+                          className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs"
+                          value={selectedMethod}
+                          onChange={(e) => setSelectedMethod(e.target.value)}
+                        >
+                          {methodOptions.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs flex-1 min-w-[6rem]"
+                          value={paymentAmountInput}
+                          onChange={(e) => setPaymentAmountInput(e.target.value)}
+                        />
+                        <Button className="text-xs" disabled={saving || noChange} onClick={() => savePaymentMethod(p.id, p.method, p.amount)}>
+                          {t("transactions.payment.saveMethod", "Simpan")}
+                        </Button>
+                        <Button variant="ghost" className="text-xs" onClick={cancelEditPayment}>
+                          {t("transactions.payment.cancelEdit", "Batal")}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {detail.payments.length === 0 && <p className="text-xs text-neutral-500">{t("transactions.detail.noPayments", "Belum ada pembayaran.")}</p>}
             </div>
 

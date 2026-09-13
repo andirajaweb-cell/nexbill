@@ -260,6 +260,18 @@ const PAYMENT_METHOD_FALLBACK_CODE: Record<string, string> = {
   transfer: "1121",
   bank: "1121", // legacy/free-text alias still used by some non-order payment flows
   fastpay_h2h: "1137",
+  // iPaymu channels — QRIS/DANA/ShopeePay settle into the SAME "what's our QRIS/DANA/ShopeePay
+  // balance" bucket regardless of which gateway processed the scan (a customer's QRIS payment
+  // looks identical to the merchant whether Fastpay or iPaymu settled it), reusing the existing
+  // codes above/1135 rather than fragmenting reconciliation by gateway. Mandiri/BRI VA reuse their
+  // existing dedicated bank codes (1122/1123); BCA/BNI/Permata VA and Alfamart/Indomaret/hosted/
+  // crossborder have no dedicated DEFAULT_COA code yet, so they fall through to the generic "1121"
+  // default below — same as how Fastpay's own va_bca/va_bni/etc. already behave unmapped.
+  ipaymu_qris: "1131",
+  ipaymu_dana: "1134",
+  ipaymu_shopeepay: "1135",
+  ipaymu_va_mandiri: "1122",
+  ipaymu_va_bri: "1123",
 };
 
 // Reuses the same canonical app-name labels the billing checkout picker and shift-closing

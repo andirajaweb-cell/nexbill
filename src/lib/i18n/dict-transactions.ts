@@ -131,4 +131,58 @@ registerDict({
   "transactions.detail.noPayments": { id: "Belum ada pembayaran.", en: "No payments yet.", ms: "Belum ada pembayaran.", th: "ยังไม่มีการชำระเงิน", fil: "Wala pang bayad.", vi: "Chưa có khoản thanh toán nào." },
   "transactions.detail.journalHeading": { id: "Jurnal Akuntansi", en: "Accounting Journal", ms: "Jurnal Perakaunan", th: "สมุดบัญชี", fil: "Accounting Journal", vi: "Sổ kế toán" },
   "transactions.detail.noJournal": { id: "Belum ada jurnal terkait.", en: "No related journal entries yet.", ms: "Belum ada jurnal berkaitan.", th: "ยังไม่มีรายการบัญชีที่เกี่ยวข้อง", fil: "Wala pang kaugnay na journal entry.", vi: "Chưa có bút toán sổ kế toán liên quan." },
+
+  // --- Duplicate-transaction flag (Daftar Transaksi table) ---
+  "transactions.duplicate.badge": { id: "Mirip Ganda", en: "Possible Duplicate", ms: "Mungkin Pendua", th: "อาจซ้ำ", fil: "Posibleng Duplicate", vi: "Có thể trùng lặp" },
+  "transactions.duplicate.tooltip": {
+    id: "Kasir, item, dan total sama persis dengan transaksi lain dalam rentang waktu berdekatan — cek kemungkinan transaksi ini terinput dua kali sebelum dianggap valid.",
+    en: "Same cashier, items, and total as another transaction close in time — check whether this was accidentally entered twice before treating it as valid.",
+    ms: "Juruwang, item, dan jumlah sama persis dengan transaksi lain dalam jarak masa yang dekat — semak kemungkinan transaksi ini dimasukkan dua kali sebelum dianggap sah.",
+    th: "แคชเชียร์ รายการ และยอดรวมเหมือนกับธุรกรรมอื่นในช่วงเวลาใกล้เคียงกัน — ตรวจสอบว่าธุรกรรมนี้ถูกบันทึกซ้ำสองครั้งหรือไม่ก่อนถือว่าถูกต้อง",
+    fil: "Parehong cashier, item, at total sa ibang transaksyon na malapit ang oras — tingnan kung baka aksidenteng na-input nang dalawang beses ito bago ituring na valid.",
+    vi: "Cùng thu ngân, mặt hàng và tổng tiền với một giao dịch khác gần thời điểm — kiểm tra xem giao dịch này có bị nhập trùng hai lần không trước khi xem là hợp lệ.",
+  },
+
+  // --- Payment method + amount correction (Owner/Superuser only) ---
+  "transactions.payment.editMethod": { id: "Koreksi", en: "Correct", ms: "Betulkan", th: "แก้ไข", fil: "Itama", vi: "Sửa" },
+  "transactions.payment.saveMethod": { id: "Simpan", en: "Save", ms: "Simpan", th: "บันทึก", fil: "I-save", vi: "Lưu" },
+  "transactions.payment.cancelEdit": { id: "Batal", en: "Cancel", ms: "Batal", th: "ยกเลิก", fil: "Kanselahin", vi: "Hủy" },
+  "transactions.payment.editHint": {
+    id: "Untuk memperbaiki kasir yang salah pilih metode (mis. tercatat QRIS padahal terima Cash) atau nominal yang sudah tidak cocok dengan total setelah koreksi lain. Sistem otomatis membatalkan & memposting ulang jurnal penjualan order ini dengan data yang benar.",
+    en: "For fixing a cashier who picked the wrong method (e.g. recorded as QRIS but cash was actually received) or an amount that no longer matches the total after another correction. The system automatically voids and reposts this order's sales journal with the corrected data.",
+    ms: "Untuk membetulkan juruwang yang tersilap pilih kaedah (cth. direkodkan QRIS sedangkan tunai yang diterima) atau jumlah yang sudah tidak sepadan dengan jumlah keseluruhan selepas pembetulan lain. Sistem secara automatik membatalkan & memposkan semula jurnal jualan order ini dengan data yang betul.",
+    th: "สำหรับแก้ไขกรณีแคชเชียร์เลือกวิธีการชำระผิด (เช่น บันทึกเป็น QRIS แต่จริงๆ รับเป็นเงินสด) หรือจำนวนเงินที่ไม่ตรงกับยอดรวมอีกต่อไปหลังการแก้ไขอื่น ระบบจะยกเลิกและโพสต์สมุดบัญชีการขายของออเดอร์นี้ใหม่โดยอัตโนมัติด้วยข้อมูลที่ถูกต้อง",
+    fil: "Para itama ang cashier na napiling maling paraan (hal. naitala bilang QRIS pero cash pala ang natanggap) o halagang hindi na tugma sa total pagkatapos ng ibang pagwawasto. Awtomatikong ibi-void at ire-repost ng sistema ang sales journal ng order na ito gamit ang tamang datos.",
+    vi: "Dùng để sửa lỗi thu ngân chọn sai phương thức (vd. ghi là QRIS nhưng thực tế nhận tiền mặt) hoặc số tiền không còn khớp với tổng sau một lần sửa khác. Hệ thống sẽ tự động hủy và đăng lại sổ nhật ký bán hàng của đơn này với dữ liệu đúng.",
+  },
+  "transactions.payment.correctSuccess": { id: "Pembayaran berhasil dikoreksi.", en: "Payment corrected successfully.", ms: "Pembayaran berjaya dibetulkan.", th: "แก้ไขการชำระเงินสำเร็จแล้ว", fil: "Matagumpay na naitama ang bayad.", vi: "Đã sửa thanh toán thành công." },
+  "transactions.payment.invalidAmount": { id: "Nominal pembayaran tidak valid.", en: "Invalid payment amount.", ms: "Jumlah pembayaran tidak sah.", th: "จำนวนเงินชำระไม่ถูกต้อง", fil: "Hindi valid na halaga ng bayad.", vi: "Số tiền thanh toán không hợp lệ." },
+
+  // --- Rental charge correction (Owner/Superuser only) ---
+  "transactions.rental.editAmount": { id: "Koreksi Nominal", en: "Correct Amount", ms: "Betulkan Jumlah", th: "แก้ไขจำนวนเงิน", fil: "Itama ang Halaga", vi: "Sửa số tiền" },
+  "transactions.rental.editHint": {
+    id: "Untuk memperbaiki tagihan rental yang salah (mis. karena harga paket promo berubah saat sesi masih berjalan). Sistem otomatis membatalkan & memposting ulang jurnal penjualan order ini dengan nominal yang benar.",
+    en: "For fixing a wrong rental charge (e.g. the package/promo price changed while the session was still running). The system automatically voids and reposts this order's sales journal with the corrected amount.",
+    ms: "Untuk membetulkan caj sewa yang salah (cth. harga pakej promo berubah semasa sesi masih berjalan). Sistem secara automatik membatalkan & memposkan semula jurnal jualan order ini dengan jumlah yang betul.",
+    th: "สำหรับแก้ไขค่าเช่าที่ผิดพลาด (เช่น ราคาแพ็กเกจ/โปรโมชันเปลี่ยนขณะเซสชันยังทำงานอยู่) ระบบจะยกเลิกและโพสต์สมุดบัญชีการขายของออเดอร์นี้ใหม่โดยอัตโนมัติด้วยจำนวนที่ถูกต้อง",
+    fil: "Para itama ang maling singil sa rental (hal. nagbago ang presyo ng package/promo habang tumatakbo pa ang session). Awtomatikong ibi-void at ire-repost ng sistema ang sales journal ng order na ito gamit ang tamang halaga.",
+    vi: "Dùng để sửa lỗi phí thuê sai (vd. giá gói/khuyến mãi thay đổi trong khi phiên vẫn đang chạy). Hệ thống sẽ tự động hủy và đăng lại sổ nhật ký bán hàng của đơn này với số tiền đúng.",
+  },
+  "transactions.rental.invalidAmount": { id: "Nominal tidak valid.", en: "Invalid amount.", ms: "Jumlah tidak sah.", th: "จำนวนเงินไม่ถูกต้อง", fil: "Hindi valid na halaga.", vi: "Số tiền không hợp lệ." },
+  "transactions.rental.correctSuccess": { id: "Nominal rental berhasil dikoreksi.", en: "Rental amount corrected successfully.", ms: "Jumlah sewa berjaya dibetulkan.", th: "แก้ไขจำนวนค่าเช่าสำเร็จแล้ว", fil: "Matagumpay na naitama ang halaga ng rental.", vi: "Đã sửa số tiền thuê thành công." },
+
+  // --- Per-item delete on an already-paid order (Owner/Superuser only) — e.g. removing a
+  // genuinely duplicate rental line left over from merging several TVs'/sessions' bills into one
+  // order. ---
+  "transactions.item.delete": { id: "Hapus", en: "Delete", ms: "Padam", th: "ลบ", fil: "Tanggalin", vi: "Xóa" },
+  "transactions.item.deletedTag": { id: "(dihapus)", en: "(deleted)", ms: "(dipadam)", th: "(ลบแล้ว)", fil: "(tinanggal)", vi: "(đã xóa)" },
+  "transactions.item.confirmDelete": {
+    id: 'Hapus item "{desc}" ({amount}) dari transaksi ini? Sistem otomatis membatalkan & memposting ulang jurnal penjualan order ini tanpa item ini. Tidak bisa dibatalkan.',
+    en: 'Delete item "{desc}" ({amount}) from this transaction? The system automatically voids and reposts this order\'s sales journal without this item. Cannot be undone.',
+    ms: 'Padam item "{desc}" ({amount}) daripada transaksi ini? Sistem secara automatik membatalkan & memposkan semula jurnal jualan order ini tanpa item ini. Tidak boleh dibatalkan.',
+    th: 'ลบรายการ "{desc}" ({amount}) ออกจากรายการนี้หรือไม่? ระบบจะยกเลิกและโพสต์สมุดบัญชีการขายของออเดอร์นี้ใหม่โดยไม่มีรายการนี้โดยอัตโนมัติ ไม่สามารถย้อนกลับได้',
+    fil: 'Tanggalin ang item na "{desc}" ({amount}) mula sa transaksyong ito? Awtomatikong ibi-void at ire-repost ng sistema ang sales journal ng order na ito nang wala ang item na ito. Hindi na maaaring bawiin.',
+    vi: 'Xóa mục "{desc}" ({amount}) khỏi giao dịch này? Hệ thống sẽ tự động hủy và đăng lại sổ nhật ký bán hàng của đơn này mà không có mục này. Không thể hoàn tác.',
+  },
+  "transactions.item.deleteSuccess": { id: "Item berhasil dihapus dari transaksi.", en: "Item deleted from the transaction successfully.", ms: "Item berjaya dipadam daripada transaksi.", th: "ลบรายการออกจากรายการสำเร็จแล้ว", fil: "Matagumpay na natanggal ang item mula sa transaksyon.", vi: "Đã xóa mục khỏi giao dịch thành công." },
 });

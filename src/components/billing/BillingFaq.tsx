@@ -21,7 +21,7 @@ const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
  * summary the page already fetched) rather than hardcoded, so it never drifts out of sync if an
  * admin edits pricing later. Only the timing constants that are NOT per-plan (trial length, grace
  * period, renewal lead time) are inlined as plain numbers — they mirror the literal constants in
- * subscription/config.ts (TRIAL_DAYS=30, RENEWAL_GRACE_DAYS=5, RENEWAL_INVOICE_LEAD_DAYS=7) and
+ * subscription/config.ts (TRIAL_DAYS=30, RENEWAL_GRACE_DAYS=7, RENEWAL_INVOICE_LEAD_DAYS=7) and
  * should be updated here too if those ever change.
  */
 export function BillingFaq({
@@ -138,7 +138,7 @@ export function BillingFaq({
         },
         {
           q: 'Apa itu "Masa Tenggang"?',
-          a: 'Kalau periode langganan habis dan tagihan perpanjangan belum dibayar, kamu diberi toleransi 5 hari (status "Masa Tenggang") sebelum akses dikunci penuh — akses masih tetap berjalan normal selama masa tenggang ini.',
+          a: 'Kalau periode langganan habis dan tagihan perpanjangan belum dibayar, kamu diberi toleransi 7 hari (status "Masa Tenggang") sebelum akses dikunci penuh — akses masih tetap berjalan normal selama masa tenggang ini, dengan pengingat pembayaran yang muncul sekali sehari.',
         },
         {
           q: "Apa yang terjadi kalau tidak bayar sampai masa tenggang habis?",

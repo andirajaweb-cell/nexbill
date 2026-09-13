@@ -8,10 +8,16 @@ const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 
 const CATEGORY_LABEL: Record<string, string> = {
-  smart_plug: "Produk",
+  smart_plug: "Smart Plug",
   installation_service: "Jasa Instalasi",
   extra_console: "Konsol Tambahan",
+  other_product: "Produk Lain (Toko)",
 };
+
+// Categories that are physical goods needing weight/dimensions (for Biteship) + a product photo —
+// "other_product" added 2026-09-13 for the standalone "Toko" tab's generic merchandise, alongside
+// the original smart_plug. installation_service/extra_console are never physical, so excluded.
+const PHYSICAL_CATEGORIES = new Set(["smart_plug", "other_product"]);
 
 const EMPTY_FORM = { category: "smart_plug", name: "", description: "", price: "", sortOrder: "0", imageUrl: "", weightGrams: "200", lengthCm: "", widthCm: "", heightCm: "" };
 
@@ -122,7 +128,7 @@ export default function PlatformProductsPage() {
       <div>
         <h1 className="gm-display text-2xl font-bold text-amber-300">Etalase Produk</h1>
         <p className="text-sm text-neutral-500 mt-1">
-          Katalog belanja di halaman Langganan outlet (Smart Plug, Jasa Instalasi, Konsol Tambahan) — outlet/merchant hanya bisa melihat &amp; menambah ke keranjang, tidak bisa mengubah katalog ini sendiri.
+          Katalog belanja outlet — Smart Plug/Jasa Instalasi/Konsol Tambahan muncul di checkout langganan pertama, sedangkan "Produk Lain (Toko)" muncul di tab Toko yang terpisah dari langganan (bisa dibeli outlet kapan saja, termasuk saat terkunci). Outlet/merchant hanya bisa melihat &amp; menambah ke keranjang, tidak bisa mengubah katalog ini sendiri.
         </p>
       </div>
 
@@ -143,7 +149,7 @@ export default function PlatformProductsPage() {
                       {editing === p.id ? (
                         <div className="space-y-2">
                           <div className="flex items-start gap-3">
-                            {editForm.category === "smart_plug" && (
+                            {PHYSICAL_CATEGORIES.has(editForm.category) && (
                               <div className="shrink-0">
                                 {editForm.imageUrl ? (
                                   <img src={editForm.imageUrl} alt={editForm.name} className="w-20 h-20 object-cover rounded-lg border border-white/10" />
@@ -160,7 +166,7 @@ export default function PlatformProductsPage() {
                               <div className="col-span-2"><label className="text-xs text-neutral-500">Nama</label><input className={inputCls} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
                               <div><label className="text-xs text-neutral-500">Harga</label><input type="number" className={inputCls} value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
                               <div><label className="text-xs text-neutral-500">Urutan</label><input type="number" className={inputCls} value={editForm.sortOrder} onChange={(e) => setEditForm({ ...editForm, sortOrder: Number(e.target.value) })} /></div>
-                              {editForm.category === "smart_plug" && (
+                              {PHYSICAL_CATEGORIES.has(editForm.category) && (
                                 <>
                                   <div><label className="text-xs text-neutral-500">Berat (gram)</label><input type="number" className={inputCls} value={editForm.weightGrams ?? 200} onChange={(e) => setEditForm({ ...editForm, weightGrams: Number(e.target.value) })} /></div>
                                   <div><label className="text-xs text-neutral-500">Panjang (cm)</label><input type="number" className={inputCls} value={editForm.lengthCm ?? ""} onChange={(e) => setEditForm({ ...editForm, lengthCm: e.target.value === "" ? null : Number(e.target.value) })} /></div>
@@ -179,7 +185,7 @@ export default function PlatformProductsPage() {
                       ) : (
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-3">
-                            {p.category === "smart_plug" && (
+                            {PHYSICAL_CATEGORIES.has(p.category) && (
                               p.imageUrl ? (
                                 <img src={p.imageUrl} alt={p.name} className="w-12 h-12 object-cover rounded-lg border border-white/10 shrink-0" />
                               ) : (
@@ -213,7 +219,7 @@ export default function PlatformProductsPage() {
         <h2 className="gm-heading font-semibold mb-3">Tambah Produk Baru</h2>
         <form onSubmit={createProduct} className="space-y-3">
           <div className="flex items-start gap-3">
-            {newForm.category === "smart_plug" && (
+            {PHYSICAL_CATEGORIES.has(newForm.category) && (
               <div className="shrink-0">
                 {newForm.imageUrl ? (
                   <img src={newForm.imageUrl} alt="Preview" className="w-24 h-24 object-cover rounded-lg border border-white/10" />
@@ -236,7 +242,7 @@ export default function PlatformProductsPage() {
               <div className="col-span-2 sm:col-span-1"><label className="text-xs text-neutral-500">Nama</label><input className={inputCls} value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value })} placeholder="Smart Plug BARDI Basic" /></div>
               <div><label className="text-xs text-neutral-500">Harga</label><input type="number" className={inputCls} value={newForm.price} onChange={(e) => setNewForm({ ...newForm, price: e.target.value })} /></div>
               <div><label className="text-xs text-neutral-500">Urutan</label><input type="number" className={inputCls} value={newForm.sortOrder} onChange={(e) => setNewForm({ ...newForm, sortOrder: e.target.value })} /></div>
-              {newForm.category === "smart_plug" && (
+              {PHYSICAL_CATEGORIES.has(newForm.category) && (
                 <>
                   <div><label className="text-xs text-neutral-500">Berat (gram)</label><input type="number" className={inputCls} value={newForm.weightGrams} onChange={(e) => setNewForm({ ...newForm, weightGrams: e.target.value })} /></div>
                   <div><label className="text-xs text-neutral-500">Panjang (cm)</label><input type="number" className={inputCls} value={newForm.lengthCm} onChange={(e) => setNewForm({ ...newForm, lengthCm: e.target.value })} placeholder="opsional" /></div>

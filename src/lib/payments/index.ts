@@ -3,7 +3,20 @@ import { cashGateway } from "./adapters/cash";
 import { fastpayGateway } from "./adapters/fastpay";
 import { danaGateway, gopayGateway } from "./adapters/ewallet-via-fastpay";
 import { bukupayGateway } from "./adapters/bukupay";
-import { ipaymuCrossBorderGateway } from "./adapters/ipaymu-crossborder";
+import {
+  ipaymuCrossBorderGateway,
+  ipaymuHostedGateway,
+  ipaymuQrisGateway,
+  ipaymuVaBcaGateway,
+  ipaymuVaBniGateway,
+  ipaymuVaMandiriGateway,
+  ipaymuVaBriGateway,
+  ipaymuVaPermataGateway,
+  ipaymuDanaGateway,
+  ipaymuShopeepayGateway,
+  ipaymuAlfamartGateway,
+  ipaymuIndomaretGateway,
+} from "./adapters/ipaymu";
 import { manualGateway } from "./adapters/manual";
 import { db, type DbOrTx } from "@/db/client";
 import { payments, orders, receivables } from "@/db/schema";
@@ -23,6 +36,22 @@ const registry: Record<PaymentMethod, PaymentGateway> = {
   // Cross-border NEXBILL Standard subscription checkout (see /platform-admin/market-risk +
   // lib/subscription/service.ts) — NOT used anywhere in the outlet-facing POS flow above.
   ipaymu_crossborder: ipaymuCrossBorderGateway,
+  // Previously exported but never registered here — doPay(id, "ipaymu_hosted") on the Billing
+  // page called this method key for years without any gateway ever answering it (400).
+  ipaymu_hosted: ipaymuHostedGateway,
+  // Real iPaymu channels for the outlet-facing POS/rental checkout — an outlet opts into any of
+  // these by adding a matching-`key` row to its own Pembayaran (paymentMethods) catalog; nothing
+  // else needs to change for a new one to start working. See lib/payments/adapters/ipaymu.ts.
+  ipaymu_qris: ipaymuQrisGateway,
+  ipaymu_va_bca: ipaymuVaBcaGateway,
+  ipaymu_va_bni: ipaymuVaBniGateway,
+  ipaymu_va_mandiri: ipaymuVaMandiriGateway,
+  ipaymu_va_bri: ipaymuVaBriGateway,
+  ipaymu_va_permata: ipaymuVaPermataGateway,
+  ipaymu_dana: ipaymuDanaGateway,
+  ipaymu_shopeepay: ipaymuShopeepayGateway,
+  ipaymu_alfamart: ipaymuAlfamartGateway,
+  ipaymu_indomaret: ipaymuIndomaretGateway,
 };
 
 export interface OrderPaymentSummary {

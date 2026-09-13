@@ -335,6 +335,52 @@ registerDict({
   "billing.tab.deposit": { id: "Saldo Deposit", en: "Deposit Balance", ms: "Baki Deposit", th: "ยอดเงินฝาก", fil: "Deposit Balance", vi: "Số dư đặt cọc" },
   "billing.tab.invoices": { id: "Riwayat Faktur", en: "Invoice History", ms: "Sejarah Invois", th: "ประวัติใบแจ้งหนี้", fil: "History ng Invoice", vi: "Lịch sử hóa đơn" },
   "billing.tab.usage": { id: "Pertumbuhan Data", en: "Usage Growth", ms: "Pertumbuhan Data", th: "การเติบโตของข้อมูล", fil: "Paglago ng Data", vi: "Tăng trưởng dữ liệu" },
+  "billing.tab.toko": { id: "Toko", en: "Store", ms: "Kedai", th: "ร้านค้า", fil: "Tindahan", vi: "Cửa hàng" },
+
+  // --- "Toko" tab — standalone product purchase, separate from subscription checkout ---
+  "billing.toko.intro": {
+    id: "Belanja produk fisik NEXBILL (Smart Plug, produk lain) kapan saja — terpisah dari tagihan langganan, bisa dibeli meskipun akses NEXBILL sedang terkunci.",
+    en: "Shop NEXBILL's physical products (Smart Plug, other items) anytime — separate from your subscription invoice, purchasable even while NEXBILL access is locked.",
+    ms: "Beli produk fizikal NEXBILL (Smart Plug, produk lain) pada bila-bila masa — berasingan daripada bil langganan, boleh dibeli walaupun akses NEXBILL sedang dikunci.",
+    th: "ซื้อสินค้าจริงของ NEXBILL (Smart Plug ผลิตภัณฑ์อื่นๆ) ได้ทุกเมื่อ — แยกจากบิลสมาชิก สามารถซื้อได้แม้การเข้าใช้งาน NEXBILL จะถูกล็อกอยู่",
+    fil: "Bumili ng mga pisikal na produkto ng NEXBILL (Smart Plug, iba pang produkto) anumang oras — hiwalay sa bill ng subscription, mabibili kahit naka-lock ang access sa NEXBILL.",
+    vi: "Mua sản phẩm vật lý của NEXBILL (Smart Plug, sản phẩm khác) bất cứ lúc nào — tách biệt với hóa đơn thuê bao, có thể mua kể cả khi quyền truy cập NEXBILL đang bị khóa.",
+  },
+  "billing.toko.empty": { id: "Belum ada produk di Toko.", en: "No products in the Store yet.", ms: "Belum ada produk di Kedai.", th: "ยังไม่มีสินค้าในร้านค้า", fil: "Wala pang produkto sa Tindahan.", vi: "Chưa có sản phẩm nào trong Cửa hàng." },
+  "billing.toko.emptyCart": { id: "Keranjang Toko masih kosong.", en: "Your Store cart is still empty.", ms: "Troli Kedai masih kosong.", th: "ตะกร้าร้านค้ายังว่างอยู่", fil: "Wala pang laman ang cart ng Tindahan.", vi: "Giỏ hàng Cửa hàng vẫn còn trống." },
+  "billing.toko.cartEmpty": {
+    id: "Belum ada item di keranjang — browse Toko di sebelah kiri.",
+    en: "No items in your cart yet — browse the Store on the left.",
+    ms: "Belum ada item dalam troli — layari Kedai di sebelah kiri.",
+    th: "ยังไม่มีสินค้าในตะกร้า — เลือกดูร้านค้าทางด้านซ้าย",
+    fil: "Wala pang item sa cart — mag-browse sa Tindahan sa kaliwa.",
+    vi: "Chưa có sản phẩm nào trong giỏ hàng — hãy xem Cửa hàng ở bên trái.",
+  },
+  "billing.toko.noteShippingOnly": {
+    id: "Wajib diisi karena ada produk fisik di keranjang — barang dikirim ke alamat ini.",
+    en: "Required because there's a physical product in your cart — the item ships to this address.",
+    ms: "Wajib diisi kerana terdapat produk fizikal dalam troli — barang dihantar ke alamat ini.",
+    th: "จำเป็นต้องกรอกเพราะมีสินค้าจริงในตะกร้า — สินค้าจะถูกจัดส่งไปยังที่อยู่นี้",
+    fil: "Kailangang punan dahil may pisikal na produkto sa cart — ipapadala ang item sa address na ito.",
+    vi: "Bắt buộc điền vì có sản phẩm vật lý trong giỏ hàng — hàng sẽ được giao đến địa chỉ này.",
+  },
+  "billing.toko.footnote": {
+    id: 'Setelah checkout, tagihan terpisah dari langganan akan muncul di kartu "Tagihan Belum Lunas" pada tab Dashboard — bayar lewat Cash/QRIS/VA/iPaymu.',
+    en: 'After checkout, an invoice separate from your subscription will appear in the "Unpaid Invoices" card on the Dashboard tab — pay via Cash/QRIS/VA/iPaymu.',
+    ms: 'Selepas checkout, invois berasingan daripada langganan akan muncul dalam kad "Tagihan Belum Bayar" pada tab Dashboard — bayar melalui Cash/QRIS/VA/iPaymu.',
+    th: 'หลังจากชำระเงิน ใบแจ้งหนี้ที่แยกจากค่าสมาชิกจะปรากฏในการ์ด "ใบแจ้งหนี้ที่ยังไม่ชำระ" บนแท็บแดชบอร์ด — ชำระผ่าน Cash/QRIS/VA/iPaymu',
+    fil: 'Pagkatapos mag-checkout, lalabas ang invoice na hiwalay sa subscription sa card na "Mga Hindi Pa Bayad na Invoice" sa tab ng Dashboard — bayaran via Cash/QRIS/VA/iPaymu.',
+    vi: 'Sau khi thanh toán, hóa đơn tách biệt với thuê bao sẽ xuất hiện ở thẻ "Hóa đơn chưa thanh toán" trên tab Dashboard — thanh toán qua Cash/QRIS/VA/iPaymu.',
+  },
+  "billing.toko.orderCreated": {
+    id: 'Pesanan dibuat — selesaikan pembayarannya di kartu "Tagihan Belum Lunas" pada tab Dashboard.',
+    en: 'Order created — complete payment in the "Unpaid Invoices" card on the Dashboard tab.',
+    ms: 'Pesanan dibuat — selesaikan bayaran dalam kad "Tagihan Belum Bayar" pada tab Dashboard.',
+    th: 'สร้างคำสั่งซื้อแล้ว — ชำระเงินให้เสร็จสิ้นที่การ์ด "ใบแจ้งหนี้ที่ยังไม่ชำระ" บนแท็บแดชบอร์ด',
+    fil: 'Nagawa ang order — kumpletuhin ang bayad sa card na "Mga Hindi Pa Bayad na Invoice" sa tab ng Dashboard.',
+    vi: 'Đã tạo đơn hàng — hoàn tất thanh toán tại thẻ "Hóa đơn chưa thanh toán" trên tab Dashboard.',
+  },
+  "billing.toko.category.otherProduct": { id: "Produk Lain", en: "Other Products", ms: "Produk Lain", th: "ผลิตภัณฑ์อื่นๆ", fil: "Ibang Produkto", vi: "Sản phẩm khác" },
 
   // --- Unpaid invoice auto-expire notice + generalized sync/reopen buttons ---
   "billing.invoices.autoExpireNotice": {
@@ -362,6 +408,7 @@ registerDict({
 
   // --- Invoice type/status labels shared with InvoiceHistoryTab ---
   "billing.invoiceType.depositTopup": { id: "Top Up Saldo Deposit", en: "Deposit Balance Top Up", ms: "Tambah Nilai Baki Deposit", th: "เติมยอดเงินฝาก", fil: "Top Up ng Deposit Balance", vi: "Nạp tiền vào số dư đặt cọc" },
+  "billing.invoiceType.productOrder": { id: "Belanja Toko", en: "Store Purchase", ms: "Belian Kedai", th: "การซื้อจากร้านค้า", fil: "Pagbili sa Tindahan", vi: "Mua hàng tại Cửa hàng" },
   "billing.invoiceStatus.unpaid": { id: "Belum Bayar", en: "Unpaid", ms: "Belum Bayar", th: "ยังไม่ชำระ", fil: "Hindi Pa Bayad", vi: "Chưa thanh toán" },
   "billing.invoiceStatus.paid": { id: "Lunas", en: "Paid", ms: "Selesai", th: "ชำระแล้ว", fil: "Bayad na", vi: "Đã thanh toán" },
   "billing.invoiceStatus.expired": { id: "Kedaluwarsa (Otomatis)", en: "Expired (Automatic)", ms: "Tamat Tempoh (Automatik)", th: "หมดอายุ (อัตโนมัติ)", fil: "Na-expire (Awtomatiko)", vi: "Đã hết hạn (Tự động)" },

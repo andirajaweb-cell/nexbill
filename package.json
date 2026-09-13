@@ -23,6 +23,7 @@
     "scheduler": "tsx scripts/booking-scheduler.ts",
     "relay:hub": "tsx scripts/relay-hub.ts",
     "relay:agent": "tsx scripts/relay-agent.ts",
+    "ipaymu:proxy": "tsx scripts/ipaymu-egress-proxy.ts",
     "subscription:scheduler": "tsx scripts/subscription-scheduler.ts",
     "seed:platform-admin": "tsx scripts/seed-platform-admin.ts",
     "reset:staff-password": "tsx scripts/reset-staff-password.ts",

@@ -8,6 +8,31 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { invalidatePaymentFeeCache } from "@/lib/accounting/payment-fee";
 
+/**
+ * Whitelist for `body.presetKey` (create only) — lets the Pembayaran page's "Aktifkan Kanal
+ * iPaymu" quick-add buttons create a row with an EXACT key (e.g. "ipaymu_qris") instead of
+ * relying on slugifyMethodKey(label) happening to produce the same string. That reliance was
+ * fragile: resolveGateway() in lib/payments/index.ts does a plain `registry[method]` lookup, so
+ * a label typo/rewording ("iPaymu - QRIS" vs "iPaymu QRIS") silently slugifies to a DIFFERENT
+ * key, which then silently falls back to the generic manual/staff-confirmed gateway instead of
+ * actually calling iPaymu — no error, just a channel that quietly never goes live. Deliberately
+ * NOT open to arbitrary client-supplied keys (that would let a caller collide with/spoof a
+ * reserved key like "cash"); only these exact, known-safe iPaymu channel keys are accepted.
+ */
+const ALLOWED_PRESET_KEYS = new Set([
+  "ipaymu_qris",
+  "ipaymu_va_bca",
+  "ipaymu_va_bni",
+  "ipaymu_va_mandiri",
+  "ipaymu_va_bri",
+  "ipaymu_va_permata",
+  "ipaymu_dana",
+  "ipaymu_shopeepay",
+  "ipaymu_alfamart",
+  "ipaymu_indomaret",
+  "ipaymu_hosted",
+]);
+
 /** Clamped 0-100, defaults to 0 (no fee) for any unparsable input — never lets a bad body value silently become NaN in the DB. */
 function toFeePercent(v: unknown): number {
   const n = Number(v);
@@ -72,11 +97,20 @@ export async function POST(req: NextRequest) {
     // Always the caller's own outlet — never trust a client-supplied outletId here.
     const siblings = await db.select().from(paymentMethods).where(eq(paymentMethods.outletId, session.outletId));
     const existingKeys = new Set(siblings.map((m) => m.key));
-    let key = slugifyMethodKey(body.label);
-    let suffix = 2;
-    while (existingKeys.has(key)) {
-      key = `${slugifyMethodKey(body.label)}_${suffix}`;
-      suffix++;
+
+    let key: string;
+    if (typeof body.presetKey === "string" && ALLOWED_PRESET_KEYS.has(body.presetKey)) {
+      if (existingKeys.has(body.presetKey)) {
+        return NextResponse.json({ error: "Kanal ini sudah ada di daftar metode pembayaran outlet." }, { status: 400 });
+      }
+      key = body.presetKey;
+    } else {
+      key = slugifyMethodKey(body.label);
+      let suffix = 2;
+      while (existingKeys.has(key)) {
+        key = `${slugifyMethodKey(body.label)}_${suffix}`;
+        suffix++;
+      }
     }
     const maxOrder = siblings.reduce((m, s) => Math.max(m, s.sortOrder), -1);
 

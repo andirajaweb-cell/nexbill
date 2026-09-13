@@ -282,6 +282,15 @@ export const rentalSessions = pgTable("rental_sessions", {
   status: text("status", { enum: ["running", "paused", "finished", "cancelled"] }).notNull().default("running"),
   totalAmount: doublePrecision("total_amount").default(0),
   promoId: text("promo_id").references(() => promos.id),
+  // Snapshot of promos.packagePrice at the MOMENT this session started (see startRentalSession in
+  // lib/rental/sessions.ts) — mirrors how plannedMinutes already freezes promos.durationMinutes at
+  // start. Without this, stopRentalSession had to re-read the promo row's CURRENT packagePrice at
+  // session-END time, hours after the customer started: if the promo's price (or duration) was
+  // edited in between — a routine Settings > Promo action, not a rare edge case — the customer's
+  // bill silently used the NEW price/duration instead of what was actually agreed/quoted when they
+  // started. Nullable because historical sessions created before this column existed never had a
+  // frozen value — stopRentalSession falls back to the live promos row for those only.
+  promoPackagePrice: doublePrecision("promo_package_price"),
   staffUserId: text("staff_user_id").references(() => staffUsers.id),
   pausedAt: text("paused_at"),
   accumulatedPauseMs: integer("accumulated_pause_ms").notNull().default(0),
@@ -1824,7 +1833,12 @@ export const marketRiskCurrencies = pgTable("market_risk_currencies", {
 
 export const platformProducts = pgTable("platform_products", {
   id: id(),
-  category: text("category", { enum: ["smart_plug", "installation_service", "extra_console"] }).notNull(),
+  // "other_product" added 2026-09-13 for the standalone "Toko" tab (see checkoutProductOrder in
+  // lib/subscription/service.ts) — generic physical merchandise NEXBILL sells to outlets beyond
+  // just Smart Plug hardware, e.g. printer paper rolls, RFID cards, branded merchandise. Mirrors
+  // the naming already used on platformPurchases.category (the internal COGS/purchase-cost
+  // tracking table), which already anticipated this category before the sellable catalog did.
+  category: text("category", { enum: ["smart_plug", "installation_service", "extra_console", "other_product"] }).notNull(),
   name: text("name").notNull(),
   description: text("description"),
   price: doublePrecision("price").notNull(),
@@ -1915,8 +1929,16 @@ export const subscriptionInvoices = pgTable("subscription_invoices", {
   outletId: text("outlet_id").notNull().references(() => outlets.id),
   subscriptionId: text("subscription_id").notNull().references(() => subscriptions.id),
   billingGroupId: text("billing_group_id").references(() => billingGroups.id),
+  // "product_order" added 2026-09-13 — the standalone "Toko" tab's checkout (checkoutProductOrder
+  // in lib/subscription/service.ts). Deliberately a SEPARATE type from "cart_order": cart_order
+  // always bundles a mandatory subscription-fee line (the first-checkout flow) and its unpaid
+  // count gates subscription activation in confirmInvoicePayment; product_order never includes a
+  // subscription line, is purchasable regardless of subscription status (even while locked — the
+  // owner's explicit choice: buying hardware has nothing to do with software access), and is
+  // EXCLUDED from the pending_payment activation unpaid-invoice count for exactly that reason — see
+  // that count's inArray(...) filter in confirmInvoicePayment.
   type: text("type", {
-    enum: ["subscription_fee", "smart_plug_purchase", "setup_service", "extra_console", "cart_order", "group_renewal", "ai_addon", "deposit_topup"],
+    enum: ["subscription_fee", "smart_plug_purchase", "setup_service", "extra_console", "cart_order", "group_renewal", "ai_addon", "deposit_topup", "product_order"],
   }).notNull(),
   period: text("period"),
   description: text("description").notNull(),

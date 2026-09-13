@@ -11,6 +11,13 @@ const TYPE_LABEL: Record<string, string> = {
   smart_plug_purchase: "Pembelian Smart Plug",
   setup_service: "Jasa Setup",
   extra_console: "Konsol Tambahan",
+  cart_order: "Belanja Langganan (Checkout Pertama)",
+  group_renewal: "Tagihan Gabungan Multi-Outlet",
+  ai_addon: "AI Add-on",
+  deposit_topup: "Top Up Saldo Deposit",
+  // Standalone "Toko" tab purchase, added 2026-09-13 — deliberately never bundled with a
+  // subscription-fee line, see checkoutProductOrder in lib/subscription/service.ts.
+  product_order: "Belanja Toko",
 };
 const STATUS_BADGE: Record<string, string> = { paid: "success", unpaid: "pending", cancelled: "failed" };
 

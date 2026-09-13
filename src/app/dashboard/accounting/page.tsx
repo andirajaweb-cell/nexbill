@@ -1055,6 +1055,10 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
   const [compareMode, setCompareMode] = useState(false);
   const [periods, setPeriods] = useState([newPeriodEntry(), newPeriodEntry()]);
   const [compareData, setCompareData] = useState<any[] | null>(null);
+  // Drill-down target for the audit-trail modal below — only meaningful in single-period mode
+  // (compareMode shows several periods side by side, so "which period's transactions" would be
+  // ambiguous for a click).
+  const [drillDown, setDrillDown] = useState<{ accountId: string; code: string; name: string; balance: number } | null>(null);
 
   useEffect(() => {
     if (compareMode) return;
@@ -1168,25 +1172,181 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
               </div>
             )}
 
+            <p className="text-[11px] text-neutral-600 mb-2">{t("accounting.pl.drillDownHint", "Klik baris mana pun untuk melihat transaksi/jurnal yang menyusun angka itu (audit trail).")}</p>
+
             <h2 className="font-medium mb-2 text-sm text-neutral-400">{t("accounting.type.revenue", "Pendapatan")}</h2>
             {(pl.revenueTree ?? pl.revenue.filter((r: any) => r.balance !== 0)).map((r: any) => (
-              <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+              <button
+                key={r.accountId}
+                type="button"
+                onClick={() => setDrillDown({ accountId: r.accountId, code: r.code, name: coaAccountName(t, r), balance: r.balance })}
+                className={`w-full flex justify-between text-sm py-1 text-left rounded hover:bg-neutral-800/60 transition-colors ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}
+                style={{ paddingLeft: (r.depth ?? 0) * 16 }}
+              >
                 <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
                 <span>{rupiah(r.balance)}</span>
-              </div>
+              </button>
             ))}
             <h2 className="font-medium mb-2 mt-4 text-sm text-neutral-400">{t("accounting.type.expense", "Beban")}</h2>
             {(pl.expenseTree ?? pl.expense.filter((r: any) => r.balance !== 0)).map((r: any) => (
-              <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+              <button
+                key={r.accountId}
+                type="button"
+                onClick={() => setDrillDown({ accountId: r.accountId, code: r.code, name: coaAccountName(t, r), balance: r.balance })}
+                className={`w-full flex justify-between text-sm py-1 text-left rounded hover:bg-neutral-800/60 transition-colors ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}
+                style={{ paddingLeft: (r.depth ?? 0) * 16 }}
+              >
                 <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
                 <span>{rupiah(r.balance)}</span>
-              </div>
+              </button>
             ))}
           </Card>
         </div>
       )}
+
+      {drillDown && (
+        <AccountLedgerModal
+          outletId={outletId}
+          accountId={drillDown.accountId}
+          code={drillDown.code}
+          name={drillDown.name}
+          balance={drillDown.balance}
+          from={period.from}
+          to={period.to}
+          periodLabel={describePeriod(period.preset, period.from, period.to)}
+          totalLabel={t("accounting.pl.drillDownTotal", "Total (sesuai Laba Rugi)")}
+          onClose={() => setDrillDown(null)}
+        />
+      )}
     </div>
   );
+}
+
+/**
+ * Shared drill-down modal for BOTH the Laba Rugi (P&L) and Neraca (Balance Sheet) tabs — shows
+ * every journal line behind the clicked account's balance for the given date range (P&L: a
+ * from/to period; Neraca: from=undefined/to=asOf, since a balance sheet account balance is
+ * cumulative-to-date, not period-scoped) — see getAccountLedgerDetail's doc comment
+ * (lib/accounting/reports.ts) for the Header-account recursion and why voided entries are
+ * deliberately still included (an owner auditing the books needs to see corrections, not have
+ * them silently hidden).
+ */
+function AccountLedgerModal({
+  outletId,
+  accountId,
+  code,
+  name,
+  balance,
+  from,
+  to,
+  periodLabel,
+  totalLabel,
+  onClose,
+}: {
+  outletId: string;
+  accountId: string;
+  code: string;
+  name: string;
+  balance: number;
+  from?: string;
+  to?: string;
+  periodLabel: string;
+  totalLabel: string;
+  onClose: () => void;
+}) {
+  const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
+  const [lines, setLines] = useState<AccountLedgerLine[] | null>(null);
+
+  useEffect(() => {
+    const qs = new URLSearchParams({ outletId, accountId, ...(from ? { from } : {}), ...(to ? { to } : {}) });
+    setLines(null);
+    fetchJsonObject<{ lines: AccountLedgerLine[] }>(`/api/accounting/profit-loss/account-detail?${qs}`).then((r) => setLines(r?.lines ?? []));
+  }, [outletId, accountId, from, to]);
+
+  const total = lines?.reduce((s, l) => s + l.amount, 0) ?? 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-1">
+          <div>
+            <h2 className="font-medium">
+              <span className="font-mono text-xs text-neutral-500 mr-1.5">{code}</span>
+              {name}
+            </h2>
+            <p className="text-xs text-neutral-500">{periodLabel}</p>
+          </div>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200 text-sm">{t("transactions.detail.close", "Tutup")}</button>
+        </div>
+        <div className="flex justify-between text-sm font-semibold border-b border-neutral-800 pb-2 mb-2">
+          <span>{totalLabel}</span>
+          <span>{rupiah(balance)}</span>
+        </div>
+
+        {lines === null ? (
+          <p className="text-sm text-neutral-500 py-4 text-center">{t("transactions.loading", "Memuat...")}</p>
+        ) : lines.length === 0 ? (
+          <p className="text-sm text-neutral-500 py-4 text-center">{t("accounting.pl.drillDownEmpty", "Tidak ada transaksi pada periode ini.")}</p>
+        ) : (
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-neutral-500 border-b border-neutral-800">
+                <th className="py-1.5">{t("accounting.pl.drillDown.date", "Tanggal")}</th>
+                <th className="py-1.5">{t("accounting.pl.drillDown.description", "Keterangan")}</th>
+                <th className="py-1.5">{t("accounting.pl.drillDown.reference", "Referensi")}</th>
+                <th className="py-1.5 text-right">{t("accounting.pl.drillDown.amount", "Nominal")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l, i) => (
+                <tr key={`${l.journalEntryId}-${i}`} className={`border-b border-neutral-900 ${l.status === "void" ? "opacity-40" : ""}`}>
+                  <td className="py-1.5 whitespace-nowrap align-top">{new Date(l.entryDate).toLocaleString("id-ID")}</td>
+                  <td className="py-1.5 align-top">
+                    <span className={l.status === "void" ? "line-through" : ""}>{l.lineDescription || l.description}</span>
+                    {l.status === "void" && <span className="ml-1.5 text-[10px] text-red-400">{t("accounting.pl.drillDown.void", "(dibatalkan)")}</span>}
+                    {pl_accountLedgerSourceLabel(l) && <div className="text-[10px] text-neutral-600">{pl_accountLedgerSourceLabel(l)}</div>}
+                  </td>
+                  <td className="py-1.5 align-top font-mono text-[10px] text-neutral-500">{l.reference ?? "-"}</td>
+                  <td className="py-1.5 text-right align-top">{rupiah(l.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="font-semibold border-t border-neutral-800">
+                <td colSpan={3} className="py-2">{t("accounting.pl.drillDown.totalLines", "Total baris di atas")}</td>
+                <td className="py-2 text-right">{rupiah(total)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface AccountLedgerLine {
+  journalEntryId: string;
+  entryDate: string;
+  reference: string | null;
+  description: string;
+  sourceType: string;
+  sourceId: string | null;
+  status: "posted" | "void";
+  voidReason: string | null;
+  lineDescription: string | null;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  debit: number;
+  credit: number;
+  amount: number;
+}
+
+/** Short "Order abc12345 (pos)" style label under a drill-down row, when the entry traces back to a specific order — helps the owner cross-reference into Transaction Center without this modal needing a full link/navigation. */
+function pl_accountLedgerSourceLabel(l: AccountLedgerLine): string | null {
+  if (!l.sourceId) return null;
+  return `${l.sourceType} · ${l.sourceId.slice(0, 8)}`;
 }
 
 interface ReconciliationRow {
@@ -1230,6 +1390,40 @@ const RECON_BADGE: Record<ReconciliationRow["reconciliationStatus"], { badge: st
 };
 
 /**
+ * Answers the recurring "apakah harus dihapus atau di edit?" question directly, per status —
+ * every one of these four is resolved the SAME safe way (the "Sinkronkan Ulang Jurnal" button,
+ * backed by resyncOrderJournal: void the stale entry, then repost fresh unless the order is
+ * cancelled — see that function's own doc comment), never by hand-editing or hand-deleting a
+ * posted journal line/entry, which this codebase deliberately never allows anywhere.
+ */
+const RECON_GUIDANCE: Partial<Record<ReconciliationRow["reconciliationStatus"], { titleKey: string; titleFallback: string; descKey: string; descFallback: string }>> = {
+  missing_gl: {
+    titleKey: "accounting.recon.guide.missingGl.title",
+    titleFallback: "Belum Terposting",
+    descKey: "accounting.recon.guide.missingGl.desc",
+    descFallback: 'Order ini sudah dibayar (Lunas/Sebagian) tapi belum punya jurnal sama sekali — biasanya karena proses posting otomatis sempat gagal diam-diam. Tidak perlu hapus atau edit apa pun secara manual: klik "Sinkronkan Ulang Jurnal" pada baris order tersebut.',
+  },
+  amount_mismatch: {
+    titleKey: "accounting.recon.guide.amountMismatch.title",
+    titleFallback: "Beda Nominal",
+    descKey: "accounting.recon.guide.amountMismatch.desc",
+    descFallback: 'Nominal di jurnal berbeda dari total transaksi saat ini — biasanya karena order ini pernah dikoreksi (Koreksi Nominal Rental / Koreksi Pembayaran / Hapus Item) setelah jurnal lamanya sudah terlanjur terposting. Tidak perlu hapus/edit jurnal secara manual: klik "Sinkronkan Ulang Jurnal" untuk membatalkan jurnal lama dan memposting ulang sesuai data order yang sekarang.',
+  },
+  date_mismatch: {
+    titleKey: "accounting.recon.guide.dateMismatch.title",
+    titleFallback: "Beda Tanggal",
+    descKey: "accounting.recon.guide.dateMismatch.desc",
+    descFallback: 'Tanggal jurnal berbeda hari dari Business Date order — sering kali WAJAR: pembayaran piutang/tempo yang baru dilunasi belakangan, atau periode akuntansi bulan tersebut sudah ditutup saat jurnal diposting (jurnal otomatis jatuh ke tanggal hari ini). Cek dulu apakah ini memang kasus wajar itu sebelum bertindak. Kalau memang perlu diperbaiki, klik "Sinkronkan Ulang Jurnal" — jurnal akan diposting ulang dengan tanggal Business Date order, selama periode akuntansinya masih terbuka.',
+  },
+  cancelled_with_gl: {
+    titleKey: "accounting.recon.guide.cancelledWithGl.title",
+    titleFallback: "Dibatalkan tapi Masih di Jurnal",
+    descKey: "accounting.recon.guide.cancelledWithGl.desc",
+    descFallback: 'Order ini berstatus Dibatalkan, tapi masih ada revenue tercatat di jurnal — seharusnya jurnalnya ikut dibatalkan otomatis saat order dibatalkan. Tidak perlu hapus manual: klik "Sinkronkan Ulang Jurnal" untuk membatalkan jurnal ini (order yang dibatalkan tidak akan diposting ulang, karena memang seharusnya tidak punya revenue).',
+  },
+};
+
+/**
  * Order-level reconciliation between this Accounting module (GL, posting/entryDate) and
  * Transaction Center (Business Date) for the same period — see the doc comment atop
  * lib/reports/reconciliation.ts. Built so a summary-card-level gap ("Rental beda Rp44.000") can be
@@ -1256,12 +1450,15 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
 
   useEffect(load, [outletId, period.from, period.to]);
 
-  // "Post Ulang" on a missing_gl row — re-invokes postSalesJournal directly instead of leaving
-  // the merchant stuck staring at a gap they have no way to act on (see the doc comment on
-  // /api/accounting/reconciliation/retry-posting). Surfaces whatever the server found — a real
-  // thrown error, "nothing to post yet" (no successful payment on file), or success — instead of
-  // that reason only ever reaching a server console log.
-  const retryPosting = async (orderId: string) => {
+  // "Sinkronkan Ulang Jurnal" on any missing_gl/amount_mismatch/date_mismatch/cancelled_with_gl
+  // row — calls resyncOrderJournal (void the stale entry if any, then repost fresh unless the
+  // order is cancelled) instead of leaving the merchant stuck staring at a gap they have no way to
+  // act on beyond hand-editing a journal (never allowed in this codebase — see
+  // resyncOrderJournal's own doc comment for why a plain "call postSalesJournal again" wouldn't
+  // actually fix anything except missing_gl, due to its idempotency guard). Surfaces whatever the
+  // server found — a real thrown error, "nothing to post yet", or success — instead of that reason
+  // only ever reaching a server console log.
+  const resyncJournal = async (orderId: string) => {
     setRetrying(orderId);
     try {
       const res = await fetch("/api/accounting/reconciliation/retry-posting", {
@@ -1271,10 +1468,10 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
       });
       const result = await res.json();
       if (!res.ok || result.error) {
-        showAlert(result.error || t("accounting.recon.retryFailed", "Gagal posting ulang."));
+        showAlert(result.error || t("accounting.recon.retryFailed", "Gagal menyinkronkan jurnal."));
         return;
       }
-      showAlert(t("accounting.recon.retrySuccess", "Jurnal berhasil diposting."));
+      showAlert(result.note || t("accounting.recon.retrySuccess", "Jurnal berhasil disinkronkan ulang."));
       load();
     } finally {
       setRetrying(null);
@@ -1284,6 +1481,10 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
   const interesting = data?.rows.filter((r) => r.reconciliationStatus !== "match" && r.reconciliationStatus !== "pending_payment") ?? [];
   const pending = data?.rows.filter((r) => r.reconciliationStatus === "pending_payment") ?? [];
   const matched = data?.rows.filter((r) => r.reconciliationStatus === "match") ?? [];
+  // Which guidance cards to show — only for statuses actually present in this period's "Perlu
+  // Diperiksa" list, so an outlet with a clean amount_mismatch-free history isn't shown irrelevant
+  // guidance every time it opens this tab.
+  const activeGuidanceStatuses = [...new Set(interesting.map((r) => r.reconciliationStatus))].filter((s): s is keyof typeof RECON_GUIDANCE => s in RECON_GUIDANCE);
 
   return (
     <div className="space-y-4">
@@ -1322,6 +1523,37 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
           {interesting.length === 0 && data.orphans.length === 0 ? (
             <Card className="text-sm text-emerald-400 text-center py-4">{t("accounting.recon.allClear", "Tidak ada order bermasalah pada periode ini — hanya \"Cocok\" dan \"Menunggu Pembayaran\".")}</Card>
           ) : (
+            <>
+              {(activeGuidanceStatuses.length > 0 || data.orphans.length > 0) && (
+                <Card className="space-y-3 border-amber-500/20 bg-amber-500/5">
+                  <h2 className="text-sm font-semibold text-amber-300">{t("accounting.recon.guideHeading", "Panduan Penyelesaian — Tidak Perlu Hapus/Edit Manual")}</h2>
+                  <p className="text-xs text-neutral-400">
+                    {t("accounting.recon.guideIntro", 'Semua status di bawah ini diselesaikan dengan CARA YANG SAMA: klik tombol "Sinkronkan Ulang Jurnal" pada baris order terkait. Jangan pernah menghapus atau mengedit baris jurnal secara manual — sistem ini tidak mendukung itu, dan bisa membuat pembukuan tidak seimbang.')}
+                  </p>
+                  <div className="space-y-2">
+                    {activeGuidanceStatuses.map((status) => {
+                      const g = RECON_GUIDANCE[status]!;
+                      return (
+                        <div key={status} className="text-xs border-l-2 border-amber-500/40 pl-3 py-0.5">
+                          <div className="font-semibold text-neutral-200">{t(g.titleKey, g.titleFallback)}</div>
+                          <div className="text-neutral-400 mt-0.5">{t(g.descKey, g.descFallback)}</div>
+                        </div>
+                      );
+                    })}
+                    {data.orphans.length > 0 && (
+                      <div className="text-xs border-l-2 border-amber-500/40 pl-3 py-0.5">
+                        <div className="font-semibold text-neutral-200">{t("accounting.recon.status.orphan", "Order Tak Ditemukan")}</div>
+                        <div className="text-neutral-400 mt-0.5">
+                          {t(
+                            "accounting.recon.guide.orphan.desc",
+                            "Biasanya BUKAN error: order-nya tetap ada, hanya saja Business Date-nya jatuh di hari lain, jadi tidak muncul bersama jurnalnya pada periode yang sama — cek order tersebut di periode Business Date yang sesuai. Tidak ada tombol otomatis untuk ini karena order-nya sendiri tidak salah. Kalau order-nya memang sudah tidak ada sama sekali (terhapus), hubungi tim teknis untuk membatalkan jurnal yatim ini secara manual."
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
             <Card className="overflow-x-auto">
               <h2 className="text-sm font-semibold mb-2 text-rose-300">{t("accounting.recon.needsReview", "Perlu Diperiksa")}</h2>
               <table className="w-full text-sm">
@@ -1348,13 +1580,13 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
                       <td className="text-right">{r.glRevenue !== null ? rupiah(r.glRevenue) : "-"}</td>
                       <td><Badge status={RECON_BADGE[r.reconciliationStatus].badge}>{t(RECON_BADGE[r.reconciliationStatus].key, RECON_BADGE[r.reconciliationStatus].fallback)}</Badge></td>
                       <td>
-                        {r.reconciliationStatus === "missing_gl" && (
+                        {r.reconciliationStatus in RECON_GUIDANCE && (
                           <button
                             className="text-xs px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 whitespace-nowrap"
                             disabled={retrying === r.orderId}
-                            onClick={() => retryPosting(r.orderId)}
+                            onClick={() => resyncJournal(r.orderId)}
                           >
-                            {retrying === r.orderId ? t("accounting.recon.retrying", "Memposting...") : t("accounting.recon.retryButton", "Post Ulang")}
+                            {retrying === r.orderId ? t("accounting.recon.retrying", "Menyinkronkan...") : t("accounting.recon.retryButton", "Sinkronkan Ulang Jurnal")}
                           </button>
                         )}
                       </td>
@@ -1374,6 +1606,7 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
                 </tbody>
               </table>
             </Card>
+            </>
           )}
 
           <details className="text-xs text-neutral-500">
@@ -1399,42 +1632,51 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
   const { formatMoney: rupiah } = useCurrency();
   const [bs, setBs] = useState<any>(null);
   const [asOf, setAsOf] = useState("");
+  // Drill-down target for the audit-trail modal below (shared with ProfitLossTab's
+  // AccountLedgerModal) — a Neraca account's balance is cumulative-to-date (from=undefined,
+  // to=asOf), not period-scoped like P&L, since a balance sheet is a snapshot, not a flow.
+  const [drillDown, setDrillDown] = useState<{ accountId: string; code: string; name: string; balance: number } | null>(null);
+  const asOfIso = asOf ? new Date(asOf).toISOString() : undefined;
   useEffect(() => {
-    const qs = new URLSearchParams({ outletId, ...(asOf ? { asOf: new Date(asOf).toISOString() } : {}) });
+    const qs = new URLSearchParams({ outletId, ...(asOfIso ? { asOf: asOfIso } : {}) });
     fetchJsonObject(`/api/accounting/balance-sheet?${qs}`).then(setBs);
-  }, [outletId, asOf]);
+  }, [outletId, asOfIso]);
   if (!bs) return null;
+
+  const openDrillDown = (r: any) => setDrillDown({ accountId: r.accountId, code: r.code, name: coaAccountName(t, r), balance: r.balance });
+  const rowClass = "w-full flex justify-between text-sm py-1 text-left rounded hover:bg-neutral-800/60 transition-colors";
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Field label={t("accounting.bs.fieldAsOf", "Per Tanggal (kosongkan untuk hari ini)")}><input type="date" className={inputClsSm} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></Field>
-        <DownloadButtons outletId={outletId} reportType="balance-sheet" to={asOf ? new Date(asOf).toISOString() : undefined} />
+        <DownloadButtons outletId={outletId} reportType="balance-sheet" to={asOfIso} />
       </div>
+      <p className="text-[11px] text-neutral-600">{t("accounting.bs.drillDownHint", "Klik baris mana pun untuk melihat transaksi/jurnal yang menyusun angka itu (audit trail).")}</p>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card>
         <h2 className="font-medium mb-2">{t("accounting.bs.assetsHeading", "Aset")}</h2>
         {(bs.assetsTree ?? bs.assets.filter((r: any) => r.balance !== 0)).map((r: any) => (
-          <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+          <button key={r.accountId} type="button" onClick={() => openDrillDown(r)} className={`${rowClass} ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
             <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
             <span>{rupiah(r.balance)}</span>
-          </div>
+          </button>
         ))}
         <div className="flex justify-between text-sm py-2 border-t border-neutral-800 font-semibold mt-2"><span>{t("accounting.bs.totalAssets", "Total Aset")}</span><span>{rupiah(bs.totalAssets)}</span></div>
       </Card>
       <Card>
         <h2 className="font-medium mb-2">{t("accounting.bs.liabilitiesEquityHeading", "Liabilitas & Ekuitas")}</h2>
         {(bs.liabilitiesTree ?? bs.liabilities.filter((r: any) => r.balance !== 0)).map((r: any) => (
-          <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+          <button key={r.accountId} type="button" onClick={() => openDrillDown(r)} className={`${rowClass} ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
             <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
             <span>{rupiah(r.balance)}</span>
-          </div>
+          </button>
         ))}
         {(bs.equityTree ?? bs.equity.filter((r: any) => r.balance !== 0)).map((r: any) => (
-          <div key={r.accountId} className={`flex justify-between text-sm py-1 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
+          <button key={r.accountId} type="button" onClick={() => openDrillDown(r)} className={`${rowClass} ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`} style={{ paddingLeft: (r.depth ?? 0) * 16 }}>
             <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
             <span>{rupiah(r.balance)}</span>
-          </div>
+          </button>
         ))}
         <div className="flex justify-between text-sm py-1"><span>{t("accounting.bs.currentPeriodProfit", "Laba Berjalan (belum ditutup)")}</span><span>{rupiah(bs.currentPeriodNetProfit)}</span></div>
         <div className="flex justify-between text-sm py-2 border-t border-neutral-800 font-semibold mt-2">
@@ -1443,6 +1685,21 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
         <div className={`text-xs mt-1 ${bs.balances ? "text-emerald-400" : "text-red-400"}`}>{bs.balances ? t("accounting.bs.balanced", "Neraca balance ✓") : t("accounting.bs.notBalanced", "TIDAK BALANCE — periksa jurnal")}</div>
       </Card>
     </div>
+
+      {drillDown && (
+        <AccountLedgerModal
+          outletId={outletId}
+          accountId={drillDown.accountId}
+          code={drillDown.code}
+          name={drillDown.name}
+          balance={drillDown.balance}
+          from={undefined}
+          to={asOfIso}
+          periodLabel={`${t("accounting.bs.asOfPrefix", "Per Tanggal:")} ${asOf ? new Date(asOf).toLocaleDateString("id-ID") : t("accounting.bs.asOfToday", "Hari Ini")}`}
+          totalLabel={t("accounting.bs.drillDownTotal", "Total (sesuai Neraca)")}
+          onClose={() => setDrillDown(null)}
+        />
+      )}
     </div>
   );
 }

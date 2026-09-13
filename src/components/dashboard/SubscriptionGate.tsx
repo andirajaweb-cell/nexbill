@@ -63,6 +63,10 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   if (authLoading || !gate || !gate.isLocked) return <>{children}</>;
 
   const copy = STATUS_COPY[gate.status] ?? STATUS_COPY.suspended;
+  // Which outlet is locked — the owner's spec explicitly asked for the merchant/outlet identity to
+  // appear on this screen, not just generic copy (useful when an Owner account is linked to
+  // multiple outlets and needs to tell at a glance which one this lockout is for).
+  const outletName = user?.linkedOutlets?.find((o) => o.id === user.outletId)?.name ?? null;
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
@@ -70,6 +74,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
         <div className="mx-auto w-14 h-14 rounded-full bg-rose-500/10 border border-rose-400/30 flex items-center justify-center">
           <Lock size={24} className="text-rose-400" />
         </div>
+        {outletName && <p className="text-[11px] text-neutral-500 uppercase tracking-wide">{outletName}</p>}
         <h1 className="text-xl font-bold text-rose-300 gm-display">{copy.title}</h1>
         <p className="text-sm text-neutral-400">{copy.body}</p>
         <Button className="w-full" onClick={() => router.push("/dashboard/billing")}>
