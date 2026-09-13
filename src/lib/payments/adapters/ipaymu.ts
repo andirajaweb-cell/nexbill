@@ -152,11 +152,19 @@ async function ipaymuRequest(path: string, body: Record<string, unknown>): Promi
 
 /** GET counterpart to ipaymuRequest — only caller so far is checkIpaymuChannels() below. Query
  * params (empty object for that endpoint, since it takes none) are signed per buildSignature's GET
- * branch, not hashed. */
+ * branch, not hashed.
+ *
+ * FIX 2026-09-13: this used to always JSON.stringify queryParams, so a param-less call (every real
+ * call so far — payment-channels takes none) signed the literal string "{}". Confirmed live against
+ * Production this always returns "401: unauthorized signature", proving iPaymu's own signature
+ * check does NOT treat "no query params" as "{}" — it expects an empty string instead. Only stringify
+ * when there's actually at least one param to sign; this keeps the "{}"-for-empty-object behavior
+ * available in principle but never triggers it in practice until a future GET call needs real params,
+ * at which point THAT case should be verified live the same way before trusting it either. */
 async function ipaymuGetRequest(path: string, queryParams: Record<string, unknown> = {}): Promise<any> {
   const va = process.env.IPAYMU_VA!;
   const apiKey = process.env.IPAYMU_API_KEY!;
-  const queryJson = JSON.stringify(queryParams);
+  const queryJson = Object.keys(queryParams).length === 0 ? "" : JSON.stringify(queryParams);
   const signature = buildSignature(va, apiKey, queryJson, "GET");
 
   const res = await ipaymuFetch(`${process.env.IPAYMU_BASE_URL}${path}`, {
