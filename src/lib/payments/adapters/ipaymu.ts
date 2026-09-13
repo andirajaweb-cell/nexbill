@@ -58,18 +58,26 @@ function isConfigured() {
 }
 
 /**
- * Outgoing request signature — confirmed correct against docs.ipaymu.com/id/docs/signature:
- *   StringToSign = Method + ":" + VA + ":" + RequestBody + ":" + APIKey
- *   Signature    = HMAC-SHA256(StringToSign, APIKey)
- * RequestBody differs by method (this used to only implement the POST case, silently mishandling
- * any future GET call — fixed 2026-09-13 when checkIpaymuChannels() became this file's first GET):
- *   - POST: SHA-256 hash (hex) of the JSON request body.
- *   - GET:  the stringified query params JSON itself, NOT hashed — pass it straight through as
- *           `bodyOrQueryJson`.
+ * Outgoing request signature.
+ *
+ * CORRECTED 2026-09-13, second pass: the generic docs.ipaymu.com/id/docs/signature page claims GET
+ * requests sign the RAW stringified query-params JSON, NOT hashed — this file briefly implemented
+ * exactly that (see git history) after checkIpaymuChannels() became its first GET call. Confirmed
+ * LIVE against Production that this is wrong: every variant tried ("{}" for no params, then "" for
+ * no params) got rejected with "401: unauthorized signature". The authoritative source turned out
+ * to be a DIFFERENT, more specific PDF — https://storage.googleapis.com/ipaymu-docs/ipaymu-api/
+ * iPaymu-signature-documentation-v2.pdf — linked directly from the "signature" header field on the
+ * newer parts of iPaymu's own Postman collection (List Payment Channels, Direct Payment, Redirect
+ * Payment, Check Transaction). It states plainly, with no method-based exception:
+ *   StringToSign = HTTPMethod + ":" + VaNumber + ":" + Lowercase(SHA-256(RequestBody)) + ":" + ApiKey
+ *   "Request body harus berupa JSON" / "Request body di enkripsi menggunakan SHA256"
+ * i.e. RequestBody is ALWAYS SHA-256-hashed, for every method including GET — there is no unhashed
+ * case. This matches what the code did before this file ever had a GET call at all, so the fix is
+ * simply to stop branching on method here.
  */
 function buildSignature(va: string, apiKey: string, bodyOrQueryJson: string, method: "POST" | "GET" = "POST"): string {
-  const component = method === "GET" ? bodyOrQueryJson : crypto.createHash("sha256").update(bodyOrQueryJson).digest("hex");
-  const stringToSign = `${method}:${va}:${component}:${apiKey}`;
+  const bodyHash = crypto.createHash("sha256").update(bodyOrQueryJson).digest("hex");
+  const stringToSign = `${method}:${va}:${bodyHash}:${apiKey}`;
   return crypto.createHmac("sha256", apiKey).update(stringToSign).digest("hex");
 }
 
@@ -150,21 +158,14 @@ async function ipaymuRequest(path: string, body: Record<string, unknown>): Promi
   return parseIpaymuResponse(res);
 }
 
-/** GET counterpart to ipaymuRequest — only caller so far is checkIpaymuChannels() below. Query
- * params (empty object for that endpoint, since it takes none) are signed per buildSignature's GET
- * branch, not hashed.
- *
- * FIX 2026-09-13: this used to always JSON.stringify queryParams, so a param-less call (every real
- * call so far — payment-channels takes none) signed the literal string "{}". Confirmed live against
- * Production this always returns "401: unauthorized signature", proving iPaymu's own signature
- * check does NOT treat "no query params" as "{}" — it expects an empty string instead. Only stringify
- * when there's actually at least one param to sign; this keeps the "{}"-for-empty-object behavior
- * available in principle but never triggers it in practice until a future GET call needs real params,
- * at which point THAT case should be verified live the same way before trusting it either. */
+/** GET counterpart to ipaymuRequest — only caller so far is checkIpaymuChannels() below, which
+ * passes no query params (queryParams stays "{}" after stringifying) since that endpoint takes
+ * none. Per buildSignature's doc comment, this "{}" gets SHA-256-hashed exactly like a POST body
+ * would — there is no unhashed case for GET, despite what the generic signature docs page implies. */
 async function ipaymuGetRequest(path: string, queryParams: Record<string, unknown> = {}): Promise<any> {
   const va = process.env.IPAYMU_VA!;
   const apiKey = process.env.IPAYMU_API_KEY!;
-  const queryJson = Object.keys(queryParams).length === 0 ? "" : JSON.stringify(queryParams);
+  const queryJson = JSON.stringify(queryParams);
   const signature = buildSignature(va, apiKey, queryJson, "GET");
 
   const res = await ipaymuFetch(`${process.env.IPAYMU_BASE_URL}${path}`, {
