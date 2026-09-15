@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -27,7 +27,21 @@ function searchBlob(c: HelpCategory): string {
   return parts.join(" \n ").toLowerCase();
 }
 
+/**
+ * useSearchParams() (for the ?category= deep-link, see below) requires a Suspense boundary around
+ * any component that calls it, or Next.js 16 fails the production build entirely while trying to
+ * prerender this page ("useSearchParams() should be wrapped in a suspense boundary") — this
+ * wrapper is that boundary; all the actual page logic lives in HelpPageInner.
+ */
 export default function HelpPage() {
+  return (
+    <Suspense fallback={null}>
+      <HelpPageInner />
+    </Suspense>
+  );
+}
+
+function HelpPageInner() {
   const { t } = useDashboardLang();
   const { user } = useAuth();
   const canEdit = user?.role === "superuser";

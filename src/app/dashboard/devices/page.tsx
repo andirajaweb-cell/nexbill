@@ -22,6 +22,7 @@ interface Device {
   httpStatusUrl: string | null;
   config: string | null;
   lastKnownState: string;
+  lastSeenAt: string | null;
 }
 
 interface RentalUnit {
@@ -179,6 +180,38 @@ export default function DevicesPage() {
     load();
   };
 
+  // Self-service .bat generator for the local "keep ADB connected" loop some outlets run on their
+  // Relay Agent PC (a fast, offline-tolerant complement to the server-side device heartbeat — see
+  // lib/devices/heartbeat.ts). Generated fresh from THIS outlet's current device list every time
+  // it's clicked, so there's nothing to hand-edit and nothing to ask NEXBILL support for — an
+  // outlet just re-downloads and overwrites the file whenever a TV is added/removed/re-IP'd.
+  const tvTargets = devices
+    .filter((d) => d.protocol === "android_tv_adb" || d.protocol === "android_tv_relay")
+    .map((d) => parseAndroidTvConfig(d.config))
+    .filter((cfg) => cfg.ip);
+
+  const downloadReconnectScript = () => {
+    if (tvTargets.length === 0) {
+      return showAlert(t("devices.reconnectScript.empty", "Belum ada TV dengan IP terisi — tambahkan dulu TV di halaman ini."));
+    }
+    const lines = [
+      "@echo off",
+      "REM Dibuat otomatis oleh NEXBILL — jangan edit manual. Kalau ada TV berubah/ditambah, download ulang file ini dari halaman Kontrol Perangkat.",
+      ":loop",
+      ...tvTargets.map((cfg) => `adb connect ${cfg.ip}:${cfg.port || "5555"}`),
+      "timeout /t 30",
+      "goto loop",
+      "",
+    ];
+    const blob = new Blob([lines.join("\r\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "auto_reconnect_adb.bat";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const claimHardware = async () => {
     if (!claimSerial.trim()) return showAlert(t("devices.hardware.serialRequired", "Nomor seri wajib diisi."));
     if (!claimName.trim()) return showAlert(t("devices.alert.nameRequired", "Nama perangkat wajib diisi."));
@@ -308,6 +341,19 @@ export default function DevicesPage() {
               {claiming ? t("devices.hardware.claiming", "Memproses...") : t("devices.hardware.claimButton", "Klaim Perangkat")}
             </Button>
           </div>
+        </Card>
+      )}
+
+      {canManage && tvTargets.length > 0 && (
+        <Card>
+          <h2 className="font-medium mb-1">{t("devices.reconnectScript.title", "Script Auto-Reconnect ADB (opsional)")}</h2>
+          <p className="text-xs text-neutral-500 mb-3">
+            {t(
+              "devices.reconnectScript.desc",
+              'Untuk PC Relay Agent yang mengontrol TV Android — script ini mencoba menyambungkan ulang ADB ke semua TV outlet ini tiap 30 detik, tetap jalan walau internet ke server NEXBILL sempat putus. Dibuat otomatis dari daftar TV saat ini, jadi tidak perlu diedit manual — cukup download ulang & timpa file lama kalau ada TV yang ditambah/dihapus/ganti IP. Taruh di folder yang sama dengan NexbillAgent, lalu jalankan (atau tambahkan ke Windows Startup).'
+            )}
+          </p>
+          <Button variant="secondary" onClick={downloadReconnectScript}>{t("devices.reconnectScript.button", "Download auto_reconnect_adb.bat")}</Button>
         </Card>
       )}
 

@@ -37,7 +37,11 @@ export interface DeviceHeartbeatResult {
 }
 
 export async function runDeviceHeartbeat(): Promise<DeviceHeartbeatResult> {
-  const rows = await db.select().from(devices).where(inArray(devices.protocol, [...HEARTBEAT_PROTOCOLS]));
+  // devices.protocol's Drizzle column type is narrower than DeviceProtocol (the DB enum list
+  // predates android_tv_adb/android_tv_relay being added — see the comment on that column in
+  // schema.ts; there's no real SQL CHECK constraint, so this is a type-level-only mismatch, same
+  // `as any` cast used for the identical reason in lib/subscription/service.ts's assertDeviceAllowed).
+  const rows = await db.select().from(devices).where(inArray(devices.protocol, HEARTBEAT_PROTOCOLS as any));
 
   const unreachable: DeviceHeartbeatResult["unreachable"] = [];
 
