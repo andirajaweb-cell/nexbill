@@ -46,6 +46,17 @@ registerDict({
   "payments.kindOption.infoOnly": { id: "Info Saja", en: "Info Only", ms: "Maklumat Sahaja", th: "ข้อมูลเท่านั้น", fil: "Impormasyon Lang", vi: "Chỉ thông tin" },
   "payments.kindOption.balanceTracked": { id: "Saldo Terlacak", en: "Tracked Balance", ms: "Baki Dijejak", th: "ยอดคงเหลือที่ติดตาม", fil: "Tinatrack na Balanse", vi: "Số dư được theo dõi" },
 
+  // Longer-form explanation shown live under the "Jenis" dropdown on the add/edit form, so an
+  // outlet owner picks the right one without having to guess from the short option label alone.
+  "payments.kindHelp": {
+    id: 'Pilih "Info Saja" kalau uangnya langsung masuk ke rekening bank/EDC outlet tanpa perlu dicek lagi (mis. transfer bank, kartu debit/kredit) — sistem cukup mencatat sudah dibayar. Pilih "Saldo Terlacak" kalau uangnya masuk ke saldo aplikasi outlet sendiri (mis. saldo DANA/GoPay/ShopeePay milik outlet) — saat tutup shift, kasir akan diminta mencocokkan saldo aplikasi itu dengan total transaksi hari ini, supaya ketahuan kalau ada selisih.',
+    en: 'Choose "Info Only" if the money goes straight into the outlet\'s own bank account/EDC with nothing left to check (e.g. bank transfer, debit/credit card) — the system just records it as paid. Choose "Tracked Balance" if the money lands in the outlet\'s own app balance (e.g. the outlet\'s own DANA/GoPay/ShopeePay balance) — at shift close, the cashier will be asked to match that app balance against today\'s total transactions, so any mismatch gets caught.',
+    ms: 'Pilih "Maklumat Sahaja" jika wang terus masuk ke akaun bank/EDC outlet tanpa perlu disemak lagi (cth. pindahan bank, kad debit/kredit) — sistem cuma merekod sebagai dibayar. Pilih "Baki Dijejak" jika wang masuk ke baki aplikasi outlet sendiri (cth. baki DANA/GoPay/ShopeePay milik outlet) — semasa tutup syif, juruwang akan diminta memadankan baki aplikasi itu dengan jumlah transaksi hari ini, supaya sebarang percanggahan dapat dikesan.',
+    th: 'เลือก "ข้อมูลเท่านั้น" ถ้าเงินเข้าบัญชีธนาคาร/EDC ของสาขาโดยตรงโดยไม่ต้องตรวจสอบอีก (เช่น โอนเงินผ่านธนาคาร, บัตรเดบิต/เครดิต) — ระบบแค่บันทึกว่าชำระแล้ว เลือก "ยอดคงเหลือที่ติดตาม" ถ้าเงินเข้ายอดคงเหลือในแอปของสาขาเอง (เช่น ยอด DANA/GoPay/ShopeePay ของสาขา) — ตอนปิดกะ แคชเชียร์จะถูกขอให้ตรวจสอบยอดคงเหลือในแอปนั้นกับยอดรวมธุรกรรมวันนี้ เพื่อให้ทราบหากมีส่วนต่าง',
+    fil: 'Piliin ang "Impormasyon Lang" kung diretso ang pera sa sariling bank account/EDC ng outlet nang walang kailangan pang i-check (hal. bank transfer, debit/credit card) — itatala lang ito ng system bilang bayad na. Piliin ang "Tinatrack na Balanse" kung napupunta ang pera sa sariling app balance ng outlet (hal. sariling balanse ng DANA/GoPay/ShopeePay ng outlet) — pag-close ng shift, hihilingin sa cashier na itugma ang balanse ng app na iyon sa kabuuang transaksyon ngayong araw, para mahuli agad kung may diperensya.',
+    vi: 'Chọn "Chỉ thông tin" nếu tiền vào thẳng tài khoản ngân hàng/EDC của cửa hàng, không cần kiểm tra thêm (vd. chuyển khoản, thẻ ghi nợ/tín dụng) — hệ thống chỉ ghi nhận là đã thanh toán. Chọn "Số dư được theo dõi" nếu tiền vào số dư ứng dụng riêng của cửa hàng (vd. số dư DANA/GoPay/ShopeePay của cửa hàng) — khi đóng ca, thu ngân sẽ được yêu cầu đối chiếu số dư ứng dụng đó với tổng giao dịch hôm nay, để phát hiện nếu có chênh lệch.',
+  },
+
   // --- Alerts / confirm ---
   "payments.alertNameRequired": {
     id: "Isi nama metode pembayaran.",
@@ -114,25 +125,9 @@ registerDict({
   "payments.addMethod": { id: "Tambah Metode", en: "Add Method", ms: "Tambah Kaedah", th: "เพิ่มวิธีการ", fil: "Magdagdag ng Paraan", vi: "Thêm phương thức" },
   "payments.cancel": { id: "Batal", en: "Cancel", ms: "Batal", th: "ยกเลิก", fil: "Kanselahin", vi: "Hủy" },
 
-  // --- iPaymu quick-add panel ---
-  "payments.ipaymu.title": {
-    id: "Aktifkan Kanal iPaymu",
-    en: "Activate iPaymu Channels",
-    ms: "Aktifkan Saluran iPaymu",
-    th: "เปิดใช้งานช่องทาง iPaymu",
-    fil: "I-activate ang mga Channel ng iPaymu",
-    vi: "Kích hoạt kênh iPaymu",
-  },
-  "payments.ipaymu.desc": {
-    id: "Klik untuk menambah kanal iPaymu ke daftar metode pembayaran outlet ini dengan key yang sudah pasti benar (jangan tambah manual lewat form di atas — resiko salah ketik key, kanal jadi tidak tersambung ke iPaymu). Setelah ditambah, kanal langsung muncul sebagai pilihan di kasir POS/Rental dan siap menerima pembayaran sungguhan dari pelanggan. Kalau ada kanal yang belum bisa dipakai untuk transaksi asli, hubungi tim support NEXBILL.",
-    en: "Click to add an iPaymu channel to this outlet's payment method list with a guaranteed-correct key (don't add these manually via the form above — a typo in the key means the channel silently never connects to iPaymu). Once added, the channel appears immediately as an option at POS/Rental checkout and is ready to accept real customer payments. If a channel isn't yet accepting real transactions, contact NEXBILL support.",
-    ms: "Klik untuk menambah saluran iPaymu ke senarai kaedah pembayaran outlet ini dengan key yang dijamin betul (jangan tambah secara manual melalui borang di atas — risiko silap taip key, saluran tidak tersambung ke iPaymu). Selepas ditambah, saluran terus muncul sebagai pilihan di kaunter POS/Sewa dan sedia menerima bayaran sebenar daripada pelanggan. Jika ada saluran yang belum boleh digunakan untuk transaksi sebenar, hubungi pasukan sokongan NEXBILL.",
-    th: "คลิกเพื่อเพิ่มช่องทาง iPaymu ลงในรายการวิธีการชำระเงินของสาขานี้ด้วยคีย์ที่ถูกต้องแน่นอน (อย่าเพิ่มด้วยตนเองผ่านแบบฟอร์มด้านบน — เสี่ยงพิมพ์คีย์ผิด ช่องทางจะไม่เชื่อมต่อกับ iPaymu อย่างเงียบๆ) หลังเพิ่มแล้ว ช่องทางจะปรากฏเป็นตัวเลือกที่หน้าขาย POS/เช่าทันทีและพร้อมรับชำระเงินจริงจากลูกค้า หากมีช่องทางใดยังใช้ทำธุรกรรมจริงไม่ได้ กรุณาติดต่อทีมซัพพอร์ตของ NEXBILL",
-    fil: "I-click para magdagdag ng channel ng iPaymu sa listahan ng paraan ng pagbabayad ng outlet na ito gamit ang tiyak-na-tamang key (huwag idagdag ito nang manual sa form sa itaas — kung magkamali sa pagta-type ng key, tahimik na hindi makokonekta ang channel sa iPaymu). Pagkatapos idagdag, agad itong lalabas bilang opsyon sa POS/Rental checkout at handa nang tumanggap ng tunay na bayad mula sa customer. Kung may channel na hindi pa tumatanggap ng tunay na transaksyon, makipag-ugnayan sa NEXBILL support.",
-    vi: "Nhấp để thêm kênh iPaymu vào danh sách phương thức thanh toán của cửa hàng này với key chắc chắn chính xác (đừng thêm thủ công qua form ở trên — gõ sai key sẽ khiến kênh âm thầm không kết nối được với iPaymu). Sau khi thêm, kênh sẽ ngay lập tức xuất hiện như một lựa chọn tại POS/Cho thuê và sẵn sàng nhận thanh toán thật từ khách hàng. Nếu có kênh nào chưa nhận được giao dịch thật, hãy liên hệ đội hỗ trợ NEXBILL.",
-  },
-  "payments.ipaymu.added": { id: "Sudah ditambah", en: "Already added", ms: "Sudah ditambah", th: "เพิ่มแล้ว", fil: "Naidagdag na", vi: "Đã thêm" },
-  "payments.ipaymu.add": { id: "+ Tambah", en: "+ Add", ms: "+ Tambah", th: "+ เพิ่ม", fil: "+ Idagdag", vi: "+ Thêm" },
+  // The "Aktifkan Kanal iPaymu" quick-add panel these keys used to serve was removed 2026-09-13 —
+  // see the doc comment in dashboard/payments/page.tsx for why (it let outlets collect customer
+  // payments through NEXBILL's own merchant-to-platform iPaymu account by mistake).
 
   // --- iPaymu connection test ---
   "payments.ipaymu.testButton": { id: "Test Koneksi iPaymu", en: "Test iPaymu Connection", ms: "Uji Sambungan iPaymu", th: "ทดสอบการเชื่อมต่อ iPaymu", fil: "Test Koneksyon ng iPaymu", vi: "Kiểm tra kết nối iPaymu" },

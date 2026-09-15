@@ -1299,18 +1299,30 @@ function AccountLedgerModal({
               </tr>
             </thead>
             <tbody>
-              {lines.map((l, i) => (
-                <tr key={`${l.journalEntryId}-${i}`} className={`border-b border-neutral-900 ${l.status === "void" ? "opacity-40" : ""}`}>
-                  <td className="py-1.5 whitespace-nowrap align-top">{new Date(l.entryDate).toLocaleString("id-ID")}</td>
-                  <td className="py-1.5 align-top">
-                    <span className={l.status === "void" ? "line-through" : ""}>{l.lineDescription || l.description}</span>
-                    {l.status === "void" && <span className="ml-1.5 text-[10px] text-red-400">{t("accounting.pl.drillDown.void", "(dibatalkan)")}</span>}
-                    {pl_accountLedgerSourceLabel(l) && <div className="text-[10px] text-neutral-600">{pl_accountLedgerSourceLabel(l)}</div>}
-                  </td>
-                  <td className="py-1.5 align-top font-mono text-[10px] text-neutral-500">{l.reference ?? "-"}</td>
-                  <td className="py-1.5 text-right align-top">{rupiah(l.amount)}</td>
-                </tr>
-              ))}
+              {lines.map((l, i) => {
+                const linkable = pl_accountLedgerLinkable(l);
+                return (
+                  <tr
+                    key={`${l.journalEntryId}-${i}`}
+                    className={`border-b border-neutral-900 ${l.status === "void" ? "opacity-40" : ""} ${linkable ? "cursor-pointer hover:bg-neutral-900/60" : ""}`}
+                    title={linkable ? t("accounting.pl.drillDown.openHint", "Buka detail transaksi di tab baru") : undefined}
+                    onClick={linkable ? () => window.open(`/dashboard/transactions?orderId=${l.sourceId}`, "_blank") : undefined}
+                  >
+                    <td className="py-1.5 whitespace-nowrap align-top">{new Date(l.entryDate).toLocaleString("id-ID")}</td>
+                    <td className="py-1.5 align-top">
+                      <span className={l.status === "void" ? "line-through" : ""}>{l.lineDescription || l.description}</span>
+                      {l.status === "void" && <span className="ml-1.5 text-[10px] text-red-400">{t("accounting.pl.drillDown.void", "(dibatalkan)")}</span>}
+                      {pl_accountLedgerSourceLabel(l) && (
+                        <div className={`text-[10px] ${linkable ? "text-sky-500 underline underline-offset-2" : "text-neutral-600"}`}>
+                          {pl_accountLedgerSourceLabel(l)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-1.5 align-top font-mono text-[10px] text-neutral-500">{l.reference ?? "-"}</td>
+                    <td className="py-1.5 text-right align-top">{rupiah(l.amount)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr className="font-semibold border-t border-neutral-800">
@@ -1341,6 +1353,14 @@ interface AccountLedgerLine {
   debit: number;
   credit: number;
   amount: number;
+}
+
+/** sourceId only resolves to a real orders.id (openable via /dashboard/transactions?orderId=) for
+ * these two sourceType values — see lib/accounting/postings.ts. Every other sourceType (ppob,
+ * expense, asset_purchase, cash_transfer, receivable_payment, etc.) points at a row in a different
+ * table, so linking those into Transaction Center would just 404; they stay plain text. */
+function pl_accountLedgerLinkable(l: AccountLedgerLine): boolean {
+  return Boolean(l.sourceId) && (l.sourceType === "pos" || l.sourceType === "rental");
 }
 
 /** Short "Order abc12345 (pos)" style label under a drill-down row, when the entry traces back to a specific order — helps the owner cross-reference into Transaction Center without this modal needing a full link/navigation. */

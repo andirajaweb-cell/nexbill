@@ -120,6 +120,7 @@ export async function receivePurchaseOrder(
         invoiceNumber,
         amount: receivedAmount,
         status: "unpaid",
+        staffUserId,
       })
       .returning();
     for (const line of receivedLines) {
@@ -252,6 +253,7 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
       invoiceNumber,
       amount: grandTotal,
       status: "unpaid",
+      staffUserId: input.staffUserId,
     })
     .returning();
 

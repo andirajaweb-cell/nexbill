@@ -112,13 +112,13 @@ export function DeviceSetupGuide() {
                     <p>
                       {t(
                         "devices.guide.tuya.body",
-                        'Untuk smart plug yang pakai aplikasi Tuya Smart / Smart Life. Langkah: 1) Pasang perangkat & hubungkan ke WiFi lewat aplikasi Tuya Smart / Smart Life seperti biasa — pakai akun Tuya/Smart Life milik outlet sendiri. 2) Buka aplikasi itu, masuk ke detail perangkat > ikon pensil/Device Information, salin "Device ID"-nya. 3) Di sini, pilih protokol "Tuya Smart Life", tempel Device ID itu — kolom "Kode DP Switch" boleh dikosongkan (default switch_1). 4) Simpan dan coba tombol Nyalakan/Matikan.'
+                        'Untuk smart plug yang pakai aplikasi Tuya Smart / Smart Life. PENTING: outlet ini wajib punya akun Tuya Cloud API sendiri dulu (isi di Pengaturan > Integrasi Tuya Cloud API) — lihat langkah lengkapnya di Pusat Bantuan > Kontrol Perangkat. Setelah itu: 1) Pasang perangkat & hubungkan ke WiFi lewat aplikasi Tuya Smart / Smart Life seperti biasa. 2) Buka aplikasi itu, masuk ke detail perangkat > ikon pensil/Device Information, salin "Device ID"-nya. 3) Di sini, pilih protokol "Tuya Smart Life", tempel Device ID itu — kolom "Kode DP Switch" boleh dikosongkan (default switch_1). 4) Simpan dan coba tombol Nyalakan/Matikan.'
                       )}
                     </p>
                     <p className="text-amber-400/90">
                       {t(
                         "devices.guide.tuya.activationNote",
-                        'Penting: setelah Langkah 1, akun Tuya/Smart Life outlet ini WAJIB "diaktifkan" satu kali oleh tim NEXBILL sebelum tombol Nyalakan/Matikan di sini bisa berfungsi — ini aturan dari Tuya, bukan dari NEXBILL. Kalau tombol belum berfungsi setelah Langkah 4, hubungi tim NEXBILL lewat menu Chat/Bantuan dan minta "aktivasi akun Tuya outlet" — prosesnya cepat (kirim/scan kode QR), tidak perlu remote/team datang ke lokasi.'
+                        'Kalau tombol Nyalakan/Matikan belum berfungsi setelah Langkah 4, cek dulu: (1) sudah isi Access ID/Secret Tuya Cloud API outlet ini di Pengaturan? (2) langganan IoT Core di akun Tuya itu masih aktif (belum expired)? Kalau sudah benar tapi tetap gagal, hubungi tim NEXBILL lewat menu Chat/Bantuan.'
                       )}
                     </p>
                   </div>

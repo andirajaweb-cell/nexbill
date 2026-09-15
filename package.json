@@ -21,6 +21,7 @@
     "reduce:outlets": "tsx scripts/reduce-to-one-outlet.ts",
     "bot:whatsapp": "tsx scripts/whatsapp-bot.mts",
     "scheduler": "tsx scripts/booking-scheduler.ts",
+    "device:heartbeat": "tsx scripts/device-heartbeat.ts",
     "relay:hub": "tsx scripts/relay-hub.ts",
     "relay:agent": "tsx scripts/relay-agent.ts",
     "ipaymu:proxy": "tsx scripts/ipaymu-egress-proxy.ts",

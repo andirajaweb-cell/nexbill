@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -31,8 +32,18 @@ export default function HelpPage() {
   const { user } = useAuth();
   const canEdit = user?.role === "superuser";
 
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState(HELP_CATEGORIES[0].id);
+
+  // Deep-link support (e.g. Settings > Integrasi Tuya Cloud API links here with
+  // ?category=devices) — only honored if the id actually exists, so a stale/typo'd link just
+  // falls back to the default first category instead of showing a blank panel.
+  useEffect(() => {
+    const wanted = searchParams.get("category");
+    if (wanted && HELP_CATEGORIES.some((c) => c.id === wanted)) setActiveId(wanted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [overrides, setOverrides] = useState<Record<string, EditableHelpFields>>({});
   const [loadingOverrides, setLoadingOverrides] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -109,7 +120,7 @@ export default function HelpPage() {
                     }`}
                   >
                     <span>{t(`help.content.${c.id}.label`, c.label)}</span>
-                    {overrides[c.id] && <span className="text-[9px] uppercase tracking-wider text-amber-400/80 flex-shrink-0">diedit</span>}
+                    {overrides[c.id] && <span className="text-[9px] uppercase tracking-wider text-amber-400/80 flex-shrink-0">{t("help.editedBadge", "diedit")}</span>}
                   </button>
                 ))}
               </div>
@@ -125,7 +136,7 @@ export default function HelpPage() {
               hasOverride={hasOverride}
               onEdit={() => setEditing(true)}
               onReset={async () => {
-                if (!(await showConfirm("Kembalikan topik ini ke versi default (menghapus semua editan)?"))) return;
+                if (!(await showConfirm(t("help.resetConfirm", "Kembalikan topik ini ke versi default (menghapus semua editan)?")))) return;
                 const res = await fetch(`/api/help-content/${active.id}`, { method: "DELETE" });
                 if (!res.ok) { const d = await res.json(); return showAlert(d.error); }
                 await loadOverrides();
@@ -186,11 +197,11 @@ function HelpArticle({
         {canEdit && (
           <div className="flex-shrink-0 flex flex-col gap-1.5 items-end">
             <Button variant="secondary" className="text-xs px-2.5 py-1.5" onClick={onEdit}>
-              Edit Konten
+              {t("help.editContent", "Edit Konten")}
             </Button>
             {hasOverride && (
               <button onClick={onReset} className="text-[11px] text-neutral-500 hover:text-rose-400 hover:underline">
-                Kembalikan ke default
+                {t("help.resetToDefault", "Kembalikan ke default")}
               </button>
             )}
           </div>
@@ -291,6 +302,7 @@ function draftToSubsection(d: SubsectionDraft): HelpSubsection {
 }
 
 function HelpEditor({ category: c, onCancel, onSaved }: { category: HelpCategory; onCancel: () => void; onSaved: () => void }) {
+  const { t } = useDashboardLang();
   const [label, setLabel] = useState(c.label);
   const [navHint, setNavHint] = useState(c.navHint ?? "");
   const [summary, setSummary] = useState(c.summary);
@@ -333,79 +345,79 @@ function HelpEditor({ category: c, onCancel, onSaved }: { category: HelpCategory
   return (
     <Card className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-neutral-100">Edit Topik: {c.label}</h2>
+        <h2 className="text-lg font-semibold text-neutral-100">{t("help.editor.title", "Edit Topik: {label}").replace("{label}", c.label)}</h2>
         <div className="flex gap-2">
-          <Button variant="ghost" className="text-xs px-2.5 py-1.5" onClick={onCancel} disabled={saving}>Batal</Button>
-          <Button className="text-xs px-2.5 py-1.5" onClick={save} disabled={saving}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+          <Button variant="ghost" className="text-xs px-2.5 py-1.5" onClick={onCancel} disabled={saving}>{t("help.editor.cancel", "Batal")}</Button>
+          <Button className="text-xs px-2.5 py-1.5" onClick={save} disabled={saving}>{saving ? t("help.editor.saving", "Menyimpan...") : t("help.editor.save", "Simpan Perubahan")}</Button>
         </div>
       </div>
 
       <div>
-        <label className={editLabelCls}>Judul Topik</label>
+        <label className={editLabelCls}>{t("help.editor.topicTitle", "Judul Topik")}</label>
         <input className={editInputCls} value={label} onChange={(e) => setLabel(e.target.value)} />
       </div>
       <div>
-        <label className={editLabelCls}>Petunjuk lokasi menu (opsional, tampil sebagai catatan kuning di atas ringkasan)</label>
+        <label className={editLabelCls}>{t("help.editor.navHint", "Petunjuk lokasi menu (opsional, tampil sebagai catatan kuning di atas ringkasan)")}</label>
         <input className={editInputCls} value={navHint} onChange={(e) => setNavHint(e.target.value)} />
       </div>
       <div>
-        <label className={editLabelCls}>Ringkasan</label>
+        <label className={editLabelCls}>{t("help.editor.summary", "Ringkasan")}</label>
         <textarea className={editInputCls} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
       </div>
       <div>
-        <label className={editLabelCls}>Siapa yang bisa akses (opsional)</label>
+        <label className={editLabelCls}>{t("help.editor.roles", "Siapa yang bisa akses (opsional)")}</label>
         <input className={editInputCls} value={roles} onChange={(e) => setRoles(e.target.value)} />
       </div>
       <div>
-        <label className={editLabelCls}>Cara Pakai — satu langkah per baris</label>
-        <textarea className={editInputCls} rows={6} value={stepsText} onChange={(e) => setStepsText(e.target.value)} placeholder={"Langkah 1...\nLangkah 2...\nLangkah 3..."} />
+        <label className={editLabelCls}>{t("help.editor.stepsLabel", "Cara Pakai — satu langkah per baris")}</label>
+        <textarea className={editInputCls} rows={6} value={stepsText} onChange={(e) => setStepsText(e.target.value)} placeholder={t("help.editor.stepsPlaceholder", "Langkah 1...\nLangkah 2...\nLangkah 3...")} />
       </div>
       <div>
-        <label className={editLabelCls}>Hal Penting & Catatan — satu catatan per baris</label>
-        <textarea className={editInputCls} rows={5} value={notesText} onChange={(e) => setNotesText(e.target.value)} placeholder={"Catatan 1...\nCatatan 2..."} />
+        <label className={editLabelCls}>{t("help.editor.notesLabel", "Hal Penting & Catatan — satu catatan per baris")}</label>
+        <textarea className={editInputCls} rows={5} value={notesText} onChange={(e) => setNotesText(e.target.value)} placeholder={t("help.editor.notesPlaceholder", "Catatan 1...\nCatatan 2...")} />
       </div>
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-neutral-200">Sub-bagian</label>
-          <Button variant="secondary" className="text-xs px-2.5 py-1.5" onClick={addSubsection}>+ Tambah Sub-bagian</Button>
+          <label className="text-sm font-medium text-neutral-200">{t("help.editor.subsectionsLabel", "Sub-bagian")}</label>
+          <Button variant="secondary" className="text-xs px-2.5 py-1.5" onClick={addSubsection}>{t("help.editor.addSubsection", "+ Tambah Sub-bagian")}</Button>
         </div>
-        {subsections.length === 0 && <p className="text-xs text-neutral-500">Belum ada sub-bagian.</p>}
+        {subsections.length === 0 && <p className="text-xs text-neutral-500">{t("help.editor.noSubsections", "Belum ada sub-bagian.")}</p>}
         {subsections.map((s, i) => (
           <div key={i} className="rounded-lg border border-neutral-800 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <input
                 className={`${editInputCls} font-medium`}
-                placeholder="Judul sub-bagian"
+                placeholder={t("help.editor.subsectionTitlePlaceholder", "Judul sub-bagian")}
                 value={s.title}
                 onChange={(e) => updateSubsection(i, { title: e.target.value })}
               />
-              <button onClick={() => removeSubsection(i)} className="text-xs text-rose-400 hover:underline flex-shrink-0 px-1">Hapus</button>
+              <button onClick={() => removeSubsection(i)} className="text-xs text-rose-400 hover:underline flex-shrink-0 px-1">{t("help.editor.removeSubsection", "Hapus")}</button>
             </div>
             <input
               className={editInputCls}
-              placeholder="Petunjuk lokasi menu (opsional)"
+              placeholder={t("help.editor.subsectionNavHintPlaceholder", "Petunjuk lokasi menu (opsional)")}
               value={s.navHint}
               onChange={(e) => updateSubsection(i, { navHint: e.target.value })}
             />
             <textarea
               className={editInputCls}
               rows={2}
-              placeholder="Kalimat pembuka sub-bagian (opsional)"
+              placeholder={t("help.editor.subsectionIntroPlaceholder", "Kalimat pembuka sub-bagian (opsional)")}
               value={s.intro}
               onChange={(e) => updateSubsection(i, { intro: e.target.value })}
             />
             <textarea
               className={editInputCls}
               rows={4}
-              placeholder={"Langkah — satu per baris"}
+              placeholder={t("help.editor.subsectionStepsPlaceholder", "Langkah — satu per baris")}
               value={s.stepsText}
               onChange={(e) => updateSubsection(i, { stepsText: e.target.value })}
             />
             <textarea
               className={editInputCls}
               rows={3}
-              placeholder={"Catatan — satu per baris"}
+              placeholder={t("help.editor.subsectionNotesPlaceholder", "Catatan — satu per baris")}
               value={s.notesText}
               onChange={(e) => updateSubsection(i, { notesText: e.target.value })}
             />
@@ -414,8 +426,8 @@ function HelpEditor({ category: c, onCancel, onSaved }: { category: HelpCategory
       </div>
 
       <div className="flex justify-end gap-2 pt-2 border-t border-neutral-800">
-        <Button variant="ghost" className="text-xs px-2.5 py-1.5" onClick={onCancel} disabled={saving}>Batal</Button>
-        <Button className="text-xs px-2.5 py-1.5" onClick={save} disabled={saving}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+        <Button variant="ghost" className="text-xs px-2.5 py-1.5" onClick={onCancel} disabled={saving}>{t("help.editor.cancel", "Batal")}</Button>
+        <Button className="text-xs px-2.5 py-1.5" onClick={save} disabled={saving}>{saving ? t("help.editor.saving", "Menyimpan...") : t("help.editor.save", "Simpan Perubahan")}</Button>
       </div>
     </Card>
   );

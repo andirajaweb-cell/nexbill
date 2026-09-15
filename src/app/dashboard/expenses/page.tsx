@@ -220,6 +220,26 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
     return a ? coaAccountName(t, a) : "-";
   };
 
+  // For audit: who actually input this expense (staffUserId, set from the logged-in session at
+  // creation — see POST /api/expenses) vs. who later approved/rejected/paid/voided it (separate
+  // approvedBy/rejectedBy/paidBy/voidedBy columns on the same row, already returned by the API).
+  // The table's own "Diinput Oleh" column below only shows the creator; the fuller trail (who
+  // approved and when, who paid and when, etc.) is surfaced via this row's title tooltip so it's
+  // still one hover away without cluttering the table with 4 more columns.
+  const staffName = (id: string | null | undefined) => {
+    if (!id) return "-";
+    const s = bundle.staff.find((x: any) => x.id === id);
+    return s?.name ?? "-";
+  };
+  const auditTrail = (e: any) => {
+    const parts = [`Diinput: ${staffName(e.staffUserId)}`];
+    if (e.approvedBy) parts.push(`Approved: ${staffName(e.approvedBy)}`);
+    if (e.rejectedBy) parts.push(`Rejected: ${staffName(e.rejectedBy)} (${e.rejectReason ?? "-"})`);
+    if (e.paidBy) parts.push(`Dibayar: ${staffName(e.paidBy)}`);
+    if (e.voidedBy) parts.push(`Dibatalkan: ${staffName(e.voidedBy)} (${e.voidReason ?? "-"})`);
+    return parts.join(" · ");
+  };
+
   const uploadAttachment = async (file: File) => {
     setUploading(true);
     try {
@@ -379,18 +399,19 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-500 border-b border-neutral-800">
-              <th className="py-2">{t("expenses.table.no", "No.")}</th><th>{t("expenses.table.date", "Tanggal")}</th><th>{t("expenses.table.account", "Akun")}</th><th>{t("expenses.placeholderDescription", "Deskripsi")}</th><th>{t("expenses.amountLabel", "Nominal")}</th><th>{t("expenses.table.status", "Status")}</th><th></th>
+              <th className="py-2">{t("expenses.table.no", "No.")}</th><th>{t("expenses.table.date", "Tanggal")}</th><th>{t("expenses.table.account", "Akun")}</th><th>{t("expenses.placeholderDescription", "Deskripsi")}</th><th>{t("expenses.amountLabel", "Nominal")}</th><th>{t("expenses.table.status", "Status")}</th><th>{t("expenses.table.inputBy", "Diinput Oleh")}</th><th></th>
             </tr>
           </thead>
           <tbody>
             {bundle.expenses.map((e: any) => (
-              <tr key={e.id} className="border-b border-neutral-900 align-top">
+              <tr key={e.id} className="border-b border-neutral-900 align-top" title={auditTrail(e)}>
                 <td className="py-2 font-mono text-xs">{e.expenseNumber}</td>
                 <td className="text-xs">{new Date(e.expenseDate).toLocaleDateString("id-ID")}</td>
                 <td className="text-xs">{accountName(e.accountId)}</td>
                 <td className="text-xs max-w-[200px] truncate" title={e.description}>{e.description || e.category}</td>
                 <td>{rupiah(e.amount + (e.taxAmount ?? 0))}</td>
                 <td><Badge status={STATUS_BADGE[e.status]}>{statusLabel(e.status)}</Badge></td>
+                <td className="text-xs">{staffName(e.staffUserId)}</td>
                 <td className="text-right space-y-1">
                   <div className="flex flex-col items-end gap-1">
                     {e.status === "draft" && canManage && <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => act(e.id, "submit")}>{t("expenses.action.submit", "Submit")}</Button>}

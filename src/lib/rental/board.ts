@@ -1,7 +1,7 @@
 import { db } from "@/db/client";
-import { rentalSessions, rentalUnits, customers, orders, orderItems, sessionAccessories } from "@/db/schema";
+import { rentalSessions, rentalUnits, customers, orders, orderItems, sessionAccessories, outlets } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { estimateAccessoryCharge } from "@/lib/rental/accessories";
+import { estimateAccessoryCharge, type AccessoryBillingMode } from "@/lib/rental/accessories";
 
 export interface LiveBillingBoardRow {
   sessionId: string;
@@ -49,6 +49,12 @@ export async function getLiveBillingBoard(outletId: string): Promise<LiveBilling
     .where(and(eq(rentalSessions.outletId, outletId), inArray(rentalSessions.status, ["running", "paused"])));
 
   if (sessions.length === 0) return [];
+
+  // One extra lookup for the whole board — same "Kebijakan Tarif Aksesoris" setting
+  // finalizeAccessoryCharges reads at session-stop time, kept in sync here so the live estimate
+  // shown to the cashier never disagrees with what actually gets billed.
+  const [outletRow] = await db.select({ accessoryBillingMode: outlets.accessoryBillingMode }).from(outlets).where(eq(outlets.id, outletId)).limit(1);
+  const accessoryBillingMode: AccessoryBillingMode = (outletRow?.accessoryBillingMode as AccessoryBillingMode) ?? "per_hour";
 
   const sessionIds = sessions.map((s) => s.id);
   const unitIds = [...new Set(sessions.map((s) => s.rentalUnitId))];
@@ -104,7 +110,7 @@ export async function getLiveBillingBoard(outletId: string): Promise<LiveBilling
 
     const sessionAccessoryRows = accessoriesBySessionId.get(session.id) ?? [];
     const activeAccessories = sessionAccessoryRows.filter((a) => !a.removedAt);
-    const accessoryEstimate = activeAccessories.reduce((s, a) => s + estimateAccessoryCharge(a, now), 0);
+    const accessoryEstimate = activeAccessories.reduce((s, a) => s + estimateAccessoryCharge(a, now, accessoryBillingMode), 0);
 
     rows.push({
       sessionId: session.id,

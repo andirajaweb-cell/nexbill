@@ -22,6 +22,8 @@ const TYPE_LABEL_META: Record<string, { key: string; fallback: string }> = {
   booking_pending: { key: "notifikasi.type.bookingPending", fallback: "Booking" },
   subscription_trial: { key: "notifikasi.type.subscriptionTrial", fallback: "Langganan" },
   announcement: { key: "notifikasi.type.announcement", fallback: "Pengumuman" },
+  shift_variance: { key: "notifikasi.type.shiftVariance", fallback: "Selisih Kas" },
+  maintenance_due: { key: "notifikasi.type.maintenanceDue", fallback: "Maintenance" },
 };
 
 export default function NotifikasiPage() {

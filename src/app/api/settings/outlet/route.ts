@@ -11,7 +11,7 @@ import { SEA_COUNTRY_TO_LANG } from "@/lib/data/sea-banks";
 /** Curated fields the Settings UI (Business/Tax/Printer/Notification tabs) is allowed to edit on the outlet row. */
 const EDITABLE_FIELDS = [
   "name", "address", "phone", "logoUrl", "wifiSsid", "wifiPassword",
-  "billingRoundingMinutes", "serviceChargePercent", "taxPercent", "expenseApprovalThreshold",
+  "billingRoundingMinutes", "accessoryBillingMode", "serviceChargePercent", "taxPercent", "expenseApprovalThreshold",
   "printerName", "printerPaperWidthMm", "receiptFooterText",
   "notifyLowStock", "notifyPendingApproval", "notifyShiftVariance", "notifyBookingReminder", "notifyMaintenanceDue",
   "defaultMaintenanceThresholdHours",
@@ -28,6 +28,11 @@ const EDITABLE_FIELDS = [
   "decimalStyle", "decimalPlaces", "dateFormat",
   // Anti-fraud shift-review thresholds — see lib/shift/fraud-detection.ts.
   "fraudVarianceThreshold", "fraudVoidCountThreshold",
+  // Settings > Integrasi Tuya Cloud API — the outlet's own Tuya IoT Platform Cloud Project
+  // credentials (see outlets.tuyaAccessId's doc comment in schema.ts). Deliberately NOT including
+  // "tuyaUseSharedPlatformAccount" here — that legacy shared-account exception flag is
+  // platform-admin-only, never editable by the outlet itself.
+  "tuyaAccessId", "tuyaAccessSecret", "tuyaProjectCode", "tuyaRegion",
 ] as const;
 
 export async function GET(_req: NextRequest) {

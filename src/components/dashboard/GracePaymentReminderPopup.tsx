@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/auth/client";
 import { useApi } from "@/lib/api/use-api";
 import { Button } from "@/components/ui/Button";
 import { AlertTriangle } from "lucide-react";
+import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import "@/lib/i18n/dict-shell";
 
 interface SubscriptionSnapshot {
   subscription: { id: string; status: string; currentPeriodEnd: string | null; graceUntil: string | null };
@@ -30,6 +32,7 @@ interface SubscriptionSnapshot {
  * graceReminderDismissedToday from the API, which is the source of truth across devices/tabs.
  */
 export function GracePaymentReminderPopup() {
+  const { t } = useDashboardLang();
   const { user } = useAuth();
   const router = useRouter();
   const { data, mutate } = useApi<SubscriptionSnapshot>(user && user.role !== "superuser" ? "/api/subscription" : null);
@@ -42,7 +45,7 @@ export function GracePaymentReminderPopup() {
 
   const graceUntil = sub.graceUntil ? new Date(sub.graceUntil) : null;
   const daysLeft = graceUntil ? Math.max(0, Math.ceil((graceUntil.getTime() - Date.now()) / 86_400_000)) : null;
-  const outletName = user?.linkedOutlets?.find((o) => o.id === user.outletId)?.name ?? "outlet Anda";
+  const outletName = user?.linkedOutlets?.find((o) => o.id === user.outletId)?.name ?? t("gracePay.yourOutletFallback", "outlet Anda");
 
   const dismiss = async (choice: "later" | "pay") => {
     setDismissing(choice);
@@ -68,27 +71,27 @@ export function GracePaymentReminderPopup() {
         <div className="p-5 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 flex items-center gap-1">
-              <AlertTriangle size={11} /> Masa Tenggang
+              <AlertTriangle size={11} /> {t("gracePay.badge", "Masa Tenggang")}
             </span>
-            <span className="text-[10px] text-neutral-500 uppercase tracking-wide">Pengingat Pembayaran NEXBILL</span>
+            <span className="text-[10px] text-neutral-500 uppercase tracking-wide">{t("gracePay.header", "Pengingat Pembayaran NEXBILL")}</span>
           </div>
-          <h2 className="text-base font-semibold text-neutral-100">Tagihan langganan {outletName} belum lunas</h2>
+          <h2 className="text-base font-semibold text-neutral-100">{t("gracePay.title", "Tagihan langganan {outlet} belum lunas").replace("{outlet}", outletName)}</h2>
           <p className="text-sm text-neutral-400 leading-relaxed">
-            Periode langganan sudah berakhir dan tagihan perpanjangan belum dibayar.{" "}
+            {t("gracePay.bodyIntro", "Periode langganan sudah berakhir dan tagihan perpanjangan belum dibayar.")}{" "}
             {daysLeft !== null && daysLeft > 0
-              ? `Kamu masih punya masa tenggang ${daysLeft} hari lagi sebelum akses NEXBILL dikunci sepenuhnya.`
-              : "Masa tenggang akan segera habis — akses NEXBILL bisa dikunci sepenuhnya kapan saja."}{" "}
-            Selesaikan pembayaran kapan saja di halaman Langganan supaya akses tidak terganggu.
+              ? t("gracePay.daysLeft", "Kamu masih punya masa tenggang {n} hari lagi sebelum akses NEXBILL dikunci sepenuhnya.").replace("{n}", String(daysLeft))
+              : t("gracePay.expiringSoon", "Masa tenggang akan segera habis — akses NEXBILL bisa dikunci sepenuhnya kapan saja.")}{" "}
+            {t("gracePay.resolveHint", "Selesaikan pembayaran kapan saja di halaman Langganan supaya akses tidak terganggu.")}
           </p>
           <div className="flex items-center justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => dismiss("later")} disabled={dismissing !== null}>
-              {dismissing === "later" ? "..." : "Nanti Dulu"}
+              {dismissing === "later" ? "..." : t("gracePay.later", "Nanti Dulu")}
             </Button>
             <Button onClick={() => dismiss("pay")} disabled={dismissing !== null}>
-              {dismissing === "pay" ? "..." : "Bayar Sekarang"}
+              {dismissing === "pay" ? "..." : t("gracePay.payNow", "Bayar Sekarang")}
             </Button>
           </div>
-          <p className="text-[11px] text-neutral-600">Pengingat ini muncul sekali sehari selama tagihan belum lunas. Data outlet-mu tetap aman.</p>
+          <p className="text-[11px] text-neutral-600">{t("gracePay.footerNote", "Pengingat ini muncul sekali sehari selama tagihan belum lunas. Data outlet-mu tetap aman.")}</p>
         </div>
       </div>
     </div>

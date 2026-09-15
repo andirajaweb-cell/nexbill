@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
@@ -37,6 +37,8 @@ export default function PlatformIpaymuPage() {
         <IpaymuConnectionTest />
         <IpaymuChannelStatusPanel />
       </Card>
+
+      <SandboxTestPanel />
 
       <Card>
         <h2 className="font-medium mb-2">Webhook URLs (gateway lain — Fastpay/BukuPay)</h2>
@@ -175,5 +177,112 @@ function IpaymuChannelStatusPanel() {
         </div>
       )}
     </div>
+  );
+}
+
+type SandboxTestState = { referenceId: string; amount: number; status: "pending" | "success" | "failed"; rawCallback?: string | null } | null;
+
+/**
+ * "Ujicoba Transaksi Sandbox" — runs a REAL checkout->pay->webhook round trip against
+ * sandbox.ipaymu.com using the separate IPAYMU_SANDBOX_* credentials (see
+ * createIpaymuSandboxTestCheckout's doc comment in lib/payments/adapters/ipaymu.ts). Never touches
+ * IPAYMU_VA/IPAYMU_API_KEY, never creates a real order/subscription-invoice row — safe to run any
+ * time, as many times as needed, independent of whatever Production is doing.
+ */
+function SandboxTestPanel() {
+  const [starting, setStarting] = useState(false);
+  const [test, setTest] = useState<SandboxTestState>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  const start = async () => {
+    setStarting(true);
+    setStartError(null);
+    setTest(null);
+    if (pollRef.current) clearInterval(pollRef.current);
+    try {
+      const res = await fetch("/api/platform-admin/ipaymu/sandbox-test/checkout", { method: "POST" });
+      const out = await res.json().catch(() => ({ error: `Server merespons status ${res.status} tanpa isi JSON.` }));
+      if (!res.ok) {
+        setStartError(out.error ?? "Gagal membuat transaksi test.");
+        return;
+      }
+      setTest({ referenceId: out.referenceId, amount: out.amount, status: "pending" });
+      window.open(out.checkoutUrl, "_blank", "noopener,noreferrer");
+
+      pollRef.current = setInterval(async () => {
+        const pollRes = await fetch(`/api/platform-admin/ipaymu/sandbox-test?referenceId=${encodeURIComponent(out.referenceId)}`);
+        const pollOut = await pollRes.json().catch(() => null);
+        if (pollRes.ok && pollOut) {
+          setTest({ referenceId: out.referenceId, amount: out.amount, status: pollOut.status, rawCallback: pollOut.rawCallback });
+          if (pollOut.status === "success" || pollOut.status === "failed") {
+            if (pollRef.current) clearInterval(pollRef.current);
+          }
+        }
+      }, 3000);
+    } catch (err: any) {
+      setStartError(`Gagal menghubungi server: ${err?.message ?? "kesalahan tidak diketahui"}.`);
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  return (
+    <Card className="space-y-3 border border-cyan-600/30">
+      <div>
+        <h2 className="font-medium">Ujicoba Transaksi Sandbox</h2>
+        <p className="text-xs text-neutral-500 mt-1">
+          Membuat transaksi test Rp10.000 sungguhan lewat <span className="font-mono">sandbox.ipaymu.com</span>, pakai kredensial{" "}
+          <span className="font-mono">IPAYMU_SANDBOX_*</span> yang sepenuhnya terpisah dari kredensial Production di atas — tidak akan pernah membuat order/tagihan
+          langganan asli, dan tidak butuh VPS proxy (sandbox tidak mensyaratkan IP statis). Perlu env var{" "}
+          <span className="font-mono">IPAYMU_SANDBOX_BASE_URL</span>, <span className="font-mono">IPAYMU_SANDBOX_VA</span>, dan{" "}
+          <span className="font-mono">IPAYMU_SANDBOX_API_KEY</span> (daftar terpisah di sandbox.ipaymu.com — beda akun dari Production).
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" className="text-xs" onClick={start} disabled={starting}>
+          {starting ? "Membuat transaksi..." : "Buat Transaksi Test (Sandbox)"}
+        </Button>
+        {test && test.status === "pending" && <span className="text-[11px] text-neutral-500">Menunggu pembayaran di tab baru & webhook...</span>}
+      </div>
+
+      {startError && <div className="text-xs rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 p-2">{startError}</div>}
+
+      {test && (
+        <div className="text-xs space-y-1">
+          <div className="text-neutral-400">
+            Referensi: <span className="font-mono">{test.referenceId}</span> · Nominal: Rp{test.amount.toLocaleString("id-ID")}
+          </div>
+          {test.status === "pending" && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 p-2">
+              Menunggu — selesaikan pembayaran di tab yang baru terbuka (pakai metode dummy/simulator sandbox iPaymu), status di sini akan otomatis update begitu webhook diterima.
+            </div>
+          )}
+          {test.status === "success" && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 p-2">
+              Berhasil — checkout, pembayaran, dan webhook sandbox semuanya jalan sesuai alur.
+            </div>
+          )}
+          {test.status === "failed" && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 p-2">
+              Gagal/dibatalkan — cek detail mentah di bawah untuk tahu sebabnya.
+            </div>
+          )}
+          {test.rawCallback && (
+            <details className="text-neutral-500">
+              <summary className="cursor-pointer hover:text-neutral-300">Lihat payload webhook mentah</summary>
+              <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[10px] text-neutral-400">{test.rawCallback}</pre>
+            </details>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }

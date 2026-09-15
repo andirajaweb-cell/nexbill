@@ -28,4 +28,6 @@ registerDict({
   "notifikasi.type.bookingPending": { id: "Booking", en: "Booking", ms: "Tempahan", th: "การจอง", fil: "Booking", vi: "Đặt chỗ" },
   "notifikasi.type.subscriptionTrial": { id: "Langganan", en: "Subscription", ms: "Langganan", th: "การสมัครสมาชิก", fil: "Subscription", vi: "Gói đăng ký" },
   "notifikasi.type.announcement": { id: "Pengumuman", en: "Announcement", ms: "Pengumuman", th: "ประกาศ", fil: "Anunsyo", vi: "Thông báo chung" },
+  "notifikasi.type.shiftVariance": { id: "Selisih Kas", en: "Cash Variance", ms: "Perbezaan Tunai", th: "ส่วนต่างเงินสด", fil: "Kaibahan sa Cash", vi: "Chênh lệch tiền mặt" },
+  "notifikasi.type.maintenanceDue": { id: "Maintenance", en: "Maintenance", ms: "Penyelenggaraan", th: "การบำรุงรักษา", fil: "Maintenance", vi: "Bảo trì" },
 });

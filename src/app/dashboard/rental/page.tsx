@@ -71,15 +71,9 @@ const TV_TYPES = [
   { value: "smart_tv", label: "Smart TV" },
   { value: "analog_tv", label: "TV Analog" },
 ];
-const DURATION_OPTIONS = [
-  { value: "", key: "rental.duration.open", fallback: "Terbuka (tanpa batas waktu)" },
-  { value: "30", key: "rental.duration.30m", fallback: "30 menit" },
-  { value: "60", key: "rental.duration.1h", fallback: "1 jam" },
-  { value: "90", key: "rental.duration.1h30m", fallback: "1,5 jam" },
-  { value: "120", key: "rental.duration.2h", fallback: "2 jam" },
-  { value: "180", key: "rental.duration.3h", fallback: "3 jam" },
-  { value: "240", key: "rental.duration.4h", fallback: "4 jam" },
-];
+// Fixed-duration options used to be hardcoded here (DURATION_OPTIONS) — now sourced per-outlet
+// from Settings > Durasi Rental (/api/rental-duration-presets), see the `durationPresets` state
+// and its useEffect fetch below. "Terbuka (tanpa batas waktu)" stays hardcoded at render time.
 const TIME_WARNING_THRESHOLD_MIN = 5;
 const EXTEND_OPTIONS = [10, 20, 30, 40, 50, 60, 90, 120];
 
@@ -209,8 +203,11 @@ function formatPlayDuration(totalMinutes: number) {
   return `${h} jam ${m} menit`;
 }
 
-/** Live (unrounded) estimate matching the server's estimateAccessoryCharge — pure display math, no writes. */
-function estimateAccessoryCharge(acc: SessionAccessory, now: number) {
+/** Live (unrounded) estimate matching the server's estimateAccessoryCharge — pure display math, no
+ * writes. mode mirrors the outlet's Settings > Pajak & Billing > "Kebijakan Tarif Aksesoris": in
+ * "per_use", the rate is charged once per qty regardless of elapsed time. */
+function estimateAccessoryCharge(acc: SessionAccessory, now: number, mode: "per_hour" | "per_use" = "per_hour") {
+  if (mode === "per_use") return Math.round(acc.qty * acc.ratePerHour);
   const endMs = acc.removedAt ? new Date(acc.removedAt).getTime() : now;
   const hours = Math.max(0, (endMs - new Date(acc.addedAt).getTime()) / 3600000);
   return Math.round(acc.qty * acc.ratePerHour * hours);
@@ -339,6 +336,17 @@ export default function RentalPage() {
   const [voucherMsg, setVoucherMsg] = useState("");
   const [plannedMinutes, setPlannedMinutes] = useState("");
   const [promos, setPromos] = useState<Promo[]>([]);
+  // Outlet-configurable fixed-duration presets (Settings > Durasi Rental) — replaces what used to
+  // be a hardcoded DURATION_OPTIONS list. "Terbuka (tanpa batas waktu)" stays hardcoded below as
+  // the permanent first choice (plannedMinutes = ""), since it drives different billing behavior
+  // (elapsed-time rounding — see stopRentalSession in lib/rental/sessions.ts) rather than being
+  // just another fixed duration; only the timed presets beneath it come from the API.
+  const [durationPresets, setDurationPresets] = useState<{ id: string; minutes: number; label: string; isActive: boolean }[]>([]);
+  // Settings > Pajak & Billing > "Kebijakan Tarif Aksesoris" — governs whether accessory add-ons
+  // (Stick Tambahan, VR, Headset, etc.) bill by elapsed hours or as a flat one-time fee per qty.
+  // Mirrors the server's getAccessoryBillingMode (lib/rental/accessories.ts) so the running
+  // estimate shown here never disagrees with what stopRentalSession actually bills.
+  const [accessoryBillingMode, setAccessoryBillingMode] = useState<"per_hour" | "per_use">("per_hour");
   const [selectedPromoId, setSelectedPromoId] = useState<string | null>(null);
   // "Bayar Dimuka" — optional prepayment collected right when a session starts (see
   // StartSessionInput.prepay in lib/rental/sessions.ts). Only cash/qris are offered here.
@@ -447,9 +455,10 @@ export default function RentalPage() {
   };
 
   useEffect(() => {
-    fetchJsonObject<{ id: string }>("/api/outlets/default").then((o) => {
+    fetchJsonObject<{ id: string; accessoryBillingMode?: "per_hour" | "per_use" }>("/api/outlets/default").then((o) => {
       if (!o) return;
       setOutletId(o.id);
+      setAccessoryBillingMode(o.accessoryBillingMode ?? "per_hour");
       // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
       fetchJsonArray(`/api/payment-methods?outletId=${o.id}`).then((rows) => {
         const active = rows.filter((m: any) => m.isActive);
@@ -459,6 +468,8 @@ export default function RentalPage() {
       fetchJsonArray<Promo>("/api/promos").then((rows) => {
         setPromos(rows.filter((p) => p.outletId === o.id));
       });
+      // Fixed-duration presets from Settings > Durasi Rental (see doc comment on durationPresets state).
+      fetchJsonArray<{ id: string; minutes: number; label: string; isActive: boolean }>(`/api/rental-duration-presets?outletId=${o.id}`).then(setDurationPresets);
       loadWidgets(o.id);
     });
     fetchJsonArray("/api/products").then((rows) => setProducts(rows.filter((p: Product) => p.isActive)));
@@ -1294,7 +1305,7 @@ export default function RentalPage() {
             const elapsedHours = session ? Math.max(0, (Date.now() - new Date(session.startedAt).getTime() - effectivePauseMs) / 3600000) : 0;
             const rentalEstimate = session ? Math.round(elapsedHours * session.ratePerHour) : 0;
             const sessionAccessories = session ? accessories[session.id] ?? [] : [];
-            const accessoryEstimate = sessionAccessories.reduce((s, a) => s + estimateAccessoryCharge(a, Date.now()), 0);
+            const accessoryEstimate = sessionAccessories.reduce((s, a) => s + estimateAccessoryCharge(a, Date.now(), accessoryBillingMode), 0);
             const runningTotal = (bill?.fnbSubtotal ?? 0) + rentalEstimate + accessoryEstimate;
 
             const allowedMinutes = session?.plannedMinutes ? session.plannedMinutes + session.extendedMinutes : null;
@@ -1432,9 +1443,9 @@ export default function RentalPage() {
                       <div className="rounded-lg border border-white/10 p-2 space-y-1">
                         {sessionAccessories.map((a) => (
                           <div key={a.id} className="flex items-center justify-between text-xs">
-                            <span>{a.name} x{a.qty} <span className="text-neutral-500">({rupiah(a.ratePerHour)}{t("rental.perHourSuffix", "/jam")})</span></span>
+                            <span>{a.name} x{a.qty} <span className="text-neutral-500">({rupiah(a.ratePerHour)}{accessoryBillingMode === "per_use" ? t("rental.perUseSuffix", "/pemakaian") : t("rental.perHourSuffix", "/jam")})</span></span>
                             <div className="flex items-center gap-2">
-                              <span className="text-neutral-400">{rupiah(estimateAccessoryCharge(a, Date.now()))}</span>
+                              <span className="text-neutral-400">{rupiah(estimateAccessoryCharge(a, Date.now(), accessoryBillingMode))}</span>
                               <button className="text-rose-400" onClick={() => returnAccessory(a.id)}>{t("rental.returnAccessory", "Kembalikan")}</button>
                             </div>
                           </div>
@@ -1479,7 +1490,7 @@ export default function RentalPage() {
                           <input
                             type="number"
                             className="rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-xs"
-                            placeholder={t("rental.ratePerHourPlaceholder", "Tarif/jam")}
+                            placeholder={accessoryBillingMode === "per_use" ? t("rental.ratePerUsePlaceholder", "Harga/pemakaian") : t("rental.ratePerHourPlaceholder", "Tarif/jam")}
                             value={accessoryForm.ratePerHour || ""}
                             onChange={(e) => setAccessoryForm((f) => ({ ...f, ratePerHour: Number(e.target.value) }))}
                           />
@@ -1631,7 +1642,10 @@ export default function RentalPage() {
                     value={plannedMinutes}
                     onChange={(e) => { setPlannedMinutes(e.target.value); setSelectedPromoId(null); }}
                   >
-                    {DURATION_OPTIONS.map((d) => <option key={d.value} value={d.value}>{t(d.key, d.fallback)}</option>)}
+                    <option value="">{t("rental.duration.open", "Terbuka (tanpa batas waktu)")}</option>
+                    {durationPresets.filter((d) => d.isActive).sort((a, b) => a.minutes - b.minutes).map((d) => (
+                      <option key={d.id} value={String(d.minutes)}>{d.label}</option>
+                    ))}
                   </select>
                   {selectedPromoId && (
                     <p className="text-[10px] text-cyan-300">{t("rental.packageFlatRateNote", "Paket dipilih — harga flat otomatis diterapkan saat sesi selesai (bukan per-jam).")}</p>

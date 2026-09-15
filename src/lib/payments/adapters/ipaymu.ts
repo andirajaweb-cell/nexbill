@@ -40,6 +40,17 @@ import { PaymentGateway, PaymentMethod, PaymentRequest, PaymentResult } from "..
  *   IPAYMU_PROXY_SECRET required alongside IPAYMU_PROXY_URL — shared Bearer secret the proxy
  *                       script checks, same pattern as RELAY_HUB_DISPATCH_SECRET.
  *
+ *   IPAYMU_SANDBOX_BASE_URL / IPAYMU_SANDBOX_VA / IPAYMU_SANDBOX_API_KEY — added 2026-09-14,
+ *                       COMPLETELY SEPARATE from the IPAYMU_* production vars above, used ONLY by
+ *                       createIpaymuSandboxTestCheckout() / Platform Admin > iPaymu's "Ujicoba
+ *                       Transaksi Sandbox" panel. Lets a Superuser run a real checkout->pay->webhook
+ *                       round trip against sandbox.ipaymu.com (a dummy Rp10.000 test transaction)
+ *                       any time, without touching IPAYMU_VA/IPAYMU_API_KEY, without needing the
+ *                       static-IP proxy (sandbox has no IP/domain whitelist requirement — see
+ *                       below), and without creating any real order/subscription-invoice row.
+ *                       Register these separately at sandbox.ipaymu.com — they are NOT the same
+ *                       credentials as production and will not work if pointed at IPAYMU_BASE_URL.
+ *
  * If IPAYMU_BASE_URL/IPAYMU_VA/IPAYMU_API_KEY are not all set, every gateway below runs in MOCK
  * MODE so the POS/rental checkout flow can be developed/demoed without a live iPaymu account.
  *
@@ -55,6 +66,25 @@ import { PaymentGateway, PaymentMethod, PaymentRequest, PaymentResult } from "..
 
 function isConfigured() {
   return Boolean(process.env.IPAYMU_BASE_URL && process.env.IPAYMU_VA && process.env.IPAYMU_API_KEY);
+}
+
+/** Sandbox counterpart to isConfigured() — see the top-of-file doc comment on IPAYMU_SANDBOX_*. */
+function isSandboxConfigured() {
+  return Boolean(process.env.IPAYMU_SANDBOX_BASE_URL && process.env.IPAYMU_SANDBOX_VA && process.env.IPAYMU_SANDBOX_API_KEY);
+}
+
+/** Resolves which credential set a request should use — production (default, used by every
+ * existing gateway/call site below) or sandbox (only createIpaymuSandboxTestCheckout passes
+ * sandbox: true). Kept as one function so nothing else has to duplicate the env-var names. */
+function resolveIpaymuCreds(sandbox: boolean): { baseUrl?: string; va?: string; apiKey?: string } {
+  if (sandbox) {
+    return {
+      baseUrl: process.env.IPAYMU_SANDBOX_BASE_URL || "https://sandbox.ipaymu.com",
+      va: process.env.IPAYMU_SANDBOX_VA,
+      apiKey: process.env.IPAYMU_SANDBOX_API_KEY,
+    };
+  }
+  return { baseUrl: process.env.IPAYMU_BASE_URL, va: process.env.IPAYMU_VA, apiKey: process.env.IPAYMU_API_KEY };
 }
 
 /**
@@ -120,8 +150,15 @@ async function parseIpaymuResponse(res: Response): Promise<any> {
  * re-issues that request from its own (static, whitelisted) IP and hands the raw status+body back,
  * which is reassembled into a real Response here so parseIpaymuResponse above needs zero changes.
  */
-async function ipaymuFetch(url: string, init: { method: "GET" | "POST"; headers: Record<string, string>; body?: string }): Promise<Response> {
-  const proxyUrl = process.env.IPAYMU_PROXY_URL;
+async function ipaymuFetch(
+  url: string,
+  init: { method: "GET" | "POST"; headers: Record<string, string>; body?: string },
+  opts: { skipProxy?: boolean } = {}
+): Promise<Response> {
+  // Sandbox test traffic always skips the proxy — sandbox.ipaymu.com has no static-IP requirement
+  // (see top-of-file doc comment), and routing a Superuser's one-off test transaction through the
+  // production VPS proxy would add a pointless extra hop and a shared failure point with real traffic.
+  const proxyUrl = opts.skipProxy ? undefined : process.env.IPAYMU_PROXY_URL;
   if (!proxyUrl) return fetch(url, init);
 
   const proxySecret = process.env.IPAYMU_PROXY_SECRET;
@@ -143,17 +180,20 @@ async function ipaymuFetch(url: string, init: { method: "GET" | "POST"; headers:
   return new Response(relayed.bodyText ?? "", { status: relayed.status ?? 502, headers: { "Content-Type": "application/json" } });
 }
 
-async function ipaymuRequest(path: string, body: Record<string, unknown>): Promise<any> {
-  const va = process.env.IPAYMU_VA!;
-  const apiKey = process.env.IPAYMU_API_KEY!;
+async function ipaymuRequest(path: string, body: Record<string, unknown>, sandbox = false): Promise<any> {
+  const { baseUrl, va, apiKey } = resolveIpaymuCreds(sandbox);
   const jsonBody = JSON.stringify(body);
-  const signature = buildSignature(va, apiKey, jsonBody);
+  const signature = buildSignature(va!, apiKey!, jsonBody);
 
-  const res = await ipaymuFetch(`${process.env.IPAYMU_BASE_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", va, signature, timestamp: ipaymuTimestamp() },
-    body: jsonBody,
-  });
+  const res = await ipaymuFetch(
+    `${baseUrl}${path}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", va: va!, signature, timestamp: ipaymuTimestamp() },
+      body: jsonBody,
+    },
+    { skipProxy: sandbox }
+  );
 
   return parseIpaymuResponse(res);
 }
@@ -329,6 +369,51 @@ function createIpaymuRedirectGateway(config: { method: "ipaymu_crossborder" | "i
 export const ipaymuCrossBorderGateway: PaymentGateway = createIpaymuRedirectGateway({ method: "ipaymu_crossborder", refPrefix: "IPAYMU-XB", lockToCard: true });
 export const ipaymuHostedGateway: PaymentGateway = createIpaymuRedirectGateway({ method: "ipaymu_hosted", refPrefix: "IPAYMU-HOSTED", lockToCard: false });
 
+export interface IpaymuSandboxCheckoutResult {
+  configured: boolean;
+  checkoutUrl?: string;
+  referenceId?: string;
+  error?: string;
+}
+
+/**
+ * "Ujicoba Transaksi Sandbox" — Platform Admin > iPaymu. Creates a REAL Redirect Payment request
+ * against sandbox.ipaymu.com (never production, never the IPAYMU_VA/IPAYMU_API_KEY pair) so a
+ * Superuser can walk through the full checkout -> pay -> webhook round trip risk-free. Isolation
+ * from real data is deliberate at every layer:
+ *  - Separate credentials (IPAYMU_SANDBOX_*, see top-of-file doc comment).
+ *  - Separate notify/return/cancel URLs, pointing at this feature's own
+ *    /api/platform-admin/ipaymu/sandbox-test/* routes — never the real POS or subscription webhooks.
+ *  - referenceId is always prefixed "NEXBILL-SANDBOXTEST-" so even if a URL were ever misregistered,
+ *    the sandbox webhook route only ever touches its own platformIpaymuSandboxTests rows.
+ * Amount is fixed and small (see the route's TEST_AMOUNT) — this only ever needs to prove the
+ * plumbing works, not exercise arbitrary amounts.
+ */
+export async function createIpaymuSandboxTestCheckout(referenceId: string, amount: number): Promise<IpaymuSandboxCheckoutResult> {
+  if (!isSandboxConfigured()) return { configured: false };
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const description = "NEXBILL Sandbox Test";
+  const body: Record<string, unknown> = {
+    product: [description],
+    qty: [1],
+    price: [amount],
+    description: [description],
+    referenceId,
+    returnUrl: `${appUrl}/platform-admin/ipaymu?sandboxTest=${referenceId}`,
+    notifyUrl: `${appUrl}/api/platform-admin/ipaymu/sandbox-test/webhook`,
+    cancelUrl: `${appUrl}/platform-admin/ipaymu?sandboxTest=${referenceId}`,
+  };
+
+  try {
+    const data = await ipaymuRequest("/api/v2/payment", body, true);
+    const d = data?.Data ?? {};
+    return { configured: true, checkoutUrl: d.Url ?? undefined, referenceId };
+  } catch (err: any) {
+    return { configured: true, error: err?.message ?? String(err) };
+  }
+}
+
 export interface IpaymuConnectionCheck {
   configured: boolean;
   baseUrl?: string;
@@ -475,11 +560,17 @@ export function normalizeIpaymuCallback(raw: Record<string, unknown>): Record<st
  * Takes an ALREADY-normalized payload (run it through normalizeIpaymuCallback first) — the caller
  * needs that same normalized object afterward anyway to read the actual status fields, so this
  * doesn't re-normalize internally (idempotent either way, but doing it twice was just wasted work).
+ *
+ * `options.sandbox` (added 2026-09-14, default false — every existing caller is unaffected) checks
+ * against IPAYMU_SANDBOX_VA instead of IPAYMU_VA — used only by the Platform Admin sandbox-test
+ * webhook route, which must never accept a signature that was actually computed with the
+ * production VA (or vice versa).
  */
-export function verifyIpaymuWebhookSignature(normalizedBody: Record<string, unknown>, signatureHeader: string | null): boolean {
-  if (!isConfigured()) return true; // mock mode — accept all for local testing
+export function verifyIpaymuWebhookSignature(normalizedBody: Record<string, unknown>, signatureHeader: string | null, options: { sandbox?: boolean } = {}): boolean {
+  const sandbox = options.sandbox ?? false;
+  if (sandbox ? !isSandboxConfigured() : !isConfigured()) return true; // mock mode — accept all for local testing
   if (!signatureHeader) return false;
-  const va = process.env.IPAYMU_VA!;
+  const va = (sandbox ? process.env.IPAYMU_SANDBOX_VA : process.env.IPAYMU_VA)!;
 
   const sortedKeys = Object.keys(normalizedBody)
     .filter((k) => k !== "signature")

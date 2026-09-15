@@ -435,10 +435,30 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           "Status agent (online/offline + terakhir aktif) terlihat di daftar. Hapus agent hanya bisa dilakukan setelah TV yang mengacu ke agent itu dipindahkan dulu.",
         ],
       },
+      {
+        title: "Tuya Cloud API Milik Sendiri (wajib untuk outlet baru)",
+        navHint: "Pengaturan → Bisnis & Pajak → kartu \"Integrasi Tuya Cloud API\"",
+        intro:
+          "Kalau outlet ini pakai smart plug Tuya Smart Life (bukan Tasmota/hardware NEXBILL), setiap outlet WAJIB mengisi akun Tuya Cloud API-nya sendiri — bukan lagi berbagi satu akun dengan outlet lain. Ini penting karena Tuya membatasi langganan Trial-nya per akun (bukan per outlet): kalau semua outlet berbagi satu akun, satu outlet yang lupa perpanjang bisa mematikan smart plug SEMUA outlet lain sekaligus. Dengan akun sendiri, masalah di satu outlet tidak menyebar ke outlet lain.",
+        steps: [
+          "Buka developer.tuya.com atau iot.tuya.com, daftar akun (bisa pakai email apa saja, gratis), lalu buat Cloud Project baru (Cloud → Create Cloud Project → pilih Data Center \"Singapore\" untuk outlet di Indonesia/Malaysia/Thailand/Vietnam).",
+          "Di dalam Cloud Project, buka tab \"Devices\" → \"Link Tuya App Account\", lalu scan QR code pakai aplikasi Smart Life/Tuya tempat smart plug outlet ini terdaftar. Semua device yang sudah dipasang di app akan otomatis muncul di project ini — tidak perlu pasang ulang device secara fisik.",
+          "Aktifkan langganan API dulu di tab \"Service API\" project ini: cari \"IoT Core\", klik Subscribe/Get Free Trial (gratis, tapi baca risikonya di bawah).",
+          "Salin \"Access ID/Client ID\" dan \"Access Secret/Client Secret\" dari halaman Overview project, lalu tempel ke Pengaturan → Bisnis & Pajak → kartu \"Integrasi Tuya Cloud API\" di NEXBILL, pilih region \"Singapore\", simpan.",
+          "Uji nyala/mati device Tuya seperti biasa di halaman Kontrol Perangkat untuk memastikan koneksinya jalan.",
+        ],
+        notes: [
+          "Risiko #1 — Trial hanya aktif ~1 bulan dan wajib diperpanjang manual: kalau lupa, error yang muncul biasanya \"IoT Core service subscription has expired\" dan SEMUA smart plug Tuya outlet ini langsung berhenti merespon (nyala/mati tidak berfungsi) sampai diperpanjang.",
+          "Risiko #2 — Trial dibatasi maksimal 10 device yang bisa dikontrol (bukan sekadar terdaftar). Kalau outlet ini punya lebih dari 10 smart plug Tuya, sebagian tidak akan bisa dikontrol sampai upgrade ke tier berbayar (Flagship/Corporate, harga mulai jutaan Rupiah per tahun — jauh lebih murah dipertimbangkan untuk pindah ke smart plug Tasmota/hardware NEXBILL kalau sudah di skala ini).",
+          "Cara cepat memperpanjang Trial: masuk ke iot.tuya.com → Cloud → pilih project → tab \"Service API\" → cari baris \"IoT Core\" → klik \"Extend Trial Period\" (biasanya butuh 1-2 hari untuk direview/disetujui Tuya, jadi jangan tunggu sampai H-1 kadaluarsa). Cek statusnya di menu \"Subscription\"/\"My Subscriptions\" pada akun yang sama.",
+          "Cara ganti akun/email Tuya Cloud API (mis. karyawan yang buat akun lama sudah resign, atau mau pindah ke email bisnis): TIDAK perlu memasang ulang device secara fisik. Cukup buat Cloud Project baru di akun/email yang baru, ulangi langkah \"Link Tuya App Account\" pakai app Smart Life yang SAMA (device ikut app account, bukan ikut Cloud Project lama), aktifkan IoT Core di project baru, lalu ganti Access ID/Secret di Pengaturan NEXBILL dengan yang baru. Device langsung kembali terkontrol begitu kredensial baru disimpan.",
+          "Rekomendasi: catat tanggal expired Trial di kalender/pengingat sendiri (NEXBILL belum mengirim notifikasi otomatis untuk ini), dan kalau outlet sudah punya banyak smart plug atau berencana tambah terus, pertimbangkan pindah bertahap ke smart plug Tasmota/hardware resmi NEXBILL (kontrol lokal, tidak tergantung langganan cloud pihak ketiga sama sekali) — lihat halaman Langganan untuk info hardware.",
+          "Pengecualian: satu-dua outlet lama yang sudah lebih dulu terhubung ke akun Tuya Cloud API bersama milik NEXBILL (sebelum aturan \"akun sendiri\" ini berlaku) boleh tetap begitu — kalau ini berlaku untuk outlet-mu, kartu Integrasi Tuya di Pengaturan akan menunjukkan field Access ID/Secret boleh dikosongkan; kalau tidak yakin, hubungi Customer Service NEXBILL.",
+        ],
+      },
     ],
     notes: [
       "Staf tanpa izin manage_devices hanya bisa menyalakan/mematikan — tombol tambah/edit/hapus/hubungkan disembunyikan total.",
-      "Perangkat Tuya Smart Life dikendalikan lewat SATU akun Tuya Cloud API bersama milik NEXBILL, dipakai untuk semua outlet/merchant di semua negara — bukan akun per-outlet. Outlet tidak perlu (dan tidak bisa) mengatur kredensial Tuya sendiri; cukup pasang device di aplikasi Smart Life lalu hubungi NEXBILL support untuk didaftarkan.",
     ],
     roles: "manage_devices: Owner, Superuser, Manager, Supervisor (tidak termasuk Cashier/Accountant/Kitchen).",
   },

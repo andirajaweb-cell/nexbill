@@ -100,6 +100,7 @@ registerDict({
   "rental.accessoryNamePlaceholder": { id: "Nama aksesoris", en: "Accessory name", ms: "Nama aksesori", th: "ชื่ออุปกรณ์เสริม", fil: "Pangalan ng accessory", vi: "Tên phụ kiện" },
   "rental.qtyLabel": { id: "Jumlah", en: "Qty", ms: "Kuantiti", th: "จำนวน", fil: "Dami", vi: "Số lượng" },
   "rental.ratePerHourPlaceholder": { id: "Tarif/jam", en: "Rate/hr", ms: "Kadar/jam", th: "อัตรา/ชม.", fil: "Rate/oras", vi: "Giá/giờ" },
+  "rental.ratePerUsePlaceholder": { id: "Harga/pemakaian", en: "Price/use", ms: "Harga/penggunaan", th: "ราคา/การใช้งาน", fil: "Presyo/gamit", vi: "Giá/lượt dùng" },
   "rental.addAccessoryButton": { id: "Tambah Aksesoris", en: "Add Accessory", ms: "Tambah Aksesori", th: "เพิ่มอุปกรณ์เสริม", fil: "Magdagdag ng Accessory", vi: "Thêm phụ kiện" },
   "rental.closeMenu": { id: "Tutup Menu", en: "Close Menu", ms: "Tutup Menu", th: "ปิดเมนู", fil: "Isara ang Menu", vi: "Đóng thực đơn" },
   "rental.addFnbToggle": { id: "+ F&B", en: "+ F&B", ms: "+ F&B", th: "+ F&B", fil: "+ F&B", vi: "+ F&B" },
@@ -154,6 +155,7 @@ registerDict({
 
   // --- Shared suffix ---
   "rental.perHourSuffix": { id: "/jam", en: "/hr", ms: "/jam", th: "/ชม.", fil: "/oras", vi: "/giờ" },
+  "rental.perUseSuffix": { id: "/pemakaian", en: "/use", ms: "/penggunaan", th: "/การใช้งาน", fil: "/gamit", vi: "/lượt dùng" },
 
   // --- Alerts / confirms / toasts ---
   "rental.dpReceivedToast": { id: "DP {amount} ({method}) diterima.", en: "Down payment {amount} ({method}) received.", ms: "Bayaran pendahuluan {amount} ({method}) diterima.", th: "รับมัดจำ {amount} ({method}) แล้ว", fil: "Natanggap na ang DP {amount} ({method}).", vi: "Đã nhận đặt cọc {amount} ({method})." },

@@ -22,6 +22,15 @@ export const outlets = pgTable("outlets", {
   wifiSsid: text("wifi_ssid"),
   wifiPassword: text("wifi_password"),
   billingRoundingMinutes: integer("billing_rounding_minutes").notNull().default(15),
+  // Settings > Pajak & Billing > "Kebijakan Tarif Aksesoris" — added 2026-09-14. Governs how
+  // sessionAccessories.ratePerHour is actually charged at billing time (see
+  // lib/rental/accessories.ts's estimateAccessoryCharge/finalizeAccessoryCharges, and the matching
+  // client-side estimate in dashboard/rental/page.tsx): "per_hour" (default, existing behavior)
+  // multiplies the rate by hours held; "per_use" charges the stored rate as a flat one-time fee per
+  // qty regardless of how long the accessory was out. The column on sessionAccessories itself is
+  // deliberately NOT renamed — it's reused as "flat price per use" when this is "per_use", to avoid
+  // a bigger migration for what's still conceptually "the price entered for this accessory".
+  accessoryBillingMode: text("accessory_billing_mode", { enum: ["per_hour", "per_use"] }).notNull().default("per_hour"),
   serviceChargePercent: doublePrecision("service_charge_percent").notNull().default(0),
   taxPercent: doublePrecision("tax_percent").notNull().default(0),
   expenseApprovalThreshold: doublePrecision("expense_approval_threshold").notNull().default(500000),
@@ -87,6 +96,24 @@ export const outlets = pgTable("outlets", {
   // Per-unit override lives on rentalUnits.maintenanceThresholdHours (null = use this default).
   defaultMaintenanceThresholdHours: integer("default_maintenance_threshold_hours").notNull().default(300),
   notifyMaintenanceDue: boolean("notify_maintenance_due").notNull().default(true),
+  // Tuya Cloud API — per-outlet own account (added 2026-09-15, see lib/devices/adapters/tuya.ts).
+  // Every NEW outlet using the "tuya" device protocol is now required to bring its own Tuya IoT
+  // Platform Cloud Project (own Access ID/Secret) instead of sharing NEXBILL's platform-wide
+  // account — this isolates subscription risk (Trial expiry, the 10-controllable-device cap) to
+  // just that one outlet instead of pooling it across every outlet on the platform. Filled in via
+  // Settings > Integrasi Tuya Cloud API by the outlet itself.
+  tuyaAccessId: text("tuya_access_id"),
+  tuyaAccessSecret: text("tuya_access_secret"),
+  tuyaProjectCode: text("tuya_project_code"),
+  tuyaRegion: text("tuya_region", { enum: ["cn", "us", "us_e", "eu", "eu_w", "in", "sg"] }).notNull().default("sg"),
+  // Legacy exception, platform-admin-only (NOT exposed to the outlet itself) — when true, this
+  // outlet keeps using the old shared `platformTuyaAccount` instead of requiring its own
+  // credentials above, even though it's empty. Exists for exactly one outlet as of this writing
+  // (Xtream Playstation, already connected via the pre-existing shared account) and must stay
+  // false (the default) for every other outlet, including all new signups — deliberately a DB
+  // flag toggled per-outlet from /platform-admin/outlets/[id] (mirrors the free-forever toggle
+  // pattern) rather than a hardcoded outlet id/name, so it's auditable and reversible.
+  tuyaUseSharedPlatformAccount: boolean("tuya_use_shared_platform_account").notNull().default(false),
   ...timestamps,
 });
 
@@ -165,6 +192,33 @@ export const relayAgents = pgTable("relay_agents", {
   token: text("token").notNull().unique(),
   status: text("status", { enum: ["online", "offline"] }).notNull().default("offline"),
   lastSeenAt: text("last_seen_at"),
+  ...timestamps,
+});
+
+/**
+ * NEXBILL-branded smart plug program (private-label ESP8266/Tasmota hardware — added 2026-09-15,
+ * see the "masuk ke bisnis hardware" decision) — each physical unit is pre-flashed BEFORE shipping
+ * with a deterministic MQTT topic derived from its own serialNumber (see mqttTopicFor() in
+ * lib/hardware/units.ts), so no outlet ever has to type/match an MQTT topic by hand and topic
+ * collisions across outlets are impossible by construction (unlike a self-supplied Tasmota plug,
+ * which still goes through the manual-topic + assertMqttTopicGloballyUnique path in
+ * app/api/devices/route.ts).
+ *
+ * Row lifecycle: "unclaimed" (generated here, printed as a QR/serial label, physically flashed and
+ * shipped) -> "claimed" (an outlet enters the serial in Kontrol Perangkat, see
+ * app/api/devices/claim-hardware/route.ts, which creates the matching `devices` row and links it
+ * back here via claimedDeviceId) -> "retired" (unit reported dead/returned; serial and topic are
+ * never reused, so a retired unit can never be re-claimed onto a different outlet by mistake).
+ */
+export const nexbillHardwareUnits = pgTable("nexbill_hardware_units", {
+  id: id(),
+  serialNumber: text("serial_number").notNull().unique(),
+  mqttTopic: text("mqtt_topic").notNull().unique(),
+  batchLabel: text("batch_label"), // free-text QC/shipment batch tag, e.g. "2026-09-batch1"
+  status: text("status", { enum: ["unclaimed", "claimed", "retired"] }).notNull().default("unclaimed"),
+  claimedOutletId: text("claimed_outlet_id").references(() => outlets.id),
+  claimedDeviceId: text("claimed_device_id").references(() => devices.id),
+  claimedAt: text("claimed_at"),
   ...timestamps,
 });
 
@@ -454,6 +508,12 @@ export const orderItems = pgTable(
     id: id(),
     orderId: text("order_id").notNull().references(() => orders.id),
     productId: text("product_id").references(() => products.id),
+    // Links a "rental" item back to the exact rentalSessions row it was billed from, so the
+    // Detail Transaksi modal can show billing start/stop time even when multiple rental items
+    // from different sessions have been merged into one order (see mergeOrders()). orders.rentalSessionId
+    // is a single order-level FK and becomes null/ambiguous in that merged case — this per-item
+    // column is what makes per-item start/stop time reliable.
+    rentalSessionId: text("rental_session_id").references(() => rentalSessions.id),
     description: text("description").notNull(),
     qty: integer("qty").notNull().default(1),
     unitPrice: doublePrecision("unit_price").notNull(),
@@ -580,6 +640,34 @@ export const platformTuyaAccount = pgTable("platform_tuya_account", {
   accessSecret: text("access_secret"),
   projectCode: text("project_code"),
   region: text("region", { enum: ["cn", "us", "us_e", "eu", "eu_w", "in", "sg"] }).notNull().default("sg"),
+  // Capacity guardrail (added 2026-09-15) — Tuya's own "controllable devices" ceiling for
+  // whichever tier this shared account's subscription is on (Trial = 10, Flagship = 30,000, etc;
+  // see /platform-admin/tuya's copy for the tier table). Every outlet flagged
+  // tuyaUseSharedPlatformAccount draws from this ONE pool, so without an explicit count-and-block
+  // check here, several outlets could each add a couple of Tuya plugs and quietly blow past
+  // Tuya's real limit with no warning until one of them just fails to connect. See
+  // assertSharedTuyaCapacityAvailable() in lib/devices/adapters/tuya.ts — update this number
+  // whenever the shared account's Tuya subscription tier changes.
+  maxControllableDevices: integer("max_controllable_devices").notNull().default(10),
+  ...timestamps,
+});
+
+/**
+ * Ephemeral log for Platform Admin > iPaymu's "Ujicoba Transaksi Sandbox" panel (added
+ * 2026-09-14) — lets a Superuser run a REAL checkout->pay->webhook round trip against
+ * sandbox.ipaymu.com (using the completely separate IPAYMU_SANDBOX_* credentials, never
+ * IPAYMU_VA/IPAYMU_API_KEY) without touching any real outlet's orders/payments or
+ * subscriptionInvoices. One row per test transaction; rows are safe to purge anytime — they're
+ * only read back by referenceId for the polling UI immediately after a test, nothing else in the
+ * app ever queries this table.
+ */
+export const platformIpaymuSandboxTests = pgTable("platform_ipaymu_sandbox_tests", {
+  id: id(),
+  referenceId: text("reference_id").notNull().unique(),
+  amount: doublePrecision("amount").notNull(),
+  status: text("status", { enum: ["pending", "success", "failed"] }).notNull().default("pending"),
+  rawCallback: text("raw_callback"),
+  createdByPlatformAdminId: text("created_by_platform_admin_id"),
   ...timestamps,
 });
 
@@ -893,6 +981,32 @@ export const units = pgTable(
   (t) => [uniqueIndex("units_outlet_code_idx").on(t.outletId, t.code)]
 );
 
+/**
+ * Per-outlet fixed-duration presets for the "Durasi" dropdown when starting a rental session
+ * (dashboard/rental) — added 2026-09-13, replacing a hardcoded 30/60/90/120/180/240-minute list
+ * so each outlet can add/remove/relabel/deactivate its own set (e.g. add "45 menit", drop "1,5
+ * jam"). `minutes` is copied directly onto rentalSessions.plannedMinutes when a session starts —
+ * NOT stored as a foreign key on the session, so editing or deleting a preset here never affects
+ * any session already running or already billed (see stopRentalSession's plannedMinutes branch in
+ * lib/rental/sessions.ts, which bills a fixed-duration session exactly, no rounding). "Terbuka
+ * (tanpa batas waktu)" is NOT a row in this table — it's a fixed, always-first, non-removable
+ * choice hardcoded in the rental page (plannedMinutes stays null), since it drives genuinely
+ * different billing behavior (elapsed-time rounding) rather than just being another preset value.
+ */
+export const rentalDurationPresets = pgTable(
+  "rental_duration_presets",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    minutes: integer("minutes").notNull(),
+    label: text("label").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("rental_duration_presets_outlet_minutes_idx").on(t.outletId, t.minutes)]
+);
+
 export const cashMovements = pgTable("cash_movements", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),
@@ -1163,6 +1277,11 @@ export const purchaseInvoices = pgTable(
     // glance from a normal unpaid/partial/paid invoice.
     status: text("status", { enum: ["unpaid", "partial", "paid", "cancelled"] }).notNull().default("unpaid"),
     journalEntryId: text("journal_entry_id"),
+    // Who actually recorded this purchase (the outlet staffer who ran "Belanja Supplier" — see
+    // recordSupplierPurchase in lib/inventory/purchasing.ts) — added 2026-09-13 for the same
+    // audit-trail reason as expenses.staffUserId. Nullable: rows created before this column
+    // existed have no creator on file and just show as "-" in the UI.
+    staffUserId: text("staff_user_id").references(() => staffUsers.id),
     ...timestamps,
   },
   (t) => [index("purchase_invoices_outlet_status_idx").on(t.outletId, t.status)]

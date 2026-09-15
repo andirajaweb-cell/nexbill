@@ -1,17 +1,25 @@
 import crypto from "crypto";
+import { eq, and, or, isNull, ne } from "drizzle-orm";
 import { db } from "@/db/client";
-import { platformTuyaAccount } from "@/db/schema";
+import { platformTuyaAccount, outlets, devices } from "@/db/schema";
 import { DeviceAdapter, DeviceRecord, DevicePowerState } from "../types";
 
 /**
  * Real Tuya IoT Platform (cloud.tuya.com) OpenAPI v1.0 adapter — HMAC-SHA256 signed requests per
- * Tuya's official signing spec. Credentials (Access ID/Secret + region) live in the SINGLE
- * `platformTuyaAccount` row (see schema.ts) — one shared Cloud Project used to control devices
- * for every outlet/merchant across every country, set from /platform-admin/tuya. NOT scoped to
- * an outlet, NOT hardcoded here — an outlet only ever stores its own device's Tuya `deviceId`
- * (and optionally a non-default DP switch code) in `devices.config` as JSON:
- * { "deviceId": "...", "switchCode": "switch_1" }; the account that talks to Tuya's API is
- * always this one shared account.
+ * Tuya's official signing spec.
+ *
+ * Credentials resolution (changed 2026-09-15 — see outlets.tuyaAccessId's doc comment in
+ * schema.ts): every outlet is looked up first for its OWN Access ID/Secret/region — this is now
+ * required for any NEW outlet using the "tuya" protocol, so each merchant owns its own Tuya
+ * subscription risk (Trial expiry, the 10-controllable-device cap) instead of pooling it onto one
+ * shared account for the whole platform. Only if the outlet has no credentials of its own AND is
+ * explicitly flagged `tuyaUseSharedPlatformAccount` (a platform-admin-only exception — currently
+ * just the legacy "Xtream Playstation" outlet, already running on the old shared account) does
+ * this fall back to the single `platformTuyaAccount` row set from /platform-admin/tuya. Any other
+ * outlet with neither gets a clear error telling it to set up its own Tuya Cloud API.
+ *
+ * Either way, an outlet only ever stores its own device's Tuya `deviceId` (and optionally a
+ * non-default DP switch code) in `devices.config` as JSON: { "deviceId": "...", "switchCode": "switch_1" }.
  */
 
 // Matches Tuya IoT Platform's actual data center endpoints. The region picked
@@ -62,12 +70,79 @@ export async function getOrCreatePlatformTuyaAccount() {
   return created;
 }
 
-async function getCreds(): Promise<TuyaCreds> {
-  const [row] = await db.select().from(platformTuyaAccount).limit(1);
-  if (!row?.accessId || !row?.accessSecret) {
-    throw new Error("Tuya Cloud API belum diatur — hubungi NEXBILL, akun Tuya Cloud API bersama belum dikonfigurasi di platform-admin.");
+/**
+ * Guardrail against silently exceeding the shared account's real Tuya-side device cap (added
+ * 2026-09-15). Every outlet flagged `tuyaUseSharedPlatformAccount` (and without its own
+ * credentials — see getCreds() below) draws from the SAME Tuya Cloud Project. Without this check,
+ * several such outlets could each add a couple of Tuya plugs and quietly sail past Tuya's real
+ * "controllable devices" ceiling (10 on Trial) with zero warning until one of them just fails to
+ * connect — a confusing, hard-to-diagnose support ticket instead of a clear message at the moment
+ * the device is added. Only ever relevant for the legacy shared-account exception; an outlet on
+ * its own Tuya Cloud API is never subject to this (that's the whole point of the per-outlet
+ * model — see the doc comment at the top of this file).
+ *
+ * Call BEFORE inserting/updating a device to "tuya" — throws instead of letting it through, so
+ * the failure surfaces as a normal form validation error, not a Tuya API 400 three steps later.
+ */
+export async function assertSharedTuyaCapacityAvailable(outletId: string, excludeDeviceId?: string): Promise<void> {
+  const [outlet] = await db
+    .select({ tuyaAccessId: outlets.tuyaAccessId, tuyaAccessSecret: outlets.tuyaAccessSecret, tuyaUseSharedPlatformAccount: outlets.tuyaUseSharedPlatformAccount })
+    .from(outlets)
+    .where(eq(outlets.id, outletId))
+    .limit(1);
+
+  // Not on the shared pool at all (own credentials, or no exception flag) — nothing to guard.
+  if (!outlet?.tuyaUseSharedPlatformAccount) return;
+  if (outlet.tuyaAccessId && outlet.tuyaAccessSecret) return;
+
+  const account = await getOrCreatePlatformTuyaAccount();
+  const conditions = [
+    eq(devices.protocol, "tuya"),
+    eq(outlets.tuyaUseSharedPlatformAccount, true),
+    or(isNull(outlets.tuyaAccessId), eq(outlets.tuyaAccessId, "")),
+  ];
+  if (excludeDeviceId) conditions.push(ne(devices.id, excludeDeviceId));
+  const rows = await db
+    .select({ id: devices.id })
+    .from(devices)
+    .innerJoin(outlets, eq(devices.outletId, outlets.id))
+    .where(and(...conditions));
+
+  const usedCount = rows.length;
+  if (usedCount >= account.maxControllableDevices) {
+    throw new Error(
+      `Kapasitas akun Tuya Cloud API bersama sudah penuh (${usedCount}/${account.maxControllableDevices} device, dipakai bersama beberapa outlet legacy). Tidak bisa menambah device Tuya baru lewat akun bersama ini — hubungi Customer Service NEXBILL untuk pindah ke akun Tuya Cloud API milik outlet sendiri (tanpa batas berbagi), atau minta platform-admin menaikkan kapasitas akun bersama (upgrade tier Tuya).`
+    );
   }
-  return { accessId: row.accessId, accessSecret: row.accessSecret, baseUrl: REGION_BASE_URL[row.region] ?? REGION_BASE_URL.sg };
+}
+
+async function getCreds(outletId: string): Promise<TuyaCreds> {
+  const [outlet] = await db
+    .select({
+      tuyaAccessId: outlets.tuyaAccessId,
+      tuyaAccessSecret: outlets.tuyaAccessSecret,
+      tuyaRegion: outlets.tuyaRegion,
+      tuyaUseSharedPlatformAccount: outlets.tuyaUseSharedPlatformAccount,
+    })
+    .from(outlets)
+    .where(eq(outlets.id, outletId))
+    .limit(1);
+
+  if (outlet?.tuyaAccessId && outlet.tuyaAccessSecret) {
+    return { accessId: outlet.tuyaAccessId, accessSecret: outlet.tuyaAccessSecret, baseUrl: REGION_BASE_URL[outlet.tuyaRegion] ?? REGION_BASE_URL.sg };
+  }
+
+  if (outlet?.tuyaUseSharedPlatformAccount) {
+    const [row] = await db.select().from(platformTuyaAccount).limit(1);
+    if (!row?.accessId || !row?.accessSecret) {
+      throw new Error("Tuya Cloud API bersama belum dikonfigurasi di platform-admin — hubungi NEXBILL.");
+    }
+    return { accessId: row.accessId, accessSecret: row.accessSecret, baseUrl: REGION_BASE_URL[row.region] ?? REGION_BASE_URL.sg };
+  }
+
+  throw new Error(
+    "Outlet ini belum mengatur Tuya Cloud API sendiri. Setiap outlet wajib punya akun Tuya Cloud API sendiri (Access ID/Secret) — atur di Pengaturan > Integrasi Tuya Cloud API."
+  );
 }
 
 function sha256Hex(input: string): string {
@@ -148,7 +223,7 @@ async function setSwitch(device: DeviceRecord, on: boolean) {
   if (!cfg.deviceId) {
     throw new Error(`Device "${device.name}" belum diisi Tuya Device ID.`);
   }
-  const creds = await getCreds();
+  const creds = await getCreds(device.outletId);
   const code = cfg.switchCode || "switch_1";
   await tuyaRequest(creds, "POST", `/v1.0/iot-03/devices/${cfg.deviceId}/commands`, {
     commands: [{ code, value: on }],
@@ -166,7 +241,7 @@ export const tuyaAdapter: DeviceAdapter = {
     const cfg = parseConfig(device);
     if (!cfg.deviceId) return "unknown";
     try {
-      const creds = await getCreds();
+      const creds = await getCreds(device.outletId);
       const code = cfg.switchCode || "switch_1";
       const status: { code: string; value: unknown }[] = await tuyaRequest(creds, "GET", `/v1.0/iot-03/devices/${cfg.deviceId}/status`);
       const entry = status.find((s) => s.code === code);

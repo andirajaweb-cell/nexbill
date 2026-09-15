@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { devices, rentalUnits } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { assertDeviceAllowed } from "@/lib/subscription/service";
+import { assertSharedTuyaCapacityAvailable } from "@/lib/devices/adapters/tuya";
+
+/** Mirrors the same check in POST /api/devices — see that file's doc comment for why mqttTopic
+ * must be unique across every outlet, not just this one (all outlets share one MQTT broker). */
+async function assertMqttTopicGloballyUnique(topic: string, excludeDeviceId?: string) {
+  const rows = await db.select({ id: devices.id }).from(devices).where(and(eq(devices.protocol, "tasmota_mqtt"), eq(devices.mqttTopic, topic)));
+  const collides = rows.some((r) => r.id !== excludeDeviceId);
+  if (collides) {
+    throw new Error(
+      `MQTT Topic "${topic}" sudah dipakai perangkat lain (outlet manapun) di broker yang sama — semua outlet NEXBILL berbagi satu broker MQTT, jadi topic harus unik secara global. Coba tambahkan nama outlet/lokasi ke topic, mis. "outletanda_${topic}".`
+    );
+  }
+}
 
 const EDITABLE_FIELDS = ["name", "protocol", "mqttTopic", "httpOnUrl", "httpOffUrl", "httpStatusUrl", "config"] as const;
 
@@ -28,6 +41,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Tidak ada perubahan." }, { status: 400 });
     if (typeof patch.protocol === "string") {
       await assertDeviceAllowed(session.outletId, patch.protocol as any, id, session.role);
+    }
+    const effectiveProtocol = (patch.protocol as string | undefined) ?? existing.protocol;
+    const effectiveTopic = (patch.mqttTopic as string | undefined) ?? existing.mqttTopic;
+    if (effectiveProtocol === "tasmota_mqtt" && effectiveTopic) {
+      await assertMqttTopicGloballyUnique(effectiveTopic, id);
+    }
+    if (effectiveProtocol === "tuya") {
+      await assertSharedTuyaCapacityAvailable(session.outletId, id);
     }
     const [updated] = await db.update(devices).set(patch).where(eq(devices.id, id)).returning();
     if (!updated) return NextResponse.json({ error: "Perangkat tidak ditemukan." }, { status: 404 });

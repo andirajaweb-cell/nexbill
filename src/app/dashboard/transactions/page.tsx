@@ -67,6 +67,49 @@ function formatDateTimeWithSeconds(iso: string): string {
   });
 }
 
+/** Drives a purely cosmetic 0→90% readout via setInterval while a correction's real work (PATCH/
+ * DELETE + the server-side void-and-repost of the order's journal — see the "Koreksi"/"Koreksi
+ * Nominal" hint text below) is in flight. There is no real per-step progress signal from the API
+ * for a single request, so this eases toward (never quite reaching) 90%, and the caller jumps it
+ * to 100% itself right when the request actually resolves successfully — see savePaymentMethod/
+ * saveRentalAmount. Returns a cleanup fn; always call it in a `finally` so the interval doesn't
+ * keep ticking after the request settles (success, error, or the component unmounting mid-save). */
+function startFakeProgress(setProgress: (pct: number) => void): () => void {
+  let pct = 0;
+  const interval = setInterval(() => {
+    pct += (90 - pct) * 0.15;
+    setProgress(Math.round(pct));
+  }, 150);
+  return () => clearInterval(interval);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Blocking "sedang memproses koreksi" overlay shown on top of the transaction detail modal while
+ * a correction saves — requested so it's visually obvious a correction is actively being applied
+ * (not just a disabled button) until the void-and-repost journal work is confirmed done. Renders
+ * above everything (including the detail modal's own backdrop) and swallows clicks so the owner
+ * can't dismiss the detail modal or fire a second save mid-flight. */
+function SavingProgressOverlay({ progress, label }: { progress: number; label: string }) {
+  const pct = Math.max(0, Math.min(100, progress));
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[#0b0f1e] border border-cyan-500/30 rounded-xl w-full max-w-xs p-5 text-center space-y-3 shadow-[0_0_40px_-10px_rgba(34,211,238,0.35)]">
+        <p className="text-sm text-neutral-200">{label}</p>
+        <div className="h-2 rounded-full bg-neutral-800 overflow-hidden">
+          <div
+            className="h-full transition-all duration-150 ease-out"
+            style={{ width: `${pct}%`, background: "linear-gradient(90deg, #22d3ee, #0ea5e9)" }}
+          />
+        </div>
+        <p className="text-xs font-mono text-cyan-400">{pct}%</p>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Pure, client-side "mirip transaksi lain" (possible-duplicate) heuristic — flags rows that share
  * the same cashier, the exact same total, and the exact same item breakdown (qty+description,
@@ -173,7 +216,7 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("transactions.pageTitle", "Transaction Center")}</h1>
-        <p className="text-sm text-neutral-500">{t("transactions.pageSubtitle", "Seluruh transaksi Rental, F&B, dan Produk yang diinput kasir — PPOB akan muncul di sini setelah modulnya dibangun. Hapus permanen hanya bisa dilakukan akun Owner/Superuser.")}</p>
+        <p className="text-sm text-neutral-500">{t("transactions.pageSubtitle", "Seluruh transaksi Rental, F&B, dan Produk yang diinput kasir. Transaksi PPOB (pulsa/token/tagihan) punya riwayat tersendiri di menu PPOB — kartu \"PPOB Revenue\" di atas hanya menampilkan total fee admin PPOB, bukan daftar transaksinya. Hapus permanen hanya bisa dilakukan akun Owner/Superuser.")}</p>
       </div>
 
       <div className="flex gap-1 border-b border-neutral-800">
@@ -218,6 +261,15 @@ function TransactionListTab({ outletId }: { outletId: string }) {
   const [data, setData] = useState<{ transactions: any[]; summary: any } | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+
+  // Deep-link support: a link like /dashboard/transactions?orderId=xxx (e.g. from the Accounting
+  // drill-down modal's "buka di transaksi" links, opened in a new tab) auto-opens that order's
+  // detail modal on load. Read once from window.location rather than useSearchParams() so this
+  // page doesn't need a Suspense boundary just for this.
+  useEffect(() => {
+    const orderId = new URLSearchParams(window.location.search).get("orderId");
+    if (orderId) setDetailId(orderId);
+  }, []);
 
   useEffect(() => { fetchJsonArray(`/api/staff?outletId=${outletId}`).then(setStaffList); }, [outletId]);
 
@@ -441,6 +493,8 @@ function TransactionDetailModal({ id, outletId, canEditPayment, onClose, onChang
   const [selectedMethod, setSelectedMethod] = useState("");
   const [paymentAmountInput, setPaymentAmountInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState<number | null>(null);
+  const [saveProgressLabel, setSaveProgressLabel] = useState("");
   // Tracks the SPECIFIC order item being edited/deleted (not just "is something being edited") —
   // a merged order (mergeOrders in lib/pos/split-merge.ts) can carry several itemType:"rental"
   // lines at once (one per originating TV/session that got combined into one payable bill), so a
@@ -466,6 +520,9 @@ function TransactionDetailModal({ id, outletId, canEditPayment, onClose, onChang
     const amountChanged = Math.round(amount) !== Math.round(originalAmount);
     if (!methodChanged && !amountChanged) return;
     setSaving(true);
+    setSaveProgressLabel(t("transactions.payment.correctingProgress", "Menyimpan koreksi pembayaran & memposting ulang jurnal..."));
+    setSaveProgress(0);
+    const stopProgress = startFakeProgress(setSaveProgress);
     try {
       const body: Record<string, unknown> = {};
       if (methodChanged) body.method = selectedMethod;
@@ -479,16 +536,21 @@ function TransactionDetailModal({ id, outletId, canEditPayment, onClose, onChang
       // that isn't valid JSON — e.g. a 404/500 HTML error page from a stale/incomplete deploy —
       // which previously failed completely silently (no dialog, no console-visible feedback to the
       // cashier/owner) since there was no catch block at all below.
-      const out = await res.json().catch(() => ({ error: `Server merespons status ${res.status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.` }));
-      if (!res.ok) return showAlert(out.error ?? `Gagal (status ${res.status}).`);
+      const out = await res.json().catch(() => ({ error: t("transactions.error.nonJsonResponse", "Server merespons status {status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.").replace("{status}", String(res.status)) }));
+      if (!res.ok) return showAlert(out.error ?? t("transactions.error.genericFailStatus", "Gagal (status {status}).").replace("{status}", String(res.status)));
+      stopProgress();
+      setSaveProgress(100);
+      await sleep(300);
       cancelEditPayment();
       await loadDetail();
       onChanged();
       showAlert(t("transactions.payment.correctSuccess", "Pembayaran berhasil dikoreksi."));
     } catch (err: any) {
-      showAlert(`Gagal menyimpan koreksi: ${err?.message ?? "kesalahan tidak diketahui"}. Cek koneksi internet lalu coba lagi.`);
+      showAlert(t("transactions.error.networkSavePayment", "Gagal menyimpan koreksi: {msg}. Cek koneksi internet lalu coba lagi.").replace("{msg}", err?.message ?? t("transactions.error.unknownError", "kesalahan tidak diketahui")));
     } finally {
+      stopProgress();
       setSaving(false);
+      setSaveProgress(null);
     }
   };
 
@@ -499,6 +561,9 @@ function TransactionDetailModal({ id, outletId, canEditPayment, onClose, onChang
     const amount = Number(rentalAmountInput);
     if (!Number.isFinite(amount) || amount < 0) return showAlert(t("transactions.rental.invalidAmount", "Nominal tidak valid."));
     setSavingRentalAmount(true);
+    setSaveProgressLabel(t("transactions.rental.correctingProgress", "Menyimpan koreksi nominal & memposting ulang jurnal..."));
+    setSaveProgress(0);
+    const stopProgress = startFakeProgress(setSaveProgress);
     try {
       const res = await fetch(`/api/transactions/${id}/rental-charge`, {
         method: "PATCH",
@@ -507,39 +572,53 @@ function TransactionDetailModal({ id, outletId, canEditPayment, onClose, onChang
       });
       // Same defensive JSON-parse + catch as savePaymentMethod above — see its comment for why this
       // is needed (a non-JSON response, e.g. from a stale/incomplete deploy, used to fail silently).
-      const out = await res.json().catch(() => ({ error: `Server merespons status ${res.status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.` }));
-      if (!res.ok) return showAlert(out.error ?? `Gagal (status ${res.status}).`);
+      const out = await res.json().catch(() => ({ error: t("transactions.error.nonJsonResponse", "Server merespons status {status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.").replace("{status}", String(res.status)) }));
+      if (!res.ok) return showAlert(out.error ?? t("transactions.error.genericFailStatus", "Gagal (status {status}).").replace("{status}", String(res.status)));
+      stopProgress();
+      setSaveProgress(100);
+      await sleep(300);
       cancelEditRentalAmount();
       await loadDetail();
       onChanged();
       showAlert(t("transactions.rental.correctSuccess", "Nominal rental berhasil dikoreksi."));
     } catch (err: any) {
-      showAlert(`Gagal menyimpan koreksi: ${err?.message ?? "kesalahan tidak diketahui"}. Cek koneksi internet lalu coba lagi.`);
+      showAlert(t("transactions.error.networkSavePayment", "Gagal menyimpan koreksi: {msg}. Cek koneksi internet lalu coba lagi.").replace("{msg}", err?.message ?? t("transactions.error.unknownError", "kesalahan tidak diketahui")));
     } finally {
+      stopProgress();
       setSavingRentalAmount(false);
+      setSaveProgress(null);
     }
   };
 
   const deleteItem = async (item: { id: string; description: string; lineTotal: number }) => {
     if (!await showConfirm(t("transactions.item.confirmDelete", "Hapus item \"{desc}\" ({amount}) dari transaksi ini? Sistem otomatis membatalkan & memposting ulang jurnal penjualan order ini tanpa item ini. Tidak bisa dibatalkan.").replace("{desc}", item.description).replace("{amount}", rupiah(item.lineTotal)))) return;
     setDeletingItemId(item.id);
+    setSaveProgressLabel(t("transactions.item.deletingProgress", "Menghapus item & memposting ulang jurnal..."));
+    setSaveProgress(0);
+    const stopProgress = startFakeProgress(setSaveProgress);
     try {
       const res = await fetch(`/api/transactions/${id}/items/${item.id}`, { method: "DELETE" });
-      const out = await res.json().catch(() => ({ error: `Server merespons status ${res.status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.` }));
-      if (!res.ok) return showAlert(out.error ?? `Gagal (status ${res.status}).`);
+      const out = await res.json().catch(() => ({ error: t("transactions.error.nonJsonResponse", "Server merespons status {status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.").replace("{status}", String(res.status)) }));
+      if (!res.ok) return showAlert(out.error ?? t("transactions.error.genericFailStatus", "Gagal (status {status}).").replace("{status}", String(res.status)));
+      stopProgress();
+      setSaveProgress(100);
+      await sleep(300);
       if (editingRentalItemId === item.id) cancelEditRentalAmount();
       await loadDetail();
       onChanged();
       showAlert(t("transactions.item.deleteSuccess", "Item berhasil dihapus dari transaksi."));
     } catch (err: any) {
-      showAlert(`Gagal menghapus item: ${err?.message ?? "kesalahan tidak diketahui"}. Cek koneksi internet lalu coba lagi.`);
+      showAlert(t("transactions.error.networkDeleteItem", "Gagal menghapus item: {msg}. Cek koneksi internet lalu coba lagi.").replace("{msg}", err?.message ?? t("transactions.error.unknownError", "kesalahan tidak diketahui")));
     } finally {
+      stopProgress();
       setDeletingItemId(null);
+      setSaveProgress(null);
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      {saveProgress !== null && <SavingProgressOverlay progress={saveProgress} label={saveProgressLabel} />}
       <div className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-medium">{t("transactions.detail.title", "Detail Transaksi")}</h2>
@@ -574,6 +653,13 @@ function TransactionDetailModal({ id, outletId, canEditPayment, onClose, onChang
                           <td className="py-1">
                             <span className={isCancelled ? "line-through" : ""}>{it.qty}x {it.description}</span>
                             {isCancelled && <span className="ml-2 text-[10px] text-red-400">{t("transactions.item.deletedTag", "(dihapus)")}</span>}
+                            {isRental && (it.rentalStartedAt || it.rentalEndedAt) && (
+                              <div className="text-[10px] text-neutral-500 mt-0.5">
+                                {t("transactions.rental.startTime", "Mulai")}: {it.rentalStartedAt ? new Date(it.rentalStartedAt).toLocaleString("id-ID") : "-"}
+                                {" · "}
+                                {t("transactions.rental.stopTime", "Berhenti")}: {it.rentalEndedAt ? new Date(it.rentalEndedAt).toLocaleString("id-ID") : "-"}
+                              </div>
+                            )}
                             {!isCancelled && isRental && canEditPayment && !isEditingThis && (
                               <button className="ml-2 text-cyan-400 hover:text-cyan-300 underline decoration-dotted" onClick={() => startEditRentalAmount(it)}>
                                 {t("transactions.rental.editAmount", "Koreksi Nominal")}

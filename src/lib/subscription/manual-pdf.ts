@@ -11,12 +11,13 @@ import PDFDocument from "pdfkit";
  * (https://bardi.co.id/cara-pemasangan-bardi-smart-plug/) as of Aug 2026 — re-verify against that
  * page if BARDI changes their app flow.
  *
- * Section 7 reflects how device onboarding actually works in this codebase: one shared Tuya
- * Cloud API account (platformTuyaAccount) is set up once by the NEXBILL platform team and used
- * for every outlet/merchant — not self-service by the merchant (see the note in help/content.ts)
- * — so after pairing in the consumer app, the merchant has to hand off the device name to
- * NEXBILL support before it appears as a controllable device on their own Dashboard > Perangkat
- * page.
+ * Section 7 reflects how device onboarding actually works in this codebase (updated 2026-09-15):
+ * every outlet is required to bring its own Tuya Cloud API Cloud Project (own Access ID/Secret,
+ * see outlets.tuyaAccessId in schema.ts) — self-service, no NEXBILL support handoff needed for
+ * new outlets. The old shared `platformTuyaAccount` still exists but only as a platform-admin-
+ * toggled legacy exception for a couple of pre-existing outlets (see
+ * outlets.tuyaUseSharedPlatformAccount's doc comment) — this manual intentionally documents the
+ * new default path, not that exception.
  */
 
 const PAGE_MARGIN = 50;
@@ -210,14 +211,16 @@ export async function buildSmartPlugManualPdf(): Promise<Buffer> {
   heading(doc, "7. Menautkan Perangkat ke Dashboard NEXBILL");
   paragraph(
     doc,
-    "Kredensial Tuya Cloud API dikelola terpusat oleh tim platform NEXBILL (bukan diatur sendiri oleh outlet), jadi setelah pairing berhasil di aplikasi, perangkat belum otomatis muncul di Dashboard NEXBILL. Langkah selanjutnya:"
+    "Setiap outlet wajib punya akun Tuya Cloud API sendiri (bukan lagi dikelola terpusat oleh NEXBILL) — ini sekali setup, gratis, dan sepenuhnya mandiri, bukan menunggu aktivasi dari tim NEXBILL. Langkah-langkahnya:"
   );
   bullets(
     doc,
     [
-      "Hubungi tim support NEXBILL (kanal yang sama dengan pengajuan dukungan lain di Dashboard) dan sertakan nama outlet serta nama perangkat yang baru ditambahkan di app.",
-      "Tim NEXBILL akan mengaktifkan perangkat tersebut agar bisa dikontrol dari sistem.",
-      "Setelah aktif, buka Dashboard > Perangkat — perangkat akan tersedia untuk ditautkan ke unit rental yang sesuai lewat tabel \"Hubungkan Perangkat ke Unit Rental\" (butuh izin manage_devices).",
+      "Daftar akun di iot.tuya.com (gratis), buat Cloud Project baru dengan Data Center \"Singapore\", lalu di tab Devices pilih \"Link Tuya App Account\" dan scan QR code pakai aplikasi Smart Life/Bardi tempat perangkat tadi dipasangkan — device otomatis muncul, tidak perlu pairing ulang.",
+      "Aktifkan langganan API \"IoT Core\" di tab Service API project itu (Subscribe/Get Free Trial).",
+      "Salin Access ID/Secret dari halaman Overview project, lalu buka Dashboard NEXBILL > Pengaturan > Bisnis & Pajak > kartu \"Integrasi Tuya Cloud API\", tempel dan simpan.",
+      "Buka Dashboard > Perangkat, tambahkan perangkat dengan protokol \"Tuya Smart Life\" dan Device ID dari app Smart Life/Bardi — perangkat siap ditautkan ke unit rental lewat tabel \"Hubungkan Perangkat ke Unit Rental\" (butuh izin manage_devices).",
+      "Panduan lengkap beserta cara mengatasi masalah (langganan Trial expired, ganti akun/email) ada di Dashboard > Pusat Bantuan > Kontrol Perangkat.",
     ],
     true
   );

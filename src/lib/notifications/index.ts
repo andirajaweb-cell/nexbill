@@ -16,6 +16,7 @@ export type NotificationSeverity = "info" | "warning" | "critical";
 export type NotificationType =
   | "low_stock"
   | "approval_pending"
+  | "shift_variance"
   | "expense_pending"
   | "booking_pending"
   | "subscription_trial"
@@ -48,8 +49,41 @@ function daysUntil(iso: string): number {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
+/**
+ * All 5 Settings > Notifikasi toggles in one query — added 2026-09-13 alongside actually wiring
+ * up the 4 that were previously saved to the DB but never once read anywhere (notifyLowStock,
+ * notifyPendingApproval, notifyBookingReminder, notifyShiftVariance — only notifyMaintenanceDue
+ * was ever actually checked, each via its own separate query). Fetched once per getNotifications()
+ * call instead of once per source function, same round-trip-saving spirit as the existing
+ * Promise.all batching below.
+ */
+async function getNotificationToggles(outletId: string) {
+  const [row] = await db
+    .select({
+      notifyLowStock: outlets.notifyLowStock,
+      notifyPendingApproval: outlets.notifyPendingApproval,
+      notifyShiftVariance: outlets.notifyShiftVariance,
+      notifyBookingReminder: outlets.notifyBookingReminder,
+      notifyMaintenanceDue: outlets.notifyMaintenanceDue,
+    })
+    .from(outlets)
+    .where(eq(outlets.id, outletId))
+    .limit(1);
+  // Every toggle defaults to "on" if the outlet row is somehow missing (session edge case already
+  // handled defensively elsewhere) — matches the outlets table's own notNull().default(true) for
+  // each of these columns, so a missing row never silently goes quiet instead of just erroring.
+  return {
+    notifyLowStock: row?.notifyLowStock ?? true,
+    notifyPendingApproval: row?.notifyPendingApproval ?? true,
+    notifyShiftVariance: row?.notifyShiftVariance ?? true,
+    notifyBookingReminder: row?.notifyBookingReminder ?? true,
+    notifyMaintenanceDue: row?.notifyMaintenanceDue ?? true,
+  };
+}
+
 // ---- Low stock (everyone) ----
-async function lowStockItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
+async function lowStockItems(outletId: string, lang: LangCode, enabled: boolean): Promise<NotificationItem[]> {
+  if (!enabled) return [];
   const rows = await db
     .select()
     .from(products)
@@ -70,12 +104,15 @@ async function lowStockItems(outletId: string, lang: LangCode): Promise<Notifica
   }));
 }
 
-// ---- Pending void/refund/etc. approvals (only those who can decide them) ----
+// ---- Pending void/refund/discount/cash-transfer approvals (only those who can decide them) ----
+// shift_close_review is deliberately EXCLUDED here — it's its own notification type below
+// (shiftVarianceItems), gated by the separate "Selisih Kas Shift" toggle, since lumping it into
+// this generic bucket meant notifyShiftVariance had no way to hide just it.
 async function approvalItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
   const rows = await db
     .select()
     .from(approvalRequests)
-    .where(and(eq(approvalRequests.outletId, outletId), eq(approvalRequests.status, "pending")));
+    .where(and(eq(approvalRequests.outletId, outletId), eq(approvalRequests.status, "pending"), sql`${approvalRequests.type} != 'shift_close_review'`));
   return rows.map((a) => ({
     key: `approval:${a.id}`,
     type: "approval_pending" as const,
@@ -90,8 +127,33 @@ async function approvalItems(outletId: string, lang: LangCode): Promise<Notifica
   }));
 }
 
+// ---- Shift close reviews flagged by the anti-fraud threshold (Settings > Preferensi > Ambang
+// Batas Anti-Fraud Shift) — split out of the generic approvalItems() above so the "Selisih Kas
+// Shift" toggle can hide just these, not every other approval type too (see that function's
+// updated doc comment for why). Same underlying data (an approvalRequests row of type
+// "shift_close_review" — see openShift/closeShift in lib/shift/shift.ts) and permission gate
+// (approve_requests), just filtered/labeled separately and gated by notifyShiftVariance.
+async function shiftVarianceItems(outletId: string, lang: LangCode, enabled: boolean): Promise<NotificationItem[]> {
+  if (!enabled) return [];
+  const rows = await db
+    .select()
+    .from(approvalRequests)
+    .where(and(eq(approvalRequests.outletId, outletId), eq(approvalRequests.status, "pending"), eq(approvalRequests.type, "shift_close_review")));
+  return rows.map((a) => ({
+    key: `approval:${a.id}`,
+    type: "shift_variance" as const,
+    severity: "warning" as const,
+    title: translate(lang, "staff.approvalType.shiftCloseReview", "Tinjauan tutup shift"),
+    message: a.reason ?? translate(lang, "notifications.approvalPending.messageFallback", "Menunggu persetujuan ({refType})").replace("{refType}", a.refType),
+    link: "/dashboard/staff",
+    createdAt: a.createdAt,
+    read: false,
+  }));
+}
+
 // ---- Pending expense approvals (only those who can approve expenses) ----
-async function expenseItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
+async function expenseItems(outletId: string, lang: LangCode, enabled: boolean): Promise<NotificationItem[]> {
+  if (!enabled) return [];
   const rows = await db
     .select()
     .from(expenses)
@@ -109,7 +171,8 @@ async function expenseItems(outletId: string, lang: LangCode): Promise<Notificat
 }
 
 // ---- Pending bookings needing confirmation (only those who manage bookings) ----
-async function bookingItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
+async function bookingItems(outletId: string, lang: LangCode, enabled: boolean): Promise<NotificationItem[]> {
+  if (!enabled) return [];
   const rows = await db
     .select()
     .from(bookings)
@@ -203,9 +266,8 @@ async function announcementItems(outletId: string): Promise<NotificationItem[]> 
 }
 
 // ---- Predictive maintenance (only those who control devices/units) ----
-async function maintenanceItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
-  const [outlet] = await db.select({ notifyMaintenanceDue: outlets.notifyMaintenanceDue }).from(outlets).where(eq(outlets.id, outletId)).limit(1);
-  if (outlet && !outlet.notifyMaintenanceDue) return [];
+async function maintenanceItems(outletId: string, lang: LangCode, enabled: boolean): Promise<NotificationItem[]> {
+  if (!enabled) return [];
 
   const due = await listUnitsNeedingMaintenance(outletId);
   return due.map(({ unit, status }) => ({
@@ -263,11 +325,18 @@ export async function getNotifications(
   role: StaffRole,
   lang: LangCode = "id"
 ): Promise<{ items: NotificationItem[]; unreadCount: number }> {
-  const sourcePromises: Promise<NotificationItem[]>[] = [lowStockItems(outletId, lang), announcementItems(outletId)];
-  if (hasPermission(role, "approve_requests")) sourcePromises.push(approvalItems(outletId, lang));
-  if (hasPermission(role, "approve_expenses")) sourcePromises.push(expenseItems(outletId, lang));
-  if (hasPermission(role, "manage_bookings")) sourcePromises.push(bookingItems(outletId, lang));
-  if (hasPermission(role, "manage_devices")) sourcePromises.push(maintenanceItems(outletId, lang));
+  // Fetched once up front (one indexed-by-PK query) so every toggle-gated source below can be an
+  // in-memory check instead of its own DB round trip — see getNotificationToggles's doc comment.
+  const toggles = await getNotificationToggles(outletId);
+
+  const sourcePromises: Promise<NotificationItem[]>[] = [lowStockItems(outletId, lang, toggles.notifyLowStock), announcementItems(outletId)];
+  if (hasPermission(role, "approve_requests")) {
+    sourcePromises.push(approvalItems(outletId, lang));
+    sourcePromises.push(shiftVarianceItems(outletId, lang, toggles.notifyShiftVariance));
+  }
+  if (hasPermission(role, "approve_expenses")) sourcePromises.push(expenseItems(outletId, lang, toggles.notifyPendingApproval));
+  if (hasPermission(role, "manage_bookings")) sourcePromises.push(bookingItems(outletId, lang, toggles.notifyBookingReminder));
+  if (hasPermission(role, "manage_devices")) sourcePromises.push(maintenanceItems(outletId, lang, toggles.notifyMaintenanceDue));
   // Only Superuser (NEXBILL's own internal/testing account) is exempt from the subscription/
   // trial feature — Owner is the role every real paying merchant uses day to day, so it must
   // still get these warnings; suppressing them for Owner would mean the business never sees a

@@ -9,7 +9,13 @@ import { registerDict } from "./registry";
 registerDict({
   // --- Page header ---
   "transactions.pageTitle": { id: "Pusat Transaksi", en: "Transaction Center", ms: "Pusat Transaksi", th: "ศูนย์ธุรกรรม", fil: "Sentro ng Transaksyon", vi: "Trung tâm giao dịch" },
-  "transactions.pageSubtitle": { id: "Seluruh transaksi Rental, F&B, dan Produk yang diinput kasir — PPOB akan muncul di sini setelah modulnya dibangun. Hapus permanen hanya bisa dilakukan akun Owner/Superuser.", en: "All Rental, F&B, and Product transactions entered by cashiers — PPOB will appear here once that module is built. Permanent deletion is only available to Owner/Superuser accounts.", ms: "Semua transaksi Sewa, F&B, dan Produk yang dimasukkan oleh juruwang — PPOB akan muncul di sini selepas modul tersebut dibina. Padam kekal hanya boleh dilakukan oleh akaun Owner/Superuser.", th: "ธุรกรรมเช่า, F&B และสินค้าทั้งหมดที่แคชเชียร์บันทึกไว้ — PPOB จะปรากฏที่นี่หลังจากโมดูลนั้นถูกสร้างขึ้น การลบถาวรทำได้เฉพาะบัญชี Owner/Superuser เท่านั้น", fil: "Lahat ng transaksyon sa Rental, F&B, at Produkto na inilagay ng cashier — lalabas ang PPOB dito kapag natapos na ang module nito. Ang permanenteng pagbura ay para lang sa Owner/Superuser account.", vi: "Toàn bộ giao dịch Thuê, F&B và Sản phẩm do thu ngân nhập — PPOB sẽ xuất hiện ở đây sau khi mô-đun đó được xây dựng xong. Chỉ tài khoản Owner/Superuser mới có thể xóa vĩnh viễn." },
+  // Updated 2026-09-13 — the old copy said "PPOB akan muncul di sini setelah modulnya dibangun",
+  // which is now stale/misleading: the PPOB module has long since shipped (see dashboard/ppob).
+  // It was never going to grow rows in THIS table though — PPOB posts to its own ppobTransactions
+  // table (lib/reports/transactions.ts), never to `orders`, so it has its own history page by
+  // design, not a missing feature. The "PPOB Revenue" summary card here only ever shows the
+  // aggregate admin-fee total from that table, not a per-transaction listing.
+  "transactions.pageSubtitle": { id: "Seluruh transaksi Rental, F&B, dan Produk yang diinput kasir. Transaksi PPOB (pulsa/token/tagihan) punya riwayat tersendiri di menu PPOB — kartu \"PPOB Revenue\" di atas hanya menampilkan total fee admin PPOB, bukan daftar transaksinya. Hapus permanen hanya bisa dilakukan akun Owner/Superuser.", en: "All Rental, F&B, and Product transactions entered by cashiers. PPOB transactions (mobile credit/tokens/bills) have their own history under the PPOB menu — the \"PPOB Revenue\" card above only shows the total PPOB admin fee, not its transaction list. Permanent deletion is only available to Owner/Superuser accounts.", ms: "Semua transaksi Sewa, F&B, dan Produk yang dimasukkan oleh juruwang. Transaksi PPOB (kredit mudah alih/token/bil) mempunyai sejarah tersendiri di menu PPOB — kad \"PPOB Revenue\" di atas hanya memaparkan jumlah fi admin PPOB, bukan senarai transaksinya. Padam kekal hanya boleh dilakukan oleh akaun Owner/Superuser.", th: "ธุรกรรมเช่า, F&B และสินค้าทั้งหมดที่แคชเชียร์บันทึกไว้ ธุรกรรม PPOB (เติมเงิน/โทเค็น/บิล) มีประวัติของตัวเองอยู่ในเมนู PPOB — การ์ด \"PPOB Revenue\" ด้านบนแสดงเฉพาะยอดรวมค่าธรรมเนียมแอดมิน PPOB ไม่ใช่รายการธุรกรรม การลบถาวรทำได้เฉพาะบัญชี Owner/Superuser เท่านั้น", fil: "Lahat ng transaksyon sa Rental, F&B, at Produkto na inilagay ng cashier. May sariling history ang mga transaksyon sa PPOB (load/token/bayarin) sa menu ng PPOB — ang card na \"PPOB Revenue\" sa itaas ay nagpapakita lang ng kabuuang admin fee ng PPOB, hindi ang listahan ng transaksyon nito. Ang permanenteng pagbura ay para lang sa Owner/Superuser account.", vi: "Toàn bộ giao dịch Thuê, F&B và Sản phẩm do thu ngân nhập. Giao dịch PPOB (nạp tiền/thẻ/hóa đơn) có lịch sử riêng ở menu PPOB — thẻ \"PPOB Revenue\" ở trên chỉ hiển thị tổng phí quản trị PPOB, không phải danh sách giao dịch. Chỉ tài khoản Owner/Superuser mới có thể xóa vĩnh viễn." },
 
   "transactions.tab.list": { id: "Daftar Transaksi", en: "Transaction List", ms: "Senarai Transaksi", th: "รายการธุรกรรม", fil: "Listahan ng Transaksyon", vi: "Danh sách giao dịch" },
   "transactions.tab.cashier": { id: "Performa Kasir", en: "Cashier Performance", ms: "Prestasi Juruwang", th: "ผลงานแคชเชียร์", fil: "Performance ng Cashier", vi: "Hiệu suất thu ngân" },
@@ -156,6 +162,14 @@ registerDict({
     vi: "Dùng để sửa lỗi thu ngân chọn sai phương thức (vd. ghi là QRIS nhưng thực tế nhận tiền mặt) hoặc số tiền không còn khớp với tổng sau một lần sửa khác. Hệ thống sẽ tự động hủy và đăng lại sổ nhật ký bán hàng của đơn này với dữ liệu đúng.",
   },
   "transactions.payment.correctSuccess": { id: "Pembayaran berhasil dikoreksi.", en: "Payment corrected successfully.", ms: "Pembayaran berjaya dibetulkan.", th: "แก้ไขการชำระเงินสำเร็จแล้ว", fil: "Matagumpay na naitama ang bayad.", vi: "Đã sửa thanh toán thành công." },
+  "transactions.payment.correctingProgress": {
+    id: "Menyimpan koreksi pembayaran & memposting ulang jurnal...",
+    en: "Saving payment correction & reposting journal...",
+    ms: "Menyimpan pembetulan pembayaran & memposkan semula jurnal...",
+    th: "กำลังบันทึกการแก้ไขการชำระเงินและโพสต์สมุดบัญชีใหม่...",
+    fil: "Sine-save ang pagwawasto sa bayad & ire-repost ang journal...",
+    vi: "Đang lưu bản sửa thanh toán & đăng lại sổ nhật ký...",
+  },
   "transactions.payment.invalidAmount": { id: "Nominal pembayaran tidak valid.", en: "Invalid payment amount.", ms: "Jumlah pembayaran tidak sah.", th: "จำนวนเงินชำระไม่ถูกต้อง", fil: "Hindi valid na halaga ng bayad.", vi: "Số tiền thanh toán không hợp lệ." },
 
   // --- Rental charge correction (Owner/Superuser only) ---
@@ -170,6 +184,16 @@ registerDict({
   },
   "transactions.rental.invalidAmount": { id: "Nominal tidak valid.", en: "Invalid amount.", ms: "Jumlah tidak sah.", th: "จำนวนเงินไม่ถูกต้อง", fil: "Hindi valid na halaga.", vi: "Số tiền không hợp lệ." },
   "transactions.rental.correctSuccess": { id: "Nominal rental berhasil dikoreksi.", en: "Rental amount corrected successfully.", ms: "Jumlah sewa berjaya dibetulkan.", th: "แก้ไขจำนวนค่าเช่าสำเร็จแล้ว", fil: "Matagumpay na naitama ang halaga ng rental.", vi: "Đã sửa số tiền thuê thành công." },
+  "transactions.rental.correctingProgress": {
+    id: "Menyimpan koreksi nominal & memposting ulang jurnal...",
+    en: "Saving amount correction & reposting journal...",
+    ms: "Menyimpan pembetulan jumlah & memposkan semula jurnal...",
+    th: "กำลังบันทึกการแก้ไขจำนวนเงินและโพสต์สมุดบัญชีใหม่...",
+    fil: "Sine-save ang pagwawasto ng halaga & ire-repost ang journal...",
+    vi: "Đang lưu bản sửa số tiền & đăng lại sổ nhật ký...",
+  },
+  "transactions.rental.startTime": { id: "Mulai", en: "Start", ms: "Mula", th: "เริ่ม", fil: "Simula", vi: "Bắt đầu" },
+  "transactions.rental.stopTime": { id: "Berhenti", en: "Stop", ms: "Henti", th: "สิ้นสุด", fil: "Hinto", vi: "Kết thúc" },
 
   // --- Per-item delete on an already-paid order (Owner/Superuser only) — e.g. removing a
   // genuinely duplicate rental line left over from merging several TVs'/sessions' bills into one
@@ -185,4 +209,48 @@ registerDict({
     vi: 'Xóa mục "{desc}" ({amount}) khỏi giao dịch này? Hệ thống sẽ tự động hủy và đăng lại sổ nhật ký bán hàng của đơn này mà không có mục này. Không thể hoàn tác.',
   },
   "transactions.item.deleteSuccess": { id: "Item berhasil dihapus dari transaksi.", en: "Item deleted from the transaction successfully.", ms: "Item berjaya dipadam daripada transaksi.", th: "ลบรายการออกจากรายการสำเร็จแล้ว", fil: "Matagumpay na natanggal ang item mula sa transaksyon.", vi: "Đã xóa mục khỏi giao dịch thành công." },
+  "transactions.item.deletingProgress": {
+    id: "Menghapus item & memposting ulang jurnal...",
+    en: "Deleting item & reposting journal...",
+    ms: "Memadam item & memposkan semula jurnal...",
+    th: "กำลังลบรายการและโพสต์สมุดบัญชีใหม่...",
+    fil: "Tinatanggal ang item & ire-repost ang journal...",
+    vi: "Đang xóa mục & đăng lại sổ nhật ký...",
+  },
+
+  // ---- Shared network/error-catch strings for the correction modals (savePaymentMethod,
+  // saveRentalAmount, deleteItem) — these were previously plain Indonesian template literals.
+  "transactions.error.unknownError": { id: "kesalahan tidak diketahui", en: "unknown error", ms: "ralat tidak diketahui", th: "ข้อผิดพลาดที่ไม่ทราบสาเหตุ", fil: "hindi kilalang error", vi: "lỗi không xác định" },
+  "transactions.error.networkSavePayment": {
+    id: "Gagal menyimpan koreksi: {msg}. Cek koneksi internet lalu coba lagi.",
+    en: "Failed to save correction: {msg}. Check your internet connection and try again.",
+    ms: "Gagal menyimpan pembetulan: {msg}. Semak sambungan internet dan cuba lagi.",
+    th: "บันทึกการแก้ไขไม่สำเร็จ: {msg} ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองอีกครั้ง",
+    fil: "Nabigong i-save ang pagwawasto: {msg}. Suriin ang internet connection at subukan ulit.",
+    vi: "Lưu bản sửa thất bại: {msg}. Kiểm tra kết nối internet rồi thử lại.",
+  },
+  "transactions.error.networkDeleteItem": {
+    id: "Gagal menghapus item: {msg}. Cek koneksi internet lalu coba lagi.",
+    en: "Failed to delete item: {msg}. Check your internet connection and try again.",
+    ms: "Gagal memadam item: {msg}. Semak sambungan internet dan cuba lagi.",
+    th: "ลบรายการไม่สำเร็จ: {msg} ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองอีกครั้ง",
+    fil: "Nabigong tanggalin ang item: {msg}. Suriin ang internet connection at subukan ulit.",
+    vi: "Xóa mục thất bại: {msg}. Kiểm tra kết nối internet rồi thử lại.",
+  },
+  "transactions.error.nonJsonResponse": {
+    id: "Server merespons status {status} tanpa isi JSON (kemungkinan endpoint belum ter-deploy atau error server) — coba refresh halaman, dan jika masih gagal, hubungi tim teknis.",
+    en: "Server responded with status {status} with no JSON body (the endpoint may not be deployed yet, or the server errored) — try refreshing the page, and contact technical support if it still fails.",
+    ms: "Pelayan membalas status {status} tanpa kandungan JSON (kemungkinan endpoint belum digunakan atau ralat pelayan) — cuba muat semula halaman, dan jika masih gagal, hubungi pasukan teknikal.",
+    th: "เซิร์ฟเวอร์ตอบกลับสถานะ {status} โดยไม่มีเนื้อหา JSON (endpoint อาจยังไม่ได้ deploy หรือเซิร์ฟเวอร์ผิดพลาด) — ลองรีเฟรชหน้า แล้วติดต่อทีมเทคนิคหากยังไม่สำเร็จ",
+    fil: "Sumagot ang server ng status {status} nang walang JSON body (posibleng hindi pa na-deploy ang endpoint o may error ang server) — subukang i-refresh ang page, at kontakin ang technical team kung patuloy pa ring nabibigo.",
+    vi: "Máy chủ phản hồi trạng thái {status} không có nội dung JSON (endpoint có thể chưa được triển khai hoặc máy chủ lỗi) — thử tải lại trang, và liên hệ đội kỹ thuật nếu vẫn thất bại.",
+  },
+  "transactions.error.genericFailStatus": {
+    id: "Gagal (status {status}).",
+    en: "Failed (status {status}).",
+    ms: "Gagal (status {status}).",
+    th: "ล้มเหลว (สถานะ {status})",
+    fil: "Nabigo (status {status}).",
+    vi: "Thất bại (trạng thái {status}).",
+  },
 });

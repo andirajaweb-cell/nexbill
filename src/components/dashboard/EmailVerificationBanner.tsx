@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth/client";
 import { Mail } from "lucide-react";
+import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import "@/lib/i18n/dict-shell";
 
 /**
  * Slim reminder bar shown above dashboard content while the logged-in account's email is
@@ -14,6 +16,7 @@ import { Mail } from "lucide-react";
  * already true and this component renders nothing.
  */
 export function EmailVerificationBanner() {
+  const { t } = useDashboardLang();
   const { user, refresh } = useAuth();
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [dismissed, setDismissed] = useState(false);
@@ -49,8 +52,17 @@ export function EmailVerificationBanner() {
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm">
       <Mail size={18} className="shrink-0 text-amber-400" />
       <p className="flex-1 min-w-[220px] text-amber-200">
-        Email <span className="font-medium text-amber-100">{user?.email}</span> belum diverifikasi.
-        {status === "sent" && " Link verifikasi baru sudah dikirim — cek inbox (atau folder spam) kamu."}
+        {(() => {
+          const [before, after] = t("emailVerify.banner", "Email {email} belum diverifikasi.").split("{email}");
+          return (
+            <>
+              {before}
+              <span className="font-medium text-amber-100">{user?.email}</span>
+              {after}
+            </>
+          );
+        })()}
+        {status === "sent" && ` ${t("emailVerify.sentNote", "Link verifikasi baru sudah dikirim — cek inbox (atau folder spam) kamu.")}`}
       </p>
       <div className="flex items-center gap-2 shrink-0">
         <button
@@ -59,17 +71,17 @@ export function EmailVerificationBanner() {
           disabled={status === "sending" || status === "sent"}
           className="rounded-lg border border-amber-400/40 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-400/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {status === "sending" ? "Mengirim..." : status === "sent" ? "Terkirim" : "Kirim Ulang Email Verifikasi"}
+          {status === "sending" ? t("emailVerify.sending", "Mengirim...") : status === "sent" ? t("emailVerify.sent", "Terkirim") : t("emailVerify.resendBtn", "Kirim Ulang Email Verifikasi")}
         </button>
         <button
           type="button"
           onClick={() => setDismissed(true)}
           className="text-xs text-amber-300/70 hover:text-amber-200 transition"
         >
-          Tutup
+          {t("emailVerify.close", "Tutup")}
         </button>
       </div>
-      {status === "error" && <p className="w-full text-xs text-rose-400">Gagal mengirim ulang. Coba lagi beberapa saat lagi.</p>}
+      {status === "error" && <p className="w-full text-xs text-rose-400">{t("emailVerify.resendFailed", "Gagal mengirim ulang. Coba lagi beberapa saat lagi.")}</p>}
     </div>
   );
 }

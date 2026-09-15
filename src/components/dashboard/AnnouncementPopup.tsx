@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/client";
+import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import "@/lib/i18n/dict-shell";
 
 interface AnnouncementItem {
   id: string;
@@ -11,10 +13,17 @@ interface AnnouncementItem {
   imageUrl?: string | null;
 }
 
-const SEVERITY_STYLE: Record<string, { border: string; badge: string; label: string }> = {
-  info: { border: "border-cyan-500/40", badge: "bg-cyan-500/15 text-cyan-300", label: "Info" },
-  warning: { border: "border-amber-500/40", badge: "bg-amber-500/15 text-amber-300", label: "Peringatan" },
-  critical: { border: "border-rose-500/40", badge: "bg-rose-500/15 text-rose-300", label: "Penting" },
+// Display labels resolved via t() inside the component (hooks can't run at module scope) — see
+// SEVERITY_LABEL_KEY below.
+const SEVERITY_STYLE: Record<string, { border: string; badge: string }> = {
+  info: { border: "border-cyan-500/40", badge: "bg-cyan-500/15 text-cyan-300" },
+  warning: { border: "border-amber-500/40", badge: "bg-amber-500/15 text-amber-300" },
+  critical: { border: "border-rose-500/40", badge: "bg-rose-500/15 text-rose-300" },
+};
+const SEVERITY_LABEL_KEY: Record<string, { key: string; fallback: string }> = {
+  info: { key: "announcement.severityInfo", fallback: "Info" },
+  warning: { key: "announcement.severityWarning", fallback: "Peringatan" },
+  critical: { key: "announcement.severityCritical", fallback: "Penting" },
 };
 
 /**
@@ -25,6 +34,7 @@ const SEVERITY_STYLE: Record<string, { border: string; badge: string; label: str
  * notification bell uses, so it disappears from both places at once.
  */
 export function AnnouncementPopup() {
+  const { t } = useDashboardLang();
   const { user } = useAuth();
   const [queue, setQueue] = useState<AnnouncementItem[]>([]);
   const [dismissing, setDismissing] = useState(false);
@@ -55,6 +65,7 @@ export function AnnouncementPopup() {
   };
 
   const style = SEVERITY_STYLE[current.severity] ?? SEVERITY_STYLE.info;
+  const severityLabelMeta = SEVERITY_LABEL_KEY[current.severity] ?? SEVERITY_LABEL_KEY.info;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -66,15 +77,15 @@ export function AnnouncementPopup() {
         )}
         <div className="p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded ${style.badge}`}>{style.label}</span>
-            <span className="text-[10px] text-neutral-500 uppercase tracking-wide">Pengumuman dari NEXBILL</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${style.badge}`}>{t(severityLabelMeta.key, severityLabelMeta.fallback)}</span>
+            <span className="text-[10px] text-neutral-500 uppercase tracking-wide">{t("announcement.fromNexbill", "Pengumuman dari NEXBILL")}</span>
           </div>
           <h2 className="text-base font-semibold text-neutral-100">{current.title}</h2>
           <p className="text-sm text-neutral-400 whitespace-pre-line leading-relaxed">{current.message}</p>
           <div className="flex items-center justify-between pt-1">
-            {queue.length > 1 && <span className="text-xs text-neutral-600">{queue.length - 1} pengumuman lain menyusul</span>}
+            {queue.length > 1 && <span className="text-xs text-neutral-600">{t("announcement.moreQueued", "{n} pengumuman lain menyusul").replace("{n}", String(queue.length - 1))}</span>}
             <Button className="ml-auto" onClick={dismiss} disabled={dismissing}>
-              {dismissing ? "..." : "Mengerti"}
+              {dismissing ? "..." : t("announcement.gotIt", "Mengerti")}
             </Button>
           </div>
         </div>

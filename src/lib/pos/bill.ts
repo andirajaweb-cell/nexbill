@@ -115,12 +115,18 @@ export async function addItemsToBill(orderId: string, items: BillItemInput[], st
   return recomputeBillTotals(orderId);
 }
 
-/** Insert (first time) or update (on extend-then-stop-again edge cases) the rental charge line — called from stopRentalSession. */
-export async function upsertRentalLineItem(orderId: string, params: { description: string; amount: number }) {
+/** Insert (first time) or update (on extend-then-stop-again edge cases) the rental charge line — called from stopRentalSession.
+ * When rentalSessionId is provided, the existing-row lookup is scoped to that session too — this
+ * matters when a single order carries rental items from more than one session (e.g. two TVs billed
+ * together before any merge), so stopping one session's rental never overwrites another's line item. */
+export async function upsertRentalLineItem(orderId: string, params: { description: string; amount: number; rentalSessionId?: string }) {
+  const conditions = [eq(orderItems.orderId, orderId), eq(orderItems.itemType, "rental")];
+  if (params.rentalSessionId) conditions.push(eq(orderItems.rentalSessionId, params.rentalSessionId));
+
   const [existing] = await db
     .select()
     .from(orderItems)
-    .where(and(eq(orderItems.orderId, orderId), eq(orderItems.itemType, "rental")))
+    .where(and(...conditions))
     .limit(1);
 
   if (existing) {
@@ -132,6 +138,7 @@ export async function upsertRentalLineItem(orderId: string, params: { descriptio
     await db.insert(orderItems).values({
       orderId,
       productId: null,
+      rentalSessionId: params.rentalSessionId ?? null,
       description: params.description,
       qty: 1,
       unitPrice: params.amount,

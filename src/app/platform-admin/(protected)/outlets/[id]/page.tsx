@@ -17,7 +17,7 @@ const STATUS_LABEL: Record<string, string> = { active: "Aktif", grace: "Tenggang
 const ROLE_LABEL: Record<string, string> = { superuser: "Superuser", owner: "Owner", manager: "Manager", cashier: "Kasir", accountant: "Akuntan", kitchen: "Dapur", supervisor: "Supervisor" };
 
 interface Detail {
-  outlet: { id: string; name: string; address: string | null; phone: string | null; createdAt: string; isActive: boolean };
+  outlet: { id: string; name: string; address: string | null; phone: string | null; createdAt: string; isActive: boolean; tuyaUseSharedPlatformAccount: boolean; tuyaAccessId: string | null };
   subscription: { status: string; trialEndsAt: string } | null;
   plan: { name: string; priceCurrent: number } | null;
   staff: { id: string; name: string; email: string; role: string; isActive: boolean }[];
@@ -106,6 +106,31 @@ export default function PlatformOutletDetailPage() {
       const res = await fetch(`/api/platform-admin/outlets/${id}/free-forever`, { method: "DELETE" });
       const d = await res.json();
       if (!res.ok) { await showAlert(d.error ?? "Gagal mencabut akses gratis selamanya."); return; }
+      load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleTuyaSharedAccount = async () => {
+    if (!data) return;
+    const next = !data.outlet.tuyaUseSharedPlatformAccount;
+    const ok = await showConfirm(
+      next
+        ? `Jadikan "${data.outlet.name}" memakai akun Tuya Cloud API BERSAMA (legacy) milik NEXBILL? Hanya untuk pengecualian outlet lama (mis. Xtream Playstation) yang sudah lebih dulu terhubung ke akun bersama — outlet baru seharusnya pakai akun Tuya sendiri lewat Settings mereka.`
+        : `Lepas "${data.outlet.name}" dari akun Tuya Cloud API bersama? Outlet ini wajib sudah mengisi Access ID/Secret miliknya sendiri di Settings, kalau tidak device Tuya-nya akan berhenti merespon.`,
+      { tone: next ? "default" : "danger" }
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/platform-admin/outlets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tuyaUseSharedPlatformAccount: next }),
+      });
+      const d = await res.json();
+      if (!res.ok) { await showAlert(d.error ?? "Gagal mengubah pengaturan Tuya."); return; }
       load();
     } finally {
       setBusy(false);
@@ -232,6 +257,24 @@ export default function PlatformOutletDetailPage() {
             <Button variant="danger" onClick={revokeFreeForever} disabled={busy}>Cabut Akses Gratis</Button>
           ) : (
             <Button onClick={grantFreeForever} disabled={busy}>Jadikan Gratis Selamanya</Button>
+          )}
+        </div>
+      </Card>
+
+      <Card className="border border-amber-700/40 bg-amber-950/10">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="gm-heading font-semibold">Akun Tuya Cloud API Bersama (Legacy)</h2>
+            <p className="text-xs text-neutral-500 mt-1 max-w-lg">
+              {data.outlet.tuyaUseSharedPlatformAccount
+                ? "Outlet ini sedang pakai akun Tuya Cloud API BERSAMA milik NEXBILL (pengecualian legacy) — Access ID/Secret di Settings outlet ini boleh kosong."
+                : `Default untuk semua outlet: wajib pakai akun Tuya Cloud API sendiri (${data.outlet.tuyaAccessId ? "sudah diisi" : "BELUM diisi"} di Settings outlet ini). Aktifkan toggle ini HANYA untuk pengecualian outlet lama yang sudah lebih dulu terhubung ke akun bersama (mis. Xtream Playstation).`}
+            </p>
+          </div>
+          {data.outlet.tuyaUseSharedPlatformAccount ? (
+            <Button variant="danger" onClick={toggleTuyaSharedAccount} disabled={busy}>Lepas dari Akun Bersama</Button>
+          ) : (
+            <Button variant="secondary" onClick={toggleTuyaSharedAccount} disabled={busy}>Jadikan Pengecualian Akun Bersama</Button>
           )}
         </div>
       </Card>

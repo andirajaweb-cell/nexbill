@@ -1265,7 +1265,11 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
           <Card key={inv.id} className="flex items-center justify-between gap-2">
             <div>
               <div className="text-sm font-medium">{inv.invoiceNumber ?? `INV #${inv.id.slice(0, 8)}`} — {rupiah(inv.amount)}</div>
-              <div className="text-xs text-neutral-500">{new Date(inv.invoiceDate).toLocaleDateString("id-ID")}</div>
+              <div className="text-xs text-neutral-500">
+                {new Date(inv.invoiceDate).toLocaleDateString("id-ID")}
+                {" · "}
+                {t("inventory.supplierPurchase.purchasedBy", "Dibeli oleh")} {inv.staffName ?? "-"}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Badge status={inv.status === "cancelled" ? "failed" : inv.status === "paid" ? "available" : inv.status === "partial" ? "pending" : "maintenance"}>{inv.status}</Badge>

@@ -11,28 +11,6 @@ import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-payments";
 
-/** Fixed, exact key <-> label pairs for the "Aktifkan Kanal iPaymu" quick-add panel — must match
- * ALLOWED_PRESET_KEYS in /api/payment-methods/route.ts and the registry in lib/payments/index.ts
- * exactly, letter for letter, or the channel silently falls back to the generic manual gateway
- * instead of actually calling iPaymu. Not derived from PAYMENT_METHOD_LABEL to avoid an accidental
- * import of a server-oriented module tree into this client page; kept as its own small, obviously
- * correct list instead. "ipaymu_crossborder" deliberately omitted — that channel is wired only for
- * the platform-billing/subscription checkout, not outlet POS/Rental.
- */
-const IPAYMU_QUICK_ADD: { key: string; label: string }[] = [
-  { key: "ipaymu_qris", label: "QRIS (iPaymu)" },
-  { key: "ipaymu_va_bca", label: "VA BCA (iPaymu)" },
-  { key: "ipaymu_va_bni", label: "VA BNI (iPaymu)" },
-  { key: "ipaymu_va_mandiri", label: "VA Mandiri (iPaymu)" },
-  { key: "ipaymu_va_bri", label: "VA BRI (iPaymu)" },
-  { key: "ipaymu_va_permata", label: "VA Permata (iPaymu)" },
-  { key: "ipaymu_dana", label: "DANA (iPaymu)" },
-  { key: "ipaymu_shopeepay", label: "ShopeePay (iPaymu)" },
-  { key: "ipaymu_alfamart", label: "Alfamart (iPaymu)" },
-  { key: "ipaymu_indomaret", label: "Indomaret (iPaymu)" },
-  { key: "ipaymu_hosted", label: "iPaymu (Pilih Kanal)" },
-];
-
 type Method = {
   id: string;
   key: string;
@@ -82,8 +60,6 @@ export default function PaymentsPage() {
       </div>
 
       {outletId && <MethodsPanel outletId={outletId} methods={methods} canManage={canManage} onChanged={load} />}
-
-      {outletId && canManage && <IpaymuQuickAdd outletId={outletId} methods={methods} onChanged={load} />}
     </div>
   );
 }
@@ -160,10 +136,22 @@ function MethodsPanel({ outletId, methods, canManage, onChanged }: { outletId: s
       {canManage && (
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-2 border-t border-neutral-800 items-end">
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs sm:col-span-2" placeholder={t("payments.labelPlaceholder", "Nama metode (mis. OVO, ShopeePay)")} value={label} onChange={(e) => setLabel(e.target.value)} disabled={!!editingId && methods.find((m) => m.id === editingId)?.kind === "cash"} />
-          <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={kind} onChange={(e) => setKind(e.target.value as Method["kind"])} disabled={!!editingId && methods.find((m) => m.id === editingId)?.kind === "cash"}>
+          <select
+            className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as Method["kind"])}
+            disabled={!!editingId && methods.find((m) => m.id === editingId)?.kind === "cash"}
+            title={kindLabel(kind, t)}
+          >
             <option value="info_only">{t("payments.kindOption.infoOnly", "Info Saja")}</option>
             <option value="balance_tracked">{t("payments.kindOption.balanceTracked", "Saldo Terlacak")}</option>
           </select>
+          <p className="sm:col-span-5 text-[11px] text-neutral-500 leading-relaxed -mt-1">
+            {t(
+              "payments.kindHelp",
+              "Pilih \"Info Saja\" kalau uangnya langsung masuk ke rekening bank/EDC outlet tanpa perlu dicek lagi (mis. transfer bank, kartu debit/kredit) — sistem cukup mencatat sudah dibayar. Pilih \"Saldo Terlacak\" kalau uangnya masuk ke saldo aplikasi outlet sendiri (mis. saldo DANA/GoPay/ShopeePay milik outlet) — saat tutup shift, kasir akan diminta mencocokkan saldo aplikasi itu dengan total transaksi hari ini, supaya ketahuan kalau ada selisih."
+            )}
+          </p>
           <input
             type="number"
             step="0.01"
@@ -194,48 +182,14 @@ function MethodsPanel({ outletId, methods, canManage, onChanged }: { outletId: s
   );
 }
 
-function IpaymuQuickAdd({ outletId, methods, onChanged }: { outletId: string; methods: Method[]; onChanged: () => void }) {
-  const { t } = useDashboardLang();
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const existingKeys = new Set(methods.map((m) => m.key));
-
-  const addChannel = async (key: string, label: string) => {
-    setBusyKey(key);
-    try {
-      const res = await fetch("/api/payment-methods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ outletId, label, kind: "info_only", isActive: true, feePercent: 0, presetKey: key }),
-      });
-      const out = await res.json();
-      if (!res.ok) return showAlert(out.error);
-      onChanged();
-    } finally {
-      setBusyKey(null);
-    }
-  };
-
-  return (
-    <Card className="space-y-2">
-      <h2 className="font-medium">{t("payments.ipaymu.title", "Aktifkan Kanal iPaymu")}</h2>
-      <p className="text-xs text-neutral-500">{t("payments.ipaymu.desc", "Klik untuk menambah kanal iPaymu ke daftar metode pembayaran outlet ini dengan key yang sudah pasti benar (jangan tambah manual lewat form di atas — resiko salah ketik key, kanal jadi tidak tersambung ke iPaymu). Setelah ditambah, kanal langsung muncul sebagai pilihan di kasir POS/Rental dan siap menerima pembayaran sungguhan dari pelanggan. Kalau ada kanal yang belum bisa dipakai untuk transaksi asli, hubungi tim support NEXBILL.")}</p>
-      <div className="flex flex-wrap gap-2 pt-1">
-        {IPAYMU_QUICK_ADD.map(({ key, label }) => {
-          const added = existingKeys.has(key);
-          return (
-            <Button
-              key={key}
-              variant={added ? "ghost" : "secondary"}
-              className="text-xs"
-              disabled={added || busyKey === key}
-              onClick={() => addChannel(key, label)}
-              title={label}
-            >
-              {label} — {added ? t("payments.ipaymu.added", "Sudah ditambah") : t("payments.ipaymu.add", "+ Tambah")}
-            </Button>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
+// The "Aktifkan Kanal iPaymu" quick-add panel that used to live here was removed 2026-09-13: the
+// platform's IPAYMU_VA/IPAYMU_API_KEY account is provisioned specifically for merchant/outlet →
+// NEXBILL payments (subscription invoices, platform purchases — see lib/subscription/service.ts
+// and dashboard/billing), never for accepting a customer's payment on behalf of an outlet. A
+// customer paying an outlet's POS/Rental bill through one of these channels would have had that
+// money land in NEXBILL's own iPaymu balance instead of the outlet's — this panel offered exactly
+// that by mistake, so it's gone rather than fixed in place. See lib/payments/index.ts for the
+// matching registry cleanup (ipaymu_qris/va_*/dana/shopeepay/alfamart/indomaret deregistered —
+// any pre-existing outlet payment-method row using one of those keys now safely falls back to the
+// generic manual/staff-confirmed gateway instead of actually calling iPaymu) and
+// /api/payment-methods/route.ts (presetKey mechanism removed, it only ever existed for this panel).

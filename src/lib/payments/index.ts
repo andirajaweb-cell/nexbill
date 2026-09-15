@@ -3,20 +3,7 @@ import { cashGateway } from "./adapters/cash";
 import { fastpayGateway } from "./adapters/fastpay";
 import { danaGateway, gopayGateway } from "./adapters/ewallet-via-fastpay";
 import { bukupayGateway } from "./adapters/bukupay";
-import {
-  ipaymuCrossBorderGateway,
-  ipaymuHostedGateway,
-  ipaymuQrisGateway,
-  ipaymuVaBcaGateway,
-  ipaymuVaBniGateway,
-  ipaymuVaMandiriGateway,
-  ipaymuVaBriGateway,
-  ipaymuVaPermataGateway,
-  ipaymuDanaGateway,
-  ipaymuShopeepayGateway,
-  ipaymuAlfamartGateway,
-  ipaymuIndomaretGateway,
-} from "./adapters/ipaymu";
+import { ipaymuCrossBorderGateway, ipaymuHostedGateway } from "./adapters/ipaymu";
 import { manualGateway } from "./adapters/manual";
 import { db, type DbOrTx } from "@/db/client";
 import { payments, orders, receivables } from "@/db/schema";
@@ -24,7 +11,12 @@ import { eq, and, sql } from "drizzle-orm";
 import { postSalesJournal, postReceivableSettlement, postDepositJournal } from "@/lib/accounting/postings";
 import { applyLoyaltyAndSpending } from "@/lib/membership/loyalty";
 
-const registry: Record<PaymentMethod, PaymentGateway> = {
+// Partial, not Record<PaymentMethod, PaymentGateway>: several PaymentMethod keys (the outlet-
+// facing ipaymu_qris/va_*/dana/shopeepay/alfamart/indomaret channels — see the comment below)
+// deliberately have NO live gateway registered anymore. resolveGateway()'s fallback already
+// handles a missing entry by returning the generic manual/staff-confirmed gateway, so this was
+// always meant to be a lookup table with gaps, not a totally-exhaustive one.
+const registry: Partial<Record<PaymentMethod, PaymentGateway>> = {
   cash: cashGateway,
   qris: fastpayGateway, // plain QRIS also goes through Fastpay H2H
   fastpay_h2h: fastpayGateway,
@@ -33,25 +25,18 @@ const registry: Record<PaymentMethod, PaymentGateway> = {
   bukupay: bukupayGateway,
   transfer: manualGateway("transfer", "TRF"),
   card: manualGateway("card", "CARD"),
-  // Cross-border NEXBILL Standard subscription checkout (see /platform-admin/market-risk +
-  // lib/subscription/service.ts) — NOT used anywhere in the outlet-facing POS flow above.
+  // NEXBILL's IPAYMU_VA/IPAYMU_API_KEY account is provisioned for merchant/outlet → NEXBILL
+  // payments only (subscription invoices, platform purchases — see lib/subscription/service.ts
+  // and dashboard/billing). Both keys below back THAT flow, never outlet POS/Rental checkout.
   ipaymu_crossborder: ipaymuCrossBorderGateway,
-  // Previously exported but never registered here — doPay(id, "ipaymu_hosted") on the Billing
-  // page called this method key for years without any gateway ever answering it (400).
   ipaymu_hosted: ipaymuHostedGateway,
-  // Real iPaymu channels for the outlet-facing POS/rental checkout — an outlet opts into any of
-  // these by adding a matching-`key` row to its own Pembayaran (paymentMethods) catalog; nothing
-  // else needs to change for a new one to start working. See lib/payments/adapters/ipaymu.ts.
-  ipaymu_qris: ipaymuQrisGateway,
-  ipaymu_va_bca: ipaymuVaBcaGateway,
-  ipaymu_va_bni: ipaymuVaBniGateway,
-  ipaymu_va_mandiri: ipaymuVaMandiriGateway,
-  ipaymu_va_bri: ipaymuVaBriGateway,
-  ipaymu_va_permata: ipaymuVaPermataGateway,
-  ipaymu_dana: ipaymuDanaGateway,
-  ipaymu_shopeepay: ipaymuShopeepayGateway,
-  ipaymu_alfamart: ipaymuAlfamartGateway,
-  ipaymu_indomaret: ipaymuIndomaretGateway,
+  // The outlet-facing "ipaymu_qris"/"ipaymu_va_bca"/etc. channels (and their "Aktifkan Kanal
+  // iPaymu" quick-add panel on dashboard/payments) were removed 2026-09-13 — that offered outlets
+  // a way to collect CUSTOMER payments through NEXBILL's own shared iPaymu account, which would
+  // have deposited the customer's money into NEXBILL's balance instead of the outlet's. Any
+  // pre-existing paymentMethods row still using one of those keys (from before this fix) now
+  // resolves via resolveGateway()'s fallback below to the generic manual/staff-confirmed gateway
+  // instead — still usable at checkout, just no longer actually calling iPaymu.
 };
 
 export interface OrderPaymentSummary {

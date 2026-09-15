@@ -5,23 +5,35 @@ import { useAuth } from "@/lib/auth/client";
 import { useApi } from "@/lib/api/use-api";
 import { Button } from "@/components/ui/Button";
 import { Lock } from "lucide-react";
+import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import "@/lib/i18n/dict-shell";
 
-const STATUS_COPY: Record<string, { title: string; body: string }> = {
+// i18n key pairs per status — resolved via t() inside the component (hooks can't run at module
+// scope, so this can't be a plain STATUS_COPY string map like it used to be).
+const STATUS_COPY_KEYS: Record<string, { titleKey: string; titleFallback: string; bodyKey: string; bodyFallback: string }> = {
   trial_expired: {
-    title: "Masa Percobaan Berakhir",
-    body: "Masa percobaan 30 hari NEXBILL sudah berakhir. Selesaikan pembayaran langganan di halaman Langganan untuk membuka akses penuh kembali.",
+    titleKey: "subGate.trialExpired.title",
+    titleFallback: "Masa Percobaan Berakhir",
+    bodyKey: "subGate.trialExpired.body",
+    bodyFallback: "Masa percobaan 30 hari NEXBILL sudah berakhir. Selesaikan pembayaran langganan di halaman Langganan untuk membuka akses penuh kembali.",
   },
   pending_payment: {
-    title: "Menunggu Pembayaran",
-    body: "Checkout sudah dibuat tapi belum lunas. Selesaikan tagihan di halaman Langganan untuk mengaktifkan akses.",
+    titleKey: "subGate.pendingPayment.title",
+    titleFallback: "Menunggu Pembayaran",
+    bodyKey: "subGate.pendingPayment.body",
+    bodyFallback: "Checkout sudah dibuat tapi belum lunas. Selesaikan tagihan di halaman Langganan untuk mengaktifkan akses.",
   },
   suspended: {
-    title: "Langganan Ditangguhkan",
-    body: "Masa tenggang (toleransi) pembayaran sudah habis tanpa pelunasan. Selesaikan tagihan di halaman Langganan untuk membuka akses kembali — data outlet-mu tetap aman.",
+    titleKey: "subGate.suspended.title",
+    titleFallback: "Langganan Ditangguhkan",
+    bodyKey: "subGate.suspended.body",
+    bodyFallback: "Masa tenggang (toleransi) pembayaran sudah habis tanpa pelunasan. Selesaikan tagihan di halaman Langganan untuk membuka akses kembali — data outlet-mu tetap aman.",
   },
   cancelled: {
-    title: "Langganan Dibatalkan",
-    body: "Langganan outlet ini sudah dibatalkan. Berlangganan kembali lewat halaman Langganan untuk membuka akses.",
+    titleKey: "subGate.cancelled.title",
+    titleFallback: "Langganan Dibatalkan",
+    bodyKey: "subGate.cancelled.body",
+    bodyFallback: "Langganan outlet ini sudah dibatalkan. Berlangganan kembali lewat halaman Langganan untuk membuka akses.",
   },
 };
 
@@ -38,6 +50,7 @@ const STATUS_COPY: Record<string, { title: string; body: string }> = {
  * either role in the first place).
  */
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
+  const { t } = useDashboardLang();
   const { user, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -62,7 +75,8 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   // screen for every paid outlet on every single page load.
   if (authLoading || !gate || !gate.isLocked) return <>{children}</>;
 
-  const copy = STATUS_COPY[gate.status] ?? STATUS_COPY.suspended;
+  const copyKeys = STATUS_COPY_KEYS[gate.status] ?? STATUS_COPY_KEYS.suspended;
+  const copy = { title: t(copyKeys.titleKey, copyKeys.titleFallback), body: t(copyKeys.bodyKey, copyKeys.bodyFallback) };
   // Which outlet is locked — the owner's spec explicitly asked for the merchant/outlet identity to
   // appear on this screen, not just generic copy (useful when an Owner account is linked to
   // multiple outlets and needs to tell at a glance which one this lockout is for).
@@ -78,9 +92,9 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
         <h1 className="text-xl font-bold text-rose-300 gm-display">{copy.title}</h1>
         <p className="text-sm text-neutral-400">{copy.body}</p>
         <Button className="w-full" onClick={() => router.push("/dashboard/billing")}>
-          Perpanjang / Bayar Sekarang
+          {t("subGate.renewNow", "Perpanjang / Bayar Sekarang")}
         </Button>
-        <p className="text-[11px] text-neutral-600">Data outlet-mu aman dan tidak hilang — semua fitur terbuka otomatis begitu pembayaran diterima.</p>
+        <p className="text-[11px] text-neutral-600">{t("subGate.footerNote", "Data outlet-mu aman dan tidak hilang — semua fitur terbuka otomatis begitu pembayaran diterima.")}</p>
       </div>
     </div>
   );

@@ -1,7 +1,20 @@
 import { db } from "@/db/client";
-import { sessionAccessories, orderItems } from "@/db/schema";
+import { sessionAccessories, orderItems, outlets, rentalSessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { recomputeBillTotals } from "@/lib/pos/bill";
+
+export type AccessoryBillingMode = "per_hour" | "per_use";
+
+/** Looks up the outlet's accessory pricing policy (Settings > Pajak & Billing > "Kebijakan Tarif
+ * Aksesoris") via the rental session's outlet — shared by the live estimate and the final billing
+ * so both always agree. Defaults to "per_hour" (the original, only-ever behavior) if anything's
+ * missing, so this never throws for an outlet that predates the column. */
+async function getAccessoryBillingMode(rentalSessionId: string): Promise<AccessoryBillingMode> {
+  const [session] = await db.select({ outletId: rentalSessions.outletId }).from(rentalSessions).where(eq(rentalSessions.id, rentalSessionId)).limit(1);
+  if (!session) return "per_hour";
+  const [outlet] = await db.select({ accessoryBillingMode: outlets.accessoryBillingMode }).from(outlets).where(eq(outlets.id, session.outletId)).limit(1);
+  return (outlet?.accessoryBillingMode as AccessoryBillingMode) ?? "per_hour";
+}
 
 export interface AddAccessoryInput {
   rentalSessionId: string;
@@ -11,10 +24,13 @@ export interface AddAccessoryInput {
   staffUserId?: string | null;
 }
 
-/** Start the per-hour clock for an extra controller/accessory attached to an active session. */
+/** Start the billing clock for an extra controller/accessory attached to an active session — the
+ * stored `ratePerHour` is interpreted as either an hourly rate or a flat per-use price depending
+ * on the outlet's accessoryBillingMode setting at finalize/estimate time (see
+ * getAccessoryBillingMode above); this function itself is agnostic to that policy. */
 export async function addAccessory(input: AddAccessoryInput) {
   if (input.qty <= 0) throw new Error("Jumlah aksesoris harus lebih dari 0.");
-  if (input.ratePerHour < 0) throw new Error("Tarif per jam tidak boleh negatif.");
+  if (input.ratePerHour < 0) throw new Error("Tarif aksesoris tidak boleh negatif.");
   const [row] = await db
     .insert(sessionAccessories)
     .values({
@@ -45,8 +61,18 @@ export async function removeAccessory(accessoryId: string) {
   return row;
 }
 
-/** Live (unrounded) estimate for the running bill / billing board — pure computation, writes nothing. Note: unlike the main PS rental clock, this doesn't pause when the session pauses — kept simple since a customer typically returns accessories rather than pausing them independently. */
-export function estimateAccessoryCharge(accessory: { qty: number; ratePerHour: number; addedAt: string; removedAt: string | null }, now = Date.now()) {
+/** Live (unrounded) estimate for the running bill / billing board — pure computation, writes
+ * nothing. Note: unlike the main PS rental clock, this doesn't pause when the session pauses —
+ * kept simple since a customer typically returns accessories rather than pausing them
+ * independently. mode defaults to "per_hour" (the only behavior that ever existed) so any caller
+ * that hasn't been updated to pass the outlet's policy keeps working exactly as before. In
+ * "per_use" mode, ratePerHour is charged once per qty regardless of elapsed time. */
+export function estimateAccessoryCharge(
+  accessory: { qty: number; ratePerHour: number; addedAt: string; removedAt: string | null },
+  now = Date.now(),
+  mode: AccessoryBillingMode = "per_hour"
+) {
+  if (mode === "per_use") return Math.round(accessory.qty * accessory.ratePerHour);
   const endMs = accessory.removedAt ? new Date(accessory.removedAt).getTime() : now;
   const hours = Math.max(0, (endMs - new Date(accessory.addedAt).getTime()) / 3600000);
   return Math.round(accessory.qty * accessory.ratePerHour * hours);
@@ -60,20 +86,28 @@ export function estimateAccessoryCharge(accessory: { qty: number; ratePerHour: n
  * An accessory still active at stop time (no removedAt) bills through to the
  * session's actual stop timestamp; one already returned mid-session bills only
  * for the time it was genuinely out.
+ *
+ * Branches on the outlet's accessoryBillingMode (Settings > Pajak & Billing > "Kebijakan Tarif
+ * Aksesoris" — see getAccessoryBillingMode above): "per_hour" (default) bills ratePerHour * hours
+ * held, same as always; "per_use" bills ratePerHour once per qty, flat, regardless of duration —
+ * the description drops the "(X jam)" suffix in that mode since duration no longer affects price.
  */
 export async function finalizeAccessoryCharges(rentalSessionId: string, orderId: string, stopTimeMs: number) {
   const accessories = await listSessionAccessories(rentalSessionId);
+  if (accessories.length === 0) return 0;
+  const mode = await getAccessoryBillingMode(rentalSessionId);
   let total = 0;
   for (const acc of accessories) {
     const endMs = acc.removedAt ? new Date(acc.removedAt).getTime() : stopTimeMs;
     const hours = Math.max(0, (endMs - new Date(acc.addedAt).getTime()) / 3600000);
-    const amount = Math.round(acc.qty * acc.ratePerHour * hours);
+    const amount = mode === "per_use" ? Math.round(acc.qty * acc.ratePerHour) : Math.round(acc.qty * acc.ratePerHour * hours);
     if (amount <= 0) continue;
     total += amount;
+    const description = mode === "per_use" ? `Rental: ${acc.name} x${acc.qty} (per pemakaian)` : `Rental: ${acc.name} x${acc.qty} (${hours.toFixed(2)} jam)`;
     await db.insert(orderItems).values({
       orderId,
       productId: null,
-      description: `Rental: ${acc.name} x${acc.qty} (${hours.toFixed(2)} jam)`,
+      description,
       qty: 1,
       unitPrice: amount,
       lineTotal: amount,

@@ -5,6 +5,7 @@ import { SubscriptionGate } from "@/components/dashboard/SubscriptionGate";
 import { AnnouncementPopup } from "@/components/dashboard/AnnouncementPopup";
 import { GracePaymentReminderPopup } from "@/components/dashboard/GracePaymentReminderPopup";
 import { EmailVerificationBanner } from "@/components/dashboard/EmailVerificationBanner";
+import { DashboardFooter } from "@/components/dashboard/DashboardFooter";
 import { DashboardLangProvider } from "@/lib/i18n/dashboard-lang";
 import { DashboardThemeProvider, ANTI_FLASH_SCRIPT } from "@/lib/ui/dashboard-theme";
 import "./dashboard-theme.css";
@@ -30,12 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <EmailVerificationBanner />
                 <SubscriptionGate>{children}</SubscriptionGate>
               </main>
-              <footer className="px-6 py-3 text-center text-xs text-neutral-600 border-t border-neutral-900">
-                &copy; {new Date().getFullYear()} &mdash; Dibuat oleh{" "}
-                <a href="https://www.digitrajasa.web.id" target="_blank" rel="noreferrer" className="text-cyan-500 hover:text-cyan-400 underline underline-offset-2">
-                  Digitrajasa
-                </a>
-              </footer>
+              <DashboardFooter />
             </div>
           </div>
         </DashboardThemeProvider>

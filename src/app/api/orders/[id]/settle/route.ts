@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getOrderPaymentSummary, initiatePayment, markPaymentSuccess } from "@/lib/payments";
+import { getOrderPaymentSummary, initiatePayment, markPaymentSuccess, settleOrderAfterPayment } from "@/lib/payments";
 import { describeError } from "@/lib/api/error";
 
 /**
@@ -48,6 +48,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
       await markPaymentSuccess(payment.id);
     }
+
+    // Covers the case where paidTotal already matched (or now matches) order.total but
+    // order.status never got flipped to "paid" — e.g. a rental "Koreksi Nominal" (see
+    // correctRentalCharge) lowered the total to exactly what was already collected, or an older
+    // payment path updated `payments` without going through settleOrderAfterPayment. Both branches
+    // above only act when there's a pending payment to confirm or a real remaining balance, so a
+    // stuck "Sebagian"/"Menunggu Bayar" order with remaining == 0 would otherwise silently no-op
+    // here forever, even after clicking "Tandai Lunas" repeatedly. Passing "" for paymentId is the
+    // same safe re-evaluate-with-no-specific-new-payment pattern stopRentalSession uses.
+    await settleOrderAfterPayment(id, "");
 
     const finalSummary = await getOrderPaymentSummary(id);
     return NextResponse.json({ ok: true, order: finalSummary?.order });

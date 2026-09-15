@@ -371,7 +371,25 @@ export async function getTransactionDetail(orderId: string) {
   const paymentRows = await db.select().from(payments).where(eq(payments.orderId, orderId));
   const [customer] = order.customerId ? await db.select().from(customers).where(eq(customers.id, order.customerId)).limit(1) : [null];
   const [staff] = order.staffUserId ? await db.select().from(staffUsers).where(eq(staffUsers.id, order.staffUserId)).limit(1) : [null];
-  return { order, items, payments: paymentRows, customer, staff };
+
+  // Attach billing start/stop time to each rental line item — joined via the item's own
+  // rentalSessionId (not order.rentalSessionId, which is a single order-level FK and goes
+  // ambiguous/null once orders from more than one session have been merged; see mergeOrders()).
+  const sessionIds = [...new Set(items.map((i) => i.rentalSessionId).filter((id): id is string => !!id))];
+  const sessionRows = sessionIds.length
+    ? await db.select().from(rentalSessions).where(inArray(rentalSessions.id, sessionIds))
+    : [];
+  const sessionById = new Map(sessionRows.map((s) => [s.id, s]));
+  const itemsWithSession = items.map((item) => {
+    const session = item.rentalSessionId ? sessionById.get(item.rentalSessionId) : undefined;
+    return {
+      ...item,
+      rentalStartedAt: session?.startedAt ?? null,
+      rentalEndedAt: session?.endedAt ?? null,
+    };
+  });
+
+  return { order, items: itemsWithSession, payments: paymentRows, customer, staff };
 }
 
 export interface CashierPerformanceRow {

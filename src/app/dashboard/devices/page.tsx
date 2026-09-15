@@ -75,6 +75,16 @@ function parseAndroidTvConfig(config: string | null): { ip: string; port: string
   }
 }
 
+// 2x the heartbeat sweep interval (scripts/device-heartbeat.ts polls every 3 minutes) — a TV that
+// hasn't been seen in over one missed cycle is flagged, without false-alarming on a single slow
+// tick. lastSeenAt only advances on a successful getState (see lib/devices/heartbeat.ts's doc
+// comment), so this naturally goes stale the moment a TV stops responding, heartbeat running or not.
+const TV_STALE_THRESHOLD_MS = 6 * 60_000;
+function isTvStale(lastSeenAt: string | null): boolean {
+  if (!lastSeenAt) return true;
+  return Date.now() - new Date(lastSeenAt).getTime() > TV_STALE_THRESHOLD_MS;
+}
+
 const emptyForm = {
   name: "",
   protocol: "tasmota_mqtt",
@@ -103,6 +113,12 @@ export default function DevicesPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
+  // NEXBILL-branded smart plug claim (see lib/hardware/units.ts) — the outlet just types the
+  // serial printed on the unit's label instead of a protocol + MQTT topic; the topic was already
+  // pre-assigned (and pre-flashed onto the physical unit) before it shipped.
+  const [claimSerial, setClaimSerial] = useState("");
+  const [claimName, setClaimName] = useState("");
+  const [claiming, setClaiming] = useState(false);
 
   const load = () => {
     fetchJsonArray<Device>("/api/devices").then(setDevices);
@@ -161,6 +177,26 @@ export default function DevicesPage() {
     if (!res.ok) return showAlert(data.error);
     setForm(emptyForm);
     load();
+  };
+
+  const claimHardware = async () => {
+    if (!claimSerial.trim()) return showAlert(t("devices.hardware.serialRequired", "Nomor seri wajib diisi."));
+    if (!claimName.trim()) return showAlert(t("devices.alert.nameRequired", "Nama perangkat wajib diisi."));
+    setClaiming(true);
+    try {
+      const res = await fetch("/api/devices/claim-hardware", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serialNumber: claimSerial.trim(), name: claimName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setClaimSerial("");
+      setClaimName("");
+      load();
+    } finally {
+      setClaiming(false);
+    }
   };
 
   const toggle = async (id: string, on: boolean) => {
@@ -247,6 +283,35 @@ export default function DevicesPage() {
       {canManage && <DeviceSetupGuide />}
 
       {canManage && (
+        <Card className="border border-amber-700/40 bg-amber-950/10">
+          <h2 className="font-medium mb-1">{t("devices.hardware.claimTitle", "Klaim Smart Plug NEXBILL")}</h2>
+          <p className="text-xs text-neutral-500 mb-3">
+            {t(
+              "devices.hardware.claimDesc",
+              "Punya smart plug resmi NEXBILL? Ketik nomor seri yang tertera di label/QR unit — MQTT Topic sudah otomatis ter-setting dari pabrik, tidak perlu diisi manual."
+            )}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input
+              className={inputCls}
+              placeholder={t("devices.hardware.serialPlaceholder", "Nomor Seri (mis. NXB-4F7QATS2)")}
+              value={claimSerial}
+              onChange={(e) => setClaimSerial(e.target.value)}
+            />
+            <input
+              className={inputCls}
+              placeholder={t("devices.form.namePlaceholder", "Nama (mis. Plug Bilik 1)")}
+              value={claimName}
+              onChange={(e) => setClaimName(e.target.value)}
+            />
+            <Button onClick={claimHardware} disabled={claiming}>
+              {claiming ? t("devices.hardware.claiming", "Memproses...") : t("devices.hardware.claimButton", "Klaim Perangkat")}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {canManage && (
         <Card>
           <h2 className="font-medium mb-3">{t("devices.addDevice", "Tambah Perangkat")}</h2>
           <DeviceFormFields form={form} setForm={setForm} relayAgents={relayAgents} />
@@ -282,6 +347,13 @@ export default function DevicesPage() {
                     ? ` · via ${relayAgents.find((a) => a.id === parseAndroidTvConfig(d.config).relayAgentId)?.name ?? t("devices.relayNotFound", "agent tidak ditemukan")}`
                     : ""}
                 </div>
+                {(d.protocol === "android_tv_adb" || d.protocol === "android_tv_relay") && (
+                  <div className={`text-xs ${isTvStale(d.lastSeenAt) ? "text-amber-400" : "text-neutral-600"}`}>
+                    {d.lastSeenAt
+                      ? `${isTvStale(d.lastSeenAt) ? "⚠ " : ""}${t("devices.heartbeat.lastSeen", "Terakhir terlihat: {time}").replace("{time}", new Date(d.lastSeenAt).toLocaleString("id-ID"))}`
+                      : `⚠ ${t("devices.heartbeat.neverSeen", "Belum pernah terdeteksi merespon")}`}
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Button variant="secondary" className="flex-1 text-xs" onClick={() => toggle(d.id, true)}>{t("devices.action.turnOn", "Nyalakan")}</Button>
                   <Button variant="secondary" className="flex-1 text-xs" onClick={() => toggle(d.id, false)}>{t("devices.action.turnOff", "Matikan")}</Button>
@@ -349,6 +421,7 @@ function DeviceFormFields({
   const { t } = useDashboardLang();
   const cls = compact ? `${inputCls} text-xs px-2 py-1.5` : inputCls;
   return (
+    <>
     <div className={`grid grid-cols-2 ${compact ? "" : "sm:grid-cols-3"} gap-2`}>
       <input className={cls} placeholder={t("devices.form.namePlaceholder", "Nama (mis. Plug Bilik 1)")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
       <select className={cls} value={form.protocol} onChange={(e) => setForm({ ...form, protocol: e.target.value })}>
@@ -419,6 +492,15 @@ function DeviceFormFields({
         </>
       )}
     </div>
+    {form.protocol === "tasmota_mqtt" && (
+      <p className="text-[11px] text-neutral-500 mt-1">
+        {t(
+          "devices.form.mqttTopicUniqueHint",
+          "Semua outlet NEXBILL berbagi satu broker MQTT — pastikan MQTT Topic ini unik (tidak sama dengan outlet lain), mis. sertakan nama outlet: \"outletanda_plug_bilik1\". Harus sama persis dengan topic yang diisi di setting Tasmota device-nya."
+        )}
+      </p>
+    )}
+    </>
   );
 }
 

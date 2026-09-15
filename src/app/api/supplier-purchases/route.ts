@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(body.items) || body.items.length === 0) {
       return NextResponse.json({ error: "Minimal 1 item belanja." }, { status: 400 });
     }
-    const result = await recordSupplierPurchase({ ...body, outletId: session.outletId });
+    // staffUserId always comes from the session, never the client body — this is also what
+    // stamps "who bought this" on the invoice for audit (purchaseInvoices.staffUserId) and on
+    // each stock movement/payment row underneath it (see recordSupplierPurchase).
+    const result = await recordSupplierPurchase({ ...body, outletId: session.outletId, staffUserId: session.sub });
     return NextResponse.json(result);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

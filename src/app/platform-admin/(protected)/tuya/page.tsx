@@ -23,6 +23,8 @@ interface Account {
   accessSecret: string; // masked
   projectCode: string;
   region: string;
+  maxControllableDevices: number;
+  usedDevices: number;
   hasAccessSecret: boolean;
   updatedAt: string;
 }
@@ -30,7 +32,7 @@ interface Account {
 export default function PlatformTuyaPage() {
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ accessId: "", accessSecret: "", projectCode: "", region: "sg" });
+  const [form, setForm] = useState({ accessId: "", accessSecret: "", projectCode: "", region: "sg", maxControllableDevices: 10 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -46,7 +48,7 @@ export default function PlatformTuyaPage() {
       return;
     }
     setAccount(data);
-    setForm({ accessId: data.accessId ?? "", accessSecret: "", projectCode: data.projectCode ?? "", region: data.region ?? "sg" });
+    setForm({ accessId: data.accessId ?? "", accessSecret: "", projectCode: data.projectCode ?? "", region: data.region ?? "sg", maxControllableDevices: data.maxControllableDevices ?? 10 });
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -67,7 +69,7 @@ export default function PlatformTuyaPage() {
         return;
       }
       setAccount(data);
-      setForm({ accessId: data.accessId ?? "", accessSecret: "", projectCode: data.projectCode ?? "", region: data.region ?? "sg" });
+      setForm({ accessId: data.accessId ?? "", accessSecret: "", projectCode: data.projectCode ?? "", region: data.region ?? "sg", maxControllableDevices: data.maxControllableDevices ?? 10 });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -78,17 +80,31 @@ export default function PlatformTuyaPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="gm-display text-2xl font-bold text-amber-300">Tuya Cloud API</h1>
+        <h1 className="gm-display text-2xl font-bold text-amber-300">Tuya Cloud API (Akun Bersama — Legacy)</h1>
         <p className="text-sm text-neutral-500 mt-1">
-          SATU akun/Cloud Project Tuya bersama, dipakai untuk mengendalikan smart plug di SEMUA outlet/merchant — domestik Indonesia maupun negara lain — bukan lagi kredensial per-outlet. Access Secret tidak pernah ditampilkan setelah disimpan, hanya bisa diganti.
+          Sejak 2026-09-15, akun/Cloud Project di halaman ini BUKAN lagi default untuk outlet baru — setiap outlet baru wajib mengisi Tuya Cloud API miliknya SENDIRI di Settings mereka (lihat lib/devices/adapters/tuya.ts). Akun bersama ini hanya dipakai oleh outlet yang secara eksplisit ditandai "tuyaUseSharedPlatformAccount" dari halaman detail outlet masing-masing (mis. Xtream Playstation) — pengecualian legacy, bukan jalur utama. Access Secret tidak pernah ditampilkan setelah disimpan, hanya bisa diganti.
         </p>
       </div>
 
       <Card className="space-y-2">
         <p className="text-xs text-neutral-500">
-          <span className="text-neutral-300 font-medium">Region Singapore (sg)</span> mencakup: {SG_DC_COUNTRIES}. Selama akun Tuya Smart/Smart Life setiap merchant didaftarkan dengan negara yang termasuk daftar ini, satu akun ini cukup untuk menghubungkan device mereka semua. Merchant di negara di luar cakupan data center ini (mis. jauh di luar Asia Tenggara) butuh Cloud Project terpisah — belum didukung modul ini.
+          <span className="text-neutral-300 font-medium">Region Singapore (sg)</span> mencakup: {SG_DC_COUNTRIES}. Kredensial di bawah hanya berlaku untuk outlet yang ditandai memakai akun bersama ini. Outlet lain mengatur Tuya Cloud API-nya sendiri lewat Pengaturan mereka masing-masing, tidak lewat halaman ini.
         </p>
       </Card>
+
+      {account && (
+        <Card className={`space-y-1 border ${account.usedDevices >= account.maxControllableDevices ? "border-red-700/50 bg-red-950/20" : account.usedDevices >= account.maxControllableDevices * 0.8 ? "border-amber-700/50 bg-amber-950/20" : "border-white/10"}`}>
+          <div className="flex items-center justify-between">
+            <h2 className="font-medium">Kapasitas Device Terpakai (Pool Bersama)</h2>
+            <span className={`text-lg font-bold ${account.usedDevices >= account.maxControllableDevices ? "text-red-400" : account.usedDevices >= account.maxControllableDevices * 0.8 ? "text-amber-400" : "text-emerald-400"}`}>
+              {account.usedDevices} / {account.maxControllableDevices}
+            </span>
+          </div>
+          <p className="text-xs text-neutral-500">
+            Jumlah device dengan protokol Tuya milik outlet-outlet yang ditandai memakai akun bersama ini (pengecualian legacy). Kalau sudah penuh, penambahan device Tuya baru lewat akun ini akan ditolak otomatis (lihat assertSharedTuyaCapacityAvailable di lib/devices/adapters/tuya.ts) — pindahkan outlet ke akun Tuya sendiri, atau naikkan angka "Kapasitas Maksimal" di bawah kalau sudah upgrade tier langganan Tuya.
+          </p>
+        </Card>
+      )}
 
       <Card className="space-y-3">
         {loading ? (
@@ -124,6 +140,16 @@ export default function PlatformTuyaPage() {
                     <option key={r.value} value={r.value}>{r.label}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="text-xs text-neutral-500">Kapasitas Maksimal Device (sesuai tier Tuya — Trial=10)</label>
+                <input
+                  type="number"
+                  min={0}
+                  className={inputCls}
+                  value={form.maxControllableDevices}
+                  onChange={(e) => setForm({ ...form, maxControllableDevices: Math.max(0, Number(e.target.value) || 0) })}
+                />
               </div>
             </div>
             <div className="flex items-center gap-2">

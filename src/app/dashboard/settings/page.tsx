@@ -18,7 +18,7 @@ import { formatNumber } from "@/lib/format/number";
 import { formatDate } from "@/lib/format/date";
 import "@/lib/i18n/dict-settings";
 
-const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Banner Iklan", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
+const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "Banner Iklan", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
@@ -27,6 +27,7 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Cabang": { key: "settings.tab.branch", fallback: "Cabang" },
   "Satuan": { key: "settings.tab.unit", fallback: "Satuan" },
   "Kategori Produk": { key: "settings.tab.productCategory", fallback: "Kategori Produk" },
+  "Durasi Rental": { key: "settings.tab.durationPreset", fallback: "Durasi Rental" },
   "Banner Iklan": { key: "settings.tab.banner", fallback: "Banner Iklan" },
   "Notifikasi": { key: "settings.tab.notification", fallback: "Notifikasi" },
   "Feature Management": { key: "settings.tab.featureManagement", fallback: "Feature Management" },
@@ -87,6 +88,8 @@ export default function SettingsPage() {
         <UnitTab outletId={outletId} canManage={canManage} />
       ) : tab === "Kategori Produk" ? (
         <ProductCategoryTab outletId={outletId} canManage={canManage} />
+      ) : tab === "Durasi Rental" ? (
+        <DurationPresetTab outletId={outletId} canManage={canManage} />
       ) : tab === "Banner Iklan" ? (
         <BannerTab outletId={outletId} canManage={canManage} />
       ) : tab === "Notifikasi" ? (
@@ -294,7 +297,64 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
           <Field label={t("settings.field.serviceChargePercent", "Service Charge (%)")}><input type="number" className={inputCls} disabled={!canManage} value={form.serviceChargePercent ?? 0} onChange={(e) => setForm({ ...form, serviceChargePercent: Number(e.target.value) })} /></Field>
           <Field label={t("settings.field.billingRoundingMinutes", "Pembulatan Billing (menit)")}><input type="number" className={inputCls} disabled={!canManage} value={form.billingRoundingMinutes ?? 15} onChange={(e) => setForm({ ...form, billingRoundingMinutes: Number(e.target.value) })} /></Field>
           <Field label={t("settings.field.expenseApprovalThreshold", "Batas Approval Expense (Rp)")}><input type="number" className={inputCls} disabled={!canManage} value={form.expenseApprovalThreshold ?? 0} onChange={(e) => setForm({ ...form, expenseApprovalThreshold: Number(e.target.value) })} /></Field>
+          <Field label={t("settings.field.accessoryBillingMode", "Kebijakan Tarif Aksesoris")}>
+            <select className={inputCls} disabled={!canManage} value={form.accessoryBillingMode ?? "per_hour"} onChange={(e) => setForm({ ...form, accessoryBillingMode: e.target.value })}>
+              <option value="per_hour">{t("settings.field.accessoryBillingModePerHour", "Per Jam")}</option>
+              <option value="per_use">{t("settings.field.accessoryBillingModePerUse", "Per Pemakaian (flat)")}</option>
+            </select>
+          </Field>
         </div>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "settings.field.accessoryBillingModeDesc",
+            "Berlaku untuk aksesoris tambahan sesi rental (stick, VR, headset, dll — tombol \"+ Aksesoris\" di halaman Rental). \"Per Jam\": tarif dikalikan lama aksesoris dipakai (perilaku lama). \"Per Pemakaian\": tarif yang diisi saat menambahkan aksesoris langsung jadi harga flat sekali bayar, berapa pun lama dipakai."
+          )}
+        </p>
+      </Card>
+
+      <Card className="space-y-3 border border-amber-700/40 bg-amber-950/10">
+        <h2 className="font-medium">{t("settings.tuya.heading", "Integrasi Tuya Cloud API (Smart Plug Tuya)")}</h2>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "settings.tuya.desc",
+            "Kalau outlet ini pakai smart plug Tuya Smart Life (bukan Tasmota/hardware NEXBILL), isi kredensial Tuya Cloud API milik outlet SENDIRI di bawah — setiap outlet baru wajib punya akun sendiri, tidak lagi berbagi satu akun dengan outlet lain. Ini artinya masa aktif langganan Tuya (Trial/berbayar) dan batas jumlah device jadi tanggung jawab outlet ini sendiri."
+          )}
+        </p>
+        <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-300">
+          {t(
+            "settings.tuya.riskBanner",
+            "Risiko: akun Tuya Cloud API gratis (Trial) hanya berlaku ~1 bulan dan wajib diperpanjang manual, serta dibatasi maksimal 10 device yang bisa dikontrol. Kalau lupa diperpanjang, SEMUA smart plug Tuya outlet ini berhenti merespon sampai diperpanjang. Baca panduan lengkap & cara mengatasi cepat di Pusat Bantuan → Kontrol Perangkat."
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t("settings.tuya.accessId", "Access ID / Client ID")}>
+            <input className={inputCls} disabled={!canManage} value={form.tuyaAccessId ?? ""} onChange={(e) => setForm({ ...form, tuyaAccessId: e.target.value })} placeholder="mis. abcdef1234567890" />
+          </Field>
+          <Field label={t("settings.tuya.accessSecret", "Access Secret / Client Secret")}>
+            <input type="password" className={inputCls} disabled={!canManage} value={form.tuyaAccessSecret ?? ""} onChange={(e) => setForm({ ...form, tuyaAccessSecret: e.target.value })} placeholder="••••••••••••••••" />
+          </Field>
+          <Field label={t("settings.tuya.projectCode", "Project Code (opsional)")}>
+            <input className={inputCls} disabled={!canManage} value={form.tuyaProjectCode ?? ""} onChange={(e) => setForm({ ...form, tuyaProjectCode: e.target.value })} />
+          </Field>
+          <Field label={t("settings.tuya.region", "Data Center / Region")}>
+            <select className={inputCls} disabled={!canManage} value={form.tuyaRegion ?? "sg"} onChange={(e) => setForm({ ...form, tuyaRegion: e.target.value })}>
+              <option value="sg">{t("settings.tuya.regionSg", "Singapore (Indonesia/Malaysia/Thailand/Vietnam)")}</option>
+              <option value="cn">{t("settings.tuya.regionCn", "China")}</option>
+              <option value="us">{t("settings.tuya.regionUs", "Amerika (Barat)")}</option>
+              <option value="us_e">{t("settings.tuya.regionUsE", "Amerika (Timur)")}</option>
+              <option value="eu">{t("settings.tuya.regionEu", "Eropa (Tengah)")}</option>
+              <option value="eu_w">{t("settings.tuya.regionEuW", "Eropa (Barat)")}</option>
+              <option value="in">{t("settings.tuya.regionIn", "India")}</option>
+            </select>
+          </Field>
+        </div>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "settings.tuya.helpLinkDesc",
+            "Belum punya akun Tuya Cloud API? Lihat panduan lengkap (cara bikin akun, cara ambil Access ID/Secret, cara memperpanjang Trial, dan cara mengganti akun/email) di"
+          )}{" "}
+          <a href="/dashboard/help?category=devices" className="text-amber-400 hover:underline">{t("settings.tuya.helpLinkText", "Pusat Bantuan → Kontrol Perangkat")}</a>.
+        </p>
       </Card>
 
       <Card className="space-y-3">
@@ -977,6 +1037,112 @@ function ProductCategoryTab({ outletId, canManage }: { outletId: string; canMana
             </label>
             <div className="flex gap-1">
               <Button className="text-xs" onClick={save}>{editingId ? t("settings.common.save", "Simpan") : t("settings.productCategory.addButton", "Tambah Kategori")}</Button>
+              {editingId && <Button variant="ghost" className="text-xs" onClick={resetForm}>{t("settings.common.cancel", "Batal")}</Button>}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+interface DurationPresetRow {
+  id: string;
+  minutes: number;
+  label: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+/**
+ * Durasi Rental — per-outlet fixed-duration presets for the "Durasi" dropdown when starting a
+ * rental session (dashboard/rental > Mulai Sesi). Replaces what used to be a hardcoded
+ * 30/60/90/120/180/240-menit list — see the doc comment on rentalDurationPresets in db/schema.ts.
+ * Same CRUD pattern as Satuan/Kategori Produk above (upsert via POST, delete via DELETE). The
+ * always-first "Terbuka (tanpa batas waktu)" choice on the rental page is NOT managed here — it's
+ * a fixed, non-removable option baked into that page, since it drives different billing behavior
+ * (elapsed-time rounding) rather than being just another fixed duration.
+ */
+function DurationPresetTab({ outletId, canManage }: { outletId: string; canManage: boolean }) {
+  const [rows, setRows] = useState<DurationPresetRow[]>([]);
+  const [minutes, setMinutes] = useState("");
+  const [label, setLabel] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const { t } = useDashboardLang();
+
+  const load = () => fetchJsonArray<DurationPresetRow>(`/api/rental-duration-presets?outletId=${outletId}`).then((r) => setRows(r.sort((a, b) => a.sortOrder - b.sortOrder)));
+  useEffect(() => { load(); }, [outletId]);
+
+  const startEdit = (p: DurationPresetRow) => { setEditingId(p.id); setMinutes(String(p.minutes)); setLabel(p.label); setIsActive(p.isActive); };
+  const resetForm = () => { setEditingId(null); setMinutes(""); setLabel(""); setIsActive(true); };
+
+  const save = async () => {
+    if (!minutes || Number(minutes) <= 0) return showAlert(t("settings.durationPreset.minutesRequiredAlert", "Isi durasi dalam menit (lebih dari 0)."));
+    if (!label.trim()) return showAlert(t("settings.durationPreset.labelRequiredAlert", "Isi nama tampilan durasi."));
+    const res = await fetch("/api/rental-duration-presets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: editingId, outletId, minutes: Number(minutes), label, isActive }),
+    });
+    const out = await res.json();
+    if (!res.ok) return showAlert(out.error);
+    resetForm();
+    load();
+  };
+
+  const remove = async (p: DurationPresetRow) => {
+    if (!(await showConfirm(t("settings.durationPreset.deleteConfirm", 'Hapus preset "{label}"? Sesi yang sudah berjalan dengan durasi ini tidak terpengaruh, hanya hilang dari pilihan ke depannya.').replace("{label}", p.label)))) return;
+    const res = await fetch(`/api/rental-duration-presets/${p.id}`, { method: "DELETE" });
+    const out = await res.json();
+    if (!res.ok) return showAlert(out.error);
+    load();
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-neutral-500">
+        {t("settings.durationPreset.explainer", 'Preset durasi tetap (mis. "1 jam", "2 jam") yang muncul di dropdown "Durasi" saat kasir mulai sesi rental di halaman Rental PS. Sesi dengan durasi tetap otomatis berhenti dan ditagih pas sesuai durasi yang dipilih — tanpa pembulatan. Pilihan "Terbuka (tanpa batas waktu)" selalu tersedia di luar daftar ini.')}
+      </p>
+      <Card className="space-y-3">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-neutral-500 border-b border-neutral-800">
+              <th className="py-2">{t("settings.durationPreset.table.label", "Nama Tampilan")}</th>
+              <th>{t("settings.durationPreset.table.minutes", "Menit")}</th>
+              <th>{t("settings.durationPreset.table.status", "Status")}</th>
+              {canManage && <th></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => (
+              <tr key={p.id} className="border-b border-neutral-900 align-top">
+                <td className="py-2 font-medium">{p.label}</td>
+                <td className="text-xs text-neutral-500 font-mono">{p.minutes}</td>
+                <td><Badge status={p.isActive ? "on" : "off"}>{p.isActive ? t("settings.common.active", "Aktif") : t("settings.common.inactive", "Nonaktif")}</Badge></td>
+                {canManage && (
+                  <td className="flex gap-1 py-2 whitespace-nowrap">
+                    <Button variant="ghost" className="text-xs" onClick={() => startEdit(p)}>{t("settings.common.edit", "Edit")}</Button>
+                    <Button variant="ghost" className="text-xs text-red-400" onClick={() => remove(p)}>{t("settings.common.delete", "Hapus")}</Button>
+                  </td>
+                )}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={canManage ? 4 : 3} className="py-4 text-center text-neutral-500 text-xs">{t("settings.durationPreset.loadingRow", "Memuat preset durasi…")}</td></tr>
+            )}
+          </tbody>
+        </table>
+
+        {canManage && (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-neutral-800 items-end">
+            <input type="number" min={1} className={inputCls} placeholder={t("settings.durationPreset.minutesPlaceholder", "Menit (mis. 45)")} value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+            <input className={inputCls} placeholder={t("settings.durationPreset.labelPlaceholder", "Nama tampilan (mis. 45 menit)")} value={label} onChange={(e) => setLabel(e.target.value)} />
+            <label className="flex items-center gap-2 text-xs text-neutral-400">
+              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> {t("settings.common.active", "Aktif")}
+            </label>
+            <div className="flex gap-1">
+              <Button className="text-xs" onClick={save}>{editingId ? t("settings.common.save", "Simpan") : t("settings.durationPreset.addButton", "Tambah Preset")}</Button>
               {editingId && <Button variant="ghost" className="text-xs" onClick={resetForm}>{t("settings.common.cancel", "Batal")}</Button>}
             </div>
           </div>

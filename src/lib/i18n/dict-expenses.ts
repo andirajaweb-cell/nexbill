@@ -126,6 +126,7 @@ registerDict({
   "expenses.table.date": { id: "Tanggal", en: "Date", ms: "Tarikh", th: "วันที่", fil: "Petsa", vi: "Ngày" },
   "expenses.table.account": { id: "Akun", en: "Account", ms: "Akaun", th: "บัญชี", fil: "Account", vi: "Tài khoản" },
   "expenses.table.status": { id: "Status", en: "Status", ms: "Status", th: "สถานะ", fil: "Status", vi: "Trạng thái" },
+  "expenses.table.inputBy": { id: "Diinput Oleh", en: "Entered By", ms: "Dimasukkan Oleh", th: "บันทึกโดย", fil: "Ni-input Ni", vi: "Người nhập" },
 
   // --- Row action buttons ---
   "expenses.action.submit": { id: "Submit", en: "Submit", ms: "Hantar", th: "ส่ง", fil: "I-submit", vi: "Gửi" },

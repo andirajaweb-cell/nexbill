@@ -279,6 +279,7 @@ export async function startRentalSession(input: StartSessionInput) {
     await upsertRentalLineItem(bill.id, {
       description: `DP Sewa ${unit.name} (dibayar di muka)`,
       amount: input.prepay.amount,
+      rentalSessionId: session.id,
     });
     prepayment = await recordDeposit({
       orderId: bill.id,
@@ -341,9 +342,9 @@ export async function extendRentalSession(sessionId: string, additionalMinutes: 
 }
 
 /**
- * Stop a session: computes the final bill (flat package price with NO overtime for promo/package
- * sessions — see the no-overtime policy doc comment inline below for why — or plain rounded hourly
- * for a non-package session), frees the unit + powers off its TV/console, and finalizes the SAME
+ * Stop a session: computes the final bill (flat package price with no extra time-based charge for
+ * promo/package sessions — see the policy doc comment inline below for why — or plain rounded
+ * hourly for a non-package session), frees the unit + powers off its TV/console, and finalizes the SAME
  * unified bill that was opened back when the session started (openBillForSession) —
  * inserting/updating its "Rental: ..." line item — rather than creating a new order. Any F&B added
  * during the session is already sitting on that bill, so this just adds the rental charge alongside
@@ -386,8 +387,13 @@ export async function stopRentalSession(sessionId: string) {
     const overtimeRounded = roundUpMinutes(overtimeMinutesRaw, roundingMinutes);
     const packagePrice = session.promoPackagePrice ?? promo?.packagePrice ?? 0;
     // POLICY (explicit decision, confirmed with the owner 2026-09-13): package/promo sessions are
-    // billed a FLAT packagePrice — overtime is never added, no matter how much later the session
-    // actually stops than its allowed time. This used to add
+    // billed a FLAT packagePrice — no extra charge is ever added for time run past the allowed
+    // duration, no matter how much later the session actually stops. NOTE ON TERMINOLOGY: this is
+    // NOT the same concept as Home Rental's "overtime"/late-fee policy (lib/home-rental/policy.ts,
+    // late_fee_tier) — that module genuinely CHARGES a denda for a late return. PS Rental (venue
+    // console sessions) never charges for running long; the note text below deliberately avoids the
+    // word "overtime" so the two modules' opposite policies are never confused with each other. This
+    // used to add
     // `overtimeCost = Math.round((overtimeRounded / 60) * session.ratePerHour)`, but that produced
     // a real billing bug: overtimeRounded is rounded UP to a full billingRoundingMinutes increment
     // (roundUpMinutes never rounds down — see its own doc comment in pricing.ts), so a session that
@@ -406,8 +412,31 @@ export async function stopRentalSession(sessionId: string) {
     // oversight. overtimeRounded is kept only for the informational billingNote below (so staff can
     // still see a session ran long), never for pricing.
     subtotal = packagePrice;
-    billingNote = `Paket ${promo?.name ?? ""} (${allowedMinutes} menit)${overtimeRounded > 0 ? ` — berhenti ${overtimeRounded} menit setelah waktu paket habis, tidak ada biaya tambahan (kebijakan no-overtime)` : ""}`;
+    billingNote = `Paket ${promo?.name ?? ""} (${allowedMinutes} menit)${overtimeRounded > 0 ? ` — sesi berhenti ${overtimeRounded} menit setelah waktu paket habis, harga tetap sesuai paket (tanpa biaya tambahan)` : ""}`;
+  } else if (session.plannedMinutes) {
+    // POLICY (explicit decision, confirmed with the owner 2026-09-13): a session started with a
+    // fixed duration preset from the "Durasi" dropdown on dashboard/rental (30 menit/1 jam/1,5
+    // jam/2 jam/3 jam/4 jam — anything other than "Terbuka (tanpa batas waktu)", which leaves
+    // plannedMinutes null) is a KNOWN, fixed length agreed with the customer up front, exactly
+    // like a promo package — it's just priced per-hour instead of at a flat promo price. There is
+    // nothing to round here: runSessionAutoStop (lib/rental/scheduler.ts) already cuts the unit's
+    // device off the moment plannedMinutes+extendedMinutes elapses, so billing the raw elapsed time
+    // (below, in the true open-ended branch) only ever produced a same-few-second rounding-up
+    // artifact from the scheduler's poll delay — visible in Transaction Center as a needless
+    // "135 menit (dibulatkan dari 121 menit)"-style note on every single fixed-duration session,
+    // exactly the "kok butuh dikoreksi terus" complaint that prompted this fix. Bill exactly the
+    // agreed minutes instead, same no-extra-charge rationale as the promo branch above — and same
+    // terminology note: this is plain "no extra charge," not Home Rental's "overtime"/late-fee
+    // policy, so the note text below avoids that word too.
+    const allowedMinutes = session.plannedMinutes + session.extendedMinutes;
+    subtotal = Math.round((allowedMinutes / 60) * session.ratePerHour);
+    const overtimeMinutesRaw = Math.max(0, elapsedMinutesRaw - allowedMinutes);
+    const overtimeRounded = roundUpMinutes(overtimeMinutesRaw, roundingMinutes);
+    billingNote = `${allowedMinutes} menit (durasi tetap, sesuai paket main yang diset)${overtimeRounded > 0 ? ` — sesi berhenti ${overtimeRounded} menit setelah waktu habis, harga tetap sesuai durasi yang diset (tanpa biaya tambahan)` : ""}`;
   } else {
+    // True open-ended session ("Terbuka (tanpa batas waktu)") — actual elapsed time is whatever the
+    // customer plays, so THIS is the one case that genuinely needs rounding up to the outlet's
+    // billing increment (billingRoundingMinutes) to produce a sane bill.
     const roundedMinutes = roundUpMinutes(elapsedMinutesRaw, roundingMinutes);
     subtotal = Math.round((roundedMinutes / 60) * session.ratePerHour);
     billingNote = `${roundedMinutes} menit (dibulatkan dari ${Math.ceil(elapsedMinutesRaw)} menit)`;
@@ -468,6 +497,7 @@ export async function stopRentalSession(sessionId: string) {
   let order = await upsertRentalLineItem(bill.id, {
     description: `Rental: ${unit?.name ?? "Unit"} (${unit?.consoleType?.toUpperCase() ?? ""}) — ${billingNote}`,
     amount: subtotal,
+    rentalSessionId: session.id,
   });
 
   const accessoryTotal = await finalizeAccessoryCharges(session.id, bill.id, now);

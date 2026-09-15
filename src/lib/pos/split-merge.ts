@@ -200,6 +200,10 @@ export async function mergeOrders(orderIds: string[]) {
     await db.insert(orderItems).values({
       orderId: merged.id,
       productId: item.productId,
+      // Preserved per-item (unlike orders.rentalSessionId above, which can only hold one session
+      // per order) so Detail Transaksi can still show each rental item's own start/stop time even
+      // after several units' bills have been merged into one order.
+      rentalSessionId: item.rentalSessionId ?? null,
       description: item.description,
       qty: item.qty,
       unitPrice: item.unitPrice,

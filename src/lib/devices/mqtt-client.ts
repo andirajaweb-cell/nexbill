@@ -1,13 +1,21 @@
 import mqtt, { MqttClient } from "mqtt";
 
 /**
- * Singleton MQTT client shared across the whole server process.
- * Works with any Tasmota-flashed smart plug (or Tasmota-compatible firmware)
- * connected to a local MQTT broker (e.g. Mosquitto running on the same
- * network / a Raspberry Pi at the outlet).
+ * Singleton MQTT client shared across the whole server process — and across EVERY outlet on the
+ * platform. This app runs on Vercel (serverless, no fixed network), so MQTT_BROKER_URL must point
+ * at ONE centrally-hosted, internet-reachable broker (e.g. Mosquitto on the same VPS that runs
+ * scripts/relay-hub.ts and scripts/ipaymu-egress-proxy.ts — see that VPS's ecosystem.config.js),
+ * NOT a broker sitting on a single outlet's own local LAN (unreachable from Vercel, and unreachable
+ * by every OTHER outlet's Tasmota devices too). Every outlet's Tasmota device connects OUT to this
+ * same broker over the internet, same as any other MQTT-over-WAN setup.
+ *
+ * Because the broker is shared, `devices.mqttTopic` must be unique ACROSS EVERY OUTLET, not just
+ * within one — see assertMqttTopicGloballyUnique() in app/api/devices/route.ts, which enforces this
+ * at save time. Two different outlets picking the same topic string would otherwise let one
+ * outlet's on/off command land on another outlet's physical plug.
  *
  * ENV:
- *   MQTT_BROKER_URL   e.g. mqtt://192.168.1.10:1883
+ *   MQTT_BROKER_URL   e.g. mqtt://mqtt.nexbill.id:1883 (or mqtts://...:8883 once/if TLS is set up)
  *   MQTT_USERNAME
  *   MQTT_PASSWORD
  */
