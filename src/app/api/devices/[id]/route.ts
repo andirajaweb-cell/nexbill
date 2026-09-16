@@ -6,7 +6,6 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { assertDeviceAllowed } from "@/lib/subscription/service";
-import { assertSharedTuyaCapacityAvailable } from "@/lib/devices/adapters/tuya";
 
 /** Mirrors the same check in POST /api/devices — see that file's doc comment for why mqttTopic
  * must be unique across every outlet, not just this one (all outlets share one MQTT broker). */
@@ -46,9 +45,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const effectiveTopic = (patch.mqttTopic as string | undefined) ?? existing.mqttTopic;
     if (effectiveProtocol === "tasmota_mqtt" && effectiveTopic) {
       await assertMqttTopicGloballyUnique(effectiveTopic, id);
-    }
-    if (effectiveProtocol === "tuya") {
-      await assertSharedTuyaCapacityAvailable(session.outletId, id);
     }
     const [updated] = await db.update(devices).set(patch).where(eq(devices.id, id)).returning();
     if (!updated) return NextResponse.json({ error: "Perangkat tidak ditemukan." }, { status: 404 });

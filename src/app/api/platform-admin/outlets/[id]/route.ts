@@ -85,11 +85,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if ("address" in body) values.address = body.address || null;
     if ("phone" in body) values.phone = body.phone || null;
     if ("isActive" in body) values.isActive = Boolean(body.isActive);
-    // Legacy exception toggle (see outlets.tuyaUseSharedPlatformAccount's doc comment in
-    // schema.ts) — platform-admin-only, never exposed on the outlet's own Settings PATCH
-    // (/api/settings/outlet). When true, this outlet's Tuya devices fall back to the shared
-    // `platformTuyaAccount` instead of requiring its own Access ID/Secret.
-    if ("tuyaUseSharedPlatformAccount" in body) values.tuyaUseSharedPlatformAccount = Boolean(body.tuyaUseSharedPlatformAccount);
     if (Object.keys(values).length === 0) return NextResponse.json({ error: "Tidak ada perubahan." }, { status: 400 });
     values.updatedAt = new Date().toISOString();
 

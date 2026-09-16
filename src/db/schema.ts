@@ -106,13 +106,12 @@ export const outlets = pgTable("outlets", {
   tuyaAccessSecret: text("tuya_access_secret"),
   tuyaProjectCode: text("tuya_project_code"),
   tuyaRegion: text("tuya_region", { enum: ["cn", "us", "us_e", "eu", "eu_w", "in", "sg"] }).notNull().default("sg"),
-  // Legacy exception, platform-admin-only (NOT exposed to the outlet itself) — when true, this
-  // outlet keeps using the old shared `platformTuyaAccount` instead of requiring its own
-  // credentials above, even though it's empty. Exists for exactly one outlet as of this writing
-  // (Xtream Playstation, already connected via the pre-existing shared account) and must stay
-  // false (the default) for every other outlet, including all new signups — deliberately a DB
-  // flag toggled per-outlet from /platform-admin/outlets/[id] (mirrors the free-forever toggle
-  // pattern) rather than a hardcoded outlet id/name, so it's auditable and reversible.
+  // RETIRED 2026-09-15 — used to flag an outlet as a legacy exception allowed to fall back to the
+  // shared `platformTuyaAccount` instead of its own credentials above. The only outlet that ever
+  // used this (Xtream Playstation) has since been migrated to its own Tuya Cloud API credentials
+  // via Settings, so lib/devices/adapters/tuya.ts's getCreds() no longer reads this column at all.
+  // Left in the schema (unused, always false from here on) rather than dropped via a migration —
+  // safe to remove in a future cleanup pass if ever desired.
   tuyaUseSharedPlatformAccount: boolean("tuya_use_shared_platform_account").notNull().default(false),
   ...timestamps,
 });
@@ -634,20 +633,17 @@ export const agentSettings = pgTable("agent_settings", {
   ...timestamps,
 });
 
+// RETIRED 2026-09-15 — the platform-wide shared Tuya Cloud API account this table backed
+// (/platform-admin/tuya, now a redirect stub) has no outlet depending on it anymore; the last one
+// (Xtream Playstation) was migrated to its own Tuya Cloud API credentials via its own Settings
+// page. lib/devices/adapters/tuya.ts's getCreds() no longer reads this table at all. Left in the
+// schema (unused) rather than dropped via a migration — safe to remove in a future cleanup pass.
 export const platformTuyaAccount = pgTable("platform_tuya_account", {
   id: id(),
   accessId: text("access_id"),
   accessSecret: text("access_secret"),
   projectCode: text("project_code"),
   region: text("region", { enum: ["cn", "us", "us_e", "eu", "eu_w", "in", "sg"] }).notNull().default("sg"),
-  // Capacity guardrail (added 2026-09-15) — Tuya's own "controllable devices" ceiling for
-  // whichever tier this shared account's subscription is on (Trial = 10, Flagship = 30,000, etc;
-  // see /platform-admin/tuya's copy for the tier table). Every outlet flagged
-  // tuyaUseSharedPlatformAccount draws from this ONE pool, so without an explicit count-and-block
-  // check here, several outlets could each add a couple of Tuya plugs and quietly blow past
-  // Tuya's real limit with no warning until one of them just fails to connect. See
-  // assertSharedTuyaCapacityAvailable() in lib/devices/adapters/tuya.ts — update this number
-  // whenever the shared account's Tuya subscription tier changes.
   maxControllableDevices: integer("max_controllable_devices").notNull().default(10),
   ...timestamps,
 });

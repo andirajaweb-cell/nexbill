@@ -6,7 +6,6 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { assertDeviceAllowed } from "@/lib/subscription/service";
-import { assertSharedTuyaCapacityAvailable } from "@/lib/devices/adapters/tuya";
 
 /**
  * All outlets share ONE physical MQTT broker (single global MQTT_BROKER_URL env var — see
@@ -57,9 +56,6 @@ export async function POST(req: NextRequest) {
     await assertDeviceAllowed(session.outletId, body.protocol, undefined, session.role);
     if (body.protocol === "tasmota_mqtt" && body.mqttTopic) {
       await assertMqttTopicGloballyUnique(body.mqttTopic);
-    }
-    if (body.protocol === "tuya") {
-      await assertSharedTuyaCapacityAvailable(session.outletId);
     }
     // outletId always comes from the session — never trust a client-supplied value, otherwise
     // a device could be created under a different outlet than the one just gated above.
