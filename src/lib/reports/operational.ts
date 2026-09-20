@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { orders, orderItems, payments, rentalSessions, rentalUnits, products, stockMovements, customers, membershipTiers } from "@/db/schema";
 import { sql, inArray } from "drizzle-orm";
 import { computeItemCogs } from "@/lib/accounting/postings";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 
 function dayRangeConditions(column: any, from?: string, to?: string) {
   const conditions = [];
@@ -23,7 +24,10 @@ export async function computeSalesReport(outletId: string, from?: string, to?: s
 
   const byDayMap = new Map<string, { rental: number; pos: number }>();
   for (const o of paidOrders) {
-    const day = o.createdAt.slice(0, 10);
+    // Kalender WIB, bukan `createdAt.slice(0, 10)`. Potongan naif itu memakai tanggal UTC, sehingga
+    // transaksi pukul 00.00–07.00 WIB jatuh ke baris tanggal kemarin — sebuah rental yang ramai
+    // selepas tengah malam akan tampak seolah omzetnya pindah hari. Lihat outletDateYmd().
+    const day = outletDateYmd(new Date(o.createdAt));
     const cur = byDayMap.get(day) ?? { rental: 0, pos: 0 };
     if (o.rentalSessionId) cur.rental += o.total; else cur.pos += o.total;
     byDayMap.set(day, cur);

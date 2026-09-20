@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { orders, expenses } from "@/db/schema";
 import { sql } from "drizzle-orm";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -52,7 +53,9 @@ async function dailyExpense(outletId: string, days: number) {
     .where(sql`${expenses.outletId} = ${outletId} AND ${expenses.status} IN ('approved','paid') AND ${expenses.expenseDate} >= ${since}`);
   const map = new Map<string, number>();
   for (const e of rows) {
-    const day = e.expenseDate.slice(0, 10);
+    // Kalender WIB — potongan UTC naif menggeser biaya dini hari ke tanggal sebelumnya, dan di sini
+    // efeknya berlipat: angka harian yang salah tanggal ini menjadi bahan mentah analisis AI.
+    const day = outletDateYmd(new Date(e.expenseDate));
     map.set(day, (map.get(day) ?? 0) + e.amount + (e.taxAmount ?? 0));
   }
   return Array.from(map.entries()).map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date));

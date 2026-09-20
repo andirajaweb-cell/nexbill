@@ -496,10 +496,15 @@ function TransactionDetailModal({ id, outletId, canEditPayment, onClose, onChang
   const [saveProgress, setSaveProgress] = useState<number | null>(null);
   const [saveProgressLabel, setSaveProgressLabel] = useState("");
   // Tracks the SPECIFIC order item being edited/deleted (not just "is something being edited") —
-  // a merged order (mergeOrders in lib/pos/split-merge.ts) can carry several itemType:"rental"
-  // lines at once (one per originating TV/session that got combined into one payable bill), so a
-  // single shared boolean here would always act on whichever line happened to be first, regardless
-  // of which row's "Koreksi Nominal"/"Hapus" link was actually clicked.
+  // an order can carry several itemType:"rental" lines at once, so a single shared boolean here
+  // would always act on whichever line happened to be first, regardless of which row's "Koreksi
+  // Nominal"/"Hapus" link was actually clicked.
+  //
+  // Multi-rental-line orders now only arise from data WARISAN: the "Gabung Order" feature that
+  // produced them (mergeOrders) was removed on 2026-09-20 — see the long note where it used to live
+  // in lib/pos/split-merge.ts. Those orders are still in the database and must keep editing
+  // correctly, so this per-item tracking stays exactly as it is. Do not "simplify" it back to a
+  // boolean on the assumption that one order means one rental line.
   const [editingRentalItemId, setEditingRentalItemId] = useState<string | null>(null);
   const [rentalAmountInput, setRentalAmountInput] = useState("");
   const [savingRentalAmount, setSavingRentalAmount] = useState(false);

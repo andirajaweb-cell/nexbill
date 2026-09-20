@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { accounts, journalLines, journalEntries } from "@/db/schema";
+import { accounts, journalLines, journalEntries, products } from "@/db/schema";
 import { eq, and, gte, lte, sql, inArray, desc } from "drizzle-orm";
 
 export interface TrialBalanceRow {
@@ -161,9 +161,45 @@ export async function computeProfitLoss(outletId: string, from?: string, to?: st
   const grossProfit = totalRevenue - totalCogs;
   const netProfit = totalRevenue - totalExpense;
 
+  /*
+   * Peringatan "HPP tidak terdeteksi".
+   *
+   * postSalesJournal hanya memposting jurnal HPP kalau `cogsTotal > 0` (postings.ts), dan
+   * computeItemCogs menghitungnya dari `products.costPrice` — kolom yang default-nya 0 dan yang
+   * form produknya sendiri menyebut "opsional, bisa otomatis dari Belanja Supplier". Jadi outlet
+   * yang menambahkan produk secara manual tanpa mengisi Harga Modal akan menjual barang dengan HPP
+   * nol, sepenuhnya diam-diam.
+   *
+   * Akibatnya bukan sekadar satu angka kosong: bagian Beban jadi melompong, Laba Kotor menjadi
+   * SAMA PERSIS dengan Total Pendapatan, dan laporan ini menyatakan margin 100% atas barang yang
+   * jelas-jelas ada modalnya. Pemilik yang mengambil keputusan harga atau belanja dari angka itu
+   * akan mengambil keputusan yang salah — dan tidak ada apa pun di layar yang memberi tahu bahwa
+   * angkanya belum lengkap. Laporan yang salah tapi terlihat normal lebih berbahaya daripada
+   * laporan yang jelas-jelas kosong.
+   *
+   * Karena itu di sini dideteksi kondisinya — ada pendapatan dari barang (F&B 42xx / Penjualan
+   * Produk 43xx) tapi HPP nol — lalu dihitung berapa produk aktif yang Harga Modal-nya masih
+   * kosong, supaya pesannya bisa langsung menyebut angka dan pemilik tahu persis apa yang harus
+   * diperbaiki. Sengaja TIDAK mengarang estimasi HPP: menebak modal barang lebih buruk daripada
+   * mengakui belum tahu.
+   */
+  const goodsRevenue = revenue
+    .filter((r) => r.isPostingAllowed && (r.code.startsWith("42") || r.code.startsWith("43")))
+    .reduce((s, r) => s + r.balance, 0);
+
+  let cogsWarning: { goodsRevenue: number; productsWithoutCostPrice: number } | null = null;
+  if (goodsRevenue > 0 && totalCogs === 0) {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(products)
+      .where(and(eq(products.outletId, outletId), eq(products.isActive, true), sql`coalesce(${products.costPrice}, 0) = 0`));
+    cogsWarning = { goodsRevenue, productsWithoutCostPrice: Number(row?.n ?? 0) };
+  }
+
   return {
     from,
     to,
+    cogsWarning,
     revenue,
     expense,
     revenueTree,

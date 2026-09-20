@@ -91,8 +91,13 @@ export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Pr
   // routes through — so it's enforced everywhere with zero risk of some other posting path
   // forgetting the check. A backdated correction into a closed period must go through
   // reopenPeriod() first (owner/superuser only); the normal fix is to post the correction with
-  // today's date instead, landing in the current open period, which is what voidJournal already
-  // does by never overriding entryDate on its reversal entries.
+  // today's date instead, landing in the current open period.
+  //
+  // voidJournal() used to get that behaviour by never passing entryDate at all, so every reversal
+  // fell through to today's date. That over-applied the rule: it also re-dated reversals whose
+  // original period was perfectly open, which produced negative revenue lines in Laba Rugi (see
+  // the long note in voidJournal). It now passes the original entry's date and only falls back to
+  // today when that period is genuinely locked — same intent, correctly scoped.
   if (await isPeriodLocked(input.outletId, entryDate, dbc)) {
     throw new Error(
       `Periode ${periodLabel(entryDate.slice(0, 7))} sudah ditutup — tidak bisa posting jurnal baru ke periode ini ("${input.description}"). Buka kembali periode tersebut dulu jika benar-benar perlu, atau posting koreksi dengan tanggal hari ini.`
@@ -162,6 +167,28 @@ export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Pr
 }
 
 /**
+ * Tanggal yang harus dipakai jurnal pembalik, MURNI — tanpa database, agar aturannya bisa diuji
+ * langsung. Dipisahkan karena aturan inilah yang dulu salah dan menghasilkan pendapatan negatif di
+ * Laba Rugi; lihat catatan panjang di voidJournal di bawah.
+ *
+ * Aturannya: ikut tanggal jurnal asli, supaya keduanya saling meniadakan di periode yang sama.
+ * Hanya kalau periode asal sudah ditutup barulah pembalik mundur ke tanggal hari ini — dengan
+ * keterangan eksplisit, karena dalam kasus itu pendapatan negatif di periode berjalan memang tidak
+ * terhindarkan dan pemilik berhak tahu asal-usulnya tanpa harus menebak.
+ */
+export function resolveReversalEntryDate(
+  originalEntryDate: string,
+  originalPeriodLocked: boolean,
+  now: string = new Date().toISOString()
+): { entryDate: string; lockedNote: string } {
+  if (!originalPeriodLocked) return { entryDate: originalEntryDate, lockedNote: "" };
+  return {
+    entryDate: now,
+    lockedNote: ` — periode asal (${periodLabel(originalEntryDate.slice(0, 7))}) sudah ditutup, pembalik dicatat di periode berjalan`,
+  };
+}
+
+/**
  * Void a journal entry by posting the exact reverse — never mutates/deletes posted history.
  * Atomic (Task #61): the reversal entry (posted via postJournal above) and the status flip on
  * the original entry happen in one transaction, so a crash between the two can never leave a
@@ -178,11 +205,42 @@ export async function voidJournal(journalEntryId: string, reason: string, dbc: D
   const lines = await dbc.select().from(journalLines).where(eq(journalLines.journalEntryId, journalEntryId));
 
   const run = async (tx: DbOrTx) => {
+    /*
+     * Pembalik memakai entryDate JURNAL ASLINYA, bukan tanggal hari ini.
+     *
+     * BUG YANG DIPERBAIKI DI SINI (2026-09-20). Sebelumnya `entryDate` tidak pernah diteruskan ke
+     * postJournal, sehingga jatuh ke nilai default kolomnya (nowIso) — pembalik selalu bertanggal
+     * hari ini. Untuk transaksi yang dibatalkan pada hari yang sama, kebetulan tidak ada yang
+     * terlihat salah. Tapi begitu sebuah penjualan dari hari sebelumnya dibatalkan, hasilnya dua
+     * laporan yang dua-duanya bohong:
+     *
+     *   - Laba Rugi hari asal tetap menampilkan pendapatan penuh, seolah pembatalan tidak pernah
+     *     terjadi.
+     *   - Laba Rugi hari ini menampilkan PENDAPATAN NEGATIF — baris seperti "Rental PS 3
+     *     Rp-2.500" pada laporan 20/9/2026, yang secara akuntansi tidak punya arti sama sekali.
+     *
+     * Ini juga diam-diam membatalkan jaminan yang ditulis di doc comment computeTrialBalance
+     * ("keduanya harus dijumlahkan agar saling meniadakan dengan bersih"): keduanya hanya bisa
+     * saling meniadakan kalau berada dalam periode yang sama. Dengan tanggal asli dipakai di sini,
+     * pembatalan menjadi tidak terlihat di laporan periode mana pun — yang memang semestinya,
+     * karena transaksinya dianggap tidak pernah terjadi. Jejaknya tetap utuh di tab Jurnal, tempat
+     * entri asli dan pembaliknya berdua tersimpan lengkap dengan alasannya.
+     *
+     * Pengecualiannya periode yang sudah ditutup (Tutup Periode): buku yang sudah dikunci tidak
+     * boleh disisipi entri baru, jadi pembaliknya mundur ke tanggal hari ini — konvensi yang sama
+     * persis dipakai postSalesJournal (postings.ts). Dalam kasus itu tanggalnya ditulis eksplisit
+     * di deskripsi, supaya pendapatan negatif yang muncul di periode berjalan bisa langsung
+     * ditelusuri ke periode asalnya alih-alih tampak seperti kesalahan.
+     */
+    const originalPeriodLocked = await isPeriodLocked(entry.outletId, entry.entryDate, tx);
+    const { entryDate, lockedNote } = resolveReversalEntryDate(entry.entryDate, originalPeriodLocked);
+
     await postJournal(
       {
         outletId: entry.outletId,
+        entryDate,
         reference: entry.reference ?? undefined,
-        description: `[VOID] ${entry.description} — ${reason}`,
+        description: `[VOID] ${entry.description} — ${reason}${lockedNote}`,
         sourceType: entry.sourceType as JournalSourceType,
         sourceId: entry.sourceId ?? undefined,
         staffUserId: entry.staffUserId ?? undefined,

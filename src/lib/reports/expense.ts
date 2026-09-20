@@ -2,7 +2,7 @@ import { db } from "@/db/client";
 import { expenses, accounts, costCenters, suppliers, rentalUnits, outlets } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { computeProfitLoss } from "@/lib/accounting/reports";
-import { outletDayStartUtc } from "@/lib/time/outlet-time";
+import { outletDayStartUtc, outletDateYmd } from "@/lib/time/outlet-time";
 
 /** Only "approved"/"paid" expenses represent real recognized spend — draft/pending/rejected/cancelled never posted a journal. */
 const RECOGNIZED = new Set(["approved", "paid"]);
@@ -79,7 +79,9 @@ export async function computeExpenseReport(outletId: string, from?: string, to?:
 
   const dayMap = new Map<string, number>();
   for (const e of rows) {
-    const day = e.expenseDate.slice(0, 10);
+    // Kalender WIB — `expenseDate.slice(0, 10)` memakai tanggal UTC dan memindahkan biaya yang
+    // dicatat pukul 00.00–07.00 WIB ke baris hari sebelumnya. Lihat outletDateYmd().
+    const day = outletDateYmd(new Date(e.expenseDate));
     dayMap.set(day, (dayMap.get(day) ?? 0) + e.amount + (e.taxAmount ?? 0));
   }
   const trend = Array.from(dayMap.entries()).map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date));
@@ -146,7 +148,8 @@ export async function computeExpenseDashboard(outletId: string) {
   const trendRows = recognized.filter((e) => e.expenseDate >= thirtyDaysAgo.toISOString());
   const dayMap = new Map<string, number>();
   for (const e of trendRows) {
-    const day = e.expenseDate.slice(0, 10);
+    // Kalender WIB — alasannya sama dengan tren di computeExpenseReport di atas.
+    const day = outletDateYmd(new Date(e.expenseDate));
     dayMap.set(day, (dayMap.get(day) ?? 0) + e.amount + (e.taxAmount ?? 0));
   }
   const trend = Array.from(dayMap.entries()).map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date));

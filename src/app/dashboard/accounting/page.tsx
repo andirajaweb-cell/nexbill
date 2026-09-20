@@ -1160,6 +1160,25 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
           <Card><div className="text-xs text-neutral-500">{t("accounting.pl.grossProfit", "Laba Kotor")}</div><div className="text-xl font-bold">{rupiah(pl.grossProfit)}</div></Card>
           <Card><div className="text-xs text-neutral-500">{t("accounting.pl.netProfit", "Laba Bersih")}</div><div className={`text-xl font-bold ${pl.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{rupiah(pl.netProfit)}</div></Card>
 
+          {/* Ada penjualan barang tapi nol HPP — Laba Kotor di kartu atas karenanya sama persis
+              dengan Total Pendapatan, seolah marginnya 100%. Diberi tahu terang-terangan, karena
+              angka yang salah tapi terlihat normal jauh lebih berbahaya daripada angka kosong. */}
+          {pl.cogsWarning && (
+            <Card className="lg:col-span-3 border-amber-500/40 bg-amber-500/5">
+              <div className="text-sm font-semibold text-amber-300">
+                {t("accounting.pl.cogsMissingTitle", "HPP belum terhitung — Laba Kotor di atas belum mencerminkan modal barang")}
+              </div>
+              <p className="text-sm text-neutral-300 mt-1">
+                {t("accounting.pl.cogsMissingBody", "Ada penjualan barang senilai {revenue} pada periode ini, tapi HPP-nya nol karena {n} produk aktif masih kosong Harga Modal-nya. Selama itu kosong, setiap penjualannya dihitung untung penuh.")
+                  .replace("{revenue}", rupiah(pl.cogsWarning.goodsRevenue))
+                  .replace("{n}", String(pl.cogsWarning.productsWithoutCostPrice))}
+              </p>
+              <p className="text-xs text-neutral-500 mt-2">
+                {t("accounting.pl.cogsMissingFix", "Isi Harga Modal di Inventory Control → Produk, atau catat pembelian lewat Belanja Supplier supaya terisi otomatis. HPP hanya terhitung untuk penjualan SETELAH Harga Modal terisi — transaksi lama tidak berubah sendiri.")}
+              </p>
+            </Card>
+          )}
+
           <Card className="lg:col-span-3">
             <div className="text-xs text-neutral-500 mb-2">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, period.to)}</div>
 
@@ -1749,6 +1768,15 @@ function CashFlowTab({ outletId }: { outletId: string }) {
           <DownloadButtons outletId={outletId} reportType="cash-flow" from={period.from} to={period.to} />
         </div>
         <div className="text-xs text-neutral-500 mt-2">{describePeriod(period.preset, period.from, period.to)}</div>
+        {/* Sejak Arus Kas dihitung dari mutasi akun Kas/Bank di jurnal (bukan lagi dari tabel
+            pembayaran), angka di halaman ini pasti sama dengan pergerakan akun yang sama di Neraca
+            Saldo. Akunnya disebutkan supaya pemilik bisa membuktikan sendiri, bukan harus percaya. */}
+        {cf.cashAccounts?.length > 0 && (
+          <div className="text-[11px] text-neutral-600 mt-1">
+            {t("accounting.cf.sourceNote", "Dihitung dari mutasi akun {accounts} di jurnal — totalnya selalu cocok dengan Neraca Saldo untuk periode yang sama.")
+              .replace("{accounts}", cf.cashAccounts.map((a: any) => `${a.name} (${a.code})`).join(", "))}
+          </div>
+        )}
       </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

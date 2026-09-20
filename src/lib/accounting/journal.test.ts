@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { computeJournalBalance } from "./journal";
+import { computeJournalBalance, resolveReversalEntryDate } from "./journal";
+import { aggregateCashFlow, type CashFlowLine } from "./cashflow";
 
 /**
  * Task #63 — the single most important invariant in the whole accounting engine: "setiap Journal
@@ -72,5 +73,91 @@ describe("computeJournalBalance", () => {
     expect(result.balanced).toBe(true);
     expect(result.totalDebit).toBe(0);
     expect(result.totalCredit).toBe(0);
+  });
+});
+
+/*
+ * Uji untuk perbaikan tanggal jurnal pembalik (2026-09-20).
+ *
+ * Sebelumnya voidJournal() tidak pernah meneruskan entryDate ke postJournal, sehingga setiap
+ * pembalik bertanggal hari ini. Membatalkan penjualan hari kemarin karenanya menghasilkan dua
+ * laporan yang dua-duanya keliru: Laba Rugi hari asal tetap menampilkan pendapatan penuh seolah
+ * pembatalan tidak pernah terjadi, sementara Laba Rugi hari ini menampilkan PENDAPATAN NEGATIF —
+ * baris "Rental PS 3 Rp-2.500" pada laporan 20/9/2026 yang secara akuntansi tidak bermakna.
+ */
+
+describe("resolveReversalEntryDate", () => {
+  it("memakai tanggal jurnal asli saat periodenya masih terbuka", () => {
+    const result = resolveReversalEntryDate("2026-09-19T20:46:00.000Z", false, "2026-09-20T06:00:00.000Z");
+
+    expect(result.entryDate).toBe("2026-09-19T20:46:00.000Z");
+    expect(result.lockedNote).toBe("");
+  });
+
+  it("mundur ke tanggal hari ini hanya kalau periode asal sudah ditutup", () => {
+    const result = resolveReversalEntryDate("2026-08-15T10:00:00.000Z", true, "2026-09-20T06:00:00.000Z");
+
+    expect(result.entryDate).toBe("2026-09-20T06:00:00.000Z");
+    // Keterangannya harus menyebut periode asal, supaya pendapatan negatif di periode berjalan
+    // bisa langsung ditelusuri alih-alih tampak seperti kesalahan sistem.
+    expect(result.lockedNote).toContain("Agustus 2026");
+    expect(result.lockedNote).toContain("sudah ditutup");
+  });
+});
+
+describe("pembalikan lintas hari tidak lagi menghasilkan angka negatif", () => {
+  const KAS = "acc-kas";
+  const PENDAPATAN = "acc-pendapatan-ps3";
+  const CASH_SET = new Set([KAS]);
+  const label = (id: string) => (id === PENDAPATAN ? "Rental PS 3 (4105)" : id);
+
+  /** Meniru cara computeTrialBalance/computeProfitLoss menjumlahkan satu akun untuk satu periode. */
+  const saldoAkun = (lines: CashFlowLine[], accountId: string, from: string, to: string) =>
+    lines
+      .filter((l) => l.accountId === accountId && l.entryDate >= from && l.entryDate <= to)
+      .reduce((s, l) => s + l.credit - l.debit, 0);
+
+  // Penjualan tanggal 19/9 pukul 22.00 WIB (= 15.00 UTC): Dr Kas / Cr Pendapatan 2.500.
+  const asli: CashFlowLine[] = [
+    { entryId: "asli", entryDate: "2026-09-19T15:00:00.000Z", description: "Rental TV 2", accountId: KAS, debit: 2_500, credit: 0 },
+    { entryId: "asli", entryDate: "2026-09-19T15:00:00.000Z", description: "Rental TV 2", accountId: PENDAPATAN, debit: 0, credit: 2_500 },
+  ];
+
+  const hariIniDari = "2026-09-19T17:00:00.000Z"; // 20/9 00.00 WIB
+  const hariIniSampai = "2026-09-20T16:59:59.999Z"; // 20/9 23.59 WIB
+
+  it("PERILAKU LAMA: pembalik bertanggal hari ini membuat pendapatan hari ini negatif", () => {
+    const tanggalPembalikLama = "2026-09-20T04:00:00.000Z"; // hari pembatalan, bukan hari penjualan
+    const pembalik: CashFlowLine[] = [
+      { entryId: "void", entryDate: tanggalPembalikLama, description: "[VOID] Rental TV 2", accountId: PENDAPATAN, debit: 2_500, credit: 0 },
+      { entryId: "void", entryDate: tanggalPembalikLama, description: "[VOID] Rental TV 2", accountId: KAS, debit: 0, credit: 2_500 },
+    ];
+    const semua = [...asli, ...pembalik];
+
+    // Persis gejala yang dilaporkan pemilik.
+    expect(saldoAkun(semua, PENDAPATAN, hariIniDari, hariIniSampai)).toBe(-2_500);
+  });
+
+  it("PERILAKU BARU: pembalik ikut tanggal asli, jadi tidak ada periode yang menampilkan angka negatif", () => {
+    const { entryDate } = resolveReversalEntryDate(asli[0].entryDate, false);
+    const pembalik: CashFlowLine[] = [
+      { entryId: "void", entryDate, description: "[VOID] Rental TV 2", accountId: PENDAPATAN, debit: 2_500, credit: 0 },
+      { entryId: "void", entryDate, description: "[VOID] Rental TV 2", accountId: KAS, debit: 0, credit: 2_500 },
+    ];
+    const semua = [...asli, ...pembalik];
+
+    // Hari ini: transaksi itu memang tidak pernah terjadi di sini, jadi nol — bukan minus.
+    expect(saldoAkun(semua, PENDAPATAN, hariIniDari, hariIniSampai)).toBe(0);
+
+    // Hari asalnya: penjualan dan pembalikannya saling meniadakan dengan bersih.
+    const kemarinDari = "2026-09-18T17:00:00.000Z";
+    const kemarinSampai = "2026-09-19T16:59:59.999Z";
+    expect(saldoAkun(semua, PENDAPATAN, kemarinDari, kemarinSampai)).toBe(0);
+
+    // Arus kas ikut netral di hari asalnya, tanpa perlu logika khusus untuk pembatalan.
+    const arusKas = aggregateCashFlow(semua, CASH_SET, label);
+    expect(arusKas.netCashFlow).toBe(0);
+    expect(arusKas.totalIn).toBe(2_500);
+    expect(arusKas.totalOut).toBe(2_500);
   });
 });

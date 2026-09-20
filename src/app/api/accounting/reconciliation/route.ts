@@ -8,6 +8,51 @@ import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 
 /**
+ * Tanggal jurnal yang MASIH HIDUP untuk sebuah order — bukan sekadar `max(entryDate)`.
+ *
+ * BUG YANG DIPERBAIKI DI SINI (2026-09-20), dan ini bug yang memakan dirinya sendiri.
+ *
+ * Sebelumnya kolom ini hanya `max(entryDate)` atas SELURUH entri milik satu order. Untuk order yang
+ * pernah ditekan "Sinkronkan Ulang Jurnal", isi ledger-nya ada tiga entri:
+ *
+ *   1. Penjualan asli    — entryDate = Business Date (mis. 5/9), status "void"
+ *   2. Jurnal pembalik   — entryDate = TANGGAL SAAT TOMBOL DITEKAN (mis. 20/9), status "posted"
+ *   3. Repost baru       — entryDate = Business Date (5/9) lagi, status "posted"
+ *
+ * `sum(credit - debit)` benar (entri 1 dan 2 saling meniadakan, menyisakan entri 3), jadi kolom
+ * nominalnya cocok. Tapi `max(entryDate)` mengambil tanggal PEMBALIK — tanggal termuda dari
+ * ketiganya — sehingga order itu dinyatakan "Beda Tanggal" padahal jurnal hidupnya sudah tepat di
+ * Business Date.
+ *
+ * Yang membuatnya berbahaya: menekan tombolnya lagi hanya menambah pembalik baru bertanggal hari
+ * ini, yang langsung jadi max() berikutnya. Barisnya secara matematis TIDAK PERNAH BISA HILANG, dan
+ * satu-satunya tombol yang ditawarkan untuk memperbaikinya justru memperbarui penyebabnya. Pemilik
+ * yang menekannya berkali-kali akan menyimpulkan pembukuannya rusak parah, padahal yang rusak hanya
+ * satu agregat di layar ini.
+ *
+ * Perbaikannya: tanggal diambil hanya dari entri yang benar-benar masih hidup — status "posted" dan
+ * bukan jurnal pembalik (voidJournal selalu memberi awalan "[VOID] " pada deskripsinya). Kalau
+ * ternyata tidak ada satu pun entri hidup (order dibatalkan dan jurnalnya sudah dibalik seluruhnya),
+ * mundur ke max() lama supaya baris "cancelled_with_gl" tetap punya tanggal untuk ditampilkan.
+ *
+ * `sum` sengaja TIDAK ikut disaring: menjumlahkan semua entri apa adanya adalah saldo sebenarnya
+ * order itu di buku besar, dan itu yang membuat jurnal ter-void yang pembaliknya gagal tetap
+ * ketahuan sebagai selisih nominal, bukan tersembunyi.
+ *
+ * Catatan: penyebab hulunya — pembalik bertanggal hari ini — sudah diperbaiki terpisah di
+ * voidJournal (lib/accounting/journal.ts). Perbaikan di sini tetap diperlukan untuk dua alasan:
+ * membersihkan data lama yang sudah terlanjur terbentuk tanpa perlu disinkronkan ulang satu per
+ * satu, dan menjaga agar pembalik yang MEMANG sah bertanggal hari ini (kasus periode akuntansi yang
+ * sudah ditutup) tidak kembali meracuni agregat ini.
+ */
+const LIVE_ENTRY_DATE = sql<string>`coalesce(
+  max(${journalEntries.entryDate}) filter (
+    where ${journalEntries.status} = 'posted' and ${journalEntries.description} not like '[VOID]%'
+  ),
+  max(${journalEntries.entryDate})
+)`;
+
+/**
  * Order-level reconciliation between Transaction Center (Business Date basis) and Accounting's
  * General Ledger (posting/entryDate basis) for the same [from, to] window — see the doc comment
  * atop lib/reports/reconciliation.ts for the full rationale. Built specifically to answer "which
@@ -53,7 +98,7 @@ export async function GET(req: NextRequest) {
       ? await db
           .select({
             orderId: journalEntries.sourceId,
-            entryDate: sql<string>`max(${journalEntries.entryDate})`,
+            entryDate: LIVE_ENTRY_DATE,
             netRevenue: sql<number>`sum(${journalLines.credit} - ${journalLines.debit})`,
           })
           .from(journalLines)
@@ -84,7 +129,8 @@ export async function GET(req: NextRequest) {
     const orphanRows = await db
       .select({
         orderId: journalEntries.sourceId,
-        entryDate: sql<string>`max(${journalEntries.entryDate})`,
+        // Alasan yang sama dengan glRows di atas — lihat doc comment LIVE_ENTRY_DATE.
+        entryDate: LIVE_ENTRY_DATE,
         netRevenue: sql<number>`sum(${journalLines.credit} - ${journalLines.debit})`,
       })
       .from(journalLines)

@@ -89,7 +89,6 @@ export default function PosPage() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
-  const [mergeSelection, setMergeSelection] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const isFirstRender = useRef(true);
 
@@ -244,31 +243,41 @@ export default function PosPage() {
     }
   };
 
-  const splitOrder = async (orderId: string) => {
-    const parts = prompt(t("pos.splitPromptMessage", "Split jadi berapa bagian?"), "2");
-    if (!parts) return;
-    const res = await fetch(`/api/orders/${orderId}/split`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ parts: Number(parts) }),
-    });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
-    loadOpenOrders();
-  };
-
-  const mergeSelected = async () => {
-    if (mergeSelection.length < 2) return showAlert(t("pos.selectMinTwoOrders", "Pilih minimal 2 order untuk digabung."));
-    const res = await fetch("/api/orders/merge", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderIds: mergeSelection }),
-    });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
-    setMergeSelection([]);
-    loadOpenOrders();
-  };
+  /*
+   * FITUR "GABUNG ORDER" DAN "SPLIT BILL" DIHAPUS (2026-09-20, atas permintaan pemilik).
+   *
+   * Dulu ada dua fungsi di sini: mergeSelected() menggabungkan beberapa order terbuka jadi satu, dan
+   * splitOrder() memecah satu order jadi N bagian. Keduanya bekerja dengan pola yang sama —
+   * membuat order BARU, lalu men-set order asalnya jadi status "cancelled".
+   *
+   * Keuangannya sebenarnya tidak pernah ganda: setiap laporan pendapatan menyaring status
+   * "cancelled" (lihat validTransactions di lib/reports/transactions.ts), dan order yang dibatalkan
+   * tidak pernah menghasilkan jurnal karena jurnal hanya diposting saat pembayaran diterima.
+   *
+   * Yang membuat keduanya harus pergi adalah apa yang TERLIHAT. Satu pembayaran nyata meninggalkan
+   * N+1 baris di Transaction Center — N order lama berstatus "Dibatalkan" plus order barunya.
+   * Pemilik yang melihat tujuh baris untuk satu rombongan wajar menyimpulkan transaksinya terhitung
+   * berkali-kali. Sistem billing yang angkanya harus "dipercaya dulu, dijelaskan belakangan" sudah
+   * gagal pada tugas utamanya, terlepas dari apakah totalnya benar. Khusus Gabung, ada cacat kedua:
+   * order gabungan dari lebih dari satu sesi kehilangan orders.rentalSessionId (satu order hanya
+   * punya satu FK sesi), sehingga dilabeli "F&B" walau isinya belasan baris rental.
+   *
+   * Ada satu risiko nyata juga: kedua fungsi itu TIDAK dibungkus db.transaction. Kalau prosesnya
+   * mati setelah order baru tersimpan tapi sebelum order asal dibatalkan, tagihan benar-benar
+   * terhitung dua kali — keduanya berstatus "open" dan keduanya bisa dibayar. Endpoint
+   * /api/diagnostics/duplicate-orders dibuat khusus untuk mencari sisa kasus seperti itu.
+   *
+   * Gantinya, tanpa merusak jejak:
+   *  - Beberapa pelanggan ingin bayar sekaligus → bayar tiap bill berurutan di kasir yang sama.
+   *  - Satu rombongan ingin bayar terpisah → buat bill terpisah sejak awal, jangan dipecah belakangan.
+   *  - Satu rombongan di satu sesi → tambahkan semuanya ke satu bill sejak awal; satu bill per sesi
+   *    memang sudah perilaku bawaan sistem ini (getOpenBillForSession di lib/pos/bill.ts).
+   *
+   * Order gabungan/hasil split yang SUDAH terbentuk sebelum tanggal ini tetap ada di database dan
+   * harus tetap tampil serta bisa dikoreksi, jadi kode yang menanganinya sengaja TIDAK dihapus —
+   * lihat komentar di dashboard/transactions/page.tsx dan
+   * api/transactions/[id]/items/[itemId]/route.ts.
+   */
 
   const filteredProducts = products.filter((p) => matchesQuery(p, search));
   const isSearching = search.trim().length > 0;
@@ -324,18 +333,16 @@ export default function PosPage() {
           <Card>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-medium text-neutral-400">{t("pos.openOrders", "Order Terbuka (belum dibayar)")}</h2>
-              {mergeSelection.length >= 2 && <Button className="text-xs" onClick={mergeSelected}>{t("pos.mergeOrders", "Gabung {n} Order").replace("{n}", String(mergeSelection.length))}</Button>}
             </div>
             <div className="space-y-2">
               {openOrders.map((o) => (
                 <div key={o.id} className="flex items-center justify-between text-sm border-b border-neutral-900 pb-2">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={mergeSelection.includes(o.id)}
-                      onChange={(e) => setMergeSelection((prev) => e.target.checked ? [...prev, o.id] : prev.filter((id) => id !== o.id))} />
-                    <span>{o.rentalSessionId ? t("pos.orderTypeRental", "Rental") : t("pos.orderTypeFnb", "F&B")} #{o.id.slice(0, 8)} — {rupiah(o.total)}</span>
-                  </label>
+                  {/* Checkbox "pilih untuk digabung" dan tombol "Split" dihapus bersama kedua fitur
+                      itu — lihat komentar panjang di atas filteredProducts. Tiap bill sekarang
+                      selalu dibayar sendiri-sendiri, sehingga satu pembayaran = satu baris di
+                      Transaction Center, tanpa baris "Dibatalkan" yang menyertainya. */}
+                  <span>{o.rentalSessionId ? t("pos.orderTypeRental", "Rental") : t("pos.orderTypeFnb", "F&B")} #{o.id.slice(0, 8)} — {rupiah(o.total)}</span>
                   <div className="flex gap-1">
-                    <Button variant="ghost" className="text-xs" onClick={() => splitOrder(o.id)}>{t("pos.split", "Split")}</Button>
                     <Button variant="secondary" className="text-xs" onClick={() => payOpenOrder(o.id)} disabled={payingOrderId === o.id}>{payingOrderId === o.id ? t("pos.payBusy", "Memproses...") : t("pos.payWithMethod", "Bayar ({method})").replace("{method}", method)}</Button>
                   </div>
                 </div>

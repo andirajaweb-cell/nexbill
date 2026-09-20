@@ -8,8 +8,11 @@ import { describeError } from "@/lib/api/error";
 
 /**
  * Deletes a single line item from an order that's ALREADY PAID — e.g. a genuinely duplicate rental
- * line left over from merging several TVs'/sessions' bills into one order (mergeOrders in
- * lib/pos/split-merge.ts). The existing per-item void (executeVoidItem, lib/pos/void.ts) explicitly
+ * line left over from the removed "Gabung Order" feature, which combined several TVs'/sessions'
+ * bills into one order (mergeOrders, deleted 2026-09-20 — see the note in lib/pos/split-merge.ts).
+ * This endpoint is now MORE important than when it was written, not less: it is the only way to
+ * clean up a bad line on those legacy merged orders, so it must keep working even though nothing
+ * creates merged orders anymore. The existing per-item void (executeVoidItem, lib/pos/void.ts) explicitly
  * refuses both conditions this needs to handle (order.status === "paid" and itemType === "rental"),
  * so this uses the separate deleteOrderItem (lib/pos/item-correction.ts), which reuses the same
  * void+repost journal-correction pattern as the rental/payment amount corrections. Exact-role check

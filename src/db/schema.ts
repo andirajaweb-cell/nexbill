@@ -477,6 +477,30 @@ export const orders = pgTable(
     promoId: text("promo_id").references(() => promos.id),
     staffUserId: text("staff_user_id").references(() => staffUsers.id),
     shiftId: text("shift_id"),
+    /*
+     * KOLOM WARISAN — hanya dibaca, tidak pernah ditulis lagi sejak 2026-09-20.
+     *
+     * Keduanya milik fitur "Split Bill" (splitGroupId) dan "Gabung Order" (mergedFromOrderIds) di
+     * halaman Kasir, yang DIHAPUS pada tanggal itu atas permintaan pemilik bersama seluruh isi
+     * lib/pos/split-merge.ts. Jangan dibangun ulang tanpa membaca alasannya lebih dulu; ringkasnya:
+     *
+     *  1. Keduanya bekerja dengan membuat order BARU lalu men-set order asal jadi "cancelled", jadi
+     *     satu pembayaran nyata meninggalkan N+1 baris di Transaction Center. Pendapatannya tidak
+     *     ganda (validTransactions di lib/reports/transactions.ts menyaring "cancelled", dan jurnal
+     *     hanya diposting saat pembayaran), tapi pemilik yang melihat tujuh baris untuk satu
+     *     rombongan wajar menyimpulkan sebaliknya — dan sistem billing yang angkanya tidak bisa
+     *     langsung dipercaya sudah gagal pada tugas utamanya.
+     *  2. Order gabungan dari lebih dari satu sesi kehilangan orders.rentalSessionId (satu order
+     *     hanya punya satu FK sesi), sehingga classifyOrder() melabelinya "F&B" walau isinya
+     *     belasan baris rental, dan kolom Unit tampil "-".
+     *  3. Tidak ada satu pun dari kedua fungsi itu yang dibungkus db.transaction, jadi kegagalan di
+     *     tengah proses bisa meninggalkan order asal DAN order baru sama-sama berstatus "open" —
+     *     satu-satunya kasus di mana uangnya benar-benar terhitung dua kali. Endpoint
+     *     /api/diagnostics/duplicate-orders mencari sisa kasus seperti itu.
+     *
+     * Kolomnya TIDAK di-drop karena order yang sudah terbentuk sebelum tanggal itu masih ada dan
+     * harus tetap bisa ditampilkan serta dikoreksi per-item.
+     */
     splitGroupId: text("split_group_id"),
     mergedFromOrderIds: text("merged_from_order_ids"),
     source: text("source", { enum: ["pos", "whatsapp", "instagram", "ai_agent"] }).notNull().default("pos"),
