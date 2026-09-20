@@ -1,7 +1,7 @@
 import { db } from "@/db/client";
 import { ppobTransactions, cashBankAccounts, staffUsers, customers } from "@/db/schema";
 import { sql, eq } from "drizzle-orm";
-import { getFastpaySaldoBalance } from "./engine";
+import { getPpobProviderSaldoBalance } from "./engine";
 
 function dayRangeConditions(column: any, from?: string, to?: string) {
   const conditions = [];
@@ -105,6 +105,6 @@ export function reconcilePpobSummary(summary: { totalPrincipal: number; totalFee
 
 export async function computePpobSummary(outletId: string, from?: string, to?: string) {
   const { summary } = await computePpobList({ outletId, from, to });
-  const saldoFastpay = await getFastpaySaldoBalance(outletId);
-  return { ...summary, saldoFastpay };
+  const saldoProvider = await getPpobProviderSaldoBalance(outletId);
+  return { ...summary, saldoProvider };
 }

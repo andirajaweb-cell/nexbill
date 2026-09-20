@@ -3,11 +3,10 @@ import { stockOpnames, stockOpnameItems, products, stockMovements } from "@/db/s
 import { eq, sql, inArray } from "drizzle-orm";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
 
-// Bounds how many stock updates run in parallel per Promise.all batch below — a full physical
-// count can easily span an outlet's entire catalog, and firing that many concurrent queries
-// unbounded risks exhausting the DB connection pool (see db/client.ts's note on the transaction
-// pooler's small `max`). Chosen to match the same chunk size used in inventory/import.ts.
-const PARALLEL_CHUNK_SIZE = 20;
+// PARALLEL_CHUNK_SIZE used to live here, bounding how many stock updates ran per Promise.all
+// batch. completeStockOpname now applies them sequentially inside a single transaction instead —
+// a transaction holds one connection, so batching across it gained nothing while making a partial
+// failure possible. See that function's comment for why correctness won over the speed.
 
 export interface CreateStockOpnameInput {
   outletId: string;
@@ -54,31 +53,49 @@ export async function completeStockOpname(stockOpnameId: string) {
   const items = await db.select().from(stockOpnameItems).where(eq(stockOpnameItems.stockOpnameId, stockOpnameId));
   const changed = items.filter((i) => i.differenceQty !== 0);
 
-  // stockMovements rows are independent of each other — one bulk insert instead of N.
-  if (changed.length > 0) {
-    await db.insert(stockMovements).values(
-      changed.map((item) => ({
-        productId: item.productId,
-        type: item.differenceQty > 0 ? ("adjustment" as const) : ("waste" as const),
-        qty: item.differenceQty,
-        note: `Stock opname ${new Date(opname.opnameDate).toLocaleDateString("id-ID")}`,
-        staffUserId: opname.staffUserId,
-      }))
-    );
-  }
-  // The stockQty update itself has a different delta per product (via sql`... + ${delta}`), so
-  // it can't collapse into one statement without a hand-rolled SQL CASE — chunked-parallel
-  // instead of sequential is still a large win without risking the pool (see PARALLEL_CHUNK_SIZE).
-  for (let i = 0; i < changed.length; i += PARALLEL_CHUNK_SIZE) {
-    const chunk = changed.slice(i, i + PARALLEL_CHUNK_SIZE);
-    await Promise.all(
-      chunk.map((item) =>
-        db.update(products).set({ stockQty: sql`${products.stockQty} + ${item.differenceQty}` }).where(eq(products.id, item.productId))
-      )
-    );
-  }
+  /*
+   * Movements, every per-product adjustment, and the opname's own "completed" flag all commit as
+   * one unit — and that flag is what makes this safe to retry.
+   *
+   * The previous version applied each piece separately, which created a genuinely dangerous
+   * failure mode: if it died partway through the per-product updates, some products had already
+   * been adjusted but the opname was still marked in-progress. The guard at the top of this
+   * function only rejects an opname already marked "completed", so a staff member simply clicking
+   * "Selesaikan" again would sail past it and apply the SAME differences a second time to the
+   * products that had succeeded. A stock count that silently double-corrects is worse than one
+   * that fails outright, because nothing about the result looks wrong.
+   *
+   * The per-product updates run sequentially here rather than chunked-parallel as before: a
+   * transaction runs on a single connection, so Promise.all across it buys nothing and risks
+   * interleaving. Stock opname is an occasional operation over a catalog of at most a few hundred
+   * products — correctness is worth far more than the milliseconds this gives up.
+   */
+  const updatedOpname = await db.transaction(async (tx) => {
+    // stockMovements rows are independent of each other — one bulk insert instead of N.
+    if (changed.length > 0) {
+      await tx.insert(stockMovements).values(
+        changed.map((item) => ({
+          productId: item.productId,
+          type: item.differenceQty > 0 ? ("adjustment" as const) : ("waste" as const),
+          qty: item.differenceQty,
+          note: `Stock opname ${new Date(opname.opnameDate).toLocaleDateString("id-ID")}`,
+          staffUserId: opname.staffUserId,
+        }))
+      );
+    }
 
-  const [updatedOpname] = await db.update(stockOpnames).set({ status: "completed" }).where(eq(stockOpnames.id, stockOpnameId)).returning();
+    // Each product has its own delta, so this can't collapse into a single statement without a
+    // hand-rolled SQL CASE.
+    for (const item of changed) {
+      await tx
+        .update(products)
+        .set({ stockQty: sql`${products.stockQty} + ${item.differenceQty}` })
+        .where(eq(products.id, item.productId));
+    }
+
+    const [row] = await tx.update(stockOpnames).set({ status: "completed" }).where(eq(stockOpnames.id, stockOpnameId)).returning();
+    return row;
+  });
 
   // A physical count can easily reveal a product is lower than the system thought — check
   // whether anything just crossed its minimum stock now that the correction is applied.

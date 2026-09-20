@@ -277,10 +277,19 @@ function createIpaymuDirectGateway(config: { method: PaymentMethod; paymentMetho
       const data = await ipaymuRequest("/api/v2/payment/direct", body);
       const d = data?.Data ?? {};
 
+      // QRIS needs different field mapping than va/cstore: for those, PaymentNo IS the account/
+      // payment code the customer transfers to, but for QRIS iPaymu puts the QR payload there
+      // instead. Passing that through as vaNumber would render it to the payer as "transfer to
+      // account 00020101021226610014ID.CO.QRIS..." — a string no bank form will accept. Field
+      // names vary a little across iPaymu's docs revisions, hence the defensive fallbacks.
+      const isQris = config.paymentMethod === "qris";
+
       return {
         providerRef: String(d.TransactionId ?? referenceId),
         status: "pending",
-        vaNumber: d.PaymentNo ? String(d.PaymentNo) : undefined,
+        vaNumber: !isQris && d.PaymentNo ? String(d.PaymentNo) : undefined,
+        qrString: isQris ? (d.QrString ?? d.QrCode ?? (d.PaymentNo ? String(d.PaymentNo) : undefined)) : undefined,
+        qrImageUrl: isQris ? (d.QrImage ?? d.QrImageUrl ?? undefined) : undefined,
         bankCode: config.paymentMethod === "va" ? config.paymentChannel : undefined,
         checkoutUrl: d.Url ?? undefined,
         feeAmount: d.Fee ?? 0,

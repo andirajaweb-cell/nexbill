@@ -71,7 +71,7 @@ const LEGACY_CODE_MIGRATIONS: Record<string, { oldName: string; code: string; na
   "6100": { oldName: "Beban Gaji & Staf", code: "6110", name: "Salary" },
   "6200": { oldName: "Beban Listrik & Internet", code: "6270", name: "Other Utilities" },
   "6300": { oldName: "Beban Biaya Payment Gateway", code: "6540", name: "Payment Gateway Fees" },
-  "6350": { oldName: "Beban Biaya Layanan PPOB (Fastpay)", code: "6570", name: "Beban Biaya Layanan PPOB (Fastpay)" },
+  "6350": { oldName: "Beban Biaya Layanan PPOB (Fastpay)", code: "6570", name: "Beban Biaya Layanan PPOB" },
   "6400": { oldName: "Beban Penyusutan", code: "6850", name: "Other Depreciation" },
   "6500": { oldName: "Beban Sewa", code: "6210", name: "Rent Expense" },
   "6600": { oldName: "Beban Maintenance", code: "6310", name: "PlayStation Maintenance" },
@@ -81,7 +81,23 @@ const LEGACY_CODE_MIGRATIONS: Record<string, { oldName: string; code: string; na
 /** Accounts Payable used for expenses recorded as hutang (unpaid at creation) — distinct from 2111 (Supplier Payable), which purchasing.ts owns. */
 export const EXPENSE_PAYABLE_ACCOUNT_CODE = "2163";
 
-export const FASTPAY_SALDO_ACCOUNT_NAME = "Saldo Deposit Fastpay (PPOB)";
+/**
+ * Display name of the PPOB deposit-balance channel (the cashBankAccounts row backing account 1151).
+ *
+ * Renamed away from "Saldo Deposit Fastpay (PPOB)" on 2026-09-16: PPOB is a revenue stream the
+ * outlet runs, and each outlet may use a different PPOB provider — naming NEXBILL's own default
+ * channel after one specific provider was wrong. The channelKey stays "ppob_fastpay_saldo"
+ * because it is a stable database identity, not a label; renaming it would orphan every existing
+ * outlet's row.
+ *
+ * LEGACY_PPOB_SALDO_ACCOUNT_NAME must stay here for the same reason: outlets seeded before the
+ * rename hold a cashBankAccounts row under the OLD name, and the seeders below look that row up by
+ * name. Matching only the new name would make them believe the channel is missing and insert a
+ * duplicate. Both names are accepted on read; only the new one is ever written.
+ */
+export const PPOB_SALDO_ACCOUNT_NAME = "Saldo Deposit PPOB";
+export const LEGACY_PPOB_SALDO_ACCOUNT_NAME = "Saldo Deposit Fastpay (PPOB)";
+const PPOB_SALDO_ACCOUNT_NAMES = [PPOB_SALDO_ACCOUNT_NAME, LEGACY_PPOB_SALDO_ACCOUNT_NAME];
 
 function normalBalanceFor(type: AccountType): "debit" | "credit" {
   return type === "asset" || type === "expense" ? "debit" : "credit";
@@ -167,20 +183,24 @@ export async function seedChartOfAccounts(outletId: string) {
     }
   }
 
-  // Fastpay PPOB deposit balance — checked independently of the block above since it was
-  // introduced later and existing outlets already had cash/bank rows by then (the
-  // "existingCashBank.length === 0" gate above would otherwise skip them forever).
-  const existingFastpay = await db.select().from(cashBankAccounts).where(and(eq(cashBankAccounts.outletId, outletId), eq(cashBankAccounts.name, FASTPAY_SALDO_ACCOUNT_NAME)));
-  if (existingFastpay.length === 0) {
+  // PPOB deposit balance — checked independently of the block above since it was introduced later
+  // and existing outlets already had cash/bank rows by then (the "existingCashBank.length === 0"
+  // gate above would otherwise skip them forever). Matches the legacy name too, so an outlet
+  // seeded before the 2026-09-16 rename is recognised instead of getting a second row.
+  const existingPpobSaldo = await db
+    .select()
+    .from(cashBankAccounts)
+    .where(and(eq(cashBankAccounts.outletId, outletId), inArray(cashBankAccounts.name, PPOB_SALDO_ACCOUNT_NAMES)));
+  if (existingPpobSaldo.length === 0) {
     const saldoAccount = existingByCode.get("1151");
     if (saldoAccount) {
-      await db.insert(cashBankAccounts).values({ outletId, name: FASTPAY_SALDO_ACCOUNT_NAME, type: "bank", accountId: saldoAccount.id });
+      await db.insert(cashBankAccounts).values({ outletId, name: PPOB_SALDO_ACCOUNT_NAME, type: "bank", accountId: saldoAccount.id });
     }
   }
 }
 
 /**
- * The Fastpay PPOB deposit-saldo channel used to be a single hardcoded line
+ * The PPOB deposit-saldo channel used to be a single hardcoded line
  * bolted onto every shift close (see shift.ts). It's now the first row of the
  * owner-editable depositBalanceChannels list — this seeds that row once per
  * outlet, reusing the account 1151 + cashBankAccounts row seedChartOfAccounts
@@ -199,7 +219,7 @@ export async function ensureDepositBalanceChannelsSeeded(outletId: string) {
   const [cba] = await db
     .select()
     .from(cashBankAccounts)
-    .where(and(eq(cashBankAccounts.outletId, outletId), eq(cashBankAccounts.name, FASTPAY_SALDO_ACCOUNT_NAME)))
+    .where(and(eq(cashBankAccounts.outletId, outletId), inArray(cashBankAccounts.name, PPOB_SALDO_ACCOUNT_NAMES)))
     .limit(1);
   if (!account || !cba) return; // COA not seeded yet for this outlet — caller runs seedChartOfAccounts first
 
@@ -208,7 +228,7 @@ export async function ensureDepositBalanceChannelsSeeded(outletId: string) {
     .values({
       outletId,
       channelKey: "ppob_fastpay_saldo",
-      label: FASTPAY_SALDO_ACCOUNT_NAME,
+      label: PPOB_SALDO_ACCOUNT_NAME,
       accountId: account.id,
       cashBankAccountId: cba.id,
       isSystem: true,

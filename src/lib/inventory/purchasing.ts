@@ -59,84 +59,99 @@ export async function receivePurchaseOrder(
   invoiceNumber?: string,
   staffUserId?: string
 ) {
-  const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, purchaseOrderId)).limit(1);
-  if (!po) throw new Error("PO tidak ditemukan.");
+  // Everything that mutates — received quantities, stock-in for each line, the PO's own status,
+  // and the invoice with its lines — commits as one unit. Receiving a multi-line PO used to write
+  // each of those separately, so a failure partway through could leave qtyReceived bumped for the
+  // first items, stock added for some, and the PO still showing its old status: a state no screen
+  // in the app can explain and nothing detects.
+  //
+  // postPurchaseInvoiceJournal stays outside for the same reason as in recordSupplierPurchase —
+  // it opens its own transaction. It is idempotent and re-reads the invoice by id, so running it
+  // after this commits is safe.
+  const result = await db.transaction(async (tx) => {
+    const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, purchaseOrderId)).limit(1);
+    if (!po) throw new Error("PO tidak ditemukan.");
 
-  const items = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
+    const items = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
 
-  let receivedAmount = 0;
-  let anyPartial = false;
-  const receivedLines: { productId: string; qty: number; unitCost: number; landedUnitCost: number }[] = [];
+    let receivedAmount = 0;
+    let anyPartial = false;
+    const receivedLines: { productId: string; qty: number; unitCost: number; landedUnitCost: number }[] = [];
 
-  for (const item of items) {
-    const qtyToReceive = receivedQtyByItemId ? (receivedQtyByItemId[item.id] ?? 0) : item.qtyOrdered - item.qtyReceived;
-    if (qtyToReceive <= 0) continue;
+    for (const item of items) {
+      const qtyToReceive = receivedQtyByItemId ? (receivedQtyByItemId[item.id] ?? 0) : item.qtyOrdered - item.qtyReceived;
+      if (qtyToReceive <= 0) continue;
 
-    await db
-      .update(purchaseOrderItems)
-      .set({ qtyReceived: item.qtyReceived + qtyToReceive })
-      .where(eq(purchaseOrderItems.id, item.id));
+      await tx
+        .update(purchaseOrderItems)
+        .set({ qtyReceived: item.qtyReceived + qtyToReceive })
+        .where(eq(purchaseOrderItems.id, item.id));
 
-    // Was previously a manual stockMovements insert + stockQty update that skipped costPrice
-    // entirely — receiving via PO never touched HPP/harga modal, unlike Belanja Supplier's
-    // recordSupplierPurchase (below) which always goes through this same helper. Routing both
-    // through receiveStockForItem keeps every stock-in path consistent: same weighted-average
-    // cost rollup, same stockMovements/stockQty bookkeeping, no matter which screen received it.
-    await receiveStockForItem(
-      item.productId,
-      qtyToReceive,
-      item.unitCost,
-      po.id,
-      `Penerimaan PO ${po.poNumber ?? po.id.slice(0, 8)}`,
-      staffUserId
-    );
-
-    receivedAmount += qtyToReceive * item.unitCost;
-    if (item.qtyReceived + qtyToReceive < item.qtyOrdered) anyPartial = true;
-
-    // Stashed here, inserted below once we know the invoice id (a PO receipt may span several
-    // invoices over time, so purchaseInvoiceItems must be tied to this specific invoice, not the
-    // PO or the item). See the schema doc comment on purchaseInvoiceItems for why this exists
-    // alongside purchaseOrderItems.
-    receivedLines.push({ productId: item.productId, qty: qtyToReceive, unitCost: item.unitCost, landedUnitCost: item.unitCost });
-  }
-
-  const updatedItems = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
-  const fullyReceived = updatedItems.every((i) => i.qtyReceived >= i.qtyOrdered);
-
-  await db
-    .update(purchaseOrders)
-    .set({ status: fullyReceived ? "received" : "partially_received" })
-    .where(eq(purchaseOrders.id, purchaseOrderId));
-
-  let invoice = null;
-  if (createInvoice && receivedAmount > 0) {
-    const [inv] = await db
-      .insert(purchaseInvoices)
-      .values({
-        outletId: po.outletId,
-        supplierId: po.supplierId,
-        purchaseOrderId: po.id,
-        invoiceNumber,
-        amount: receivedAmount,
-        status: "unpaid",
+      // Was previously a manual stockMovements insert + stockQty update that skipped costPrice
+      // entirely — receiving via PO never touched HPP/harga modal, unlike Belanja Supplier's
+      // recordSupplierPurchase (below) which always goes through this same helper. Routing both
+      // through receiveStockForItem keeps every stock-in path consistent: same weighted-average
+      // cost rollup, same stockMovements/stockQty bookkeeping, no matter which screen received it.
+      await receiveStockForItem(
+        item.productId,
+        qtyToReceive,
+        item.unitCost,
+        po.id,
+        `Penerimaan PO ${po.poNumber ?? po.id.slice(0, 8)}`,
         staffUserId,
-      })
-      .returning();
-    for (const line of receivedLines) {
-      await db.insert(purchaseInvoiceItems).values({
-        purchaseInvoiceId: inv.id,
-        productId: line.productId,
-        qty: line.qty,
-        unitCost: line.unitCost,
-        landedUnitCost: line.landedUnitCost,
-      });
-    }
-    await postPurchaseInvoiceJournal(inv.id);
-    invoice = inv;
-  }
+        tx
+      );
 
-  return { po, invoice, fullyReceived: fullyReceived && !anyPartial };
+      receivedAmount += qtyToReceive * item.unitCost;
+      if (item.qtyReceived + qtyToReceive < item.qtyOrdered) anyPartial = true;
+
+      // Stashed here, inserted below once we know the invoice id (a PO receipt may span several
+      // invoices over time, so purchaseInvoiceItems must be tied to this specific invoice, not the
+      // PO or the item). See the schema doc comment on purchaseInvoiceItems for why this exists
+      // alongside purchaseOrderItems.
+      receivedLines.push({ productId: item.productId, qty: qtyToReceive, unitCost: item.unitCost, landedUnitCost: item.unitCost });
+    }
+
+    const updatedItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
+    const fullyReceived = updatedItems.every((i) => i.qtyReceived >= i.qtyOrdered);
+
+    await tx
+      .update(purchaseOrders)
+      .set({ status: fullyReceived ? "received" : "partially_received" })
+      .where(eq(purchaseOrders.id, purchaseOrderId));
+
+    let invoice = null;
+    if (createInvoice && receivedAmount > 0) {
+      const [inv] = await tx
+        .insert(purchaseInvoices)
+        .values({
+          outletId: po.outletId,
+          supplierId: po.supplierId,
+          purchaseOrderId: po.id,
+          invoiceNumber,
+          amount: receivedAmount,
+          status: "unpaid",
+          staffUserId,
+        })
+        .returning();
+      for (const line of receivedLines) {
+        await tx.insert(purchaseInvoiceItems).values({
+          purchaseInvoiceId: inv.id,
+          productId: line.productId,
+          qty: line.qty,
+          unitCost: line.unitCost,
+          landedUnitCost: line.landedUnitCost,
+        });
+      }
+      invoice = inv;
+    }
+
+    return { po, invoice, fullyReceived: fullyReceived && !anyPartial };
+  });
+
+  if (result.invoice) await postPurchaseInvoiceJournal(result.invoice.id);
+
+  return result;
 }
 
 export async function payPurchaseInvoice(purchaseInvoiceId: string, amount: number, method: string, cashBankAccountId: string, staffUserId?: string) {
@@ -168,20 +183,34 @@ export async function createPurchaseReturn(input: {
   unitCost: number;
   reason?: string;
 }) {
-  const [ret] = await db.insert(purchaseReturns).values(input).returning();
+  // Return record + stock-out commit together: without this, a failure between them left goods
+  // recorded as returned to the supplier while the stock was still counted as on hand.
+  //
+  // NOTE on `type: "adjustment"`: stockMovements has no dedicated purchase-return type (the enum
+  // is purchase_in / sale_out / adjustment / waste), so a return is indistinguishable from a
+  // manual stock correction in the movement history except by its note text. Adding a proper type
+  // would touch every report that filters on it, so it is left alone deliberately rather than
+  // changed in passing.
+  const ret = await db.transaction(async (tx) => {
+    const [row] = await tx.insert(purchaseReturns).values(input).returning();
 
-  await db.insert(stockMovements).values({
-    productId: input.productId,
-    type: "adjustment",
-    qty: -Math.abs(input.qty),
-    note: `Retur pembelian: ${input.reason ?? ""}`,
-    staffUserId: undefined,
+    await tx.insert(stockMovements).values({
+      productId: input.productId,
+      type: "adjustment",
+      qty: -Math.abs(input.qty),
+      note: `Retur pembelian: ${input.reason ?? ""}`,
+      staffUserId: undefined,
+    });
+    await tx
+      .update(products)
+      .set({ stockQty: sql`${products.stockQty} - ${input.qty}` })
+      .where(eq(products.id, input.productId));
+
+    return row;
   });
-  await db
-    .update(products)
-    .set({ stockQty: sql`${products.stockQty} - ${input.qty}` })
-    .where(eq(products.id, input.productId));
 
+  // Outside the transaction — postPurchaseReturnJournal opens its own, same as the other posting
+  // helpers, and re-reads the return by id so it is safe to run once the rows above are committed.
   await postPurchaseReturnJournal(ret.id);
   return ret;
 }
@@ -245,35 +274,53 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
 
   const invoiceNumber = input.invoiceNumber ?? `BLJ-${Date.now().toString(36).toUpperCase()}`;
 
-  const [invoice] = await db
-    .insert(purchaseInvoices)
-    .values({
-      outletId: input.outletId,
-      supplierId: input.supplierId,
-      invoiceNumber,
-      amount: grandTotal,
-      status: "unpaid",
-      staffUserId: input.staffUserId,
-    })
-    .returning();
+  // Invoice + every line's stock-in + every line row commit together or not at all.
+  //
+  // Before this was a transaction, each step committed on its own: a purchase whose SECOND item
+  // referenced a product that no longer existed left the invoice saved, the first item's stock
+  // already added, and nothing for the rest — while the invoice still appeared in the Belanja
+  // Supplier list looking perfectly normal. That is precisely the shape of "stok tidak bertambah
+  // padahal belanja tercatat", and it was silent.
+  //
+  // Journal posting and payment stay OUTSIDE this block on purpose: postPurchaseInvoiceJournal
+  // opens its own db.transaction, and nesting one inside another would turn it into a savepoint
+  // whose rollback semantics are not what either function assumes. Both are separately idempotent
+  // and both re-read the invoice by id, so running them after this commits is safe — and by then
+  // the invoice and its stock are already consistent with each other.
+  const invoice = await db.transaction(async (tx) => {
+    const [inv] = await tx
+      .insert(purchaseInvoices)
+      .values({
+        outletId: input.outletId,
+        supplierId: input.supplierId,
+        invoiceNumber,
+        amount: grandTotal,
+        status: "unpaid",
+        staffUserId: input.staffUserId,
+      })
+      .returning();
 
-  for (const line of lineBreakdown) {
-    await receiveStockForItem(
-      line.productId,
-      line.qty,
-      line.landedUnitCost,
-      invoice.id,
-      `Belanja supplier ${invoiceNumber}${additionalCostsTotal > 0 ? " (termasuk ongkos transport/parkir/lain-lain)" : ""}`,
-      input.staffUserId
-    );
-    await db.insert(purchaseInvoiceItems).values({
-      purchaseInvoiceId: invoice.id,
-      productId: line.productId,
-      qty: line.qty,
-      unitCost: line.unitCost,
-      landedUnitCost: line.landedUnitCost,
-    });
-  }
+    for (const line of lineBreakdown) {
+      await receiveStockForItem(
+        line.productId,
+        line.qty,
+        line.landedUnitCost,
+        inv.id,
+        `Belanja supplier ${invoiceNumber}${additionalCostsTotal > 0 ? " (termasuk ongkos transport/parkir/lain-lain)" : ""}`,
+        input.staffUserId,
+        tx
+      );
+      await tx.insert(purchaseInvoiceItems).values({
+        purchaseInvoiceId: inv.id,
+        productId: line.productId,
+        qty: line.qty,
+        unitCost: line.unitCost,
+        landedUnitCost: line.landedUnitCost,
+      });
+    }
+
+    return inv;
+  });
 
   // Dr 1200 Persediaan (grandTotal — goods + landed costs) / Cr 2000 Hutang Usaha.
   await postPurchaseInvoiceJournal(invoice.id);

@@ -19,7 +19,7 @@ async function assertAccess() {
 /**
  * Renames a channel — keeps the label AND its linked COA account name AND its
  * cashBankAccounts wrapper name all "calibrated" together, per the owner's
- * request. Works for the system Fastpay PPOB row too (still not deletable,
+ * request. Works for the system PPOB saldo row too (still not deletable,
  * see DELETE below), since every lookup elsewhere resolves it by account CODE
  * ("1151"), never by name.
  */
@@ -59,7 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
  * actually used (no journal history, no historical shift-close check),
  * otherwise soft-deletes the account (isActive: false) so old records keep
  * resolving, mirroring the same guard the Chart of Accounts CRUD uses. The
- * seeded Fastpay PPOB row (isSystem) can never be deleted — the PPOB module
+ * seeded PPOB saldo row (isSystem) can never be deleted — the PPOB module
  * depends on account 1151 always existing — only renamed via PATCH above.
  */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -71,7 +71,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!existing) return NextResponse.json({ ok: true }); // already gone
     if (existing.outletId !== access.session!.outletId) return NextResponse.json({ error: "Channel saldo deposit tidak ditemukan." }, { status: 404 });
     if (existing.isSystem) {
-      return NextResponse.json({ error: "Channel Saldo Deposit Fastpay (PPOB) tidak bisa dihapus — hanya bisa diganti namanya." }, { status: 400 });
+      return NextResponse.json({ error: "Channel Saldo Deposit PPOB tidak bisa dihapus — hanya bisa diganti namanya." }, { status: 400 });
     }
 
     await db.delete(depositBalanceChannels).where(eq(depositBalanceChannels.id, id));

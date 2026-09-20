@@ -94,7 +94,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         steps: [
           "Metode \"Tunai (Cash)\" sudah otomatis ada sejak awal, tidak perlu ditambah.",
           "Tambahkan metode non-tunai yang benar-benar dipakai outletmu (QRIS, GoPay, DANA, dll) — pilih jenis \"Saldo Terlacak\" untuk metode yang perlu dicek saldo appnya sendiri saat tutup shift (e-wallet), atau \"Info Saja\" untuk yang langsung masuk rekening bank tanpa perlu dicek (kartu debit/EDC, transfer).",
-          "Kalau pakai payment gateway Fastpay/BukuPay dengan kredensial live, daftarkan URL webhook yang tertera di bagian bawah halaman ini ke dashboard gateway masing-masing supaya konfirmasi pembayaran QRIS otomatis (bukan manual \"Tandai Diterima\" terus).",
+          "Kalau pakai payment gateway BukuPay dengan kredensial live, daftarkan URL webhook yang tertera di bagian bawah halaman ini ke dashboard gateway masing-masing supaya konfirmasi pembayaran QRIS otomatis (bukan manual \"Tandai Diterima\" terus).",
         ],
       },
       {
@@ -264,7 +264,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         steps: [
           "Pastikan semua sesi rental yang masih \"Running\"/\"Jeda\" di Rental PS sudah benar-benar selesai — kalau ada customer yang sudah pulang tapi sesinya lupa di-end, akhiri & catat statusnya (lunas atau \"bayar nanti\") sebelum tutup shift.",
           "Hitung fisik kas di laci SATU PER SATU per pecahan uang (jangan intip laporan sistem dulu) di form Tutup Shift.",
-          "Buka app/dashboard tiap channel non-tunai (GoPay/DANA/BukuPay/Fastpay/dll) dan masukkan saldo yang benar-benar tertera di sana saat itu juga.",
+          "Buka app/dashboard tiap channel non-tunai (GoPay/DANA/BukuPay/dll) dan masukkan saldo yang benar-benar tertera di sana saat itu juga.",
           "Submit Tutup Shift — kalau ada selisih (kas atau non-tunai), catat dugaan penyebabnya di kolom catatan sebelum lupa (mis. \"kembalian kurang di transaksi jam 3 sore\").",
           "Matikan TV/unit yang sedang tidak dipakai (kalau tidak otomatis mati sendiri), rapikan controller & aksesoris kembali ke tempatnya.",
           "Kunci laci kas dan area kasir sesuai SOP keamanan outlet masing-masing (di luar cakupan aplikasi ini).",
@@ -318,7 +318,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           "Klik \"End Session & Bayar\" — sistem hitung tagihan final (sewa + aksesoris + F&B) dan tampilkan kartu \"Sesi Selesai\".",
           "Opsional sebelum ada pembayaran masuk: masukkan Diskon (Rp), centang Pajak, atau terapkan kode voucher/reward customer.",
           "Isi \"Jumlah bayar\" (default: sisa tagihan penuh) dan pilih Metode Pembayaran, lalu klik Bayar.",
-          "Cash/manual langsung tercatat lunas. QRIS/e-wallet (qris, fastpay_h2h, dana, gopay, bukupay) menampilkan QR dan menunggu konfirmasi otomatis — ada juga tombol manual \"Tandai Diterima\" kalau webhook lambat/gagal.",
+          "Cash/manual langsung tercatat lunas. QRIS/e-wallet (qris, dana, gopay, bukupay) menampilkan QR dan menunggu konfirmasi otomatis — ada juga tombol manual \"Tandai Diterima\" kalau webhook lambat/gagal.",
           "Bisa bayar sebagian dulu dengan satu metode, sisanya nanti dengan metode lain (split payment) — kartu akan tetap terbuka menampilkan sisa tagihan.",
           "Kalau customer mau bayar nanti, klik \"Tutup (bayar nanti di POS)\" — tagihan tetap tersimpan sebagai order belum lunas dan bisa dibayar dari halaman Kasir (POS) atau Transaksi kapan saja.",
         ],
@@ -527,7 +527,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         steps: [
           "Buka shift: isi Modal Awal Kas, klik Buka Shift.",
           "Tutup shift: hitung uang fisik di laci SATU PER SATU per pecahan (jangan lihat laporan sistem dulu) — total muncul otomatis saat diisi.",
-          "Isi \"Verifikasi Saldo Channel Non-Tunai\": buka app/dashboard tiap channel (GoPay, DANA, BukuPay, Fastpay, dan channel deposit lain yang terdaftar) lalu masukkan saldo yang tertera di sana saat itu juga.",
+          "Isi \"Verifikasi Saldo Channel Non-Tunai\": buka app/dashboard tiap channel (GoPay, DANA, BukuPay, dan channel deposit lain yang terdaftar) lalu masukkan saldo yang tertera di sana saat itu juga.",
           "Isi catatan opsional (mis. alasan selisih yang sudah diketahui), lalu klik Tutup Shift — sistem baru menampilkan selisih (kas & non-tunai) SETELAH kamu submit, bukan sebelumnya, supaya hitungan tidak diarahkan ke angka yang \"pas\".",
           "Riwayat shift menampilkan setiap pergantian shift dengan selisih kas & non-tunai ditandai warna: merah \"Kurang\" untuk kekurangan, kuning \"Lebih\" untuk kelebihan.",
         ],
@@ -536,7 +536,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         title: "Kelola Channel Saldo Deposit (Non-Tunai)",
         intro: "Bagian ini menentukan daftar channel yang muncul di Verifikasi Saldo Channel Non-Tunai saat tutup shift.",
         steps: [
-          "Channel \"Saldo Deposit Fastpay (PPOB)\" adalah channel bawaan sistem — bisa diganti namanya (klik \"Ganti Nama\") tapi tidak bisa dihapus, karena modul PPOB bergantung padanya.",
+          "Channel \"Saldo Deposit PPOB\" adalah channel bawaan sistem — bisa diganti namanya (klik \"Ganti Nama\") tapi tidak bisa dihapus, karena modul PPOB bergantung padanya.",
           "Untuk menambah channel deposit lain (mis. provider PPOB kedua), isi nama di kolom \"Nama channel saldo deposit baru\" lalu klik \"Tambah Channel\" — sistem otomatis membuatkan akun COA & akun kas/bank sendiri untuk channel ini.",
           "Hapus channel custom (bukan bawaan) dengan tombol Hapus — akun COA yang terkait otomatis ikut dibersihkan (dihapus kalau belum pernah dipakai, diarsipkan kalau sudah ada riwayat transaksi/penutupan shift).",
         ],
@@ -544,7 +544,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       },
     ],
     notes: [
-      "Channel non-tunai yang diverifikasi setiap tutup shift: setiap metode pembayaran GoPay/DANA/BukuPay/Fastpay yang benar-benar dipakai shift itu, PLUS setiap channel saldo deposit yang terdaftar (selalu dicek, karena saldo ini adalah float bersama yang bisa terpakai siapa saja).",
+      "Channel non-tunai yang diverifikasi setiap tutup shift: setiap metode pembayaran GoPay/DANA/BukuPay yang benar-benar dipakai shift itu, PLUS setiap channel saldo deposit yang terdaftar (selalu dicek, karena saldo ini adalah float bersama yang bisa terpakai siapa saja).",
       "Angka \"Ekspektasi\" (baik kas maupun non-tunai) dihitung sistem dari saldo akuntansi berjalan — tidak pernah ditampilkan ke kasir sebelum dia submit hitungannya sendiri (blind count).",
     ],
   },
@@ -585,17 +585,17 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     group: "Penjualan & Pelanggan",
     label: "PPOB",
     summary:
-      "Catat transaksi PPOB (top up e-wallet, token listrik, pulsa, transfer, tarik tunai) lewat Fastpay — tetap satu accounting dengan modul lain, margin & biaya provider terpisah jelas.",
+      "Catat transaksi PPOB (top up e-wallet, token listrik, pulsa, transfer, tarik tunai) — tetap satu accounting dengan modul lain, margin & biaya provider terpisah jelas.",
     steps: [
       "Isi form transaksi: kategori, produk (harga & margin default terisi dari Kelola Harga Provider & Margin), nominal, nomor referensi (untuk token/pulsa), akun sumber dana (funding) dan akun penerima (receiving).",
-      "Khusus Tarik Tunai, arah akunnya otomatis dibalik: customer terima uang cash, saldo Fastpay yang bertambah (bukan sebaliknya).",
+      "Khusus Tarik Tunai, arah akunnya otomatis dibalik: customer terima uang cash, saldo provider PPOB yang bertambah (bukan sebaliknya).",
       "Klik \"Kelola Harga Provider & Margin\" untuk atur biaya modal & margin default per produk supaya tidak perlu isi manual tiap transaksi.",
       "Batalkan (void) transaksi kalau salah input — perlu izin manage_ppob. Edit dan Hapus permanen HANYA untuk akun Superuser (beda dengan Batalkan: Hapus menghilangkan total termasuk jurnalnya, tidak bisa dibatalkan).",
-      "Kartu ringkasan atas menampilkan Saldo Deposit Fastpay saat ini dan jumlah transaksi periode berjalan — filter tanggal Dari/Sampai tersedia di atas tabel.",
+      "Kartu ringkasan atas menampilkan Saldo Deposit PPOB saat ini dan jumlah transaksi periode berjalan — filter tanggal Dari/Sampai tersedia di atas tabel.",
     ],
     notes: [
-      "Biaya provider (Fee Outlet Fastpay tier Basic) dibukukan sebagai beban riil terpisah dari margin toko yang kamu atur sendiri — jadi margin yang kamu lihat adalah margin bersih, bukan kotor.",
-      "Saldo Deposit Fastpay bisa diganti namanya lewat halaman Shift & Kasir → Kelola Channel Saldo Deposit (perubahan nama otomatis tersinkron ke sini juga).",
+      "Biaya provider (tarif provider PPOB) dibukukan sebagai beban riil terpisah dari margin toko yang kamu atur sendiri — jadi margin yang kamu lihat adalah margin bersih, bukan kotor.",
+      "Saldo Deposit PPOB bisa diganti namanya lewat halaman Shift & Kasir → Kelola Channel Saldo Deposit (perubahan nama otomatis tersinkron ke sini juga).",
       "Modul PPOB bisa dimatikan sepenuhnya lewat Pengaturan → Feature Management kalau outletmu tidak menjual PPOB — begitu dimatikan, menu ini hilang dari sidebar dan transaksi baru tidak bisa dibuat, tapi riwayat transaksi lama tetap tersimpan dan muncul lagi begitu modul dinyalakan ulang.",
     ],
     roles: "Catat/void transaksi & kelola harga: manage_ppob. Edit/Hapus permanen: khusus akun Superuser. Nyala/matikan modul ini: khusus Superuser lewat Feature Management.",
@@ -973,7 +973,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     ],
     notes: [
       "Metode \"Tunai (Cash)\" tidak bisa dihapus dan jenisnya tidak bisa diubah — dibutuhkan sistem untuk hitung fisik kas saat tutup shift.",
-      "Di bagian bawah ada URL webhook Fastpay/BukuPay untuk didaftarkan ke dashboard payment gateway kalau kredensial live sudah dikonfigurasi.",
+      "Di bagian bawah ada URL webhook BukuPay untuk didaftarkan ke dashboard payment gateway kalau kredensial live sudah dikonfigurasi.",
     ],
     roles: "manage_settings: Owner, Superuser, Manager.",
   },

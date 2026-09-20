@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Clock, UtensilsCrossed, Gamepad2 } from "lucide-react";
-import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
+import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-billing-board";
 
@@ -83,14 +84,13 @@ export default function BillingBoardPage() {
     if (!outlet) return;
     setOutletId(outlet.id);
     load(outlet.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outlet]);
 
-  useEffect(() => {
-    if (!outletId) return;
-    const id = setInterval(() => load(outletId), 3000);
-    return () => clearInterval(id);
-  }, [outletId]);
+  // 3s while someone is watching; nothing at all in a backgrounded tab, and an immediate refresh
+  // the moment the tab is focused again — see usePollingWhenVisible.
+  usePollingWhenVisible(() => {
+    if (outletId) load(outletId);
+  }, 3000, !!outletId);
 
   const totalRunning = rows.reduce((s, r) => s + r.runningTotal, 0);
   const totalFnbItems = rows.reduce((s, r) => s + r.fnbItemCount, 0);

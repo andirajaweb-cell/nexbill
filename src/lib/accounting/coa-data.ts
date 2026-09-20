@@ -56,7 +56,10 @@ export const DEFAULT_COA: CoaDef[] = [
   { code: "1134", name: "DANA", type: "asset", parentCode: "1130" },
   { code: "1135", name: "ShopeePay", type: "asset", parentCode: "1130" },
   { code: "1136", name: "BukuPay", type: "asset", parentCode: "1130" },
-  { code: "1137", name: "Fastpay Gateway (Settlement)", type: "asset", parentCode: "1130" },
+  // 1137 "Fastpay Gateway (Settlement)" was dropped from this seed on 2026-09-16 together with the
+  // Fastpay gateway adapter. Code intentionally left unused rather than recycled: outlets seeded
+  // before that date still have the account, possibly with journal entries against it, and a
+  // reused code would silently merge two unrelated histories.
   { code: "1140", name: "Accounts Receivable", type: "asset", parentCode: "1100", isPostingAllowed: false },
   { code: "1141", name: "Customer Receivable", type: "asset", parentCode: "1140" },
   { code: "1142", name: "Other Receivable", type: "asset", parentCode: "1140" },
@@ -301,7 +304,7 @@ export const DEFAULT_COA: CoaDef[] = [
   { code: "6540", name: "Payment Gateway Fees", type: "expense", parentCode: "6500" },
   { code: "6550", name: "Software Subscription", type: "expense", parentCode: "6500" },
   { code: "6560", name: "Professional Services", type: "expense", parentCode: "6500" },
-  { code: "6570", name: "Beban Biaya Layanan PPOB (Fastpay)", type: "expense", parentCode: "6500" },
+  { code: "6570", name: "Beban Biaya Layanan PPOB", type: "expense", parentCode: "6500" },
   { code: "6600", name: "LOGISTICS", type: "expense", parentCode: "6000", isPostingAllowed: false },
   { code: "6610", name: "Transportation", type: "expense", parentCode: "6600" },
   { code: "6620", name: "Delivery", type: "expense", parentCode: "6600" },

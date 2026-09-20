@@ -102,7 +102,7 @@ export default function ShiftPage() {
   const [closing, setClosing] = useState(false);
   const [closeResult, setCloseResult] = useState<any>(null);
 
-  // Deposit-balance channel management (rename Fastpay PPOB saldo / add-delete other
+  // Deposit-balance channel management (rename PPOB provider saldo / add-delete other
   // deposit-balance channels) — kept in sync with COA via /api/deposit-balance-channels.
   const [depositChannels, setDepositChannels] = useState<DepositChannel[]>([]);
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
@@ -391,7 +391,7 @@ export default function ShiftPage() {
             <li>{t("shift.guideStep2", "Selama shift berjalan, lakukan transaksi seperti biasa (rental, F&B, dll) — tidak perlu buka halaman ini lagi sampai mau pulang/gantian.")}</li>
             <li>{t("shift.guideStep3", "Saat mau pulang atau gantian shift, buka halaman ini lagi dan klik \"Tutup Shift\".")}</li>
             <li>{t("shift.guideStep4", "Hitung UANG TUNAI di laci satu per satu sesuai pecahannya (lembar Rp100.000, Rp50.000, dst), lalu isi jumlah lembarnya di kolom masing-masing — bukan totalnya, tapi JUMLAH LEMBAR/KEPINGnya.")}</li>
-            <li>{t("shift.guideStep5", "Kalau ada channel non-tunai (GoPay, DANA, saldo Fastpay, dll), buka aplikasinya di HP, lihat angka saldo yang tertera di layar, lalu ketik angka itu apa adanya — jangan dikira-kira.")}</li>
+            <li>{t("shift.guideStep5", "Kalau ada channel non-tunai (GoPay, DANA, saldo PPOB, dll), buka aplikasinya di HP, lihat angka saldo yang tertera di layar, lalu ketik angka itu apa adanya — jangan dikira-kira.")}</li>
             <li>{t("shift.guideStep6", "Klik \"Tutup Shift\". Sistem otomatis membandingkan hitunganmu dengan catatan transaksi, dan langsung menunjukkan kalau ada selisih (uang kurang atau lebih).")}</li>
           </ol>
         )}
@@ -408,7 +408,7 @@ export default function ShiftPage() {
         <Card>
           <h2 className="font-medium mb-1">{t("shift.depositChannelsTitle", "Channel Saldo Deposit (Non-Tunai)")}</h2>
           <p className="text-xs text-neutral-500 mb-3">
-            {t("shift.depositChannelsDesc", 'Daftar ini yang muncul di "Verifikasi Saldo Channel Non-Tunai" saat tutup shift — Saldo Deposit Fastpay (PPOB) bisa diganti namanya, dan kamu bisa menambah channel saldo deposit lain (mis. provider PPOB kedua). Setiap channel otomatis terhubung ke akun COA sendiri — tambah/hapus channel di sini akan ikut membuat/menghapus akun COA-nya.')}
+            {t("shift.depositChannelsDesc", 'Daftar ini yang muncul di "Verifikasi Saldo Channel Non-Tunai" saat tutup shift — Saldo Deposit PPOB bisa diganti namanya, dan kamu bisa menambah channel saldo deposit lain (mis. provider PPOB kedua). Setiap channel otomatis terhubung ke akun COA sendiri — tambah/hapus channel di sini akan ikut membuat/menghapus akun COA-nya.')}
           </p>
           <div className="space-y-2">
             {depositChannels.map((c) => (
@@ -627,7 +627,7 @@ export default function ShiftPage() {
           {t("shift.historyDescPrefix", "Setiap pergantian shift otomatis dicek selisih kas (fisik vs ekspektasi sistem) dan selisih saldo channel non-tunai — ditandai")} <span className="text-red-400">{t("shift.historyDescRedLabel", 'merah "Kurang"')}</span> {t("shift.historyDescMiddle", "untuk kekurangan dan")} <span className="text-amber-400">{t("shift.historyDescAmberLabel", 'kuning "Lebih"')}</span> {t("shift.historyDescSuffix", "untuk kelebihan, supaya keduanya sama-sama kelihatan, bukan cuma yang kurang.")}
         </p>
         <table className="w-full text-sm">
-          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colOpen", "Buka")}</th><th>{t("shift.colClose", "Tutup")}</th><th>{t("shift.colStaff", "Karyawan")}</th><th>{t("shift.colOpeningCapital", "Modal")}</th><th title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.colExpected", "Ekspektasi")}</th><th title={t("shift.colActualCashHint", "Total uang tunai hasil hitungan fisik saat tutup shift")}>{t("shift.colActual", "Aktual")}</th><th title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")}</th><th title={t("shift.colNonCashVarianceHint", "Total selisih (aktual vs ekspektasi) untuk semua channel non-tunai seperti GoPay/DANA/Fastpay pada shift ini")}>{t("shift.colNonCashVariance", "Selisih Non-Tunai")}</th><th title={t("shift.colFraudHint", "Ditandai otomatis kalau selisih atau jumlah void/refund/hapus pada shift ini melebihi ambang batas di Pengaturan > Preferensi")}>{t("shift.colFraud", "Anti-Fraud")}</th><th></th></tr></thead>
+          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colOpen", "Buka")}</th><th>{t("shift.colClose", "Tutup")}</th><th>{t("shift.colStaff", "Karyawan")}</th><th>{t("shift.colOpeningCapital", "Modal")}</th><th title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.colExpected", "Ekspektasi")}</th><th title={t("shift.colActualCashHint", "Total uang tunai hasil hitungan fisik saat tutup shift")}>{t("shift.colActual", "Aktual")}</th><th title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")}</th><th title={t("shift.colNonCashVarianceHint", "Total selisih (aktual vs ekspektasi) untuk semua channel non-tunai seperti GoPay/DANA/PPOB pada shift ini")}>{t("shift.colNonCashVariance", "Selisih Non-Tunai")}</th><th title={t("shift.colFraudHint", "Ditandai otomatis kalau selisih atau jumlah void/refund/hapus pada shift ini melebihi ambang batas di Pengaturan > Preferensi")}>{t("shift.colFraud", "Anti-Fraud")}</th><th></th></tr></thead>
           <tbody>
             {history.map((s) => {
               const cashV = varianceBadge(s.variance, t, rupiah);

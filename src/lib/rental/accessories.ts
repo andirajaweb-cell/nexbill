@@ -3,7 +3,14 @@ import { sessionAccessories, orderItems, outlets, rentalSessions } from "@/db/sc
 import { eq } from "drizzle-orm";
 import { recomputeBillTotals } from "@/lib/pos/bill";
 
-export type AccessoryBillingMode = "per_hour" | "per_use";
+import type { AccessoryBillingMode } from "./charge";
+
+// estimateAccessoryCharge and AccessoryBillingMode live in ./charge, which has no DB imports, so
+// the Rental page can call the SAME function instead of keeping its own hand-written copy (it did,
+// until 2026-09-19). Re-exported from here so every existing server-side importer of
+// "@/lib/rental/accessories" keeps working unchanged.
+export { estimateAccessoryCharge } from "./charge";
+export type { AccessoryBillingMode } from "./charge";
 
 /** Looks up the outlet's accessory pricing policy (Settings > Pajak & Billing > "Kebijakan Tarif
  * Aksesoris") via the rental session's outlet — shared by the live estimate and the final billing
@@ -67,16 +74,6 @@ export async function removeAccessory(accessoryId: string) {
  * independently. mode defaults to "per_hour" (the only behavior that ever existed) so any caller
  * that hasn't been updated to pass the outlet's policy keeps working exactly as before. In
  * "per_use" mode, ratePerHour is charged once per qty regardless of elapsed time. */
-export function estimateAccessoryCharge(
-  accessory: { qty: number; ratePerHour: number; addedAt: string; removedAt: string | null },
-  now = Date.now(),
-  mode: AccessoryBillingMode = "per_hour"
-) {
-  if (mode === "per_use") return Math.round(accessory.qty * accessory.ratePerHour);
-  const endMs = accessory.removedAt ? new Date(accessory.removedAt).getTime() : now;
-  const hours = Math.max(0, (endMs - new Date(accessory.addedAt).getTime()) / 3600000);
-  return Math.round(accessory.qty * accessory.ratePerHour * hours);
-}
 
 /**
  * Finalize every accessory rental on a session into the bill as one orderItems

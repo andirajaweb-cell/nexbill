@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
+import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { showAlert } from "@/lib/ui/dialog";
 import { Paperclip, Download, X, FileVideo } from "lucide-react";
 import "@/lib/i18n/dict-chat";
@@ -115,9 +116,10 @@ export default function SupportChatPage() {
   const loadThreads = () => fetchJsonArray<Thread>("/api/support-chat").then(setThreads);
   useEffect(() => {
     loadThreads();
-    const id = setInterval(loadThreads, 5000);
-    return () => clearInterval(id);
   }, []);
+
+  // Daftar thread: 5s saat tab dilihat, berhenti total saat tab di latar belakang.
+  usePollingWhenVisible(loadThreads, 5000);
 
   useEffect(() => {
     if (!selected) return;
@@ -126,9 +128,13 @@ export default function SupportChatPage() {
     // refresh the thread list right away so its unread dot/badge clears immediately instead of
     // waiting for the next 5s poll.
     load().then(loadThreads);
-    const id = setInterval(load, 3000);
-    return () => clearInterval(id);
   }, [selected]);
+
+  // Isi percakapan yang sedang dibuka: 3s, dan hanya bila ada thread terpilih.
+  usePollingWhenVisible(() => {
+    if (!selected) return;
+    void fetchJsonArray<Message>(`/api/support-chat/${selected.id}/messages`).then(setMessages);
+  }, 3000, !!selected);
 
   const createTicket = async () => {
     if (!newMessage.trim() && !newAttachment) return;

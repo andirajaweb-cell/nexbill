@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
+import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
 import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -133,9 +134,9 @@ export default function PosPage() {
     // regardless of what's in the Produk catalog.
     fetchJsonArray("/api/products").then((rows) => setProducts(rows.filter((p: Product) => p.isActive && p.category !== "device_rental")));
     loadOpenOrders();
-    const id = setInterval(loadOpenOrders, 5000);
-    return () => clearInterval(id);
   }, []);
+
+  usePollingWhenVisible(loadOpenOrders, 5000);
 
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {

@@ -7,8 +7,15 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Power, Play, Square, Pause, PlayCircle, Clock, UtensilsCrossed, Plus, Minus, Settings, Pencil, Archive, RotateCcw, ArrowLeftRight, AlertTriangle, Gamepad, History, Activity, BadgeCheck, Wrench } from "lucide-react";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { useAuth } from "@/lib/auth/client";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
+// From ./charge, not ./pricing or ./accessories — both of those import @/db/client, which would
+// drag the postgres driver into this client bundle and break the production build. charge.ts holds
+// the pure arithmetic precisely so this page can share it instead of keeping its own copy; the
+// hand-written duplicate of estimateAccessoryCharge that used to live here was removed on
+// 2026-09-19. See charge.ts's own doc comment.
+import { computeSessionCharge, estimateAccessoryCharge } from "@/lib/rental/charge";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { describeError } from "@/lib/api/error";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -48,6 +55,11 @@ interface RentalSession {
   extendedMinutes: number;
   gameName: string | null;
   plannedMinutes: number | null;
+  // Needed so the card estimate can price promo sessions at their flat package price instead of
+  // elapsed time. GET /api/rental-sessions already returns the whole row; these were simply never
+  // declared here.
+  promoId: string | null;
+  promoPackagePrice: number | null;
 }
 
 const CONSOLE_TYPES = [
@@ -203,16 +215,6 @@ function formatPlayDuration(totalMinutes: number) {
   return `${h} jam ${m} menit`;
 }
 
-/** Live (unrounded) estimate matching the server's estimateAccessoryCharge — pure display math, no
- * writes. mode mirrors the outlet's Settings > Pajak & Billing > "Kebijakan Tarif Aksesoris": in
- * "per_use", the rate is charged once per qty regardless of elapsed time. */
-function estimateAccessoryCharge(acc: SessionAccessory, now: number, mode: "per_hour" | "per_use" = "per_hour") {
-  if (mode === "per_use") return Math.round(acc.qty * acc.ratePerHour);
-  const endMs = acc.removedAt ? new Date(acc.removedAt).getTime() : now;
-  const hours = Math.max(0, (endMs - new Date(acc.addedAt).getTime()) / 3600000);
-  return Math.round(acc.qty * acc.ratePerHour * hours);
-}
-
 function ElapsedTimer({ startedAt, accumulatedPauseMs, paused }: { startedAt: string; accumulatedPauseMs: number; paused: boolean }) {
   const [elapsed, setElapsed] = useState("00:00:00");
   useEffect(() => {
@@ -347,6 +349,8 @@ export default function RentalPage() {
   // Mirrors the server's getAccessoryBillingMode (lib/rental/accessories.ts) so the running
   // estimate shown here never disagrees with what stopRentalSession actually bills.
   const [accessoryBillingMode, setAccessoryBillingMode] = useState<"per_hour" | "per_use">("per_hour");
+  // Mirrors the outlet's billing rounding so the card estimate matches what stopRentalSession bills.
+  const [billingRoundingMinutes, setBillingRoundingMinutes] = useState(1);
   const [selectedPromoId, setSelectedPromoId] = useState<string | null>(null);
   // "Bayar Dimuka" — optional prepayment collected right when a session starts (see
   // StartSessionInput.prepay in lib/rental/sessions.ts). Only cash/qris are offered here.
@@ -455,10 +459,11 @@ export default function RentalPage() {
   };
 
   useEffect(() => {
-    fetchJsonObject<{ id: string; accessoryBillingMode?: "per_hour" | "per_use" }>("/api/outlets/default").then((o) => {
+    fetchJsonObject<{ id: string; accessoryBillingMode?: "per_hour" | "per_use"; billingRoundingMinutes?: number }>("/api/outlets/default").then((o) => {
       if (!o) return;
       setOutletId(o.id);
       setAccessoryBillingMode(o.accessoryBillingMode ?? "per_hour");
+      setBillingRoundingMinutes(o.billingRoundingMinutes ?? 1);
       // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
       fetchJsonArray(`/api/payment-methods?outletId=${o.id}`).then((rows) => {
         const active = rows.filter((m: any) => m.isActive);
@@ -478,15 +483,13 @@ export default function RentalPage() {
     // still needlessly tight for data that's mostly cosmetic countdown-timer accuracy (the visible
     // per-second countdowns above run off local Date.now() ticks, not this poll). 8s keeps the
     // board feeling live without over-polling every session's bill+accessories on every tick.
-    const id = setInterval(load, 8000);
-    return () => clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    if (!outletId) return;
-    const id = setInterval(() => loadWidgets(outletId), 20000);
-    return () => clearInterval(id);
-  }, [outletId]);
+  usePollingWhenVisible(load, 8000);
+
+  usePollingWhenVisible(() => {
+    if (outletId) loadWidgets(outletId);
+  }, 20000, !!outletId);
 
   // A promo package is scoped to one console type — switching the selected station clears
   // any package pick that might not even apply to the new unit, back to plain per-jam billing.
@@ -910,13 +913,18 @@ export default function RentalPage() {
     load();
   };
 
-  /** Payment methods with a live online gateway behind them (Fastpay H2H powers QRIS/DANA/GoPay,
-   * plus BukuPay) settle asynchronously via webhook (see /api/payments/webhook/*) — they're never
-   * auto-confirmed from this panel. Everything else (cash, transfer, card, and any custom method
-   * an owner adds via the Pembayaran page) has no webhook behind it — resolveGateway() in
-   * lib/payments falls back to the same staff-confirmed "manual" gateway cash already used, so the
-   * kasir confirms receipt on the spot for all of those, exactly like cash always worked. */
-  const ASYNC_GATEWAY_METHODS = new Set(["qris", "fastpay_h2h", "dana", "gopay", "bukupay"]);
+  /** Payment methods with a live online gateway behind them settle asynchronously via webhook (see
+   * /api/payments/webhook/*) — they're never auto-confirmed from this panel. Everything else
+   * (cash, transfer, card, QRIS/DANA/GoPay, and any custom method an owner adds via the Pembayaran
+   * page) has no webhook behind it — resolveGateway() in lib/payments falls back to the same
+   * staff-confirmed "manual" gateway cash already used, so the kasir confirms receipt on the spot
+   * for all of those, exactly like cash always worked.
+   *
+   * QRIS/DANA/GoPay left this set on 2026-09-16: they used to route through the Fastpay H2H
+   * adapter, which was deleted because NEXBILL holds no Fastpay merchant account — and a customer
+   * paying an outlet should settle into the OUTLET's own QRIS/e-wallet account anyway, which is
+   * exactly what the staff-confirmed flow expresses. */
+  const ASYNC_GATEWAY_METHODS = new Set(["bukupay"]);
 
   /**
    * Supports split payment across ANY combination/order of methods — cash then QRIS, QRIS then
@@ -1303,7 +1311,24 @@ export default function RentalPage() {
               effectivePauseMs += Date.now() - new Date(session.pausedAt).getTime();
             }
             const elapsedHours = session ? Math.max(0, (Date.now() - new Date(session.startedAt).getTime() - effectivePauseMs) / 3600000) : 0;
-            const rentalEstimate = session ? Math.round(elapsedHours * session.ratePerHour) : 0;
+            // Same function stopRentalSession bills with, so this card never disagrees with the
+            // receipt. It previously did `elapsedHours * ratePerHour` by hand, which ignored both
+            // the outlet's rounding increment and the fact that fixed-duration/promo sessions have
+            // an agreed price — a 60-minute session 10 minutes in showed Rp833 against a Rp5.000
+            // bill. Promo name/duration are omitted here because the estimate only needs the
+            // subtotal, and a promo session's subtotal is its frozen package price.
+            const rentalEstimate = session
+              ? computeSessionCharge({
+                  promo: session.promoId
+                    ? { name: null, packagePrice: session.promoPackagePrice ?? 0, durationMinutes: 0 }
+                    : null,
+                  plannedMinutes: session.plannedMinutes,
+                  extendedMinutes: session.extendedMinutes,
+                  ratePerHour: session.ratePerHour,
+                  elapsedMinutes: elapsedHours * 60,
+                  roundingMinutes: billingRoundingMinutes,
+                }).subtotal
+              : 0;
             const sessionAccessories = session ? accessories[session.id] ?? [] : [];
             const accessoryEstimate = sessionAccessories.reduce((s, a) => s + estimateAccessoryCharge(a, Date.now(), accessoryBillingMode), 0);
             const runningTotal = (bill?.fnbSubtotal ?? 0) + rentalEstimate + accessoryEstimate;

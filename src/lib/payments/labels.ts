@@ -12,7 +12,6 @@ import type { PaymentMethod } from "./types";
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   cash: "Tunai (Cash)",
   qris: "QRIS",
-  fastpay_h2h: "Fastpay (Gateway)",
   dana: "DANA",
   gopay: "GoPay",
   bukupay: "BukuPay",

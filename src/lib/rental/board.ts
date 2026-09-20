@@ -1,7 +1,8 @@
 import { db } from "@/db/client";
-import { rentalSessions, rentalUnits, customers, orders, orderItems, sessionAccessories, outlets } from "@/db/schema";
+import { rentalSessions, rentalUnits, customers, orders, orderItems, sessionAccessories, outlets, promos } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { estimateAccessoryCharge, type AccessoryBillingMode } from "@/lib/rental/accessories";
+import { computeSessionCharge } from "@/lib/rental/pricing";
 
 export interface LiveBillingBoardRow {
   sessionId: string;
@@ -26,11 +27,16 @@ export interface LiveBillingBoardRow {
 }
 
 /**
- * One-screen live view for cashiers: every currently running/paused rental session
- * with its unit, customer, elapsed-based rental estimate, F&B subtotal/count from the
- * session's open bill, and a running grand total. Mirrors the exact "no rounding, no
- * overtime" estimate formula already shown on the Rental page cards
- * (elapsedHours * ratePerHour) so both views stay consistent for the cashier.
+ * One-screen live view for cashiers: every currently running/paused rental session with its unit,
+ * customer, rental estimate, F&B subtotal/count from the session's open bill, and a running grand
+ * total.
+ *
+ * The estimate goes through computeSessionCharge — the SAME function stopRentalSession bills with.
+ * Until 2026-09-19 this computed `elapsedHours * ratePerHour` by hand, which was wrong in two
+ * ways: it ignored the outlet's rounding increment on open-ended sessions (so the total jumped at
+ * closing time), and it billed elapsed time on fixed-duration sessions whose price was agreed up
+ * front (a 60-minute session 10 minutes in showed Rp833 against a Rp5.000 bill). What the cashier
+ * sees now matches the receipt from the first second of the session.
  *
  * PERF: this used to fetch each session's open bill (getOpenBillForSession), that bill's
  * item/payment breakdown (getBillBreakdown), and its accessories (listSessionAccessories) inside
@@ -50,25 +56,35 @@ export async function getLiveBillingBoard(outletId: string): Promise<LiveBilling
 
   if (sessions.length === 0) return [];
 
-  // One extra lookup for the whole board — same "Kebijakan Tarif Aksesoris" setting
-  // finalizeAccessoryCharges reads at session-stop time, kept in sync here so the live estimate
-  // shown to the cashier never disagrees with what actually gets billed.
-  const [outletRow] = await db.select({ accessoryBillingMode: outlets.accessoryBillingMode }).from(outlets).where(eq(outlets.id, outletId)).limit(1);
+  // One extra lookup for the whole board, fetching both settings that decide what a session costs:
+  // accessoryBillingMode (the "Kebijakan Tarif Aksesoris" that finalizeAccessoryCharges reads at
+  // session-stop time) and billingRoundingMinutes (what stopRentalSession rounds with). Both are
+  // read here so the live estimate can never disagree with what actually gets billed.
+  const [outletRow] = await db
+    .select({ accessoryBillingMode: outlets.accessoryBillingMode, billingRoundingMinutes: outlets.billingRoundingMinutes })
+    .from(outlets)
+    .where(eq(outlets.id, outletId))
+    .limit(1);
   const accessoryBillingMode: AccessoryBillingMode = (outletRow?.accessoryBillingMode as AccessoryBillingMode) ?? "per_hour";
+  const roundingMinutes = outletRow?.billingRoundingMinutes ?? 1;
 
   const sessionIds = sessions.map((s) => s.id);
   const unitIds = [...new Set(sessions.map((s) => s.rentalUnitId))];
   const customerIds = [...new Set(sessions.map((s) => s.customerId).filter((id): id is string => !!id))];
+  // Batched like every other lookup here rather than queried per session — see the PERF note above.
+  const promoIds = [...new Set(sessions.map((s) => s.promoId).filter((id): id is string => !!id))];
 
-  const [units, customerRows, openOrders, accessoryRows] = await Promise.all([
+  const [units, customerRows, openOrders, accessoryRows, promoRows] = await Promise.all([
     db.select().from(rentalUnits).where(inArray(rentalUnits.id, unitIds)),
     customerIds.length ? db.select().from(customers).where(inArray(customers.id, customerIds)) : Promise.resolve([]),
     db.select().from(orders).where(and(inArray(orders.rentalSessionId, sessionIds), eq(orders.status, "open"))),
     db.select().from(sessionAccessories).where(inArray(sessionAccessories.rentalSessionId, sessionIds)),
+    promoIds.length ? db.select().from(promos).where(inArray(promos.id, promoIds)) : Promise.resolve([]),
   ]);
 
   const unitById = new Map(units.map((u) => [u.id, u]));
   const customerById = new Map(customerRows.map((c) => [c.id, c]));
+  const promoById = new Map(promoRows.map((p) => [p.id, p]));
   const openOrderBySessionId = new Map(openOrders.map((o) => [o.rentalSessionId as string, o]));
 
   const orderIds = openOrders.map((o) => o.id);
@@ -99,8 +115,24 @@ export async function getLiveBillingBoard(outletId: string): Promise<LiveBilling
     if (session.status === "paused" && session.pausedAt) {
       effectivePauseMs += now - new Date(session.pausedAt).getTime();
     }
-    const elapsedHours = Math.max(0, (now - new Date(session.startedAt).getTime() - effectivePauseMs) / 3600000);
-    const rentalEstimate = Math.round(elapsedHours * session.ratePerHour);
+    const elapsedMinutes = Math.max(0, (now - new Date(session.startedAt).getTime() - effectivePauseMs) / 60000);
+    const promoRow = session.promoId ? promoById.get(session.promoId) : undefined;
+    const rentalEstimate = computeSessionCharge({
+      // Same resolution order stopRentalSession uses: values frozen on the session row win over
+      // the promo's current ones, since a promo can be edited mid-session.
+      promo: session.promoId
+        ? {
+            name: promoRow?.name ?? null,
+            packagePrice: session.promoPackagePrice ?? promoRow?.packagePrice ?? 0,
+            durationMinutes: promoRow?.durationMinutes ?? 0,
+          }
+        : null,
+      plannedMinutes: session.plannedMinutes,
+      extendedMinutes: session.extendedMinutes,
+      ratePerHour: session.ratePerHour,
+      elapsedMinutes,
+      roundingMinutes,
+    }).subtotal;
 
     const bill = openOrderBySessionId.get(session.id) ?? null;
     const items = bill ? itemsByOrderId.get(bill.id) ?? [] : [];

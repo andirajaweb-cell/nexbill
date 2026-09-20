@@ -2,8 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
+import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
+import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-kitchen";
@@ -173,11 +174,10 @@ export default function KitchenDisplayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outlet]);
 
-  useEffect(() => {
-    if (!outletId) return;
-    const id = setInterval(() => load(outletId), 4000);
-    return () => clearInterval(id);
-  }, [outletId]);
+  // Layar dapur sering dibiarkan terbuka semalaman — jangan menarik data saat tak dilihat.
+  usePollingWhenVisible(() => {
+    if (outletId) load(outletId);
+  }, 4000, !!outletId);
 
   const toggleSound = () => {
     const next = !soundOn;

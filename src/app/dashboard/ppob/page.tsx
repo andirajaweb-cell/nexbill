@@ -55,7 +55,7 @@ export default function PpobPage() {
   const [fromDate, setFromDate] = useState(toDateInput(new Date()));
   const [toDate, setToDate] = useState(toDateInput(new Date()));
   const [data, setData] = useState<{ transactions: any[]; summary: any } | null>(null);
-  const [saldoFastpay, setSaldoFastpay] = useState<number | null>(null);
+  const [saldoProvider, setSaldoProvider] = useState<number | null>(null);
 
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
@@ -86,11 +86,11 @@ export default function PpobPage() {
     const res = await fetchJsonObject(`/api/ppob/transactions?${params}`);
     setData(res as any);
     const summary = await fetchJsonObject(`/api/ppob/summary?${params}`);
-    setSaldoFastpay((summary as any)?.saldoFastpay ?? null);
+    setSaldoProvider((summary as any)?.saldoProvider ?? null);
   };
   useEffect(() => { load(); }, [outletId, range.from, range.to]);
 
-  const fastpayAccount = accounts.find((a) => a.code === "1151");
+  const ppobSaldoAccount = accounts.find((a) => a.code === "1151");
   const cashAccount = accounts.find((a) => a.type === "cash");
 
   const doVoid = async (id: string) => {
@@ -133,13 +133,13 @@ export default function PpobPage() {
       <div>
         <h1 className="gm-display text-2xl font-bold gm-gradient-title">PPOB</h1>
         <p className="text-sm text-neutral-500">
-          {t("ppob.subtitle", "Pencatatan transaksi PPOB (top up e-wallet, token listrik, pulsa, transfer, tarik tunai) via Fastpay — terpisah dari stok F&B, tetap satu accounting. Setiap transaksi diperlakukan sebagai dana titipan pihak ketiga: nominal pokok (modal + biaya provider) dibukukan sebagai PPOB Payable/Clearing dan disetorkan ke provider saat settlement, BUKAN sebagai revenue atau beban NexBill. Hanya Admin Fee/Margin yang benar-benar menjadi pendapatan NexBill dan masuk Laba Rugi. Edit dan hapus permanen transaksi hanya bisa dilakukan akun Superuser.")}
+          {t("ppob.subtitle", "Pencatatan transaksi PPOB (top up e-wallet, token listrik, pulsa, transfer, tarik tunai) — terpisah dari stok F&B, tetap satu accounting. Setiap transaksi diperlakukan sebagai dana titipan pihak ketiga: nominal pokok (modal + biaya provider) dibukukan sebagai PPOB Payable/Clearing dan disetorkan ke provider saat settlement, BUKAN sebagai revenue atau beban NexBill. Hanya Admin Fee/Margin yang benar-benar menjadi pendapatan NexBill dan masuk Laba Rugi. Edit dan hapus permanen transaksi hanya bisa dilakukan akun Superuser.")}
         </p>
       </div>
 
       {outletId && (
         <>
-          <SummaryCards saldoFastpay={saldoFastpay} summary={data?.summary} />
+          <SummaryCards saldoProvider={saldoProvider} summary={data?.summary} />
           <Card className="flex flex-wrap items-end gap-2">
             <div>
               <label className="text-xs text-neutral-500">{t("ppob.filter.from", "Dari")}</label>
@@ -156,7 +156,7 @@ export default function PpobPage() {
 
           {canManage && showPriceRules && <PriceRulesPanel outletId={outletId} rules={priceRules} onChanged={loadPriceRules} />}
 
-          {canManage && <EntryForm outletId={outletId} accounts={accounts} priceRules={priceRules} defaultFunding={fastpayAccount?.id} defaultReceiving={cashAccount?.id} onCreated={load} />}
+          {canManage && <EntryForm outletId={outletId} accounts={accounts} priceRules={priceRules} defaultFunding={ppobSaldoAccount?.id} defaultReceiving={cashAccount?.id} onCreated={load} />}
 
           <Card>
             <table className="w-full text-sm">
@@ -219,14 +219,14 @@ export default function PpobPage() {
   );
 }
 
-function SummaryCards({ saldoFastpay, summary }: { saldoFastpay: number | null; summary: any }) {
+function SummaryCards({ saldoProvider, summary }: { saldoProvider: number | null; summary: any }) {
   const { t } = useDashboardLang();
   const CATEGORY_LABEL = categoryLabels(t);
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <Card className="p-3">
-        <div className="text-xs text-neutral-500">{t("ppob.summary.saldoFastpay", "Saldo Deposit Fastpay")}</div>
-        <div className="text-lg font-semibold mt-1">{saldoFastpay === null ? "-" : rupiah(saldoFastpay)}</div>
+        <div className="text-xs text-neutral-500">{t("ppob.summary.saldoProvider", "Saldo Deposit PPOB")}</div>
+        <div className="text-lg font-semibold mt-1">{saldoProvider === null ? "-" : rupiah(saldoProvider)}</div>
       </Card>
       <Card className="p-3">
         <div className="text-xs text-neutral-500">{t("ppob.summary.transactionsPeriod", "Transaksi (periode ini)")}</div>
@@ -306,12 +306,12 @@ function PriceRulesPanel({ outletId, rules, onChanged }: { outletId: string; rul
     <Card className="space-y-3 border-amber-500/30">
       <div>
         <h2 className="font-medium">{t("ppob.priceRules.heading", "Harga Provider & Margin")}</h2>
-        <p className="text-xs text-neutral-500">{t("ppob.priceRules.description", "Biaya Fastpay diisi dari daftar Fee Outlet tier Basic (fastpay.co.id/blog/layanan-fee) — margin sepenuhnya Anda atur sendiri. Keduanya jadi default saat kasir memilih produk ini, tapi tetap bisa diubah per transaksi.")}</p>
+        <p className="text-xs text-neutral-500">{t("ppob.priceRules.description", "Biaya provider diisi dari daftar tarif provider PPOB yang Anda pakai — margin sepenuhnya Anda atur sendiri. Keduanya jadi default saat kasir memilih produk ini, tapi tetap bisa diubah per transaksi.")}</p>
       </div>
       <table className="w-full text-xs">
         <thead>
           <tr className="text-left text-neutral-500 border-b border-neutral-800">
-            <th className="py-1.5">{t("ppob.priceRules.col.category", "Kategori")}</th><th>{t("ppob.priceRules.col.product", "Produk")}</th><th>{t("ppob.priceRules.col.providerFee", "Biaya Fastpay")}</th><th>{t("ppob.priceRules.col.defaultMargin", "Margin Default")}</th><th></th>
+            <th className="py-1.5">{t("ppob.priceRules.col.category", "Kategori")}</th><th>{t("ppob.priceRules.col.product", "Produk")}</th><th>{t("ppob.priceRules.col.providerFee", "Biaya Provider")}</th><th>{t("ppob.priceRules.col.defaultMargin", "Margin Default")}</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -334,7 +334,7 @@ function PriceRulesPanel({ outletId, rules, onChanged }: { outletId: string; rul
           {Object.entries(CATEGORY_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.priceRules.productPlaceholder", "Nama produk")} value={product} onChange={(e) => setProduct(e.target.value)} />
-        <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.priceRules.providerFeePlaceholder", "Biaya Fastpay")} value={providerFee} onChange={(e) => setProviderFee(e.target.value)} />
+        <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.priceRules.providerFeePlaceholder", "Biaya Provider")} value={providerFee} onChange={(e) => setProviderFee(e.target.value)} />
         <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.priceRules.defaultMarginPlaceholder", "Margin default")} value={defaultMargin} onChange={(e) => setDefaultMargin(e.target.value)} />
         <div className="flex gap-1">
           <Button className="text-xs" onClick={save}>{editingId ? t("ppob.save", "Simpan") : t("ppob.add", "Tambah")}</Button>
@@ -373,16 +373,16 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
 
   const productsForCategory = priceRules.filter((r) => r.category === category);
 
-  // Tarik tunai flips the usual flow: customer receives cash, Fastpay saldo gets credited —
+  // Tarik tunai flips the usual flow: customer receives cash, the PPOB provider saldo gets credited —
   // swap the default legs when the category changes to it (still editable by the cashier).
   const onCategoryChange = (next: string) => {
     setCategory(next);
     setProduct(""); setProviderFee(""); setFeeAdmin("");
     if (next === "tarik_tunai") {
       const cash = accounts.find((a) => a.type === "cash")?.id;
-      const fastpay = accounts.find((a) => a.code === "1151")?.id;
+      const ppobSaldo = accounts.find((a) => a.code === "1151")?.id;
       if (cash) setFunding(cash);
-      if (fastpay) setReceiving(fastpay);
+      if (ppobSaldo) setReceiving(ppobSaldo);
     } else if (defaultFunding && defaultReceiving) {
       setFunding(defaultFunding);
       setReceiving(defaultReceiving);
@@ -436,7 +436,7 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
           {productsForCategory.map((r) => <option key={r.id} value={r.product} />)}
         </datalist>
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.serviceRefPlaceholder", "No. HP / ID Pelanggan (perintah jasa)")} value={serviceRef} onChange={(e) => setServiceRef(e.target.value)} />
-        <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.providerRefPlaceholder", "Ref. Provider (opsional, mis. Trx ID Fastpay)")} value={providerRef} onChange={(e) => setProviderRef(e.target.value)} />
+        <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.providerRefPlaceholder", "Ref. Provider (opsional, mis. Trx ID dari provider)")} value={providerRef} onChange={(e) => setProviderRef(e.target.value)} />
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.customerNamePlaceholder", "Nama customer (opsional)")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
 
         <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.nominalPlaceholder", "Nominal")} value={nominal} onChange={(e) => setNominal(e.target.value)} />
@@ -527,7 +527,7 @@ function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: 
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.customerNamePlaceholderShort", "Nama customer")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.nominalPlaceholder", "Nominal")} value={nominal} onChange={(e) => setNominal(e.target.value)} />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.modalPlaceholderShort", "Modal")} value={modalAmount} onChange={(e) => setModalAmount(e.target.value)} />
-          <input type="number" className="rounded-lg bg-amber-950/30 border border-amber-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.providerFeePlaceholder", "Biaya Fastpay (beban)")} value={providerFee} onChange={(e) => setProviderFee(e.target.value)} />
+          <input type="number" className="rounded-lg bg-amber-950/30 border border-amber-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.providerFeePlaceholder", "Biaya provider (beban)")} value={providerFee} onChange={(e) => setProviderFee(e.target.value)} />
           <input type="number" className="rounded-lg bg-emerald-950/30 border border-emerald-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.feeAdminPlaceholder", "Margin (keuntungan)")} value={feeAdmin} onChange={(e) => setFeeAdmin(e.target.value)} />
           <div className="rounded-lg bg-neutral-950 border border-neutral-800 px-2 py-1.5 text-xs text-neutral-400 flex items-center justify-between col-span-2">
             <span>{t("ppob.editModal.uangMasukLabel", "Uang Masuk")}</span><span className="font-medium text-neutral-200">{rupiah(uangMasuk)}</span>

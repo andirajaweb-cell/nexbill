@@ -392,7 +392,7 @@ registerDict({
     vi: "Hóa đơn chưa thanh toán trong 2x24 giờ sẽ tự động hết hạn (tự động hủy, vẫn được ghi lại trong Lịch sử hóa đơn).",
   },
   "billing.invoices.syncStatus": { id: "Cek Status Pembayaran", en: "Check Payment Status", ms: "Semak Status Bayaran", th: "ตรวจสอบสถานะการชำระเงิน", fil: "I-check ang Payment Status", vi: "Kiểm tra trạng thái thanh toán" },
-  "billing.invoices.reopenPayment": { id: "Buka Hal. Pembayaran", en: "Reopen Payment Page", ms: "Buka Semula Halaman Bayaran", th: "เปิดหน้าชำระเงินอีกครั้ง", fil: "Buksan Muli ang Payment Page", vi: "Mở lại trang thanh toán" },
+  "billing.invoices.reopenPayment": { id: "Buka Halaman Pembayaran", en: "Open Payment Page", ms: "Buka Halaman Bayaran", th: "เปิดหน้าชำระเงิน", fil: "Buksan ang Payment Page", vi: "Mở lại trang thanh toán" },
   "billing.invoices.vaAmountNote": { id: "Sistem kami akan memeriksa pembayaran ini secara otomatis.", en: "Our system will check this payment automatically.", ms: "Sistem kami akan menyemak bayaran ini secara automatik.", th: "ระบบของเราจะตรวจสอบการชำระเงินนี้โดยอัตโนมัติ", fil: "Awtomatikong che-check ng aming sistema ang bayad na ito.", vi: "Hệ thống sẽ tự động kiểm tra thanh toán này." },
   "billing.invoices.qrisNote": { id: "Silakan scan kode QRIS ini. Sistem akan mengecek otomatis.", en: "Please scan this QRIS code. The system will check automatically.", ms: "Sila imbas kod QRIS ini. Sistem akan menyemak secara automatik.", th: "กรุณาสแกนรหัส QRIS นี้ ระบบจะตรวจสอบโดยอัตโนมัติ", fil: "Paki-scan ang QRIS code na ito. Awtomatikong che-check ng sistema.", vi: "Vui lòng quét mã QRIS này. Hệ thống sẽ tự động kiểm tra." },
   "billing.invoices.ipaymuHostedPending": {
@@ -405,6 +405,10 @@ registerDict({
   },
   "billing.invoices.crossBorderNote": { id: "Sistem akan mengecek pembayaran ini secara otomatis.", en: "The system will check this payment automatically.", ms: "Sistem akan menyemak bayaran ini secara automatik.", th: "ระบบจะตรวจสอบการชำระเงินนี้โดยอัตโนมัติ", fil: "Awtomatikong che-check ng sistema ang bayad na ito.", vi: "Hệ thống sẽ tự động kiểm tra thanh toán này." },
   "billing.method.ipaymuHosted": { id: "E-Wallet / Retail", en: "E-Wallet / Retail", ms: "E-Wallet / Runcit", th: "E-Wallet / ร้านค้าปลีก", fil: "E-Wallet / Retail", vi: "Ví điện tử / Cửa hàng bán lẻ" },
+  // The single button that replaced the per-channel row on 2026-09-16 — it sends the outlet to
+  // iPaymu's hosted page, where the channel is actually picked.
+  "billing.invoices.payNow": { id: "Bayar Sekarang", en: "Pay Now", ms: "Bayar Sekarang", th: "ชำระเงินตอนนี้", fil: "Magbayad Ngayon", vi: "Thanh toán ngay" },
+  "billing.alert.noPaymentUrl": { id: "Halaman pembayaran belum bisa dibuka. Coba lagi, atau hubungi NEXBILL bila berulang.", en: "The payment page could not be opened. Please try again, or contact NEXBILL if this keeps happening.", ms: "Halaman bayaran tidak dapat dibuka. Cuba lagi, atau hubungi NEXBILL jika berulang.", th: "ไม่สามารถเปิดหน้าชำระเงินได้ กรุณาลองใหม่ หรือติดต่อ NEXBILL หากยังเกิดขึ้นอีก", fil: "Hindi mabuksan ang payment page. Subukan ulit, o makipag-ugnayan sa NEXBILL kung paulit-ulit ito.", vi: "Không thể mở trang thanh toán. Vui lòng thử lại, hoặc liên hệ NEXBILL nếu tình trạng này lặp lại." },
 
   // --- Invoice type/status labels shared with InvoiceHistoryTab ---
   "billing.invoiceType.depositTopup": { id: "Top Up Saldo Deposit", en: "Deposit Balance Top Up", ms: "Tambah Nilai Baki Deposit", th: "เติมยอดเงินฝาก", fil: "Top Up ng Deposit Balance", vi: "Nạp tiền vào số dư đặt cọc" },

@@ -8,9 +8,10 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
+import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert } from "@/lib/ui/dialog";
 import { ShoppingCart, Plus, Minus, Zap, Wrench, Tv, Package, Sparkles, Share2, Timer, LayoutDashboard, FileText, Wallet, TrendingUp, Receipt } from "lucide-react";
 import { BillingFaq } from "@/components/billing/BillingFaq";
 import { BillingProfileTab } from "@/components/billing/BillingProfileTab";
@@ -215,13 +216,11 @@ const CATEGORY_ICON: Record<string, React.ElementType> = {
   extra_console: Tv,
 };
 
-const VA_BANKS: { method: string; labelKey: string; fallback: string }[] = [
-  { method: "va_bca", labelKey: "billing.method.vaBca", fallback: "VA BCA" },
-  { method: "va_bni", labelKey: "billing.method.vaBni", fallback: "VA BNI" },
-  { method: "va_mandiri", labelKey: "billing.method.vaMandiri", fallback: "VA Mandiri" },
-  { method: "va_bri", labelKey: "billing.method.vaBri", fallback: "VA BRI" },
-  { method: "va_permata", labelKey: "billing.method.vaPermata", fallback: "VA Permata" },
-];
+/**
+ * Only used to label a VA number on invoices that already have one. The per-bank BUTTON row this
+ * used to feed was removed on 2026-09-16: every channel is now picked on iPaymu's own hosted page,
+ * so NEXBILL offering its own VA/QRIS picker just meant maintaining a second copy of that screen.
+ */
 const VA_BANK_NAME: Record<string, string> = { bca: "BCA", bni: "BNI", mandiri: "Mandiri", bri: "BRI", permata: "Permata" };
 
 export default function BillingPage() {
@@ -275,44 +274,33 @@ export default function BillingPage() {
   }, [load]);
 
   // --- Auto-Polling: Mengecek status pembayaran otomatis ke API jika ada tagihan Pending iPaymu ---
-  useEffect(() => {
-    const safeInvoices = data?.invoices ?? [];
-    const needsPolling = safeInvoices.some((inv) => inv.status === "unpaid" && inv.method && inv.method !== "cash");
-    
-    if (!needsPolling) return;
+  // Hanya berjalan bila memang ada tagihan menunggu pembayaran non-tunai, DAN hanya selama tab
+  // dilihat. Halaman ini sering ditinggal terbuka setelah tagihan dibuat; tanpa jeda itu, satu tab
+  // di latar belakang terus menembak /api/subscription tiap 5 detik sepanjang hari.
+  const pendingGatewayInvoices = data?.invoices ?? [];
+  const needsPaymentPolling = pendingGatewayInvoices.some((inv) => inv.status === "unpaid" && inv.method && inv.method !== "cash");
 
-    let cancelled = false;
-    const pollInterval = setInterval(async () => {
+  usePollingWhenVisible(
+    async () => {
       try {
         const res = await fetchJsonObject<BillingResponse>("/api/subscription");
-        if (cancelled) return;
+        if (!res?.invoices) return;
 
-        if (res && res.invoices) {
-          // Cari apakah ada invoice iPaymu yang baru saja Lunas secara otomatis
-          let autoPaidDetected = false;
-          res.invoices.forEach((newInv) => {
-            const oldInv = safeInvoices.find((old) => old.id === newInv.id);
-            if (oldInv && oldInv.status === "unpaid" && newInv.status === "paid" && oldInv.method !== "cash") {
-              autoPaidDetected = true;
-            }
-          });
+        // Tagihan yang tadinya belum lunas dan kini lunas = pembayaran masuk lewat gateway.
+        const autoPaidDetected = res.invoices.some((newInv) => {
+          const oldInv = pendingGatewayInvoices.find((old) => old.id === newInv.id);
+          return !!oldInv && oldInv.status === "unpaid" && newInv.status === "paid" && oldInv.method !== "cash";
+        });
 
-          if (autoPaidDetected) {
-            showAlert(t("billing.alert.autoPaid", "Berhasil melakukan pembayaran secara otomatis!"));
-          }
-          
-          setData(res);
-        }
+        if (autoPaidDetected) showAlert(t("billing.alert.autoPaid", "Berhasil melakukan pembayaran secara otomatis!"));
+        setData(res);
       } catch {
-        // Abaikan error jaringan saat polling
+        // Abaikan error jaringan saat polling — percobaan berikutnya akan mencoba lagi.
       }
-    }, 5000); // Polling setiap 5 detik
-
-    return () => {
-      cancelled = true;
-      clearInterval(pollInterval);
-    };
-  }, [data?.invoices, t]);
+    },
+    5000,
+    needsPaymentPolling
+  );
 
   const setQty = (productId: string, qty: number) => {
     setCart((prev) => {
@@ -402,12 +390,39 @@ export default function BillingPage() {
       setAreaQuery("");
       setRateOptions([]);
       setSelectedRate(null);
+
+      // Straight to iPaymu instead of dropping the outlet back onto this page to hunt for the
+      // invoice it just created. If the redirect can't happen (mock mode / unexpected response),
+      // doPay falls back to refreshing this page, where the new invoice is waiting under
+      // "Tagihan Belum Lunas" with its own "Bayar Sekarang" button.
+      if (out.invoice?.id) {
+        await doPay(out.invoice.id, "ipaymu_hosted");
+        return;
+      }
       await load();
     } finally {
       setBusy(false);
     }
   };
 
+  /**
+   * Starts (or restarts) payment on one invoice and sends the outlet straight to iPaymu's hosted
+   * page, where every channel — VA, QRIS, e-wallet, retail, card — is picked. NEXBILL deliberately
+   * shows no channel picker of its own: iPaymu's page already is one, and duplicating it here only
+   * created a second screen to maintain.
+   *
+   * A full-page redirect, not window.open: popup blockers eat a new tab opened after an await, and
+   * the outlet coming back via the browser's Back button (or iPaymu's return_url) lands on Billing
+   * with the invoice refreshed either way.
+   *
+   * The checkout URL is intentionally not persisted — each click mints a fresh iPaymu session.
+   * A stored URL would eventually point at an expired session, which fails silently at the worst
+   * possible moment; minting on demand always hands the outlet a live page.
+   *
+   * "cash" stopped being selectable on 2026-09-16, so there is no cash-confirm branch here.
+   * Invoices that already carry method "cash" keep their "Tandai Lunas (Manual)" button below,
+   * which calls doConfirm directly.
+   */
   const doPay = async (invoiceId: string, method: string) => {
     const res = await fetch(`/api/subscription/invoices/${invoiceId}/pay`, {
       method: "POST",
@@ -416,15 +431,19 @@ export default function BillingPage() {
     });
     const out = await res.json();
     if (!res.ok) return showAlert(out.error);
-    
-    await load();
-    
-    if (method === "cash") {
-      const ok = await showConfirm(t("billing.confirm.cashReceived", "Konfirmasi tunai {amount} sudah diterima NEXBILL?").replace("{amount}", money(out.amount || 0)));
-      if (ok) await doConfirm(invoiceId);
-    } else if (out.paymentUrl && (method === "ipaymu_crossborder" || method === "ipaymu_hosted")) {
-      window.open(out.paymentUrl, "_blank");
+
+    if (out.paymentUrl) {
+      // assign() rather than `location.href = ...`: same navigation, but it's a method call, which
+      // the React Compiler lint accepts instead of flagging a write to a global.
+      window.location.assign(out.paymentUrl);
+      return;
     }
+
+    // No URL came back — the gateway is in mock mode (IPAYMU_* unset) or returned an unexpected
+    // shape. Refresh so whatever the invoice DID get (VA number, QR) renders, instead of leaving
+    // the outlet staring at a button that appears to do nothing.
+    await load();
+    showAlert(t("billing.alert.noPaymentUrl", "Halaman pembayaran belum bisa dibuka. Coba lagi, atau hubungi NEXBILL bila berulang."));
   };
 
   const doSync = async (invoiceId: string) => {
@@ -1024,17 +1043,21 @@ export default function BillingPage() {
                     <span className="text-sm font-semibold">{money(inv.amount)}</span>
                     
                     {/* Munculkan pemilihan metode jika belum di-set ATAU waktu sudah habis (kedaluwarsa) */}
+                    {/* One button, not a channel picker: it hands the outlet straight to iPaymu's
+                        hosted page where VA / QRIS / e-wallet / retail / card are all chosen. The
+                        cross-border card button stays separate because it is a different iPaymu
+                        product (international card acceptance) and only applies to outlets billed
+                        in a foreign currency. */}
                     {canManage && (!inv.method || isExpired) && (
                       <div className="flex gap-2 flex-wrap justify-end">
+                        <Button onClick={() => doPay(inv.id, "ipaymu_hosted")}>
+                          {t("billing.invoices.payNow", "Bayar Sekarang")}
+                        </Button>
                         {data.billingCurrency?.code ? (
-                          <Button onClick={() => doPay(inv.id, "ipaymu_crossborder")}>{t("billing.method.crossBorderCard", "Bayar Kartu ({currency})").replace("{currency}", data.billingCurrency.code)}</Button>
+                          <Button variant="secondary" onClick={() => doPay(inv.id, "ipaymu_crossborder")}>
+                            {t("billing.method.crossBorderCard", "Bayar Kartu ({currency})").replace("{currency}", data.billingCurrency.code)}
+                          </Button>
                         ) : null}
-                        <Button variant="secondary" onClick={() => doPay(inv.id, "cash")}>{t("billing.method.cash", "Cash")}</Button>
-                        <Button variant="secondary" onClick={() => doPay(inv.id, "qris")}>{t("billing.method.qris", "QRIS")}</Button>
-                        {VA_BANKS.map((b) => (
-                          <Button key={b.method} variant="secondary" onClick={() => doPay(inv.id, b.method)}>{t(b.labelKey, b.fallback)}</Button>
-                        ))}
-                        <Button variant="secondary" onClick={() => doPay(inv.id, "ipaymu_hosted")}>{t("billing.method.ipaymuHosted", "E-Wallet / Retail")}</Button>
                       </div>
                     )}
                     
@@ -1055,14 +1078,16 @@ export default function BillingPage() {
                           </Button>
                         ) : (
                           <>
+                            {/* Primary and first: an outlet that came back here (Back button, or
+                                iPaymu's return_url) without finishing almost always wants the
+                                payment page again, not a status check. Each click mints a fresh
+                                iPaymu session, so this never leads to an expired page. */}
+                            <Button onClick={() => doPay(inv.id, "ipaymu_hosted")}>
+                              {t("billing.invoices.reopenPayment", "Buka Halaman Pembayaran")}
+                            </Button>
                             <Button variant="secondary" onClick={() => doSync(inv.id)}>
                               {t("billing.invoices.syncStatus", "Cek Status Pembayaran")}
                             </Button>
-                            {(inv.method === "ipaymu_hosted" || inv.method === "ipaymu_crossborder") && (
-                              <Button variant="secondary" onClick={() => doPay(inv.id, inv.method as string)}>
-                                {t("billing.invoices.reopenPayment", "Buka Hal. Pembayaran")}
-                              </Button>
-                            )}
                           </>
                         )}
                       </div>

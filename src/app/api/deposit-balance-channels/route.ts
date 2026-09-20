@@ -10,7 +10,7 @@ import { describeError } from "@/lib/api/error";
 
 /**
  * Owner-editable list of non-cash "deposit balance" channels checked at shift
- * close (Verifikasi Saldo Channel Non-Tunai) — the built-in Fastpay PPOB saldo
+ * close (Verifikasi Saldo Channel Non-Tunai) — the built-in PPOB provider saldo
  * row plus any custom float the outlet wants tracked the same way (e.g. a
  * second PPOB-style provider). Any authenticated staff can GET this (needed to
  * render the shift-close screen); only manage_coa can add/edit/delete, since

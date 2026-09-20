@@ -7,7 +7,11 @@ import { db } from "@/db/client";
 import { subscriptionInvoices, subscriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-const VALID_METHODS = new Set(["cash", "qris", "va_bca", "va_bni", "va_mandiri", "va_bri", "va_permata", "ipaymu_crossborder", "ipaymu_hosted"]);
+// "cash" deliberately absent since 2026-09-16 — NEXBILL's own subscription billing is an online
+// service, so cash was never a real channel for an outlet paying US (the POS side's cash payments
+// are a different system entirely, see lib/payments/index.ts). Invoices already carrying method
+// "cash" stay confirmable via the sibling /confirm route.
+const VALID_METHODS = new Set(["qris", "va_bca", "va_bni", "va_mandiri", "va_bri", "va_permata", "ipaymu_crossborder", "ipaymu_hosted"]);
 
 /** Initiates payment on one platform-billing invoice (cash, QRIS, or bank VA) — mirrors the
  * customer-facing bayar-dimuka flow, but money flows the other direction (outlet -> NEXBILL). */
@@ -30,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!target || !owns) return NextResponse.json({ error: "Invoice tidak ditemukan." }, { status: 404 });
     const { method } = await req.json();
     if (!VALID_METHODS.has(method)) {
-      return NextResponse.json({ error: "Metode pembayaran harus cash, qris, virtual account (BCA/BNI/Mandiri/BRI/Permata), atau kartu lintas negara." }, { status: 400 });
+      return NextResponse.json({ error: "Metode pembayaran harus QRIS, virtual account (BCA/BNI/Mandiri/BRI/Permata), e-wallet/retail, atau kartu lintas negara." }, { status: 400 });
     }
     const invoice = await initiateInvoicePayment(id, method);
     return NextResponse.json(invoice);

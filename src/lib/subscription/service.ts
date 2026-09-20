@@ -16,10 +16,17 @@ import {
 } from "@/db/schema";
 import { eq, and, sql, inArray, lte, desc, gte } from "drizzle-orm";
 import { DeviceProtocol } from "@/lib/devices/types";
-import { cashGateway } from "@/lib/payments/adapters/cash";
-import { fastpayGateway } from "@/lib/payments/adapters/fastpay";
-import { ipaymuCrossBorderGateway, ipaymuHostedGateway } from "@/lib/payments/adapters/ipaymu";
-import { VaBankMethod } from "@/lib/payments/types";
+import {
+  ipaymuCrossBorderGateway,
+  ipaymuHostedGateway,
+  ipaymuQrisGateway,
+  ipaymuVaBcaGateway,
+  ipaymuVaBniGateway,
+  ipaymuVaMandiriGateway,
+  ipaymuVaBriGateway,
+  ipaymuVaPermataGateway,
+} from "@/lib/payments/adapters/ipaymu";
+import { PaymentGateway, VaBankMethod } from "@/lib/payments/types";
 import { resolveBillingCurrencyForOutlet, convertIdrToCurrency } from "@/lib/market-risk/currency";
 import { getRates } from "@/lib/shipping/biteship";
 import { TRIAL_DAYS, SMART_PLUG_PROTOCOLS, ANDROID_TV_PROTOCOLS, TRIAL_REMINDER_DAYS, RENEWAL_GRACE_DAYS, RENEWAL_INVOICE_LEAD_DAYS } from "./config";
@@ -1217,11 +1224,10 @@ export async function startCheckout(input: StartCheckoutInput) {
   return invoices;
 }
 
-/** Initiates payment on one invoice via the same cash/QRIS/VA gateway plumbing customer-facing
- * checkout uses — reused here for the reverse money direction (outlet owner -> NEXBILL). QRIS and
- * every va_* bank channel both route through fastpayGateway (see adapters/fastpay.ts), which
- * differentiates the product code/response shape per method — cash is the only one settled
- * without a real gateway call.
+/** Initiates payment on one subscription/platform invoice — money flowing from the outlet owner TO
+ * NEXBILL. Every channel goes through NEXBILL's own iPaymu account via SUBSCRIPTION_GATEWAYS
+ * below; see that map's comment for why this must never share gateways with the outlet's own
+ * customer-facing checkout.
  *
  * "ipaymu_crossborder" is the mancanegara channel (see resolveBillingCurrencyForOutlet /
  * /platform-admin/market-risk) — the actual charge still always settles in IDR (see the top-of-
@@ -1229,13 +1235,42 @@ export async function startCheckout(input: StartCheckoutInput) {
  * the merchant in IDR, the card network converts at charge time), `invoice.amount` is never
  * touched; displayCurrencyCode/displayAmount are purely what the customer SAW quoted on the
  * Billing page (see money()/data.billingCurrency there), for cosmetic receipt text only. */
-export async function initiateInvoicePayment(invoiceId: string, method: "cash" | "qris" | VaBankMethod | "ipaymu_crossborder" | "ipaymu_hosted") {
+/**
+ * Every channel on this page settles into NEXBILL's OWN iPaymu account, because that is what this
+ * money is: an outlet paying NEXBILL for the software it subscribes to and the hardware it buys
+ * from the NEXBILL team. It is never an outlet's customer paying the outlet — that direction is
+ * the POS/Rental flow in lib/payments/index.ts, which keeps its own gateways (Fastpay, cash,
+ * e-wallets) so the money lands in the OUTLET's account. The two must never share a gateway.
+ *
+ * Until 2026-09-16 the QRIS and va_* channels here went through fastpayGateway, which was simply
+ * wrong on those grounds — and in practice it also meant billing ran on mock numbers, since the
+ * FASTPAY_* env vars were never set for this deployment while the IPAYMU_* ones were. The direct
+ * gateways below already existed in the iPaymu adapter (added for a since-reverted outlet-facing
+ * feature) but had no caller; this is the flow they were always right for.
+ */
+const SUBSCRIPTION_GATEWAYS: Record<string, PaymentGateway> = {
+  qris: ipaymuQrisGateway,
+  va_bca: ipaymuVaBcaGateway,
+  va_bni: ipaymuVaBniGateway,
+  va_mandiri: ipaymuVaMandiriGateway,
+  va_bri: ipaymuVaBriGateway,
+  va_permata: ipaymuVaPermataGateway,
+  ipaymu_crossborder: ipaymuCrossBorderGateway,
+  ipaymu_hosted: ipaymuHostedGateway,
+};
+
+export async function initiateInvoicePayment(invoiceId: string, method: "qris" | VaBankMethod | "ipaymu_crossborder" | "ipaymu_hosted") {
   const [invoice] = await db.select().from(subscriptionInvoices).where(eq(subscriptionInvoices.id, invoiceId)).limit(1);
   if (!invoice) throw new Error("Invoice tidak ditemukan.");
   if (invoice.status === "paid") throw new Error("Invoice ini sudah lunas.");
 
-  const gateway =
-    method === "cash" ? cashGateway : method === "ipaymu_crossborder" ? ipaymuCrossBorderGateway : method === "ipaymu_hosted" ? ipaymuHostedGateway : fastpayGateway;
+  // "cash" was removed as a selectable channel on 2026-09-16 (owner's call: NEXBILL's own billing
+  // is an online service, so an outlet paying its subscription in cash was never a real flow).
+  // Historical invoices that already carry method "cash" are untouched: they keep their guard in
+  // syncInvoicePaymentStatus below and stay confirmable through confirmInvoicePayment
+  // (POST /api/subscription/invoices/[id]/confirm).
+  const gateway = SUBSCRIPTION_GATEWAYS[method];
+  if (!gateway) throw new Error("Metode pembayaran tidak dikenal.");
 
   let displayCurrencyCode: string | undefined;
   let displayAmount: number | undefined;
@@ -1273,25 +1308,31 @@ export async function initiateInvoicePayment(invoiceId: string, method: "cash" |
     })
     .where(eq(subscriptionInvoices.id, invoiceId))
     .returning();
-  return updated;
+
+  // paymentUrl is returned alongside the row but deliberately NOT persisted: subscriptionInvoices
+  // has no column for it, and a hosted-checkout session URL is short-lived anyway. Before this,
+  // the function returned the bare row, so the Billing page's `window.open(out.paymentUrl)` was
+  // opening `undefined` — the redirect to iPaymu silently never happened for ipaymu_hosted and
+  // ipaymu_crossborder. If an outlet closes the tab and needs the link again, re-initiating the
+  // payment (the "Buka Hal. Pembayaran" button) mints a fresh session, which is the correct
+  // behaviour for an expiring checkout URL.
+  return { ...updated, paymentUrl: result.checkoutUrl ?? null };
 }
 
 /**
  * The actual implementation behind the Billing page's "Cek Status Pembayaran" button (POST
  * /api/subscription/invoices/[id]/sync) — previously a dead route (see the doc comment history on
  * this file), so this button always 404'd no matter which gateway an invoice was paying through.
- * Resolves the SAME gateway initiateInvoicePayment used (by invoice.method, not a hardcoded
- * assumption of iPaymu — most subscription invoices actually pay via fastpayGateway for
- * QRIS/VA, only ipaymu_crossborder/ipaymu_hosted go through iPaymu), calls its checkStatus(), and:
+ * Resolves the SAME gateway initiateInvoicePayment used, by looking invoice.method up in
+ * SUBSCRIPTION_GATEWAYS, calls its checkStatus(), and:
  *   - "success" -> confirms the invoice paid (idempotent, reuses confirmInvoicePayment's own
  *     activation/renewal/deposit-fulfillment logic — nothing duplicated here).
  *   - "failed" -> clears the stale method/providerRef/VA/QR so the payment-method buttons
  *     reappear, letting the outlet just try a different channel instead of being stuck.
- *   - "pending" (or gateway not configured — mock mode always returns "pending", see the fastpay/
- *     ipaymu-crossborder adapters' isConfigured() checks) -> no-op, invoice stays unpaid.
- * Every adapter's checkStatus is fully live-safe to call without credentials: mock mode simply
- * returns "pending" forever, so this never throws or fakes a payment when the IPAYMU_ or FASTPAY_
- * env vars are unset — exactly the "tetap pakai mock jika kredensial kosong" behavior asked for.
+ *   - "pending" (or gateway not configured — mock mode always returns "pending", see the iPaymu
+ *     adapter's isConfigured() check) -> no-op, invoice stays unpaid.
+ * Every adapter's checkStatus is live-safe to call without credentials: mock mode simply returns
+ * "pending" forever, so this never throws or fakes a payment when the IPAYMU_* env vars are unset.
  */
 export async function syncInvoicePaymentStatus(invoiceId: string): Promise<{ status: string }> {
   const [invoice] = await db.select().from(subscriptionInvoices).where(eq(subscriptionInvoices.id, invoiceId)).limit(1);
@@ -1299,10 +1340,12 @@ export async function syncInvoicePaymentStatus(invoiceId: string): Promise<{ sta
   if (invoice.status !== "unpaid") return { status: invoice.status };
   if (!invoice.method || invoice.method === "cash" || !invoice.providerRef) return { status: "unpaid" };
 
-  const gateway =
-    invoice.method === "ipaymu_crossborder" ? ipaymuCrossBorderGateway : invoice.method === "ipaymu_hosted" ? ipaymuHostedGateway : fastpayGateway; // qris + every va_* channel
-
-  if (!gateway.checkStatus) return { status: "unpaid" };
+  // Same map initiateInvoicePayment used, so a poll always asks the gateway that actually created
+  // the payment. An unknown method (a legacy row from before a channel was retired — "cash", or
+  // one of the old Fastpay-era values) simply has no entry and is left alone rather than being
+  // asked about at a gateway that never saw it.
+  const gateway = SUBSCRIPTION_GATEWAYS[invoice.method];
+  if (!gateway?.checkStatus) return { status: "unpaid" };
   const gwStatus = await gateway.checkStatus(invoice.providerRef);
 
   if (gwStatus === "success") {
@@ -1321,9 +1364,11 @@ export async function syncInvoicePaymentStatus(invoiceId: string): Promise<{ sta
 
 /**
  * Push counterpart of syncInvoicePaymentStatus's pull-based polling — called from
- * /api/subscription/webhook/fastpay and /api/subscription/webhook/ipaymu once each route has
- * already verified the request's signature (verifyFastpayWebhookSignature /
- * verifyIpaymuWebhookSignature) and extracted the gateway's own transaction reference. Looks the
+ * /api/subscription/webhook/ipaymu once that route has verified the request's signature
+ * (verifyIpaymuWebhookSignature) and extracted the gateway's own transaction reference. The
+ * sibling Fastpay webhook that used to also call this was deleted on 2026-09-16 along with
+ * Fastpay's role in subscription billing; the POS one at /api/payments/webhook/fastpay is a
+ * different endpoint updating a different table and is unaffected. Looks the
  * invoice up by providerRef (not id — a webhook only ever carries the gateway's own reference),
  * silently no-ops on an unknown/already-settled providerRef (idempotent against replayed/duplicate
  * webhook deliveries, which every payment gateway can send).

@@ -265,7 +265,7 @@ registerDict({
   "coa.6540": { id: "Biaya Payment Gateway", en: "Payment Gateway Fees", ms: "Yuran Payment Gateway", th: "ค่าธรรมเนียม Payment Gateway", fil: "Payment Gateway Fees", vi: "Phí cổng thanh toán" },
   "coa.6550": { id: "Langganan Software", en: "Software Subscription", ms: "Langganan Perisian", th: "ค่าสมัครสมาชิกซอฟต์แวร์", fil: "Subscription sa Software", vi: "Phí thuê bao phần mềm" },
   "coa.6560": { id: "Jasa Profesional", en: "Professional Services", ms: "Perkhidmatan Profesional", th: "ค่าบริการวิชาชีพ", fil: "Professional Services", vi: "Dịch vụ chuyên nghiệp" },
-  "coa.6570": { id: "Beban Biaya Layanan PPOB (Fastpay)", en: "PPOB Service Fee Expense (Fastpay)", ms: "Perbelanjaan Yuran Perkhidmatan PPOB (Fastpay)", th: "ค่าใช้จ่ายค่าบริการ PPOB (Fastpay)", fil: "Gastos sa Service Fee ng PPOB (Fastpay)", vi: "Chi phí phí dịch vụ PPOB (Fastpay)" },
+  "coa.6570": { id: "Beban Biaya Layanan PPOB", en: "PPOB Service Fee Expense", ms: "Perbelanjaan Yuran Perkhidmatan PPOB", th: "ค่าใช้จ่ายค่าบริการ PPOB (Fastpay)", fil: "Gastos sa Service Fee ng PPOB (Fastpay)", vi: "Chi phí phí dịch vụ PPOB (Fastpay)" },
   "coa.6600": { id: "LOGISTIK", en: "LOGISTICS", ms: "LOGISTIK", th: "โลจิสติกส์", fil: "LOGISTICS", vi: "HẬU CẦN" },
   "coa.6610": { id: "Transportasi", en: "Transportation", ms: "Pengangkutan", th: "ค่าขนส่ง", fil: "Transportasyon", vi: "Vận chuyển" },
   "coa.6620": { id: "Pengiriman", en: "Delivery", ms: "Penghantaran", th: "การจัดส่ง", fil: "Delivery", vi: "Giao hàng" },

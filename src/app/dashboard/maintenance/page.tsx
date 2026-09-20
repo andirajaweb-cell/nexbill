@@ -272,6 +272,18 @@ function MaintenancePageInner() {
         </p>
       </div>
 
+      <Card className="border border-cyan-700/40 bg-cyan-950/10 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="font-medium text-neutral-100">{t("maintenance.gamepad.promoTitle", "Gamepad Tester — Cek Controller PS3/PS4/PS5")}</h2>
+          <p className="text-xs text-neutral-500 mt-1">
+            {t("maintenance.gamepad.promoDesc", "Sambungkan controller ke PC, cek tiap tombol & deteksi stick drift secara langsung sebelum dipakai customer.")}
+          </p>
+        </div>
+        <a href="/dashboard/maintenance/gamepad-tester" className="shrink-0 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-neutral-900 text-sm font-medium px-4 py-2 transition">
+          {t("maintenance.gamepad.promoButton", "Buka Gamepad Tester")}
+        </a>
+      </Card>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {Object.entries(CATEGORY_LABEL).map(([cat, label]) => {
           const s = summary[cat];

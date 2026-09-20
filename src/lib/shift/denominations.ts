@@ -45,16 +45,16 @@ export function denominationLabel(value: number, currency: OutletCurrency = DEFA
 
 /**
  * Non-cash payment channels that carry a real, checkable app/dashboard
- * balance (GoPay Merchant, DANA Merchant, BukuPay, Fastpay Gateway) — for
+ * balance (GoPay Merchant, DANA Merchant, BukuPay) — for
  * these, the cashier types in what the app shows and the system compares it
  * to the expected cumulative GL balance. QRIS/Card/Transfer settle straight
  * to a bank account with no separate balance to check, so they're shown as
  * read-only info instead of requiring a manual entry.
  */
-export const BALANCE_TRACKED_METHODS = new Set(["gopay", "dana", "bukupay", "fastpay_h2h"]);
+export const BALANCE_TRACKED_METHODS = new Set(["gopay", "dana", "bukupay"]);
 export const INFO_ONLY_METHODS = new Set(["qris", "card", "transfer"]);
 
 export const CHANNEL_LABEL: Record<string, string> = {
   ...PAYMENT_METHOD_LABEL,
-  ppob_fastpay_saldo: "Saldo Deposit Fastpay (PPOB)",
+  ppob_fastpay_saldo: "Saldo Deposit PPOB",
 };

@@ -1,7 +1,5 @@
 import { PaymentGateway, PaymentMethod, PaymentRequest } from "./types";
 import { cashGateway } from "./adapters/cash";
-import { fastpayGateway } from "./adapters/fastpay";
-import { danaGateway, gopayGateway } from "./adapters/ewallet-via-fastpay";
 import { bukupayGateway } from "./adapters/bukupay";
 import { ipaymuCrossBorderGateway, ipaymuHostedGateway } from "./adapters/ipaymu";
 import { manualGateway } from "./adapters/manual";
@@ -18,13 +16,15 @@ import { applyLoyaltyAndSpending } from "@/lib/membership/loyalty";
 // always meant to be a lookup table with gaps, not a totally-exhaustive one.
 const registry: Partial<Record<PaymentMethod, PaymentGateway>> = {
   cash: cashGateway,
-  qris: fastpayGateway, // plain QRIS also goes through Fastpay H2H
-  fastpay_h2h: fastpayGateway,
-  dana: danaGateway,
-  gopay: gopayGateway,
   bukupay: bukupayGateway,
   transfer: manualGateway("transfer", "TRF"),
   card: manualGateway("card", "CARD"),
+  // qris/dana/gopay deliberately have NO live gateway (the Fastpay H2H adapter that used to back
+  // all three was deleted 2026-09-16 — NEXBILL never held a Fastpay merchant account, so those
+  // channels were running on mock numbers). They now fall through resolveGateway() to
+  // manualGateway: the outlet shows its OWN static QRIS or e-wallet account and the cashier marks
+  // the payment received. That is the correct shape anyway — a customer paying an outlet must land
+  // in the OUTLET's account, never in a NEXBILL-held aggregator balance.
   // NEXBILL's IPAYMU_VA/IPAYMU_API_KEY account is provisioned for merchant/outlet → NEXBILL
   // payments only (subscription invoices, platform purchases — see lib/subscription/service.ts
   // and dashboard/billing). Both keys below back THAT flow, never outlet POS/Rental checkout.

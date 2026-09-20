@@ -3,31 +3,34 @@ import { paymentMethods } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { PAYMENT_METHOD_LABEL } from "./labels";
 
-/** Starter catalog — the 8 built-in channels, seeded once per outlet with the same
+/** Starter catalog — the 7 built-in channels, seeded once per outlet with the same
  * `kind` categorization the app already used in code (see shift/denominations.ts
- * history): "cash" gets the physical count flow, gopay/dana/bukupay/fastpay_h2h
- * are balance_tracked (own app saldo to verify at shift close), the rest are
- * info_only (settle straight to a bank/EDC account, no separate balance check). */
+ * history): "cash" gets the physical count flow, gopay/dana/bukupay are
+ * balance_tracked (own app saldo to verify at shift close), the rest are
+ * info_only (settle straight to a bank/EDC account, no separate balance check).
+ *
+ * "fastpay_h2h" was dropped from this list on 2026-09-16 along with the Fastpay gateway adapter —
+ * NEXBILL never held a Fastpay merchant account, so the channel only ever produced mock
+ * references. Outlets seeded before that date still have the row in their own paymentMethods
+ * catalog; it resolves to the manual/staff-confirmed gateway and can be switched off from the
+ * Pembayaran page like any other channel. */
 const STARTER_KIND: Record<string, "cash" | "balance_tracked" | "info_only"> = {
   cash: "cash",
   qris: "info_only",
-  fastpay_h2h: "info_only",
   dana: "balance_tracked",
   gopay: "balance_tracked",
   bukupay: "balance_tracked",
   transfer: "info_only",
   card: "info_only",
 };
-const STARTER_ORDER = ["cash", "qris", "fastpay_h2h", "dana", "gopay", "bukupay", "transfer", "card"];
+const STARTER_ORDER = ["cash", "qris", "dana", "gopay", "bukupay", "transfer", "card"];
 
-/** Starter merchant-fee % — only QRIS/Fastpay H2H default to a nonzero rate (typical Indonesian
- * QRIS MDR ~0.7%), matching what fastpay.ts's mock mode already simulated before this feature
- * existed. Every other starter channel defaults to 0 (unchanged behavior). This is only a
- * starting point — real negotiated rates vary per merchant/bank/PJSP, so outlets should confirm
- * and adjust theirs on the Pembayaran page. See lib/accounting/payment-fee.ts. */
+/** Starter merchant-fee % — only QRIS defaults to a nonzero rate (typical Indonesian QRIS MDR
+ * ~0.7%). Every other starter channel defaults to 0. This is only a starting point — real
+ * negotiated rates vary per merchant/bank/PJSP, so outlets should confirm and adjust theirs on
+ * the Pembayaran page. See lib/accounting/payment-fee.ts. */
 const STARTER_FEE_PERCENT: Record<string, number> = {
   qris: 0.7,
-  fastpay_h2h: 0.7,
 };
 
 /** Idempotent — only inserts once per outlet; after that the owner's own add/edit/delete is authoritative. */

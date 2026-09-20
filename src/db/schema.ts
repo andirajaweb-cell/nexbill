@@ -21,7 +21,12 @@ export const outlets = pgTable("outlets", {
   logoUrl: text("logo_url"),
   wifiSsid: text("wifi_ssid"),
   wifiPassword: text("wifi_password"),
-  billingRoundingMinutes: integer("billing_rounding_minutes").notNull().default(15),
+  // Default 1 = bill the real elapsed minute (owner's call, 2026-09-19). It used to be 15, which
+  // meant an open-ended session of 181 minutes was billed as 195 — a charge the customer never
+  // incurred. Set it higher per-outlet in Pengaturan if that outlet genuinely wants to round up.
+  // NOTE: changing this default only affects NEWLY created outlets; existing rows keep whatever
+  // value they already hold and must be changed in Pengaturan (or by a one-off UPDATE).
+  billingRoundingMinutes: integer("billing_rounding_minutes").notNull().default(1),
   // Settings > Pajak & Billing > "Kebijakan Tarif Aksesoris" — added 2026-09-14. Governs how
   // sessionAccessories.ratePerHour is actually charged at billing time (see
   // lib/rental/accessories.ts's estimateAccessoryCharge/finalizeAccessoryCharges, and the matching

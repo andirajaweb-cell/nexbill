@@ -76,7 +76,7 @@ async function runDeviceOnCommand(device: Parameters<typeof turnDeviceOn>[0], er
   }
   return null;
 }
-import { computeEffectiveHourlyRate, roundUpMinutes } from "./pricing";
+import { computeEffectiveHourlyRate, computeSessionCharge, type SessionChargeInput } from "./pricing";
 import { openBillForSession, getOpenBillForSession, upsertRentalLineItem, addItemsToBill } from "@/lib/pos/bill";
 import { finalizeAccessoryCharges } from "./accessories";
 import { recordDeposit, confirmDeposit, settleOrderAfterPayment } from "@/lib/payments";
@@ -358,7 +358,7 @@ export async function stopRentalSession(sessionId: string) {
 
   const [unit] = await db.select().from(rentalUnits).where(eq(rentalUnits.id, session.rentalUnitId)).limit(1);
   const [outlet] = await db.select().from(outlets).where(eq(outlets.id, session.outletId)).limit(1);
-  const roundingMinutes = outlet?.billingRoundingMinutes ?? 15;
+  const roundingMinutes = outlet?.billingRoundingMinutes ?? 1;
 
   const now = Date.now();
   let accumulatedPauseMs = session.accumulatedPauseMs;
@@ -369,78 +369,33 @@ export async function stopRentalSession(sessionId: string) {
   const startedAtMs = new Date(session.startedAt).getTime();
   const elapsedMinutesRaw = Math.max(0, (now - startedAtMs - accumulatedPauseMs) / 60000);
 
-  let subtotal: number;
-  let billingNote: string;
-
+  // The promo row is consulted only for its display name and as a fallback for sessions started
+  // before promoPackagePrice existed on the session row. Values FROZEN ON THE SESSION always win:
+  // a promo's price/duration can legitimately be edited in Settings while sessions started under
+  // the old terms are still running, and those must bill what the customer actually agreed to.
+  let promoInput: SessionChargeInput["promo"] = null;
   if (session.promoId) {
     const [promo] = await db.select().from(promos).where(eq(promos.id, session.promoId)).limit(1);
-    // Prefer what was FROZEN at session start (session.plannedMinutes / session.promoPackagePrice)
-    // over the promo row's CURRENT/live values — see the doc comment on rentalSessions.
-    // promoPackagePrice in db/schema.ts. A promo's price/duration can legitimately be edited in
-    // Settings > Promo at any time (e.g. a routine price update) while other sessions are still
-    // running against the OLD terms; without this, those in-flight sessions would silently get
-    // billed using whatever the promo says NOW, not what the customer actually agreed to when they
-    // started. The live promo row is only consulted as a fallback, for sessions started before this
-    // column existed (promoPackagePrice is null) or where plannedMinutes was never set.
-    const allowedMinutes = (session.plannedMinutes ?? promo?.durationMinutes ?? 0) + session.extendedMinutes;
-    const overtimeMinutesRaw = Math.max(0, elapsedMinutesRaw - allowedMinutes);
-    const overtimeRounded = roundUpMinutes(overtimeMinutesRaw, roundingMinutes);
-    const packagePrice = session.promoPackagePrice ?? promo?.packagePrice ?? 0;
-    // POLICY (explicit decision, confirmed with the owner 2026-09-13): package/promo sessions are
-    // billed a FLAT packagePrice — no extra charge is ever added for time run past the allowed
-    // duration, no matter how much later the session actually stops. NOTE ON TERMINOLOGY: this is
-    // NOT the same concept as Home Rental's "overtime"/late-fee policy (lib/home-rental/policy.ts,
-    // late_fee_tier) — that module genuinely CHARGES a denda for a late return. PS Rental (venue
-    // console sessions) never charges for running long; the note text below deliberately avoids the
-    // word "overtime" so the two modules' opposite policies are never confused with each other. This
-    // used to add
-    // `overtimeCost = Math.round((overtimeRounded / 60) * session.ratePerHour)`, but that produced
-    // a real billing bug: overtimeRounded is rounded UP to a full billingRoundingMinutes increment
-    // (roundUpMinutes never rounds down — see its own doc comment in pricing.ts), so a session that
-    // finished even a few SECONDS late — e.g. the up-to-~15s gap before runSessionAutoStop's poll
-    // (lib/rental/scheduler.ts) notices plannedMinutes ran out and calls this function — got billed
-    // a FULL rounding increment (typically 15 minutes = Rp15.000+) of overtime for zero actual
-    // extra playtime. The fix is to stop charging overtime at all: runSessionAutoStop already
-    // powers the unit's device off the moment allowed time runs out, so in normal operation the
-    // customer physically can't keep playing past their package+extension time anyway.
-    // IMPORTANT OPERATIONAL DEPENDENCY this policy relies on: runSessionAutoStop must actually be
-    // running continuously in production (`npm run scheduler` / scripts/booking-scheduler.ts, or an
-    // external cron hitting POST /api/bookings/scheduler/run every ~15-60s) AND the unit must be
-    // linked to a controllable device on Kontrol Perangkat. If either isn't true for a given
-    // unit/outlet, a session can keep running (TV still on) past its allowed time and this will now
-    // bill NO extra charge for that overrun — a known, explicitly accepted trade-off, not an
-    // oversight. overtimeRounded is kept only for the informational billingNote below (so staff can
-    // still see a session ran long), never for pricing.
-    subtotal = packagePrice;
-    billingNote = `Paket ${promo?.name ?? ""} (${allowedMinutes} menit)${overtimeRounded > 0 ? ` — sesi berhenti ${overtimeRounded} menit setelah waktu paket habis, harga tetap sesuai paket (tanpa biaya tambahan)` : ""}`;
-  } else if (session.plannedMinutes) {
-    // POLICY (explicit decision, confirmed with the owner 2026-09-13): a session started with a
-    // fixed duration preset from the "Durasi" dropdown on dashboard/rental (30 menit/1 jam/1,5
-    // jam/2 jam/3 jam/4 jam — anything other than "Terbuka (tanpa batas waktu)", which leaves
-    // plannedMinutes null) is a KNOWN, fixed length agreed with the customer up front, exactly
-    // like a promo package — it's just priced per-hour instead of at a flat promo price. There is
-    // nothing to round here: runSessionAutoStop (lib/rental/scheduler.ts) already cuts the unit's
-    // device off the moment plannedMinutes+extendedMinutes elapses, so billing the raw elapsed time
-    // (below, in the true open-ended branch) only ever produced a same-few-second rounding-up
-    // artifact from the scheduler's poll delay — visible in Transaction Center as a needless
-    // "135 menit (dibulatkan dari 121 menit)"-style note on every single fixed-duration session,
-    // exactly the "kok butuh dikoreksi terus" complaint that prompted this fix. Bill exactly the
-    // agreed minutes instead, same no-extra-charge rationale as the promo branch above — and same
-    // terminology note: this is plain "no extra charge," not Home Rental's "overtime"/late-fee
-    // policy, so the note text below avoids that word too.
-    const allowedMinutes = session.plannedMinutes + session.extendedMinutes;
-    subtotal = Math.round((allowedMinutes / 60) * session.ratePerHour);
-    const overtimeMinutesRaw = Math.max(0, elapsedMinutesRaw - allowedMinutes);
-    const overtimeRounded = roundUpMinutes(overtimeMinutesRaw, roundingMinutes);
-    billingNote = `${allowedMinutes} menit (durasi tetap, sesuai paket main yang diset)${overtimeRounded > 0 ? ` — sesi berhenti ${overtimeRounded} menit setelah waktu habis, harga tetap sesuai durasi yang diset (tanpa biaya tambahan)` : ""}`;
-  } else {
-    // True open-ended session ("Terbuka (tanpa batas waktu)") — actual elapsed time is whatever the
-    // customer plays, so THIS is the one case that genuinely needs rounding up to the outlet's
-    // billing increment (billingRoundingMinutes) to produce a sane bill.
-    const roundedMinutes = roundUpMinutes(elapsedMinutesRaw, roundingMinutes);
-    subtotal = Math.round((roundedMinutes / 60) * session.ratePerHour);
-    billingNote = `${roundedMinutes} menit (dibulatkan dari ${Math.ceil(elapsedMinutesRaw)} menit)`;
+    promoInput = {
+      name: promo?.name ?? null,
+      packagePrice: session.promoPackagePrice ?? promo?.packagePrice ?? 0,
+      durationMinutes: promo?.durationMinutes ?? 0,
+    };
   }
+
+  // Single source of truth, shared with the live estimates on the Rental page and the Billing
+  // Board — see computeSessionCharge's doc comment in pricing.ts for the three billing modes, the
+  // no-extra-charge policy, and the scheduler dependency that policy rests on.
+  const charge = computeSessionCharge({
+    promo: promoInput,
+    plannedMinutes: session.plannedMinutes,
+    extendedMinutes: session.extendedMinutes,
+    ratePerHour: session.ratePerHour,
+    elapsedMinutes: elapsedMinutesRaw,
+    roundingMinutes,
+  });
+  const subtotal = charge.subtotal;
+  const billingNote = charge.billingNote;
 
   const total = Math.max(0, subtotal - session.discountAmount);
 

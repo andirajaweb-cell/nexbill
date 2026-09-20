@@ -321,7 +321,7 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Field label={t("settings.field.taxPercent", "Pajak (%)")}><input type="number" className={inputCls} disabled={!canManage} value={form.taxPercent ?? 0} onChange={(e) => setForm({ ...form, taxPercent: Number(e.target.value) })} /></Field>
           <Field label={t("settings.field.serviceChargePercent", "Service Charge (%)")}><input type="number" className={inputCls} disabled={!canManage} value={form.serviceChargePercent ?? 0} onChange={(e) => setForm({ ...form, serviceChargePercent: Number(e.target.value) })} /></Field>
-          <Field label={t("settings.field.billingRoundingMinutes", "Pembulatan Billing (menit)")}><input type="number" className={inputCls} disabled={!canManage} value={form.billingRoundingMinutes ?? 15} onChange={(e) => setForm({ ...form, billingRoundingMinutes: Number(e.target.value) })} /></Field>
+          <Field label={t("settings.field.billingRoundingMinutes", "Pembulatan Billing (menit)")}><input type="number" min={1} step={1} className={inputCls} disabled={!canManage} value={form.billingRoundingMinutes ?? 1} onChange={(e) => setForm({ ...form, billingRoundingMinutes: Math.max(1, Number(e.target.value) || 1) })} /></Field>
           <Field label={t("settings.field.expenseApprovalThreshold", "Batas Approval Expense (Rp)")}><input type="number" className={inputCls} disabled={!canManage} value={form.expenseApprovalThreshold ?? 0} onChange={(e) => setForm({ ...form, expenseApprovalThreshold: Number(e.target.value) })} /></Field>
           <Field label={t("settings.field.accessoryBillingMode", "Kebijakan Tarif Aksesoris")}>
             <select className={inputCls} disabled={!canManage} value={form.accessoryBillingMode ?? "per_hour"} onChange={(e) => setForm({ ...form, accessoryBillingMode: e.target.value })}>
@@ -330,6 +330,12 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
             </select>
           </Field>
         </div>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "settings.field.billingRoundingMinutesDesc",
+            "Pembulatan Billing berlaku HANYA untuk sesi Terbuka (tanpa batas waktu) — sesi berdurasi tetap dan paket promo selalu ditagih sesuai kesepakatan awal, tanpa pembulatan. Isi 1 agar pelanggan membayar persis menit yang dipakai (mis. 181 menit ditagih 181 menit). Isi 15 bila outlet ingin membulatkan ke atas tiap seperempat jam (181 menit jadi 195 menit)."
+          )}
+        </p>
         <p className="text-xs text-neutral-500">
           {t(
             "settings.field.accessoryBillingModeDesc",

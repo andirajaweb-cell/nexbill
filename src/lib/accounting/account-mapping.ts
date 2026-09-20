@@ -182,7 +182,9 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "payment", transactionKey: "bukupay", accountCode: "1136", label: "Payment — BukuPay" },
   { module: "payment", transactionKey: "card", accountCode: "1125", label: "Payment — Kartu (EDC)" },
   { module: "payment", transactionKey: "transfer", accountCode: "1121", label: "Payment — Bank Transfer" },
-  { module: "payment", transactionKey: "fastpay_h2h", accountCode: "1137", label: "Payment — Fastpay Gateway" },
+  // "fastpay_h2h" (account 1137) was removed from this seed on 2026-09-16 with the Fastpay
+  // gateway. Outlets seeded earlier keep both the mapping row and the GL account — deliberately
+  // left in place, since an account that already carries journal entries must not disappear.
   { module: "other", transactionKey: "service_charge_tax", accountCode: "4650", label: "Service Charge & Pajak" },
   { module: "other_income", transactionKey: "vendor_commission", accountCode: "4710", label: "Pendapatan Lain — Komisi Vendor" },
   { module: "other_income", transactionKey: "asset_rental", accountCode: "4720", label: "Pendapatan Lain — Sewa Tempat/Aset" },

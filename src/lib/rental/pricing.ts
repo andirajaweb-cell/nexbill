@@ -111,8 +111,7 @@ export async function computeEffectiveHourlyRate(
   };
 }
 
-/** Round minutes up to the nearest billing increment (e.g. 15 min) — never rounds down. */
-export function roundUpMinutes(minutes: number, incrementMinutes: number): number {
-  if (incrementMinutes <= 0) return Math.ceil(minutes);
-  return Math.ceil(minutes / incrementMinutes) * incrementMinutes;
-}
+// Pure charge arithmetic lives in ./charge (no DB imports, safe for client components).
+// Re-exported here so every existing server-side importer of "@/lib/rental/pricing" keeps working.
+export { roundUpMinutes, computeSessionCharge } from "./charge";
+export type { SessionChargeInput, SessionCharge } from "./charge";

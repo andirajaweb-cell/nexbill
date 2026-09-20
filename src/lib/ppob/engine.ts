@@ -132,8 +132,8 @@ async function buildPpobSettlementLines(
 /**
  * Records one PPOB transaction (top-up e-wallet, token listrik, pulsa, transfer,
  * tarik tunai, dst.) and posts its accounting in one shot. This module doesn't
- * call any real Fastpay API — the cashier executes the actual top-up/token/
- * transfer over at Fastpay themselves; this only books what happened.
+ * call any real provider API — the cashier executes the actual top-up/token/
+ * transfer at their PPOB provider themselves; this only books what happened.
  *
  * THIRD-PARTY / PASS-THROUGH ACCOUNTING (see buildPpobCollectionLines/
  * buildPpobSettlementLines above for the journal shapes): the customer's
@@ -150,7 +150,7 @@ async function buildPpobSettlementLines(
  *   2. Settlement:  Dr PPOB Payable principal  /  Cr [funding] principal
  * They run back-to-back here (not deferred) because this app has no batched/
  * webhook-driven provider settlement cycle yet — `funding` (the account the
- * cashier already picks, e.g. Saldo Fastpay) IS the settlement account, known
+ * cashier already picks, e.g. Saldo Deposit PPOB) IS the settlement account, known
  * up front. The transaction's `settlementStatus` still ends up "settled" with
  * both journal ids recorded, so a future deferred-settlement flow (see
  * postPpobSettlementJournal) is a drop-in: it would just leave settlement
@@ -481,8 +481,8 @@ export async function hardDeletePpobTransaction(id: string, staffUserId?: string
   return { id };
 }
 
-/** Current balance of the Fastpay PPOB deposit account (COA 1151), computed the same way as every other balance in this app — via the trial balance, which already nets out voided entries correctly. */
-export async function getFastpaySaldoBalance(outletId: string): Promise<number> {
+/** Current balance of the PPOB provider deposit account (COA 1151), computed the same way as every other balance in this app — via the trial balance, which already nets out voided entries correctly. */
+export async function getPpobProviderSaldoBalance(outletId: string): Promise<number> {
   const tb = await computeTrialBalance(outletId);
   return tb.find((r) => r.code === "1151")?.balance ?? 0;
 }

@@ -2,7 +2,6 @@
 export type KnownPaymentMethod =
   | "cash"
   | "qris"
-  | "fastpay_h2h"
   | "dana"
   | "gopay"
   | "bukupay"
@@ -27,7 +26,8 @@ export type KnownPaymentMethod =
   | "ipaymu_crossborder";
 
 /** Bank-specific virtual account channels — used by the NEXBILL platform-billing flow
- * (subscription invoices, smart plug purchase) via fastpayGateway, see adapters/fastpay.ts. */
+ * (subscription invoices, platform purchases) via the iPaymu direct VA gateways; see
+ * SUBSCRIPTION_GATEWAYS in lib/subscription/service.ts. */
 export type VaBankMethod = "va_bca" | "va_bni" | "va_mandiri" | "va_bri" | "va_permata";
 
 /**
