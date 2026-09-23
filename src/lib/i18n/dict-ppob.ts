@@ -104,6 +104,8 @@ registerDict({
   "ppob.cancel": { id: "Batal", en: "Cancel", ms: "Batal", th: "ยกเลิก", fil: "Kanselahin", vi: "Hủy" },
   "ppob.edit": { id: "Edit", en: "Edit", ms: "Edit", th: "แก้ไข", fil: "I-edit", vi: "Sửa" },
   "ppob.delete": { id: "Hapus", en: "Delete", ms: "Padam", th: "ลบ", fil: "Tanggalin", vi: "Xóa" },
+  "ppob.settle": { id: "Setorkan", en: "Settle", ms: "Selesaikan", th: "ชำระ", fil: "I-settle", vi: "Thanh toán NCC" },
+  "ppob.confirmSettle": { id: "Tandai transaksi ini sudah disetorkan ke provider? Sistem akan mencatat jurnal pelunasan utang provider memakai TANGGAL TRANSAKSI aslinya, bukan tanggal hari ini.", en: "Mark this transaction as settled with the provider? The system will post the provider-payable settlement journal using the transaction's ORIGINAL DATE, not today's.", ms: "Tandakan transaksi ini sudah dijelaskan kepada pembekal? Sistem akan mencatat jurnal pelunasan hutang pembekal menggunakan TARIKH TRANSAKSI asalnya, bukan tarikh hari ini.", th: "ทำเครื่องหมายว่าชำระให้ผู้ให้บริการแล้วหรือไม่? ระบบจะลงบัญชีชำระหนี้ผู้ให้บริการโดยใช้วันที่ของธุรกรรมเดิม ไม่ใช่วันที่วันนี้", fil: "Markahan ang transaksyong ito na na-settle na sa provider? Ipo-post ng sistema ang settlement journal gamit ang ORIHINAL NA PETSA ng transaksyon, hindi ang ngayon.", vi: "Đánh dấu giao dịch này đã thanh toán cho nhà cung cấp? Hệ thống sẽ ghi bút toán tất toán công nợ NCC theo NGÀY GIAO DỊCH gốc, không phải hôm nay." },
   "ppob.void": { id: "Batalkan", en: "Void", ms: "Batalkan", th: "ยกเลิก", fil: "Bawiin", vi: "Hủy giao dịch" },
 
   // --- Alerts / confirms / prompts ---

@@ -78,8 +78,64 @@ export const PPOB_FLAG_DEFS: FeatureFlagDef[] = [
   },
 ];
 
+/**
+ * TV Screensaver / Kiosk Display — layar TV Android di tiap bilik yang menampilkan branding
+ * outlet, harga, QR booking, jam, dan status unit realtime saat menganggur.
+ *
+ * defaultEnabled sengaja DIBIARKAN false (opt-in), berbeda dari PPOB di atas. Dua alasannya:
+ *
+ *   1. Ini fitur yang benar-benar baru — tidak ada outlet yang sudah memakainya, jadi tidak ada
+ *      yang bisa "diam-diam dimatikan" seperti yang dikhawatirkan pada PPOB.
+ *
+ *   2. Yang lebih penting: fitur ini menuntut TV tetap MENYALA saat bilik kosong. Di outlet yang
+ *      memakai smart plug NEXBILL, daya bilik justru diputus otomatis saat sesi berhenti (lihat
+ *      stopRentalSession di lib/rental/sessions.ts) — jadi menyalakan fitur ini tanpa merchant
+ *      memilihnya sendiri berarti menambah biaya listrik yang tidak mereka minta. Keputusan itu
+ *      harus tetap ada di tangan merchant.
+ */
+export const TV_SCREENSAVER_FLAG_DEFS: FeatureFlagDef[] = [
+  {
+    key: "TV_SCREENSAVER_ENABLED",
+    parentKey: null,
+    label: "TV Screensaver (khusus TV Android)",
+    description:
+      "Saklar utama. TV Android / Google TV di bilik menampilkan nama outlet, harga sewa, QR booking, jam, dan status unit saat menganggur — lalu dibuka staf dengan PIN. Tidak untuk TV analog maupun Smart TV non-Android. Jika OFF, semua layar yang sudah terpasang langsung berhenti menampilkan screensaver, tapi pasangannya tidak hilang dan langsung jalan lagi saat diaktifkan kembali.",
+    wired: true,
+  },
+  {
+    key: "TV_SCREENSAVER_UNIT_STATUS",
+    parentKey: "TV_SCREENSAVER_ENABLED",
+    label: "Status Unit Realtime",
+    description: "Tampilkan TERSEDIA / SEDANG DIPAKAI beserta sisa waktu sesi di layar bilik. Jika OFF, layar hanya menampilkan branding dan promo.",
+    wired: true,
+    defaultEnabled: true,
+  },
+  {
+    key: "TV_SCREENSAVER_BOOKING_QR",
+    parentKey: "TV_SCREENSAVER_ENABLED",
+    label: "QR Booking",
+    description: "Tampilkan QR code yang mengarah ke halaman booking publik outlet — pelanggan tinggal scan dari layar. Butuh slug booking outlet sudah diisi di Pengaturan.",
+    wired: true,
+    defaultEnabled: true,
+  },
+  {
+    key: "TV_SCREENSAVER_SLIDESHOW",
+    parentKey: "TV_SCREENSAVER_ENABLED",
+    label: "Slideshow Banner Promo",
+    description: "Putar banner promo bergantian di layar bilik, memakai banner yang sama dengan halaman booking publik (Pengaturan > Banner Iklan). (Segera — fase berikutnya)",
+    wired: false,
+  },
+  {
+    key: "TV_SCREENSAVER_SCHEDULE",
+    parentKey: "TV_SCREENSAVER_ENABLED",
+    label: "Jadwal Promo per Jam",
+    description: "Tampilkan promo berbeda menurut jam — mis. promo happy hour siang, paket malam. (Segera — fase berikutnya)",
+    wired: false,
+  },
+];
+
 /** Every module's flags in one flat list — add a new module by adding its own *_FLAG_DEFS array above and spreading it in here. */
-export const ALL_FLAG_DEFS: FeatureFlagDef[] = [...HOME_RENTAL_FLAG_DEFS, ...PPOB_FLAG_DEFS];
+export const ALL_FLAG_DEFS: FeatureFlagDef[] = [...HOME_RENTAL_FLAG_DEFS, ...PPOB_FLAG_DEFS, ...TV_SCREENSAVER_FLAG_DEFS];
 
 const FLAG_DEF_BY_KEY = new Map(ALL_FLAG_DEFS.map((f) => [f.key, f]));
 

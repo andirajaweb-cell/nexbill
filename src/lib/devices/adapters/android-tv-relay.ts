@@ -48,7 +48,16 @@ async function dispatch(device: DeviceRecord, action: "turnOn" | "turnOff" | "ge
   if (!cfg.relayAgentId) throw new Error(`Device "${device.name}" belum dipasangkan ke Relay Agent.`);
   if (!cfg.ip) throw new Error(`Device "${device.name}" belum diisi alamat IP TV.`);
 
-  const [agent] = await db.select().from(relayAgents).where(eq(relayAgents.id, cfg.relayAgentId)).limit(1);
+  // Kolom dipilih EKSPLISIT. Ini jalur yang menyalakan dan mematikan TV setiap kali sesi dimulai
+  // atau selesai. db.select() polos akan ikut menyebut kolom baru dari migrasi 0010
+  // (agent_version, capabilities, update_channel), dan gagal total kalau Vercel men-deploy kode
+  // ini sebelum migrasi itu dijalankan — semua TV di semua outlet berhenti bisa dikontrol. Empat
+  // kolom lama ini sudah cukup untuk mengirim perintah.
+  const [agent] = await db
+    .select({ id: relayAgents.id, outletId: relayAgents.outletId, name: relayAgents.name, token: relayAgents.token })
+    .from(relayAgents)
+    .where(eq(relayAgents.id, cfg.relayAgentId))
+    .limit(1);
   if (!agent) throw new Error(`Relay Agent untuk device "${device.name}" tidak ditemukan (mungkin sudah dihapus).`);
   if (agent.outletId !== device.outletId) {
     throw new Error(`Relay Agent untuk device "${device.name}" terdaftar di outlet lain.`);

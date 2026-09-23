@@ -29,6 +29,7 @@ registerDict({
   "nav.payments": { id: "Pembayaran", en: "Payments", ms: "Pembayaran", th: "การชำระเงิน", fil: "Mga Bayad", vi: "Thanh toán" },
   "nav.billing": { id: "Langganan", en: "Subscription", ms: "Langganan", th: "การสมัครสมาชิก", fil: "Subscription", vi: "Gói đăng ký" },
   "nav.affiliateShowcase": { id: "Rekomendasi Produk", en: "Recommended Gear", ms: "Cadangan Produk", th: "แนะนำสินค้า", fil: "Rekomendadong Produkto", vi: "Sản phẩm đề xuất" },
+  "nav.marketplace": { id: "Marketplace Outlet", en: "Outlet Marketplace", ms: "Pasaran Outlet", th: "ตลาดร้านค้า", fil: "Outlet Marketplace", vi: "Chợ giữa các cửa hàng" },
   "nav.referral": { id: "Program Referral", en: "Referral Program", ms: "Program Rujukan", th: "โปรแกรมแนะนำเพื่อน", fil: "Programa sa Referral", vi: "Chương trình giới thiệu" },
   "nav.accounting": { id: "Accounting", en: "Accounting", ms: "Perakaunan", th: "บัญชี", fil: "Accounting", vi: "Kế toán" },
   "nav.expenses": { id: "Expense Management", en: "Expense Management", ms: "Pengurusan Perbelanjaan", th: "จัดการค่าใช้จ่าย", fil: "Pamamahala ng Gastos", vi: "Quản lý chi phí" },

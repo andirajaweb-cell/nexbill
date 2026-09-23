@@ -3,22 +3,25 @@ import { expenses, accounts, outlets, cashBankAccounts, recurringExpenseTemplate
 import { eq, and, sql } from "drizzle-orm";
 import { postJournal } from "./journal";
 import { EXPENSE_PAYABLE_ACCOUNT_CODE } from "./coa";
+import { isPeriodLocked } from "./periods";
 import { logAudit } from "@/lib/audit/log";
 import type { StaffRole } from "@/lib/auth/permissions";
-import { hasPermission, canApproveForRole, roleLabel } from "@/lib/auth/permissions";
+import { hasPermission, canReviewRequestOf, roleLabel } from "@/lib/auth/permissions";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 
 /**
  * Approval-hierarchy check shared by approveExpense/rejectExpense — on top of the
- * approve_expenses permission gate, the approver must be strictly more senior (lower
- * ROLE_LEVEL) than whoever submitted the expense, per the 6-tier level structure in
- * permissions.ts. An expense with no staffUserId (shouldn't normally happen) skips the check.
+ * approve_expenses permission gate, the approver must outrank whoever submitted the expense,
+ * per the 6-tier level structure in permissions.ts. Owner/Superuser are exempt (they have no
+ * superior inside the outlet — see canReviewRequestOf for the full rationale). An expense with
+ * no staffUserId (shouldn't normally happen) skips the check.
  */
 async function assertCanReviewExpense(expense: typeof expenses.$inferSelect, reviewerRole: StaffRole) {
   if (!expense.staffUserId) return;
   const [requester] = await db.select({ role: staffUsers.role }).from(staffUsers).where(eq(staffUsers.id, expense.staffUserId)).limit(1);
   if (!requester) return;
-  if (!canApproveForRole(reviewerRole, requester.role as StaffRole)) {
-    throw new Error(`Role kamu (${roleLabel(reviewerRole)}) tidak bisa menyetujui/menolak expense dari role yang levelnya setara atau lebih tinggi (${roleLabel(requester.role as StaffRole)}).`);
+  if (!canReviewRequestOf(reviewerRole, requester.role as StaffRole)) {
+    throw new Error(`Role kamu (${roleLabel(reviewerRole)}) tidak bisa menyetujui/menolak expense dari role yang levelnya setara atau lebih tinggi (${roleLabel(requester.role as StaffRole)}). Minta Owner yang menyetujui.`);
   }
 }
 
@@ -83,9 +86,47 @@ async function getCashBankGlAccountId(cashBankAccountId: string): Promise<string
   return row.accountId;
 }
 
+/**
+ * Mengubah string kosong menjadi undefined untuk kolom yang merujuk tabel lain.
+ *
+ * BUG YANG DIPERBAIKI DI SINI (2026-09-22). Dropdown opsional di form Pengeluaran memakai
+ * `<option value="">` untuk pilihan "tidak ada" — itu cara standar dan benar di HTML. Tapi nilai
+ * yang terkirim adalah string KOSONG, bukan null, dan Postgres memperlakukannya sebagai id
+ * sungguhan yang harus dicari. Hasilnya:
+ *
+ *     insert or update on table "expenses" violates foreign key constraint
+ *     "expenses_supplier_id_suppliers_id_fk"
+ *
+ * Pesan yang tidak berarti apa pun bagi pemilik outlet, muncul hanya karena satu kolom OPSIONAL
+ * dibiarkan kosong — persis seperti yang seharusnya boleh dilakukan.
+ *
+ * Dinormalkan di sini, bukan di form, karena inilah gerbang tunggal yang dilewati SEMUA pembuat
+ * expense: form manual, Cash Out Cepat, dan generator recurring. Memperbaikinya di satu form hanya
+ * akan menyisakan lubang yang sama di jalur lain.
+ */
+export const nullIfBlank = (v: string | null | undefined): string | undefined => {
+  const trimmed = typeof v === "string" ? v.trim() : v;
+  return trimmed ? trimmed : undefined;
+};
+
 export async function createExpense(input: CreateExpenseInput) {
   if (input.amount <= 0) throw new Error("Nominal expense harus lebih dari 0.");
   await assertExpenseAccount(input.accountId);
+
+  // Dinormalkan SEBELUM pemeriksaan di bawah — tanpa ini, cashBankAccountId berisi "" lolos dari
+  // pemeriksaan `!input.cashBankAccountId`... justru tidak, "" memang falsy. Tapi ketiga kolom lain
+  // tidak punya pemeriksaan sama sekali, dan itulah yang menembus sampai ke database.
+  input = {
+    ...input,
+    supplierId: nullIfBlank(input.supplierId),
+    costCenterId: nullIfBlank(input.costCenterId),
+    rentalUnitId: nullIfBlank(input.rentalUnitId),
+    cashBankAccountId: nullIfBlank(input.cashBankAccountId),
+    staffUserId: nullIfBlank(input.staffUserId),
+    shiftId: nullIfBlank(input.shiftId),
+    recurringTemplateId: nullIfBlank(input.recurringTemplateId),
+  };
+
   if (!input.recordAsPayable && !input.cashBankAccountId) {
     throw new Error("Pilih akun kas/bank untuk expense yang dibayar langsung, atau centang 'Catat sebagai hutang' jika belum dibayar.");
   }
@@ -138,9 +179,30 @@ async function postAndAdvance(expenseId: string, actorId?: string) {
   if (!expense) throw new Error("Expense tidak ditemukan.");
   const total = round(expense.amount + (expense.taxAmount ?? 0));
 
+  /*
+   * Jurnal dicatat pada TANGGAL PENGELUARANNYA, bukan tanggal disetujui.
+   *
+   * BUG YANG DIPERBAIKI DI SINI (2026-09-21). Kedua panggilan postJournal di bawah tidak pernah
+   * meneruskan entryDate, jadi keduanya jatuh ke nilai bawaan kolomnya (nowIso) — hari ini. Selama
+   * expense dicatat dan disetujui di hari yang sama, tidak ada yang terlihat salah. Tapi begitu
+   * pemilik mencatat biaya bulan lalu, atau menyetujui draft yang sudah menunggu beberapa hari,
+   * biayanya mendarat di Laba Rugi bulan berjalan — bukan bulan tempat biaya itu sebenarnya
+   * terjadi. Laba bulan lalu jadi terlihat lebih besar dari yang sebenarnya, dan bulan ini lebih
+   * kecil; dua-duanya salah, dan tidak ada apa pun di layar yang menandainya.
+   *
+   * Ini juga yang membuat kolom Tanggal Pengeluaran di form menjadi setelan kosong: pemilik boleh
+   * mengisinya mundur, tapi jurnalnya tetap tercatat hari ini.
+   *
+   * Sama seperti postSalesJournal: kalau periode tujuan sudah ditutup (Tutup Periode), tanggalnya
+   * mundur ke hari ini — buku yang sudah dikunci tidak boleh disisipi entri baru.
+   */
+  const expenseDate = expense.expenseDate ?? new Date().toISOString();
+  const entryDate = (await isPeriodLocked(expense.outletId, expenseDate)) ? new Date().toISOString() : expenseDate;
+
   if (expense.recordAsPayable) {
     const journalId = await postJournal({
       outletId: expense.outletId,
+      entryDate,
       reference: expense.expenseNumber,
       description: expense.description || `Beban ${expense.category} (hutang)`,
       sourceType: "expense",
@@ -162,6 +224,7 @@ async function postAndAdvance(expenseId: string, actorId?: string) {
   const cashBankGlAccountId = await getCashBankGlAccountId(expense.cashBankAccountId);
   const journalId = await postJournal({
     outletId: expense.outletId,
+    entryDate,
     reference: expense.expenseNumber,
     description: expense.description || `Beban ${expense.category}`,
     sourceType: "expense",
@@ -302,48 +365,103 @@ export async function voidExpense(expenseId: string, staffUserId: string, role: 
   return updated;
 }
 
-/** Generate a new draft expense for every active recurring template whose nextDueDate has arrived (or passed). */
+/**
+ * Maksimum periode yang boleh disusulkan satu template dalam sekali jalan.
+ *
+ * Bukan batas bisnis, melainkan rem pengaman: kalau sebuah template pernah salah diisi dengan
+ * nextDueDate bertahun-tahun ke belakang, tanpa batas ini satu klik akan membuat ratusan draft
+ * expense sekaligus. Dua tahun bulanan sudah jauh melampaui ketertinggalan yang wajar; sisanya
+ * dilaporkan lewat `templatesMasihTertinggal` supaya ketahuan, bukan dikerjakan diam-diam.
+ */
+const MAX_CATCH_UP_PERIODS = 24;
+
+/**
+ * Buat draft expense untuk setiap template recurring aktif yang sudah jatuh tempo — TERMASUK
+ * menyusul periode-periode yang terlewat.
+ *
+ * DUA BUG YANG DIPERBAIKI DI SINI (2026-09-20):
+ *
+ * 1. Dulu hanya SATU instance dibuat per template per klik, lalu nextDueDate dimajukan satu
+ *    periode. Template bulanan yang tertinggal tiga bulan menghasilkan satu draft dan tetap
+ *    tertinggal dua bulan — dan tidak ada apa pun di layar yang memberi tahu bahwa masih ada yang
+ *    kurang. Pemilik menekan tombolnya, melihat "1 draft expense dibuat", lalu wajar menyimpulkan
+ *    pekerjaannya selesai. Biaya rutin yang diam-diam tidak tercatat membuat Laba Rugi terlihat
+ *    lebih untung daripada kenyataan — kesalahan yang arahnya paling berbahaya.
+ *
+ * 2. Perbandingan jatuh tempo memakai `new Date().toISOString().slice(0, 10)`, yaitu tanggal UTC.
+ *    Antara pukul 00.00–07.00 WIB, tanggal UTC masih kemarin, jadi template yang jatuh tempo HARI
+ *    INI ikut terlewat. Rental PS justru ramai di jam-jam itu, sehingga inilah jam saat pemilik
+ *    paling mungkin membuka halaman ini.
+ *
+ * Yang TIDAK berubah, dan memang disengaja: hasilnya tetap berstatus "draft". Biaya rutin seperti
+ * gaji dan listrik nominalnya bisa berbeda tiap periode, jadi harus dilihat dan di-Submit manusia
+ * sebelum masuk jurnal. Draft belum memposting jurnal apa pun, jadi belum muncul di Laba Rugi —
+ * itu perilaku yang benar, bukan bug.
+ */
 export async function generateDueRecurringExpenses(outletId: string) {
-  const today = new Date().toISOString().slice(0, 10);
+  // Kalender WIB, bukan UTC — lihat bug #2 di atas dan doc comment outletDateYmd().
+  const today = outletDateYmd(new Date());
   const due = await db
     .select()
     .from(recurringExpenseTemplates)
     .where(and(eq(recurringExpenseTemplates.outletId, outletId), eq(recurringExpenseTemplates.isActive, true)));
 
-  const generated: string[] = [];
-  for (const tpl of due) {
-    if (tpl.nextDueDate.slice(0, 10) > today) continue;
-
-    const periodLabel = new Date(tpl.nextDueDate).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-    const expense = await createExpense({
-      outletId: tpl.outletId,
-      accountId: tpl.accountId,
-      category: tpl.category,
-      description: `${tpl.name} — ${periodLabel}`,
-      payeeName: tpl.payeeName ?? undefined,
-      supplierId: tpl.supplierId ?? undefined,
-      amount: tpl.amount,
-      taxAmount: tpl.taxAmount,
-      recordAsPayable: tpl.recordAsPayable,
-      costCenterId: tpl.costCenterId ?? undefined,
-      rentalUnitId: tpl.rentalUnitId ?? undefined,
-      dueDate: tpl.nextDueDate,
-      expenseDate: tpl.nextDueDate,
-      isRecurringInstance: true,
-      recurringTemplateId: tpl.id,
-    });
-    generated.push(expense.id);
-
-    const next = new Date(tpl.nextDueDate);
-    if (tpl.frequency === "weekly") next.setDate(next.getDate() + 7);
-    else if (tpl.frequency === "yearly") next.setFullYear(next.getFullYear() + 1);
+  const advance = (iso: string, frequency: string) => {
+    const next = new Date(iso);
+    if (frequency === "weekly") next.setDate(next.getDate() + 7);
+    else if (frequency === "yearly") next.setFullYear(next.getFullYear() + 1);
     else next.setMonth(next.getMonth() + 1);
+    return next.toISOString();
+  };
+
+  const generated: string[] = [];
+  const templatesMasihTertinggal: { templateId: string; nama: string; jatuhTempoBerikutnya: string }[] = [];
+
+  for (const tpl of due) {
+    let cursor = tpl.nextDueDate;
+    let dibuat = 0;
+
+    // Terus menyusul selama tanggalnya masih di masa lalu (atau hari ini), sampai rem pengaman.
+    while (outletDateYmd(new Date(cursor)) <= today && dibuat < MAX_CATCH_UP_PERIODS) {
+      const periodLabel = new Date(cursor).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+      const expense = await createExpense({
+        outletId: tpl.outletId,
+        accountId: tpl.accountId,
+        category: tpl.category,
+        description: `${tpl.name} — ${periodLabel}`,
+        payeeName: tpl.payeeName ?? undefined,
+        supplierId: tpl.supplierId ?? undefined,
+        amount: tpl.amount,
+        taxAmount: tpl.taxAmount,
+        recordAsPayable: tpl.recordAsPayable,
+        costCenterId: tpl.costCenterId ?? undefined,
+        rentalUnitId: tpl.rentalUnitId ?? undefined,
+        dueDate: cursor,
+        // expenseDate memakai tanggal PERIODENYA, bukan hari ini — supaya biaya bulan lalu yang
+        // baru disusulkan tetap jatuh di Laba Rugi bulan lalu setelah disetujui, bukan menumpuk di
+        // bulan berjalan.
+        expenseDate: cursor,
+        isRecurringInstance: true,
+        recurringTemplateId: tpl.id,
+      });
+      generated.push(expense.id);
+      dibuat++;
+      cursor = advance(cursor, tpl.frequency);
+    }
+
+    if (dibuat === 0) continue;
 
     await db
       .update(recurringExpenseTemplates)
-      .set({ nextDueDate: next.toISOString(), lastGeneratedAt: new Date().toISOString() })
+      .set({ nextDueDate: cursor, lastGeneratedAt: new Date().toISOString() })
       .where(eq(recurringExpenseTemplates.id, tpl.id));
+
+    // Kena rem pengaman dan masih tertinggal — dilaporkan supaya pemilik tahu harus menekan lagi,
+    // alih-alih mengira semuanya sudah beres.
+    if (dibuat >= MAX_CATCH_UP_PERIODS && outletDateYmd(new Date(cursor)) <= today) {
+      templatesMasihTertinggal.push({ templateId: tpl.id, nama: tpl.name, jatuhTempoBerikutnya: cursor });
+    }
   }
 
-  return generated;
+  return { generated, templatesMasihTertinggal };
 }

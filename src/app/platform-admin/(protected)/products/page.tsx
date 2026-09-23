@@ -23,6 +23,7 @@ const EMPTY_FORM = { category: "smart_plug", name: "", description: "", price: "
 
 export default function PlatformProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
+  const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newForm, setNewForm] = useState(EMPTY_FORM);
   const [editing, setEditing] = useState<string | null>(null);
@@ -113,12 +114,34 @@ export default function PlatformProductsPage() {
   };
 
   const removeProduct = async (p: any) => {
-    if (!confirm(`Hapus produk "${p.name}"? Produk akan disembunyikan dari etalase (histori invoice lama tetap aman).`)) return;
-    await fetch(`/api/platform-admin/products/${p.id}`, { method: "DELETE" });
+    if (!confirm(`Hapus produk "${p.name}" dari katalog? Faktur outlet yang sudah lewat tidak terpengaruh — isinya disimpan sebagai salinan, bukan rujukan.`)) return;
+    // Hasilnya diperiksa, bukan diabaikan: endpoint ini bisa MENGHAPUS atau hanya MENONAKTIFKAN
+    // tergantung apakah produknya masih dipakai di catatan Pembelian/COGS, dan admin berhak tahu
+    // mana yang barusan terjadi. Versi sebelumnya membuang seluruh respons, jadi kedua hasil itu
+    // terlihat sama persis — dan karena daftar ini juga menampilkan produk nonaktif, "dihapus" dan
+    // "tidak terjadi apa-apa" pun tidak bisa dibedakan.
+    const res = await fetch(`/api/platform-admin/products/${p.id}`, { method: "DELETE" });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(out?.error ?? "Gagal menghapus produk.");
+      return;
+    }
+    if (out?.mode === "deactivated") alert(out.pesan);
     await load();
   };
 
-  const grouped = products.reduce<Record<string, any[]>>((acc, p) => {
+  /*
+   * Produk nonaktif disembunyikan secara bawaan.
+   *
+   * Daftar ini dulu menampilkan SEMUA baris, sehingga menonaktifkan atau menghapus produk tidak
+   * mengubah apa pun yang terlihat selain satu lencana kecil — dan itulah yang membuat tombol
+   * "Hapus" dilaporkan tidak berfungsi. Sekarang produk yang dinonaktifkan benar-benar hilang dari
+   * pandangan, dan bisa dimunculkan lagi lewat sakelar di bawah saat perlu diaktifkan kembali.
+   */
+  const visibleProducts = showInactive ? products : products.filter((p: any) => p.isActive);
+  const inactiveCount = products.filter((p: any) => !p.isActive).length;
+
+  const grouped = visibleProducts.reduce<Record<string, any[]>>((acc, p) => {
     (acc[p.category] ??= []).push(p);
     return acc;
   }, {});
@@ -126,7 +149,15 @@ export default function PlatformProductsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="gm-display text-2xl font-bold text-amber-300">Etalase Produk</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="gm-display text-2xl font-bold text-amber-300">Etalase Produk</h1>
+          {inactiveCount > 0 && (
+            <label className="flex items-center gap-2 text-xs text-neutral-400">
+              <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+              Tampilkan {inactiveCount} produk nonaktif
+            </label>
+          )}
+        </div>
         <p className="text-sm text-neutral-500 mt-1">
           Katalog belanja outlet — Smart Plug/Jasa Instalasi/Konsol Tambahan muncul di checkout langganan pertama, sedangkan "Produk Lain (Toko)" muncul di tab Toko yang terpisah dari langganan (bisa dibeli outlet kapan saja, termasuk saat terkunci). Outlet/merchant hanya bisa melihat &amp; menambah ke keranjang, tidak bisa mengubah katalog ini sendiri.
         </p>

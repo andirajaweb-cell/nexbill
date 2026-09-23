@@ -35,8 +35,7 @@ import {
   HelpCircle,
   Gift,
   Wrench,
-  Share2,
-} from "lucide-react";
+  Share2, Store,} from "lucide-react";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { roleLabel, type StaffRole } from "@/lib/auth/permissions";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
@@ -59,6 +58,7 @@ const nav = [
   { href: "/dashboard/payments", key: "nav.payments", icon: CreditCard },
   { href: "/dashboard/billing", key: "nav.billing", icon: BillingIcon },
   { href: "/dashboard/rekomendasi-produk", key: "nav.affiliateShowcase", icon: Gift },
+  { href: "/dashboard/marketplace", key: "nav.marketplace", icon: Store },
   { href: "/dashboard/referral", key: "nav.referral", icon: Share2 },
   { href: "/dashboard/accounting", key: "nav.accounting", icon: Calculator },
   { href: "/dashboard/expenses", key: "nav.expenses", icon: Receipt },

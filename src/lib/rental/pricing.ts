@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { pricingRules, customers, membershipTiers, rentalUnits } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { outletDay, outletTimeHHmm } from "@/lib/time/outlet-time";
+import { isMembershipActive } from "@/lib/membership/tier-benefits";
 
 const DAY_CODES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
@@ -94,7 +95,17 @@ export async function computeEffectiveHourlyRate(
       const [tier] = await db.select().from(membershipTiers).where(eq(membershipTiers.id, customer.membershipTierId)).limit(1);
       if (tier) {
         memberTierName = tier.name;
-        memberDiscountPercent = tier.discountPercent;
+        /*
+         * Diskon hanya berlaku selama keanggotaannya masih hidup. membershipExpiresAt null berarti
+         * tanpa batas waktu — itu kasus tier yang didapat lewat total belanja, dan tier berbayar
+         * yang masa berlakunya memang disetel seumur hidup — jadi keduanya lolos apa adanya dan
+         * perilaku lama tidak berubah sedikit pun untuk data yang sudah ada.
+         *
+         * Namanya tetap dikembalikan meski sudah kedaluwarsa, supaya kasir melihat "Gold" di layar
+         * dengan tarif penuh dan langsung tahu ada perpanjangan yang bisa ditawarkan — bukan
+         * diam-diam kehilangan status member tanpa penjelasan.
+         */
+        memberDiscountPercent = isMembershipActive(customer.membershipExpiresAt, at) ? tier.discountPercent : 0;
       }
     }
   }

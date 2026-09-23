@@ -18,7 +18,7 @@ import { formatNumber } from "@/lib/format/number";
 import { formatDate } from "@/lib/format/date";
 import "@/lib/i18n/dict-settings";
 
-const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "Banner Iklan", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
+const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "Banner Iklan", "TV Screensaver", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
@@ -29,6 +29,7 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Kategori Produk": { key: "settings.tab.productCategory", fallback: "Kategori Produk" },
   "Durasi Rental": { key: "settings.tab.durationPreset", fallback: "Durasi Rental" },
   "Banner Iklan": { key: "settings.tab.banner", fallback: "Banner Iklan" },
+  "TV Screensaver": { key: "settings.tab.tvScreensaver", fallback: "TV Screensaver" },
   "Notifikasi": { key: "settings.tab.notification", fallback: "Notifikasi" },
   "Feature Management": { key: "settings.tab.featureManagement", fallback: "Feature Management" },
   "Audit Log": { key: "settings.tab.auditLog", fallback: "Audit Log" },
@@ -92,6 +93,8 @@ export default function SettingsPage() {
         <DurationPresetTab outletId={outletId} canManage={canManage} />
       ) : tab === "Banner Iklan" ? (
         <BannerTab outletId={outletId} canManage={canManage} />
+      ) : tab === "TV Screensaver" ? (
+        <TvScreensaverTab canManage={canManage} />
       ) : tab === "Notifikasi" ? (
         <NotificationTab outletId={outletId} canManage={canManage} />
       ) : tab === "Feature Management" ? (
@@ -321,7 +324,20 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Field label={t("settings.field.taxPercent", "Pajak (%)")}><input type="number" className={inputCls} disabled={!canManage} value={form.taxPercent ?? 0} onChange={(e) => setForm({ ...form, taxPercent: Number(e.target.value) })} /></Field>
           <Field label={t("settings.field.serviceChargePercent", "Service Charge (%)")}><input type="number" className={inputCls} disabled={!canManage} value={form.serviceChargePercent ?? 0} onChange={(e) => setForm({ ...form, serviceChargePercent: Number(e.target.value) })} /></Field>
-          <Field label={t("settings.field.billingRoundingMinutes", "Pembulatan Billing (menit)")}><input type="number" min={1} step={1} className={inputCls} disabled={!canManage} value={form.billingRoundingMinutes ?? 1} onChange={(e) => setForm({ ...form, billingRoundingMinutes: Math.max(1, Number(e.target.value) || 1) })} /></Field>
+          {/*
+           * Batas bawah dilonggarkan dari 1 ke 0 (2026-09-21).
+           *
+           * Nilai 0 dan 1 menghasilkan tagihan yang PERSIS SAMA — roundUpMinutes() di
+           * lib/rental/charge.ts memperlakukan increment <= 0 sebagai "bulatkan ke menit penuh",
+           * identik dengan increment 1. Jadi ini semata-mata soal kolomnya tidak lagi menolak
+           * angka yang pemilik coba masukkan; tidak ada perubahan perhitungan sama sekali.
+           *
+           * Karena itu keterangannya (lihat billingRoundingMinutesDesc di bawah) menyebutkan
+           * kesamaan itu secara terbuka. Setelan yang bisa diubah tapi tidak mengubah apa pun,
+           * tanpa dijelaskan, adalah cara paling cepat membuat pemilik outlet kehilangan
+           * kepercayaan pada setelan yang lain.
+           */}
+          <Field label={t("settings.field.billingRoundingMinutes", "Pembulatan Billing (menit)")}><input type="number" min={0} step={1} className={inputCls} disabled={!canManage} value={form.billingRoundingMinutes ?? 1} onChange={(e) => setForm({ ...form, billingRoundingMinutes: Math.max(0, Math.floor(Number(e.target.value)) || 0) })} /></Field>
           <Field label={t("settings.field.expenseApprovalThreshold", "Batas Approval Expense (Rp)")}><input type="number" className={inputCls} disabled={!canManage} value={form.expenseApprovalThreshold ?? 0} onChange={(e) => setForm({ ...form, expenseApprovalThreshold: Number(e.target.value) })} /></Field>
           <Field label={t("settings.field.accessoryBillingMode", "Kebijakan Tarif Aksesoris")}>
             <select className={inputCls} disabled={!canManage} value={form.accessoryBillingMode ?? "per_hour"} onChange={(e) => setForm({ ...form, accessoryBillingMode: e.target.value })}>
@@ -1701,6 +1717,433 @@ function ChangeEmailCard({ user, hasPassword, refresh, t }: { user: AuthUser | n
         </Button>
       </form>
     </Card>
+  );
+}
+
+/** ---------------- TV SCREENSAVER ---------------- */
+
+interface TvSettingsData {
+  idleMinutes: number;
+  headline: string | null;
+  tagline: string | null;
+  priceText: string | null;
+  footerText: string | null;
+  showClock: boolean;
+  showUnitStatus: boolean;
+  showBookingQr: boolean;
+  showWifi: boolean;
+  accentColor: string;
+  nightModeEnabled: boolean;
+  nightStartHour: number;
+  nightEndHour: number;
+  nightDimPercent: number;
+  hasPin: boolean;
+  moduleEnabled: boolean;
+}
+
+interface TvScreenData {
+  id: string;
+  name: string;
+  rentalUnitId: string | null;
+  unitName: string | null;
+  isActive: boolean;
+  isPaired: boolean;
+  lastSeenAt: string | null;
+  pairingCode: string | null;
+  pairingCodeExpiresAt: string | null;
+  eligibility: TvEligibilityData | null;
+}
+
+/** Bentuk yang dikirim /api/tv/units dan /api/tv/screens — cermin TvEligibility di lib/tv/eligibility.ts. */
+interface TvEligibilityData {
+  level: "ready" | "warning" | "unsupported";
+  label: string;
+  reason: string;
+  control: "adb" | "smart_plug" | "none" | "n/a";
+}
+
+interface TvUnitCompatData {
+  id: string;
+  name: string;
+  tvType: string;
+  deviceProtocol: string | null;
+  eligibility: TvEligibilityData;
+}
+
+const TV_ELIGIBILITY_BADGE: Record<TvEligibilityData["level"], string> = { ready: "success", warning: "pending", unsupported: "failed" };
+
+/**
+ * Pengaturan tampilan layar TV bilik + daftar layar yang terpasang.
+ *
+ * Saklar ON/OFF modulnya SENGAJA TIDAK ADA di tab ini — ia ada di tab Feature Management bersama
+ * Home Rental dan PPOB, dan tab ini hanya MENAMPILKAN keadaannya lalu menunjuk ke sana. Dua saklar
+ * untuk satu hal, di dua tempat, adalah cara paling cepat membuat merchant mematikan fitur di satu
+ * tempat lalu bingung kenapa masih menyala.
+ */
+function TvScreensaverTab({ canManage }: { canManage: boolean }) {
+  const [settings, setSettings] = useState<TvSettingsData | null>(null);
+  const [screens, setScreens] = useState<TvScreenData[] | null>(null);
+  const [units, setUnits] = useState<TvUnitCompatData[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [pin, setPin] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newUnitId, setNewUnitId] = useState("");
+
+  const loadSettings = () => fetchJsonObject<TvSettingsData>("/api/tv/settings").then((d) => d && setSettings(d));
+  const loadScreens = () => fetchJsonArray<TvScreenData>("/api/tv/screens").then((d) => setScreens(d ?? []));
+
+  useEffect(() => {
+    loadSettings();
+    loadScreens();
+    // Dari /api/tv/units, bukan /api/rental-units: yang dibutuhkan di sini bukan sekadar daftar unit,
+    // tapi kelayakan tiap unit (tipe TV + perangkat kontrolnya) — dinilai di server dengan aturan
+    // yang sama yang menolak pemasangan layar, supaya dropdown tidak pernah menawarkan pilihan
+    // yang lalu ditolak saat disimpan.
+    fetchJsonArray<TvUnitCompatData>("/api/tv/units").then((rows) => setUnits(rows ?? []));
+  }, []);
+
+  const patch = async (body: Record<string, unknown>) => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/tv/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error ?? "Gagal menyimpan.");
+      await loadSettings();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addScreen = async () => {
+    if (!newName.trim()) return showAlert("Nama layar wajib diisi.");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/tv/screens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim(), rentalUnitId: newUnitId || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error ?? "Gagal menambah layar.");
+      setNewName("");
+      setNewUnitId("");
+      await loadScreens();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const screenAction = async (id: string, body: Record<string, unknown>) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/tv/screens/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error ?? "Gagal memperbarui layar.");
+      await loadScreens();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeScreen = async (screen: TvScreenData) => {
+    const ok = await showConfirm(`Hapus layar "${screen.name}"? TV yang sudah terpasang akan langsung berhenti dan harus dipasangkan ulang dengan kode baru.`);
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/tv/screens/${screen.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error ?? "Gagal menghapus layar.");
+      await loadScreens();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!settings || !screens) return <div className="text-sm text-neutral-500">Memuat...</div>;
+
+  const unitsByLevel = {
+    ready: units.filter((u) => u.eligibility.level === "ready"),
+    warning: units.filter((u) => u.eligibility.level === "warning"),
+    unsupported: units.filter((u) => u.eligibility.level === "unsupported"),
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-2">
+        <h2 className="font-medium">TV Screensaver — Layar Bilik (khusus TV Android)</h2>
+        <p className="text-xs text-neutral-500">
+          TV Android / Google TV di bilik menampilkan nama outlet, harga sewa, QR booking, jam, dan status unit saat menganggur — lalu bisa dibuka staf dengan PIN.
+          Buka <span className="text-neutral-300">nexbill.id/tv</span> di browser TV, masukkan kode pairing, selesai. Tidak perlu memasang aplikasi apa pun.
+          <span className="text-neutral-400"> TV analog dan Smart TV non-Android tidak didukung.</span>
+        </p>
+
+        {!settings.moduleEnabled && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+            Modul ini sedang <span className="font-semibold">nonaktif</span>. Semua setelan di bawah tetap tersimpan, tapi layar tidak akan menampilkan apa pun sampai
+            saklarnya dinyalakan di tab <span className="font-semibold">Feature Management</span> (khusus Superuser).
+          </div>
+        )}
+
+        {/*
+          Ringkasan kompatibilitas PER UNIT, bukan peringatan umum. Versi pertama tab ini memuat
+          satu paragraf generik soal smart plug yang memutus daya — benar untuk Smart TV, tapi keliru
+          untuk TV Android yang dikontrol ADB (daya tidak pernah diputus). Merchant perlu tahu nasib
+          TIAP bilik-nya sendiri: mana yang siap, mana yang perlu dicek, dan mana yang tidak bisa
+          sama sekali — beserta alasannya. Penilaiannya dari server (lib/tv/eligibility.ts), aturan
+          yang sama yang menolak pemasangan layar.
+        */}
+        {units.length > 0 && (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3 text-xs space-y-3">
+            <div className="font-medium text-neutral-300">Kompatibilitas unit di outlet ini</div>
+            {(
+              [
+                ["ready", "Siap dipakai"],
+                ["warning", "Bisa dipasang, tapi perlu dicek"],
+                ["unsupported", "Tidak didukung"],
+              ] as const
+            ).map(([level, heading]) =>
+              unitsByLevel[level].length === 0 ? null : (
+                <div key={level} className="space-y-1">
+                  <div className="text-neutral-400">
+                    {heading} ({unitsByLevel[level].length})
+                  </div>
+                  <ul className="space-y-1">
+                    {unitsByLevel[level].map((u) => (
+                      <li key={u.id} className="flex flex-wrap items-start gap-2">
+                        <Badge status={TV_ELIGIBILITY_BADGE[u.eligibility.level]}>{u.name}</Badge>
+                        <span className="text-neutral-500 flex-1 min-w-[16rem]">{u.eligibility.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            )}
+          </div>
+        )}
+
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3 text-xs text-neutral-400 space-y-1">
+          <div className="font-medium text-neutral-300">Soal listrik</div>
+          <p>
+            Screensaver hanya tampil selama layar TV menyala. Satu TV LED menyala menganggur ±50-100 watt — delapan jam sehari ≈{" "}
+            <span className="text-neutral-200">Rp25.000-50.000 per TV per bulan</span>. Gunakan <span className="text-neutral-200">Mode Malam</span> di bawah untuk
+            menekannya di jam sepi.
+          </p>
+        </div>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">Tampilan Layar</h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Judul besar (mis. Mau Main?)">
+            <input className={inputCls} disabled={!canManage} defaultValue={settings.headline ?? ""} onBlur={(e) => patch({ headline: e.target.value })} />
+          </Field>
+          <Field label="Baris konsol (mis. PS5 • PS4 • PS3)">
+            <input className={inputCls} disabled={!canManage} defaultValue={settings.tagline ?? ""} onBlur={(e) => patch({ tagline: e.target.value })} />
+          </Field>
+          <Field label="Baris harga (mis. Mulai dari Rp5.000/jam)">
+            <input className={inputCls} disabled={!canManage} defaultValue={settings.priceText ?? ""} onBlur={(e) => patch({ priceText: e.target.value })} />
+          </Field>
+          <Field label="Baris tambahan (promo, jam buka, nomor WA)">
+            <input className={inputCls} disabled={!canManage} defaultValue={settings.footerText ?? ""} onBlur={(e) => patch({ footerText: e.target.value })} />
+          </Field>
+          <Field label="Warna aksen">
+            <input type="color" className={inputCls} disabled={!canManage} defaultValue={settings.accentColor} onBlur={(e) => patch({ accentColor: e.target.value })} />
+          </Field>
+          <Field label="Muncul setelah diam berapa menit">
+            <input
+              type="number"
+              min={1}
+              max={30}
+              className={inputCls}
+              disabled={!canManage}
+              defaultValue={settings.idleMinutes}
+              onBlur={(e) => patch({ idleMinutes: Number(e.target.value) })}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          {([
+            ["showClock", "Tampilkan jam & tanggal"],
+            ["showUnitStatus", "Tampilkan status unit (TERSEDIA / sisa waktu)"],
+            ["showBookingQr", "Tampilkan QR booking"],
+            ["showWifi", "Tampilkan nama WiFi outlet"],
+          ] as const).map(([key, label]) => (
+            <label key={key} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" disabled={!canManage} checked={settings[key]} onChange={(e) => patch({ [key]: e.target.checked })} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+        {/*
+          Kata sandi WiFi TIDAK pernah ikut ditampilkan meski sakelar di atas menyala — hanya
+          nama jaringannya. Itu keputusan yang diambil sadar di lib/tv/service.ts, bukan kelalaian:
+          layar ini sering terlihat dari luar bilik, bahkan dari jalan.
+        */}
+        <p className="text-xs text-neutral-600">Hanya nama WiFi yang ditampilkan, tidak pernah kata sandinya.</p>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">PIN Staf</h2>
+        <p className="text-xs text-neutral-500">
+          Tanpa PIN, siapa pun yang menekan tombol remote bisa menutup screensaver. PIN 4-6 digit, dan hanya dipakai untuk menutup screensaver — ia{" "}
+          <span className="text-neutral-300">tidak</span> memberi akses ke transaksi, pelanggan, atau kasir.
+          {settings.hasPin && <span className="text-emerald-400"> PIN sudah diatur.</span>}
+        </p>
+        <div className="flex flex-wrap gap-2 items-end">
+          <Field label={settings.hasPin ? "Ganti PIN" : "Atur PIN"}>
+            <input
+              inputMode="numeric"
+              maxLength={6}
+              className={inputCls}
+              disabled={!canManage}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              placeholder="4-6 digit"
+            />
+          </Field>
+          <Button
+            disabled={!canManage || busy || pin.length < 4}
+            onClick={async () => {
+              await patch({ unlockPin: pin });
+              setPin("");
+            }}
+          >
+            Simpan PIN
+          </Button>
+          {settings.hasPin && (
+            <Button
+              variant="ghost"
+              disabled={!canManage || busy}
+              onClick={async () => {
+                const ok = await showConfirm("Hapus PIN? Screensaver jadi bisa ditutup siapa saja yang menekan remote.");
+                if (ok) await patch({ unlockPin: "" });
+              }}
+            >
+              Hapus PIN
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">Mode Malam</h2>
+        <p className="text-xs text-neutral-500">
+          Meredupkan layar di jam sepi supaya tidak menyilaukan dan lebih hemat. Jam mengikuti waktu outlet (WIB). Rentang yang melewati tengah malam — misalnya 23 sampai
+          6 — memang seharusnya begitu.
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" disabled={!canManage} checked={settings.nightModeEnabled} onChange={(e) => patch({ nightModeEnabled: e.target.checked })} />
+          <span>Aktifkan mode malam</span>
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Field label="Mulai jam">
+            <input type="number" min={0} max={23} className={inputCls} disabled={!canManage || !settings.nightModeEnabled} defaultValue={settings.nightStartHour} onBlur={(e) => patch({ nightStartHour: Number(e.target.value) })} />
+          </Field>
+          <Field label="Sampai jam">
+            <input type="number" min={0} max={23} className={inputCls} disabled={!canManage || !settings.nightModeEnabled} defaultValue={settings.nightEndHour} onBlur={(e) => patch({ nightEndHour: Number(e.target.value) })} />
+          </Field>
+          <Field label="Tingkat redup (%)">
+            <input type="number" min={0} max={90} className={inputCls} disabled={!canManage || !settings.nightModeEnabled} defaultValue={settings.nightDimPercent} onBlur={(e) => patch({ nightDimPercent: Number(e.target.value) })} />
+          </Field>
+        </div>
+        <p className="text-xs text-neutral-600">Maksimal 90% — layar tidak pernah dibuat hitam total, supaya tidak dikira TV-nya mati lalu dicabut.</p>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">Layar Terpasang</h2>
+        <p className="text-xs text-neutral-500">
+          Tambahkan satu layar per TV, lalu buka <span className="text-neutral-300">nexbill.id/tv</span> di TV itu dan ketik kode 6 digitnya dengan tombol angka remote.
+          Kode berlaku 30 menit dan hangus sekali pakai.
+        </p>
+
+        {canManage && (
+          <div className="flex flex-wrap gap-2 items-end rounded-lg border border-neutral-800 p-3">
+            <Field label="Nama layar">
+              <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="mis. TV Bilik 5" />
+            </Field>
+            <Field label="Unit rental (TV Android)">
+              <select className={inputCls} value={newUnitId} onChange={(e) => setNewUnitId(e.target.value)}>
+                <option value="">— tanpa unit (branding saja) —</option>
+                {/*
+                  Unit yang tidak didukung tetap DITAMPILKAN tapi dinonaktifkan, bukan disembunyikan:
+                  merchant yang mencari "PS 03" lalu tidak menemukannya akan mengira ada yang rusak.
+                  Melihatnya abu-abu dengan keterangan "Smart TV — tidak didukung" langsung
+                  menjawab pertanyaannya.
+                */}
+                {units.map((u) => (
+                  <option key={u.id} value={u.id} disabled={u.eligibility.level === "unsupported"}>
+                    {u.name}
+                    {u.eligibility.level === "unsupported"
+                      ? ` — ${u.tvType === "analog_tv" ? "TV analog" : u.tvType === "smart_tv" ? "Smart TV" : "tipe TV kosong"}, tidak didukung`
+                      : u.eligibility.level === "warning"
+                        ? " — smart plug, perlu dicek"
+                        : ""}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Button disabled={busy || !newName.trim()} onClick={addScreen}>
+              Tambah Layar
+            </Button>
+          </div>
+        )}
+        {newUnitId && units.find((u) => u.id === newUnitId)?.eligibility.level === "warning" && (
+          <p className="text-xs text-amber-300/80">{units.find((u) => u.id === newUnitId)?.eligibility.reason}</p>
+        )}
+        <p className="text-xs text-neutral-600">
+          &ldquo;Tanpa unit&rdquo; untuk TV Android yang bukan bilik — area tunggu atau etalase — dan hanya menampilkan branding, harga, dan QR booking.
+        </p>
+
+        {screens.length === 0 ? (
+          <p className="text-sm text-neutral-500">Belum ada layar terpasang.</p>
+        ) : (
+          <div className="space-y-2">
+            {screens.map((s) => (
+              <div key={s.id} className="rounded-lg border border-neutral-800 p-3 flex flex-wrap items-center gap-3 justify-between">
+                <div className="space-y-0.5">
+                  <div className="font-medium flex items-center gap-2">
+                    {s.name}
+                    {!s.isActive && <Badge status="off">Nonaktif</Badge>}
+                    {s.isPaired ? <Badge status="success">Terpasang</Badge> : <Badge status="pending">Belum dipasangkan</Badge>}
+                  </div>
+                  <div className="text-xs text-neutral-500">
+                    {s.unitName ? `Unit: ${s.unitName}` : "Tanpa unit — hanya branding"}
+                    {s.lastSeenAt && ` · Terakhir aktif ${formatDate(s.lastSeenAt)}`}
+                  </div>
+                  {/* Layar lama yang unitnya kini tidak didukung / perlu dicek — misalnya tipe TV-nya diganti setelah layar dipasang. */}
+                  {s.eligibility && s.eligibility.level !== "ready" && (
+                    <div className={`text-xs ${s.eligibility.level === "unsupported" ? "text-rose-300/90" : "text-amber-300/80"}`}>
+                      {s.eligibility.level === "unsupported" ? "Tidak tampil: " : "Perlu dicek: "}
+                      {s.eligibility.reason}
+                    </div>
+                  )}
+                  {s.pairingCode && (
+                    <div className="text-sm mt-1">
+                      Kode pairing: <span className="font-mono text-xl tracking-[0.3em] text-emerald-400">{s.pairingCode}</span>
+                    </div>
+                  )}
+                </div>
+                {canManage && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="ghost" disabled={busy} onClick={() => screenAction(s.id, { action: "regenerate_code" })}>
+                      Kode Baru
+                    </Button>
+                    <Button variant="ghost" disabled={busy} onClick={() => screenAction(s.id, { isActive: !s.isActive })}>
+                      {s.isActive ? "Nonaktifkan" : "Aktifkan"}
+                    </Button>
+                    <Button variant="danger" disabled={busy} onClick={() => removeScreen(s)}>
+                      Hapus
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
 

@@ -196,6 +196,21 @@ export const relayAgents = pgTable("relay_agents", {
   token: text("token").notNull().unique(),
   status: text("status", { enum: ["online", "offline"] }).notNull().default("offline"),
   lastSeenAt: text("last_seen_at"),
+  /**
+   * Versi + kemampuan yang dilaporkan agent saat terakhir terhubung (NexbillAgent v1.2+, lihat
+   * AGENT-V1.2-DESIGN.md dan lib/relay/capabilities.ts). Diisi relay-hub.ts. NULL = belum pernah
+   * terhubung sejak kolom ini ada, ATAU agent v1.1 yang tidak melaporkan apa pun — keduanya dibaca
+   * sebagai v1.1 dengan kemampuan ["power"] oleh parseStoredCapabilities().
+   *
+   * PERINGATAN URUTAN DEPLOY: tiga kolom ini ditambahkan oleh migrasi 0010. Setiap
+   * `db.select().from(relayAgents)` TANPA daftar kolom akan menyebut kolom-kolom ini secara
+   * eksplisit di SQL-nya, dan GAGAL bila migrasi belum dijalankan. Jalur kontrol TV
+   * (adapters/android-tv-relay.ts) dan autentikasi hub (scripts/relay-hub.ts) sengaja memilih
+   * kolom secara eksplisit supaya tetap jalan dalam kondisi itu — pertahankan pola tersebut.
+   */
+  agentVersion: text("agent_version"),
+  capabilities: text("capabilities"),
+  updateChannel: text("update_channel", { enum: ["stable", "beta"] }).notNull().default("stable"),
   ...timestamps,
 });
 
@@ -227,6 +242,110 @@ export const nexbillHardwareUnits = pgTable("nexbill_hardware_units", {
 });
 
 /** ---------------- RENTAL UNITS (PS2/PS3/PS4/PS5/PS6 + TV) ---------------- */
+
+/** ---------------- TV SCREENSAVER / KIOSK DISPLAY ---------------- */
+
+/**
+ * Pengaturan screensaver TV milik satu outlet (tepat SATU baris per outlet — dijamin oleh
+ * uniqueIndex di bawah, dibuat malas oleh getOrCreateTvSettings()).
+ *
+ * Kenapa tabel sendiri, bukan kolom-kolom baru di `outlets`: tabel outlets sudah memuat ~70 kolom
+ * dari belasan fitur yang tidak berhubungan, dan setiap `SELECT * FROM outlets` (ada puluhan di
+ * codebase ini) ikut menarik semuanya. Blok setelan yang hanya dibaca oleh satu modul lebih baik
+ * berdiri sendiri — sama seperti yang sudah dilakukan subscriptions dan featureFlags.
+ *
+ * CATATAN SAKLAR: baris ini BUKAN saklar utama fitur. Saklar utamanya adalah feature flag
+ * TV_SCREENSAVER_ENABLED (lihat TV_SCREENSAVER_FLAG_DEFS di lib/home-rental/feature-flags.ts),
+ * supaya konsisten dengan Home Rental dan PPOB: modul dimatikan lewat Feature Management, bukan
+ * lewat boolean yang tersebar di tabel masing-masing.
+ */
+export const tvScreensaverSettings = pgTable(
+  "tv_screensaver_settings",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    /** Menit tanpa aktivitas sebelum screensaver muncul. Dibatasi 1-30 di service layer. */
+    idleMinutes: integer("idle_minutes").notNull().default(3),
+    /** Tiga baris teks bebas yang dikarang merchant sendiri — sengaja TIDAK diterjemahkan otomatis: ini nama dagang dan harga outlet, bukan teks produk. */
+    headline: text("headline"),
+    tagline: text("tagline"),
+    priceText: text("price_text"),
+    footerText: text("footer_text"),
+    showClock: boolean("show_clock").notNull().default(true),
+    showUnitStatus: boolean("show_unit_status").notNull().default(true),
+    showBookingQr: boolean("show_booking_qr").notNull().default(true),
+    showWifi: boolean("show_wifi").notNull().default(false),
+    accentColor: text("accent_color").notNull().default("#22d3ee"),
+    /**
+     * PIN staf untuk keluar dari screensaver, disimpan sebagai hash bcrypt — TIDAK PERNAH sebagai
+     * teks polos. Layar TV ini dipasang di ruang publik dan endpoint /api/tv/state bersifat publik
+     * (hanya bermodal token layar), jadi PIN polos di kolom ini akan setara menempelkan kunci di
+     * pintu. NULL = belum diset; saat NULL, screensaver bisa ditutup tanpa PIN (lihat unlockMode).
+     */
+    unlockPinHash: text("unlock_pin_hash"),
+    unlockMode: text("unlock_mode", { enum: ["pin", "none"] }).notNull().default("none"),
+    /**
+     * Mode malam: setelah jam nightStartHour sampai sebelum nightEndHour (jam OUTLET/WIB, lihat
+     * lib/time/outlet-time.ts — bukan jam server), layar diredupkan dengan overlay hitam
+     * nightDimPercent persen. Rentangnya boleh melewati tengah malam (23 -> 6), dan itu justru
+     * kasus yang normal; lihat isNightMode() di lib/tv/view.ts.
+     */
+    nightModeEnabled: boolean("night_mode_enabled").notNull().default(true),
+    nightStartHour: integer("night_start_hour").notNull().default(23),
+    nightEndHour: integer("night_end_hour").notNull().default(6),
+    nightDimPercent: integer("night_dim_percent").notNull().default(60),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("tv_screensaver_settings_outlet_idx").on(t.outletId)]
+);
+
+/**
+ * Satu layar TV fisik yang sudah dipasangkan ke sebuah rental unit.
+ *
+ * Alur pairing sengaja dibalik dari yang biasa: dashboard membuat baris ini lebih dulu dan
+ * menampilkan `pairingCode` 6 DIGIT ANGKA, lalu TV-nya yang mengetik kode itu dan menukarnya
+ * dengan `token` panjang. Alasannya remote TV: mengetik token acak 40 karakter dengan tombol arah
+ * di papan ketik layar itu menyiksa, sedangkan 6 digit angka bisa ditekan langsung di tombol angka
+ * remote. Kode habis masa berlaku (pairingCodeExpiresAt) dan hangus begitu ditukar, jadi kode yang
+ * terlanjur terlihat orang lain tidak bisa dipakai ulang.
+ *
+ * `token` adalah rahasia jangka panjang yang disimpan di localStorage TV dan dikirim di setiap
+ * polling /api/tv/state. Ia hanya memberi akses BACA ke status satu unit + teks branding outlet —
+ * tidak ke transaksi, tidak ke pelanggan, tidak ke uang. Itu batas kewenangan yang disengaja:
+ * perangkat di ruang publik yang tidak bisa diawasi tidak boleh memegang sesi staf.
+ */
+export const tvScreens = pgTable(
+  "tv_screens",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    /** Unit yang diwakili layar ini. NULL disediakan untuk "mode lobi" (menampilkan semua unit) yang belum dibangun di tahap ini. */
+    // AnyPgColumn: rentalUnits dideklarasikan SETELAH tabel ini, jadi anotasi eksplisit diperlukan
+    // agar TypeScript tidak mencoba menyimpulkan tipe yang belum ada (pola yang sama sudah dipakai
+    // outlets.referredByPartnerId di atas).
+    rentalUnitId: text("rental_unit_id").references((): AnyPgColumn => rentalUnits.id),
+    name: text("name").notNull(),
+    token: text("token").notNull().unique(),
+    pairingCode: text("pairing_code"),
+    pairingCodeExpiresAt: text("pairing_code_expires_at"),
+    pairedAt: text("paired_at"),
+    isActive: boolean("is_active").notNull().default(true),
+    lastSeenAt: text("last_seen_at"),
+    /**
+     * Otomatisasi "sesi selesai → buka screensaver, sesi mulai → pindah ke HDMI" (NexbillAgent
+     * v1.2, migrasi 0010). DEFAULT MATI per layar, dan hanya boleh dinyalakan setelah tombol Tes
+     * lulus di TV itu — kalau perpindahan ke HDMI gagal, pelanggan yang baru mulai main melihat
+     * screensaver, bukan PlayStation. Belum dibaca kode mana pun di tahap 1.
+     */
+    autoSwitchEnabled: boolean("auto_switch_enabled").notNull().default(false),
+    /** Port HDMI tempat PlayStation dicolokkan, 1-4. */
+    hdmiPort: integer("hdmi_port"),
+    /** Paket browser yang dipakai saat pairing — openScreensaver harus membuka browser yang SAMA supaya token pairing di penyimpanannya tetap terbaca. */
+    browserPackage: text("browser_package"),
+    ...timestamps,
+  },
+  (t) => [index("tv_screens_outlet_idx").on(t.outletId), uniqueIndex("tv_screens_pairing_code_idx").on(t.pairingCode)]
+);
 
 export const rentalUnits = pgTable("rental_units", {
   id: id(),
@@ -268,6 +387,17 @@ export const customers = pgTable(
     waJid: text("wa_jid"),
     notes: text("notes"),
     membershipTierId: text("membership_tier_id"),
+    /**
+     * Kapan keanggotaan BERBAYAR ini habis masa berlakunya (ISO). NULL = tanpa batas waktu —
+     * artinya tier yang didapat lewat total belanja (minSpending), atau tier berbayar yang
+     * validityDays-nya 0. Diisi oleh sellMembership() dari validityDays tier-nya.
+     *
+     * Yang membaca kolom ini adalah computeEffectiveHourlyRate(): tier yang sudah lewat tanggal
+     * ini tidak lagi memberi diskon. Baris membershipTierId-nya sengaja TIDAK dikosongkan,
+     * supaya riwayat "dia pernah jadi member Gold" tetap terbaca di detail customer dan
+     * perpanjangan tinggal satu klik.
+     */
+    membershipExpiresAt: text("membership_expires_at"),
     totalSpending: doublePrecision("total_spending").notNull().default(0),
     loyaltyPoints: doublePrecision("loyalty_points").notNull().default(0),
     lastVisitAt: text("last_visit_at"),
@@ -1420,7 +1550,31 @@ export const membershipTiers = pgTable("membership_tiers", {
   feeAmount: doublePrecision("fee_amount").notNull().default(0),
   pointMultiplier: doublePrecision("point_multiplier").notNull().default(1),
   discountPercent: doublePrecision("discount_percent").notNull().default(0),
+  /**
+   * Nilai/keuntungan member yang DITULIS BEBAS oleh merchant, satu baris per keuntungan
+   * ("Gratis 1 jam tiap ulang tahun", "Kopi gratis tiap main 3 jam"). Kolomnya sudah lama ada di
+   * tabel tapi tidak pernah muncul di layar mana pun — sekarang ditampilkan di tab Membership
+   * Tier, di panel penjualan keanggotaan, dan di detail customer.
+   *
+   * Sengaja teks bebas, bukan daftar pilihan: tiap outlet punya bentuk keuntungan sendiri, dan
+   * memaksa mereka memilih dari daftar tetap akan membuang justru yang paling membedakan mereka.
+   * Yang BERLAKU OTOMATIS di sistem hanya tiga kolom terstruktur di bawah + discountPercent;
+   * sisanya di kolom ini adalah janji yang diberikan kasir secara manual, dan layarnya menyebut
+   * perbedaan itu dengan jelas supaya tidak ada yang mengira sistem memotongnya sendiri.
+   */
   benefits: text("benefits"),
+  /**
+   * Masa berlaku keanggotaan berbayar dalam hari; 0 = seumur hidup.
+   *
+   * Sebelumnya tidak ada sama sekali, sehingga keanggotaan berbayar otomatis abadi — sekali
+   * bayar, diskonnya berlaku selamanya dan tidak ada alasan bagi member untuk memperpanjang.
+   * Itu membuat "iuran keanggotaan" tidak bisa jadi pendapatan berulang.
+   */
+  validityDays: integer("validity_days").notNull().default(0),
+  /** Bonus menit main gratis yang dijanjikan tier ini — diberikan kasir saat membuka sesi, bukan dipotong otomatis. */
+  freePlayMinutes: integer("free_play_minutes").notNull().default(0),
+  /** Nilai F&B gratis (Rp) yang dijanjikan tier ini — diberikan kasir sebagai diskon item, bukan dipotong otomatis. */
+  freeFnbAmount: doublePrecision("free_fnb_amount").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
   ...timestamps,
 });
@@ -2004,6 +2158,21 @@ export const affiliateProducts = pgTable("affiliate_products", {
   shopeeUrl: text("shopee_url").notNull(),
   priceLabel: text("price_label"),
   category: text("category"),
+  /*
+   * Terjemahan judul/deskripsi/kategori ke lima bahasa lain, dibuat otomatis saat produk disimpan
+   * (lihat lib/affiliate/translate-product.ts). Bentuknya:
+   *   { "en": { title, description, category }, "ms": {...}, "th": {...}, "fil": {...}, "vi": {...} }
+   *
+   * Bahasa Indonesia TIDAK disimpan di sini — kolom title/description/category di atas adalah
+   * sumber aslinya, dan itu juga yang dipakai sebagai cadangan kalau terjemahan belum ada atau
+   * gagal dibuat. Dengan begitu produk yang baru ditambahkan tetap tampil utuh meski penerjemahan
+   * sedang bermasalah; yang hilang hanya kenyamanan, bukan datanya.
+   *
+   * Disimpan sebagai teks JSON, bukan tabel terpisah: isinya selalu dibaca bersamaan dengan
+   * produknya, tidak pernah dicari atau difilter per bahasa, dan jumlah produknya puluhan — tabel
+   * relasi di sini hanya menambah join tanpa memberi apa pun.
+   */
+  translationsJson: text("translations_json"),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   updatedBy: text("updated_by").references(() => platformAdmins.id),
@@ -2082,7 +2251,11 @@ export const subscriptionInvoices = pgTable("subscription_invoices", {
   // EXCLUDED from the pending_payment activation unpaid-invoice count for exactly that reason — see
   // that count's inArray(...) filter in confirmInvoicePayment.
   type: text("type", {
-    enum: ["subscription_fee", "smart_plug_purchase", "setup_service", "extra_console", "cart_order", "group_renewal", "ai_addon", "deposit_topup", "product_order"],
+    // "marketplace_fee" (2026-09-23) — ujrah (upah jasa) Marketplace Antar-Outlet, ditagihkan ke
+    // outlet PENJUAL. Sengaja tipe tersendiri dan DILUAR daftar yang menggantung aktivasi
+    // langganan di confirmInvoicePayment (daftarnya allowlist, jadi tipe ini otomatis terkecuali):
+    // fee marketplace sebesar beberapa ribu rupiah tidak boleh bisa mengunci akses aplikasi outlet.
+    enum: ["subscription_fee", "smart_plug_purchase", "setup_service", "extra_console", "cart_order", "group_renewal", "ai_addon", "deposit_topup", "product_order", "marketplace_fee"],
   }).notNull(),
   period: text("period"),
   description: text("description").notNull(),
@@ -2167,16 +2340,36 @@ export const referralConversions = pgTable(
   (t) => [uniqueIndex("referral_conversions_referee_idx").on(t.refereeOutletId)]
 );
 
-export const referralCommissions = pgTable("referral_commissions", {
-  id: id(),
-  referralPartnerId: text("referral_partner_id").notNull().references(() => referralPartners.id),
-  referralConversionId: text("referral_conversion_id").notNull().references(() => referralConversions.id),
-  sourceInvoiceId: text("source_invoice_id").notNull().references(() => subscriptionInvoices.id).unique(),
-  sourceInvoiceAmount: doublePrecision("source_invoice_amount").notNull(),
-  commissionPercent: doublePrecision("commission_percent").notNull(),
-  amount: doublePrecision("amount").notNull(),
-  createdAt: text("created_at").notNull().$defaultFn(nowIso),
-});
+export const referralCommissions = pgTable(
+  "referral_commissions",
+  {
+    id: id(),
+    referralPartnerId: text("referral_partner_id").notNull().references(() => referralPartners.id),
+    referralConversionId: text("referral_conversion_id").notNull().references(() => referralConversions.id),
+    /*
+     * sourceInvoiceId DULU bertanda .unique() — satu faktur hanya boleh melahirkan satu baris
+     * komisi. Batasan itu benar selama setiap faktur langganan hanya mewakili satu outlet, dan
+     * memang itulah yang terjadi pada merchant satu cabang.
+     *
+     * Tapi merchant multi-outlet ditagih lewat SATU faktur gabungan (type "group_renewal", lihat
+     * ensureGroupRenewalInvoiceExists di lib/subscription/service.ts) yang mencakup semua cabang
+     * sekaligus. Faktur seperti itu bisa memuat tiga outlet yang diajak tiga partner berbeda, dan
+     * masing-masing berhak atas komisinya sendiri — mustahil dicatat kalau satu faktur hanya boleh
+     * punya satu baris.
+     *
+     * Diganti jadi unik GABUNGAN (sourceInvoiceId, referralConversionId): satu faktur boleh
+     * melahirkan banyak baris komisi, tapi tetap tidak lebih dari satu baris per outlet yang
+     * diajak. Sifat idempoten yang dijaga batasan lama tetap utuh — pembayaran yang terulang atau
+     * webhook ganda tetap tidak bisa menggandakan komisi siapa pun.
+     */
+    sourceInvoiceId: text("source_invoice_id").notNull().references(() => subscriptionInvoices.id),
+    sourceInvoiceAmount: doublePrecision("source_invoice_amount").notNull(),
+    commissionPercent: doublePrecision("commission_percent").notNull(),
+    amount: doublePrecision("amount").notNull(),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [uniqueIndex("referral_commissions_invoice_conversion_idx").on(t.sourceInvoiceId, t.referralConversionId)]
+);
 
 export const referralPayouts = pgTable("referral_payouts", {
   id: id(),
@@ -2273,6 +2466,85 @@ export const platformPurchases = pgTable("platform_purchases", {
   createdBy: text("created_by").references(() => platformAdmins.id),
   ...timestamps,
 });
+
+/** ---------------- MARKETPLACE ANTAR-OUTLET ---------------- */
+
+/*
+ * Marketplace Antar-Outlet — outlet yang punya stok berlebih (stik, konsol bekas, kabel, TV)
+ * menjualnya ke outlet lain di jaringan NEXBILL.
+ *
+ * AKAD DAN ALUR UANG (ditetapkan pemilik, 2026-09-23):
+ *
+ *  1. NEXBILL TIDAK MEMEGANG UANG SIAPA PUN. Pembeli membayar langsung ke penjual (transfer/COD);
+ *     NEXBILL hanya mempertemukan dan mencatat. Ini keputusan sadar, bukan penyederhanaan: menahan
+ *     dana pihak lain (escrow) di Indonesia menuntut lisensi penyelenggara jasa pembayaran, dan itu
+ *     urusan regulasi, bukan urusan kode. Karena itu TIDAK ADA kolom saldo tertahan di sini, dan
+ *     tidak boleh ditambahkan tanpa lisensinya lebih dulu.
+ *
+ *  2. FEE NEXBILL ADALAH UJRAH — upah jasa dengan nominal TETAP per transaksi sukses, bukan
+ *     persentase dari nilai barang. Secara fikih ini akad ijarah/ju'alah: yang dibayar adalah jasa
+ *     memfasilitasi yang besarannya sudah diketahui pasti di muka, sehingga tidak ada unsur gharar
+ *     pada nominal yang belum pasti. Nominalnya DISALIN ke tiap kesepakatan saat dibuat
+ *     (platformFeeAmount di bawah), bukan dibaca ulang dari konfigurasi saat penagihan — kesepakatan
+ *     yang sudah disetujui tidak boleh berubah biayanya karena tarif diubah belakangan.
+ *
+ *  3. UJRAH DITAGIH KE PENJUAL, menyusul lewat faktur "marketplace_fee" yang menumpuk sampai
+ *     dibayar (lihat lib/marketplace/billing.ts) — membuat satu faktur Rp5.000 per transaksi akan
+ *     membanjiri Riwayat Tagihan tanpa gunanya.
+ */
+export const marketplaceListings = pgTable(
+  "marketplace_listings",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    title: text("title").notNull(),
+    description: text("description"),
+    category: text("category", { enum: ["controller", "console", "cable", "tv", "furniture", "accessory", "other"] }).notNull().default("other"),
+    condition: text("condition", { enum: ["new", "like_new", "used", "needs_repair"] }).notNull().default("used"),
+    qty: integer("qty").notNull().default(1),
+    price: doublePrecision("price").notNull(),
+    /** Boleh nego atau harga pas — hanya informasi bagi pembeli, tidak memengaruhi perhitungan apa pun. */
+    negotiable: boolean("negotiable").notNull().default(true),
+    city: text("city"),
+    contactPhone: text("contact_phone"),
+    imageUrl: text("image_url"),
+    status: text("status", { enum: ["active", "reserved", "sold", "closed"] }).notNull().default("active"),
+    ...timestamps,
+  },
+  (t) => [index("marketplace_listings_status_idx").on(t.status), index("marketplace_listings_outlet_idx").on(t.outletId)]
+);
+
+export const marketplaceDeals = pgTable(
+  "marketplace_deals",
+  {
+    id: id(),
+    dealNumber: text("deal_number").notNull().unique(),
+    listingId: text("listing_id").notNull().references(() => marketplaceListings.id),
+    sellerOutletId: text("seller_outlet_id").notNull().references(() => outlets.id),
+    buyerOutletId: text("buyer_outlet_id").notNull().references(() => outlets.id),
+    qty: integer("qty").notNull().default(1),
+    /** Harga yang BENAR-BENAR disepakati, bukan harga pasang — listing boleh nego, jadi keduanya bisa berbeda. */
+    agreedPrice: doublePrecision("agreed_price").notNull(),
+    /**
+     * Ujrah NEXBILL, disalin dari konfigurasi saat kesepakatan dibuat. Lihat catatan akad di atas
+     * untuk alasan kenapa disalin alih-alih dihitung ulang saat menagih.
+     */
+    platformFeeAmount: doublePrecision("platform_fee_amount").notNull().default(0),
+    platformFeeStatus: text("platform_fee_status", { enum: ["pending", "invoiced", "waived"] }).notNull().default("pending"),
+    platformFeeInvoiceId: text("platform_fee_invoice_id"),
+    status: text("status", { enum: ["requested", "accepted", "completed", "rejected", "cancelled"] }).notNull().default("requested"),
+    buyerNote: text("buyer_note"),
+    sellerNote: text("seller_note"),
+    /** Cara pembeli membayar penjual — dicatat apa adanya, karena uangnya tidak lewat NEXBILL. */
+    settlementMethod: text("settlement_method", { enum: ["cash", "transfer", "qris", "other"] }),
+    /** Jurnal Pendapatan Lain-lain (kategori asset_sale) yang dibuat di sisi PENJUAL saat kesepakatan selesai. Sisi pembeli sengaja tidak diposting otomatis — lihat lib/marketplace/service.ts. */
+    sellerOtherIncomeId: text("seller_other_income_id"),
+    completedAt: text("completed_at"),
+    closedReason: text("closed_reason"),
+    ...timestamps,
+  },
+  (t) => [index("marketplace_deals_seller_idx").on(t.sellerOutletId), index("marketplace_deals_buyer_idx").on(t.buyerOutletId)]
+);
 
 export const platformAnnouncements = pgTable("platform_announcements", {
   id: id(),

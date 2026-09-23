@@ -101,6 +101,16 @@ export default function PpobPage() {
     load();
   };
 
+  const doSettle = async (id: string) => {
+    // Dikonfirmasi dulu karena ini memposting jurnal sungguhan (Dr Utang Provider / Cr sumber
+    // dana) — bukan sekadar mengubah label status di layar.
+    if (!await showConfirm(t("ppob.confirmSettle", "Tandai transaksi ini sudah disetorkan ke provider? Sistem akan mencatat jurnal pelunasan utang provider memakai TANGGAL TRANSAKSI aslinya, bukan tanggal hari ini."))) return;
+    const res = await fetch(`/api/ppob/transactions/${id}/settle`, { method: "POST" });
+    const out = await res.json();
+    if (!res.ok) return showAlert(out.error);
+    load();
+  };
+
   const deleteTx = async (id: string) => {
     if (!await showConfirm(t("ppob.confirmDeleteTransaction", "Hapus transaksi PPOB ini secara PERMANEN? Beda dengan Batalkan — ini menghapus total dari sistem (termasuk jurnal akuntansinya) dan tidak bisa dibatalkan."))) return;
     const res = await fetch(`/api/ppob/transactions/${id}`, { method: "DELETE" });
@@ -185,6 +195,19 @@ export default function PpobPage() {
                     <td><Badge status={tx.status === "success" ? "success" : "failed"}>{tx.status === "success" ? t("ppob.status.success", "Sukses") : t("ppob.status.reversed", "Reversed")}</Badge></td>
                     <td>
                       <div className="flex flex-wrap gap-1">
+                        {/*
+                         * Tombol "Setorkan" hanya muncul pada baris yang masih Pending.
+                         *
+                         * Transaksi baru tidak akan pernah pending — postPpobTransaction
+                         * menyelesaikan pemungutan dan penyetoran dalam satu operasi. Yang pending
+                         * adalah sisa dari perilaku lama dan data impor, dan sampai sekarang tidak
+                         * ada satu pun cara membereskannya dari dalam aplikasi: fungsi
+                         * postPpobSettlementJournal() sudah lama ada tapi tidak pernah dipanggil
+                         * dari mana pun. Utang ke provider itu menggantung selamanya di Neraca.
+                         */}
+                        {canManage && tx.status === "success" && tx.settlementStatus !== "settled" && (
+                          <Button variant="ghost" className="text-xs text-amber-400" onClick={() => doSettle(tx.id)}>{t("ppob.settle", "Setorkan")}</Button>
+                        )}
                         {canManage && tx.status === "success" && (
                           <Button variant="ghost" className="text-xs text-red-400" onClick={() => doVoid(tx.id)}>{t("ppob.void", "Batalkan")}</Button>
                         )}

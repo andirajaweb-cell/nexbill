@@ -11,6 +11,7 @@ import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 import "@/lib/i18n/dict-expenses";
 import "@/lib/i18n/dict-coa";
 
@@ -154,10 +155,15 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Hari ini dalam kalender WIB, bukan UTC — di atas pukul 00.00–07.00 WIB tanggal UTC masih
+  // kemarin, dan kasir yang mencatat pengeluaran dini hari akan melihat form terisi tanggal yang
+  // salah. Sama seperti kelas bug yang sudah diperbaiki di laporan harian.
+  const todayYmd = outletDateYmd(new Date());
   const [form, setForm] = useState<any>({
     accountId: "", category: "", description: "", payeeName: "", supplierId: "",
     qty: 1, amount: 0, taxAmount: 0, paymentMethod: "cash", cashBankAccountId: "",
     recordAsPayable: false, costCenterId: "", rentalUnitId: "", dueDate: "", attachmentUrl: "",
+    expenseDate: todayYmd,
   });
   const [payFor, setPayFor] = useState<{ id: string; method: string; cashBankAccountId: string } | null>(null);
 
@@ -255,16 +261,36 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   };
 
   const submitCreate = async () => {
-    if (!form.accountId || !form.category || !form.amount) return showAlert(t("expenses.alert.requiredFields", "Akun, kategori, dan nominal wajib diisi."));
-    if (!form.recordAsPayable && !form.cashBankAccountId) return showAlert(t("expenses.alert.selectCashBankOrPayable", "Pilih akun kas/bank, atau centang 'Catat sebagai hutang'."));
+    // Pesan menyebut nama kolom PERSIS seperti yang tertulis di layar — versi lama menyebut "Akun"
+    // dan "centang 'Catat sebagai hutang'", dua sebutan yang tidak pernah muncul di form itu
+    // sendiri, sehingga pemakainya harus menebak kotak mana yang dimaksud.
+    if (!form.accountId || !form.category || !form.amount) {
+      return showAlert(t("expenses.alert.requiredFields", "Lengkapi dulu: Jenis biaya, Kategori, dan Nominal (langkah 1 dan 2)."));
+    }
+    if (!form.recordAsPayable && !form.cashBankAccountId) {
+      return showAlert(t("expenses.alert.selectCashBankOrPayable", "Di langkah 4, pilih dulu \"Uangnya diambil dari mana?\" — atau ubah ke \"Belum dibayar (hutang)\" kalau uangnya memang belum keluar."));
+    }
+    /*
+     * Tanggal dari <input type="date"> berbentuk "YYYY-MM-DD", sementara seluruh kolom tanggal lain
+     * di aplikasi ini menyimpan instant UTC penuh. Dikonversi ke pukul 12.00 WIB pada tanggal itu,
+     * bukan tengah malam: tengah malam WIB berada tepat di batas hari dalam UTC (17.00 hari
+     * sebelumnya), jadi kesalahan pembulatan sekecil apa pun bisa melemparkannya ke tanggal
+     * sebelahnya. Tengah hari memberi jarak tujuh jam ke kedua arah dan tidak pernah ambigu.
+     */
+    const expenseDateIso = form.expenseDate
+      ? new Date(`${form.expenseDate}T12:00:00+07:00`).toISOString()
+      : new Date().toISOString();
+
     const res = await fetch("/api/expenses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, outletId, qty: Number(form.qty) || 1, amount: Number(form.amount), taxAmount: Number(form.taxAmount) || 0 }),
+      body: JSON.stringify({ ...form, outletId, qty: Number(form.qty) || 1, amount: Number(form.amount), taxAmount: Number(form.taxAmount) || 0, expenseDate: expenseDateIso }),
     });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
-    setForm({ accountId: "", category: "", description: "", payeeName: "", supplierId: "", qty: 1, amount: 0, taxAmount: 0, paymentMethod: "cash", cashBankAccountId: "", recordAsPayable: false, costCenterId: "", rentalUnitId: "", dueDate: "", attachmentUrl: "" });
+    // expenseDate dikembalikan ke hari ini, bukan dikosongkan — form kosong tanpa tanggal adalah
+    // keadaan yang tidak valid, dan mengosongkannya hanya memindahkan beban mengisinya ke pemakai.
+    setForm({ accountId: "", category: "", description: "", payeeName: "", supplierId: "", qty: 1, amount: 0, taxAmount: 0, paymentMethod: "cash", cashBankAccountId: "", recordAsPayable: false, costCenterId: "", rentalUnitId: "", dueDate: "", attachmentUrl: "", expenseDate: todayYmd });
     setShowForm(false);
     load();
   };
@@ -317,57 +343,248 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
       </div>
 
       {showForm && (
-        <Card className="space-y-3">
-          <h2 className="font-medium">{t("expenses.formTitle", "Form Expense")}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <SearchableSelect
-              className="col-span-2"
-              value={form.accountId}
-              onChange={(v) => setForm({ ...form, accountId: v })}
-              placeholder={t("expenses.optionAccountCoa", "Akun Beban (COA)")}
-              options={bundle.accounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
-            />
-            <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderCategoryExample", "Kategori (mis. Listrik)")} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-            <input type="date" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} title={t("expenses.dueDateTooltip", "Jatuh tempo (jika hutang)")} />
-
-            <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" placeholder={t("expenses.placeholderDescription", "Deskripsi")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderPayee", "Payee (nama, jika bukan supplier)")} value={form.payeeName} onChange={(e) => setForm({ ...form, payeeName: e.target.value })} />
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
-              <option value="">{t("expenses.optionSupplier", "Supplier (opsional)")}</option>
-              {bundle.suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-
-            <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderQty", "Qty")} value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
-            <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.amountLabel", "Nominal")} value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-            <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderTax", "Pajak (opsional)")} value={form.taxAmount || ""} onChange={(e) => setForm({ ...form, taxAmount: e.target.value })} />
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.costCenterId} onChange={(e) => setForm({ ...form, costCenterId: e.target.value })}>
-              <option value="">{t("expenses.optionCostCenter", "Cost Center (opsional)")}</option>
-              {bundle.costCenters.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.rentalUnitId} onChange={(e) => setForm({ ...form, rentalUnitId: e.target.value })}>
-              <option value="">{t("expenses.optionRentalUnit", "Unit PS terkait (opsional)")}</option>
-              {bundle.rentalUnits.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} disabled={form.recordAsPayable}>
-              <option value="cash">{t("expenses.method.cash", "Cash")}</option><option value="bank">{t("expenses.method.bank", "Bank")}</option><option value="transfer">{t("expenses.method.transfer", "Transfer")}</option><option value="qris">{t("expenses.method.qris", "QRIS")}</option>
-            </select>
-            <SearchableSelect
-              value={form.cashBankAccountId}
-              onChange={(v) => setForm({ ...form, cashBankAccountId: v })}
-              disabled={form.recordAsPayable}
-              placeholder={t("expenses.optionCashBankAccount", "Akun Kas/Bank")}
-              options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
-            />
-            <label className="flex items-center gap-2 text-xs text-neutral-400">
-              <input type="checkbox" checked={form.recordAsPayable} onChange={(e) => setForm({ ...form, recordAsPayable: e.target.checked })} /> {t("expenses.recordAsPayableCheckbox", "Catat sebagai hutang (belum dibayar)")}
-            </label>
+        /*
+         * FORM DIRANCANG ULANG (2026-09-20) atas permintaan pemilik outlet.
+         *
+         * Versi sebelumnya adalah grid 4 kolom berisi 13 kolom tanpa SATU pun label — semuanya
+         * hanya mengandalkan placeholder, yang menghilang begitu kolomnya diisi. Jadi setelah
+         * mengetik, tidak ada lagi cara mengetahui kolom itu untuk apa; satu-satunya jalan adalah
+         * menghapus isinya supaya petunjuknya muncul lagi. Ditambah istilah akuntansi mentah
+         * ("Akun Beban (COA)", "Cost Center", "Payee"), pemilik rental yang tidak berlatar akuntansi
+         * praktis harus menebak.
+         *
+         * Pendekatan barunya:
+         *  - Label tetap di atas tiap kolom, plus penjelasan satu baris untuk yang tidak
+         *    jelas-dengan-sendirinya. Label yang selalu terlihat mengalahkan placeholder cantik.
+         *  - Dikelompokkan jadi langkah bernomor yang mengikuti cara orang berpikir tentang sebuah
+         *    pengeluaran: biaya apa → berapa → ke siapa → sudah dibayar belum.
+         *  - Checkbox "Catat sebagai hutang" diganti dua pilihan eksplisit. Checkbox memaksa
+         *    pembacanya menyimpulkan arti keadaan TIDAK tercentang, dan di sini artinya sama sekali
+         *    tidak jelas.
+         *  - Kolom akuntansi murni (Cost Center, Unit PS) dipindah ke bagian opsional paling bawah
+         *    dan diberi tahu terus terang bahwa boleh dilewati.
+         *  - Ringkasan satu kalimat sebelum tombol simpan, supaya isian bisa diperiksa dalam bahasa
+         *    manusia, bukan dengan membaca ulang 13 kotak.
+         */
+        <Card className="space-y-5">
+          <div>
+            <h2 className="font-medium">{t("expenses.formTitle", "Catat Pengeluaran")}</h2>
+            <p className="text-xs text-neutral-500 mt-0.5">{t("expenses.formSubtitle", "Isi dari atas ke bawah. Kolom bertanda * wajib diisi, sisanya boleh dilewati.")}</p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input type="file" accept="image/*,.pdf" onChange={(e) => e.target.files?.[0] && uploadAttachment(e.target.files[0])} className="text-xs" />
-            {uploading && <span className="text-xs text-neutral-500">{t("expenses.uploading", "Mengunggah...")}</span>}
-            {form.attachmentUrl && <a href={form.attachmentUrl} target="_blank" className="text-xs text-emerald-400">{t("expenses.viewProof", "Lihat bukti")}</a>}
+          {/* LANGKAH 1 — biaya apa */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold text-cyan-300 uppercase tracking-wide">{t("expenses.step1", "1. Pengeluaran untuk apa?")}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldAccount", "Jenis biaya *")}</div>
+                <SearchableSelect
+                  value={form.accountId}
+                  onChange={(v) => setForm({ ...form, accountId: v })}
+                  placeholder={t("expenses.fieldAccountPlaceholder", "Pilih jenis biaya...")}
+                  options={bundle.accounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+                />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldAccountHint", "Contoh: Listrik, Gaji, Internet, Pemeliharaan PlayStation. Ini yang menentukan pengeluaran masuk ke baris mana di Laba Rugi.")}</div>
+              </label>
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldCategory", "Kategori *")}</div>
+                <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.fieldCategoryPlaceholder", "mis. Listrik")} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldCategoryHint", "Nama pendek versi Anda sendiri, untuk mengelompokkan laporan biaya.")}</div>
+              </label>
+              {/*
+               * Tanggal Pengeluaran — kolom TERPISAH dari Jatuh Tempo di langkah 4.
+               *
+               * Versi form sebelumnya hanya punya satu kolom tanggal, yang dipakai sebagai
+               * dueDate; saat form dirombak (2026-09-20) kolom itu dipindah ke langkah 4 dan hanya
+               * muncul untuk hutang, sehingga pengeluaran yang sudah dibayar kehilangan tanggalnya
+               * sama sekali dan selalu tercatat hari ini.
+               *
+               * Keduanya memang beda arti dan tidak boleh digabung lagi: tanggal pengeluaran
+               * menentukan biaya ini masuk Laba Rugi bulan mana, sedangkan jatuh tempo menentukan
+               * kapan hutangnya harus dibayar. Sebuah tagihan bisa tertanggal 28 Agustus tapi baru
+               * jatuh tempo 10 September, dan keduanya harus bisa diisi berbeda.
+               */}
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldExpenseDate", "Tanggal pengeluaran *")}</div>
+                <input
+                  type="date"
+                  className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+                  value={form.expenseDate || todayYmd}
+                  onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+                />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldExpenseDateHint", "Kapan biaya ini benar-benar terjadi. Ini yang menentukan biaya masuk Laba Rugi bulan mana — isi mundur kalau mencatat tagihan bulan lalu.")}</div>
+              </label>
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldDescription", "Keterangan")}</div>
+                <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.fieldDescriptionPlaceholder", "mis. Token listrik September")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldDescriptionHint", "Catatan bebas supaya nanti Anda ingat ini pengeluaran apa.")}</div>
+              </label>
+            </div>
+          </section>
+
+          {/* LANGKAH 2 — berapa */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold text-cyan-300 uppercase tracking-wide">{t("expenses.step2", "2. Berapa nominalnya?")}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldAmount", "Nominal (Rp) *")}</div>
+                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder="0" value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldAmountHint", "Tanpa titik atau koma. Contoh: 1005000")}</div>
+              </label>
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldQty", "Jumlah")}</div>
+                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder="1" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldQtyHint", "Biarkan 1 kalau tidak dihitung per satuan.")}</div>
+              </label>
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldTax", "Pajak (Rp)")}</div>
+                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder="0" value={form.taxAmount || ""} onChange={(e) => setForm({ ...form, taxAmount: e.target.value })} />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldTaxHint", "Kosongkan kalau tidak ada pajak terpisah.")}</div>
+              </label>
+            </div>
+          </section>
+
+          {/* LANGKAH 3 — ke siapa */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold text-cyan-300 uppercase tracking-wide">{t("expenses.step3", "3. Dibayarkan ke siapa?")}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldPayee", "Nama penerima")}</div>
+                <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.fieldPayeePlaceholder", "mis. Andika, PLN, Toko Berkah")} value={form.payeeName} onChange={(e) => setForm({ ...form, payeeName: e.target.value })} />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldPayeeHint", "Isi ini kalau penerimanya bukan supplier terdaftar.")}</div>
+              </label>
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldSupplier", "Atau pilih supplier terdaftar")}</div>
+                <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
+                  <option value="">{t("expenses.fieldSupplierNone", "— tidak ada —")}</option>
+                  {bundle.suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldSupplierHint", "Cukup isi salah satu: nama penerima ATAU supplier.")}</div>
+              </label>
+            </div>
+          </section>
+
+          {/* LANGKAH 4 — sudah dibayar atau belum */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold text-cyan-300 uppercase tracking-wide">{t("expenses.step4", "4. Uangnya sudah keluar?")}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Dua pilihan eksplisit, bukan satu checkbox — arti keadaan "tidak tercentang" pada
+                  versi lama tidak pernah dinyatakan di mana pun. */}
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, recordAsPayable: false })}
+                className={`text-left rounded-lg border px-3 py-2 ${!form.recordAsPayable ? "border-emerald-500/60 bg-emerald-500/10" : "border-neutral-700 bg-neutral-800/50"}`}
+              >
+                <div className="text-sm font-medium">{t("expenses.paidNowTitle", "Sudah dibayar")}</div>
+                <div className="text-[11px] text-neutral-400 mt-0.5">{t("expenses.paidNowHint", "Uangnya sudah keluar sekarang. Kas berkurang saat ini juga.")}</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, recordAsPayable: true })}
+                className={`text-left rounded-lg border px-3 py-2 ${form.recordAsPayable ? "border-amber-500/60 bg-amber-500/10" : "border-neutral-700 bg-neutral-800/50"}`}
+              >
+                <div className="text-sm font-medium">{t("expenses.payableTitle", "Belum dibayar (hutang)")}</div>
+                <div className="text-[11px] text-neutral-400 mt-0.5">{t("expenses.payableHint", "Dicatat sebagai hutang dulu. Kas belum berkurang sampai Anda bayar nanti.")}</div>
+              </button>
+            </div>
+
+            {!form.recordAsPayable ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="space-y-1 block">
+                  <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldMethod", "Cara bayar")}</div>
+                  <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
+                    <option value="cash">{t("expenses.method.cash", "Cash")}</option><option value="bank">{t("expenses.method.bank", "Bank")}</option><option value="transfer">{t("expenses.method.transfer", "Transfer")}</option><option value="qris">{t("expenses.method.qris", "QRIS")}</option>
+                  </select>
+                </label>
+                <label className="space-y-1 block">
+                  <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldCashBank", "Uangnya diambil dari mana? *")}</div>
+                  <SearchableSelect
+                    value={form.cashBankAccountId}
+                    onChange={(v) => setForm({ ...form, cashBankAccountId: v })}
+                    placeholder={t("expenses.fieldCashBankPlaceholder", "Pilih sumber dana...")}
+                    options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+                  />
+                  <div className="text-[11px] text-neutral-500">{t("expenses.fieldCashBankHint", "Pilih laci kas atau rekening yang saldonya benar-benar berkurang. Salah pilih di sini bikin saldo kas tidak cocok dengan uang fisik.")}</div>
+                </label>
+              </div>
+            ) : (
+              <label className="space-y-1 block sm:w-1/2">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldDueDate", "Jatuh tempo")}</div>
+                <input type="date" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldDueDateHint", "Kapan hutang ini harus dibayar. Akan muncul sebagai pengingat di Hutang (AP).")}</div>
+              </label>
+            )}
+          </section>
+
+          {/* LANGKAH 5 — opsional */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">{t("expenses.step5", "5. Tambahan (boleh dilewati)")}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldCostCenter", "Divisi / bagian")}</div>
+                <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.costCenterId} onChange={(e) => setForm({ ...form, costCenterId: e.target.value })}>
+                  <option value="">{t("expenses.fieldCostCenterNone", "— tidak dipilah —")}</option>
+                  {bundle.costCenters.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldCostCenterHint", "Kalau Anda ingin tahu biaya per bagian, mis. Dapur vs Ruang Main.")}</div>
+              </label>
+              <label className="space-y-1 block">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldRentalUnit", "Unit PS terkait")}</div>
+                <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.rentalUnitId} onChange={(e) => setForm({ ...form, rentalUnitId: e.target.value })}>
+                  <option value="">{t("expenses.fieldRentalUnitNone", "— tidak terkait unit tertentu —")}</option>
+                  {bundle.rentalUnits.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldRentalUnitHint", "Isi kalau biayanya khusus satu TV, mis. servis stik TV 3.")}</div>
+              </label>
+              <div className="space-y-1 sm:col-span-2">
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldAttachment", "Foto bukti / nota")}</div>
+                <div className="flex items-center gap-2">
+                  <input type="file" accept="image/*,.pdf" onChange={(e) => e.target.files?.[0] && uploadAttachment(e.target.files[0])} className="text-xs" />
+                  {uploading && <span className="text-xs text-neutral-500">{t("expenses.uploading", "Mengunggah...")}</span>}
+                  {form.attachmentUrl && <a href={form.attachmentUrl} target="_blank" className="text-xs text-emerald-400">{t("expenses.viewProof", "Lihat bukti")}</a>}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/*
+           * Ringkasan dalam satu kalimat. Memeriksa 13 kotak isian satu per satu adalah pekerjaan
+           * yang mudah dilewati orang; membaca satu kalimat dan merasa ada yang janggal jauh lebih
+           * mungkin terjadi — dan di sinilah salah pilih sumber dana paling sering tertangkap.
+           */}
+          <div className="rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-2 text-sm">
+            <div className="text-xs text-neutral-500 mb-1">{t("expenses.summaryHeading", "Periksa sekali lagi")}</div>
+            {(() => {
+              const akun = bundle.accounts.find((a: any) => a.id === form.accountId);
+              const sumber = cashBankAccounts.find((c: any) => c.id === form.cashBankAccountId);
+              const penerima = form.payeeName || bundle.suppliers.find((s: any) => s.id === form.supplierId)?.name;
+              const nominal = Number(form.amount) || 0;
+              const pajak = Number(form.taxAmount) || 0;
+              if (!akun || !nominal) {
+                return <span className="text-neutral-500">{t("expenses.summaryIncomplete", "Isi dulu jenis biaya dan nominalnya.")}</span>;
+              }
+              // Tanggal ikut disebut dalam ringkasan — inilah kolom yang paling mungkin terlewat
+              // saat mencatat tagihan bulan lalu, dan akibat salahnya (biaya mendarat di bulan yang
+              // keliru) tidak terlihat sampai Laba Rugi bulan itu dibaca ulang.
+              const tanggal = form.expenseDate ? new Date(`${form.expenseDate}T12:00:00+07:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+              return (
+                <span>
+                  {tanggal && <span className="text-neutral-400">{tanggal} — </span>}
+                  {t("expenses.summarySentence", "Pengeluaran {jenis} sebesar {total}{penerima}, {status}.")
+                    .replace("{jenis}", coaAccountName(t, akun))
+                    .replace("{total}", rupiah(nominal + pajak))
+                    .replace("{penerima}", penerima ? t("expenses.summaryPayee", " untuk {nama}").replace("{nama}", penerima) : "")
+                    .replace(
+                      "{status}",
+                      form.recordAsPayable
+                        ? t("expenses.summaryPayable", "dicatat sebagai hutang (kas belum berkurang)")
+                        : sumber
+                          ? t("expenses.summaryPaid", "dibayar dari {sumber}").replace("{sumber}", sumber.name)
+                          : t("expenses.summaryNoSource", "TAPI sumber dananya belum dipilih")
+                    )}
+                </span>
+              );
+            })()}
           </div>
 
           <Button onClick={submitCreate}>{t("expenses.saveAndSubmit", "Simpan & Submit")}</Button>
@@ -561,9 +778,30 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
       )}
 
       {canManage && (
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" onClick={generate} disabled={generating}>{generating ? t("expenses.processing", "Memproses...") : t("expenses.generateDue", "Generate Expense yang Jatuh Tempo")}</Button>
-          {lastResult && <span className="text-xs text-neutral-500">{t("expenses.generatedCount", "{n} draft expense dibuat.").replace("{n}", String(lastResult.generatedCount))}</span>}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={generate} disabled={generating}>{generating ? t("expenses.processing", "Memproses...") : t("expenses.generateDue", "Generate Expense yang Jatuh Tempo")}</Button>
+            {lastResult && <span className="text-xs text-neutral-500">{t("expenses.generatedCount", "{n} draft expense dibuat.").replace("{n}", String(lastResult.generatedCount))}</span>}
+          </div>
+          {/* "Sudah dibuat" bukan berarti "sudah masuk laporan". Draft belum memposting jurnal apa
+              pun, jadi belum muncul di Laba Rugi — tanpa kalimat ini, pemilik wajar mengira biaya
+              rutinnya sudah tercatat padahal belum, dan itu membuat laporan terlihat lebih untung
+              daripada kenyataannya. */}
+          {lastResult && lastResult.generatedCount > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
+              {t("expenses.generatedStillDraft", "Draft ini BELUM masuk Laba Rugi. Buka tab \"Daftar Expense\", lalu Submit dan setujui tiap draft supaya jurnalnya terposting.")}
+            </div>
+          )}
+          {lastResult && lastResult.generatedCount === 0 && (
+            <div className="text-xs text-neutral-500">
+              {t("expenses.generatedNothingDue", "Tidak ada template yang jatuh tempo. Kalau ada yang Anda harapkan muncul, cek tanggal \"Jatuh tempo berikutnya\" pada template tersebut.")}
+            </div>
+          )}
+          {lastResult?.templatesMasihTertinggal?.length > 0 && (
+            <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs text-rose-200">
+              {t("expenses.generatedStillBehind", "{n} template masih tertinggal lebih dari 24 periode dan dibatasi demi keamanan — tekan tombol ini sekali lagi untuk melanjutkan.").replace("{n}", String(lastResult.templatesMasihTertinggal.length))}
+            </div>
+          )}
         </div>
       )}
 

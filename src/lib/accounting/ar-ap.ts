@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
-import { receivables, customers, purchaseInvoices, suppliers, expenses } from "@/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { receivables, customers, purchaseInvoices, suppliers, expenses, orders } from "@/db/schema";
+import { eq, and, ne, inArray } from "drizzle-orm";
+import { previewPaymentDestinationAccount } from "./account-mapping";
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -26,12 +27,43 @@ function emptyAgingBuckets(): Record<AgingBucket, number> {
  * fully paid at recognition time) joined with customer names, with an aging
  * breakdown so the owner can see who owes how much and how overdue it is.
  */
+/** Metode yang ditawarkan tombol "Terima Bayar" di tab Piutang — dipakai untuk menghitung tujuan kasnya di muka. */
+const AR_COLLECTION_METHODS = ["cash", "transfer", "qris", "card"] as const;
+
 export async function computeAccountsReceivable(outletId: string) {
   const [allRows, customerRows] = await Promise.all([
     db.select().from(receivables).where(eq(receivables.outletId, outletId)),
     db.select().from(customers).where(eq(customers.outletId, outletId)),
   ]);
   const customerName = new Map(customerRows.map((c) => [c.id, c.name ?? c.phone ?? "-"]));
+
+  /*
+   * Order mana yang MASIH ADA.
+   *
+   * Tabel receivables tidak punya foreign key ke orders (kolomnya text biasa, nullable), dan
+   * fungsi ini dulu membacanya tanpa join sama sekali. Akibatnya piutang yang ordernya sudah
+   * dihapus permanen tetap tampil lengkap dengan tombol "Terima Bayar" — tombol yang pasti gagal,
+   * karena jalur pembayarannya memanggil /api/orders/{id}/pay atas order yang tidak ada lagi.
+   * Pemilik outlet melaporkannya sebagai "tombolnya tidak bisa ditekan"; dari sisinya memang
+   * seperti itulah rasanya, tidak ada bedanya dengan tombol rusak.
+   *
+   * Sumber baris yatim itu: hardDeleteOrder dulu hanya menghapus jurnal ber-sourceId orderId dan
+   * tidak pernah menyentuh baris receivables (sudah diperbaiki 2026-09-20) — tapi baris yang
+   * terlanjur terbentuk tetap ada dan harus ditampilkan apa adanya, bukan disembunyikan: uang yang
+   * pernah tercatat sebagai piutang tidak boleh hilang dari layar tanpa penjelasan.
+   */
+  const orderIds = Array.from(new Set(allRows.map((r) => r.orderId).filter((id): id is string => !!id)));
+  const existingOrderRows = orderIds.length ? await db.select({ id: orders.id }).from(orders).where(inArray(orders.id, orderIds)) : [];
+  const existingOrderIds = new Set(existingOrderRows.map((o) => o.id));
+
+  // Ke akun kas/bank mana tiap metode akan masuk — dihitung sekali di sini supaya layar bisa
+  // menyebutkannya sebelum tombol ditekan, bukan setelah uangnya terlanjur masuk ke tempat yang
+  // tidak diduga. Hanya-baca; tidak membuat akun kas baru (lihat previewPaymentDestinationAccount).
+  const paymentDestinations = Object.fromEntries(
+    await Promise.all(
+      AR_COLLECTION_METHODS.map(async (m) => [m, await previewPaymentDestinationAccount(outletId, m)] as const)
+    )
+  ) as Record<string, { code: string; name: string } | null>;
 
   const open = allRows.filter((r) => r.status !== "paid" && r.status !== "written_off");
   const agingBuckets = emptyAgingBuckets();
@@ -44,6 +76,9 @@ export async function computeAccountsReceivable(outletId: string) {
       customerId: r.customerId,
       customerName: r.customerId ? customerName.get(r.customerId) ?? "-" : "Walk-in",
       orderId: r.orderId,
+      // false = transaksi asalnya sudah dihapus permanen; pelunasan lewat tombol tidak mungkin
+      // dilakukan dan layar harus mengatakannya, bukan menampilkan tombol yang pasti gagal.
+      orderExists: !!r.orderId && existingOrderIds.has(r.orderId),
       amount: r.amount,
       paidAmount: r.paidAmount,
       outstanding,
@@ -72,6 +107,8 @@ export async function computeAccountsReceivable(outletId: string) {
     detail,
     byCustomer,
     agingBuckets,
+    paymentDestinations,
+    orphanCount: detail.filter((r) => !r.orderExists).length,
   };
 }
 

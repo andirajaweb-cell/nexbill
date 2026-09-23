@@ -773,11 +773,17 @@ export async function ensureDefaultPlan() {
 }
 
 /**
- * Idempotently seeds a starter storefront catalog (a couple of smart plug variants, the
- * installation service, and the extra-console add-on) if no active product exists yet — same
- * defensive pattern as ensureDefaultPlan, called both from scripts/seed.ts and defensively at
- * the top of listStorefrontProducts() so a database that never ran the seed script still shows
- * something browsable instead of an empty etalase.
+ * Seeds a starter storefront catalog (a couple of smart plug variants, the installation service,
+ * and the extra-console add-on) into an empty catalog. Called ONLY from scripts/seed.ts.
+ *
+ * Sengaja TIDAK dipanggil dari listStorefrontProducts(). Sebelum 2026-09-23 fungsi ini dipanggil
+ * di awal listStorefrontProducts() "secara defensif", dan itu ternyata bug serius: penjaganya
+ * hanya `if (existing) return`, jadi begitu platform-admin menghapus SELURUH produk, tabelnya
+ * kosong — dan kunjungan merchant berikutnya ke tab Toko langsung menyemai ulang keempat produk
+ * bawaan ini. Dari sisi admin tombol Hapus tampak gagal padahal berhasil; produknya "hidup lagi"
+ * sendiri. Etalase kosong adalah keadaan yang sah (admin memang sedang mengosongkannya), dan
+ * satu-satunya cara membedakannya dari database yang belum pernah di-seed adalah menyemai hanya
+ * pada saat seed eksplisit — bukan pada setiap pembacaan.
  */
 export async function ensureDefaultProducts() {
   const [existing] = await db.select().from(platformProducts).limit(1);
@@ -816,7 +822,6 @@ export async function ensureDefaultProducts() {
 
 /** Active storefront products for the Billing page's etalase, grouped/sorted for rendering. */
 export async function listStorefrontProducts() {
-  await ensureDefaultProducts();
   const rows = await db.select().from(platformProducts).where(eq(platformProducts.isActive, true));
   return rows.sort((a, b) => a.sortOrder - b.sortOrder);
 }

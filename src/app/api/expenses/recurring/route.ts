@@ -5,6 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { nullIfBlank } from "@/lib/accounting/expense";
 
 export async function GET(_req: NextRequest) {
   try {
@@ -30,7 +31,26 @@ export async function POST(req: NextRequest) {
     if (!name || !accountId || !category || !amount || !nextDueDate) {
       return NextResponse.json({ error: "name, accountId, category, amount, nextDueDate wajib diisi." }, { status: 400 });
     }
-    const [row] = await db.insert(recurringExpenseTemplates).values({ ...body, outletId: session.outletId }).returning();
+    /*
+     * Kolom relasi yang boleh kosong dinormalkan dari "" menjadi undefined — masalah yang sama
+     * dengan yang diperbaiki di createExpense (lihat nullIfBlank di lib/accounting/expense.ts).
+     *
+     * `<option value="">` di dropdown "tidak ada" mengirim string KOSONG, bukan null, dan Postgres
+     * memperlakukannya sebagai id yang harus dicari — lalu menolak dengan pesan pelanggaran foreign
+     * key yang tidak berarti apa pun bagi pemilik outlet. Di sini `{ ...body }` menyebarkan seluruh
+     * isian form apa adanya, jadi tanpa normalisasi ini template recurring akan gagal dibuat hanya
+     * karena kolom opsionalnya dibiarkan kosong.
+     */
+    const [row] = await db
+      .insert(recurringExpenseTemplates)
+      .values({
+        ...body,
+        outletId: session.outletId,
+        costCenterId: nullIfBlank(body.costCenterId),
+        rentalUnitId: nullIfBlank(body.rentalUnitId),
+        supplierId: nullIfBlank(body.supplierId),
+      })
+      .returning();
     return NextResponse.json(row);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -387,6 +387,11 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAccountId, setEditAccountId] = useState("");
+  // Nama transaksi dan label kini ikut bisa diubah — sebelumnya Edit hanya mengganti akun tujuan,
+  // sehingga satu huruf yang salah ketik di kunci transaksi memaksa baris itu dihapus dan dibuat
+  // ulang dari nol.
+  const [editKey, setEditKey] = useState("");
+  const [editLabel, setEditLabel] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ module: "rental", transactionKey: "", accountId: "", label: "" });
 
@@ -409,7 +414,14 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
   };
 
   const saveEdit = async (id: string) => {
-    const res = await fetch(`/api/account-mappings/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: editAccountId }) });
+    if (!editKey.trim()) return showAlert(t("accounting.mapping.alertKeyRequired", "Nama transaksi tidak boleh kosong."));
+    const res = await fetch(`/api/account-mappings/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      // label sengaja dikirim null saat dikosongkan, bukan string kosong — kolomnya nullable dan
+      // tabel menampilkan "-" untuk null, jadi mengosongkannya harus benar-benar mengosongkan.
+      body: JSON.stringify({ accountId: editAccountId, transactionKey: editKey.trim(), label: editLabel.trim() || null }),
+    });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
     setEditingId(null);
@@ -442,6 +454,19 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
       <p className="text-xs text-neutral-500">
         {t("accounting.mapping.explainer", "Kasir dan modul lain (Rental, F&B, PPOB, Expense, Asset, Payment) tidak pernah memilih akun COA secara manual — sistem otomatis memilih akun dari tabel ini berdasarkan modul + jenis transaksi. Ubah baris di bawah untuk mengarahkan transaksi ke akun COA lain; hapus baris untuk kembali ke akun default bawaan sistem.")}
       </p>
+
+      {/*
+       * Peringatan ini ada karena kolom "Transaksi" kini bisa diubah, dan namanya menyesatkan.
+       * Isinya bukan label bebas melainkan KUNCI PENCARIAN yang dipakai kode: getMappedAccountId()
+       * mencari baris berdasarkan modul + kunci ini. Mengubahnya menjadi teks yang tidak dikenali
+       * kode TIDAK menimbulkan galat apa pun — barisnya sekadar berhenti dipakai, dan modulnya
+       * diam-diam kembali ke akun default bawaan. Kegagalan yang tidak bersuara seperti itu bisa
+       * berbulan-bulan tidak ketahuan, jadi harus dikatakan di muka.
+       */}
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-neutral-300">
+        <span className="font-semibold text-amber-300">{t("accounting.mapping.keyWarningTitle", "Tentang kolom \"Transaksi\":")}</span>{" "}
+        {t("accounting.mapping.keyWarningBody", "kolom ini bukan sekadar nama — ini kunci yang dicari sistem saat memilih akun. Kalau diganti jadi kata yang tidak dikenali sistem, barisnya berhenti dipakai tanpa pesan error apa pun, dan transaksinya kembali memakai akun default bawaan. Kolom \"Label\" aman diubah sesuka Anda; itu murni nama tampilan.")}
+      </div>
 
       <div className="flex justify-end">
         <Button className="text-xs" onClick={() => setShowForm((s) => !s)}>{showForm ? t("accounting.common.close", "Tutup") : t("accounting.mapping.newMappingButton", "+ Mapping Baru")}</Button>
@@ -479,8 +504,33 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
             <tbody>
               {list.map((m) => (
                 <tr key={m.id} className={`border-b border-neutral-900 ${!m.isActive ? "opacity-40" : ""}`}>
-                  <td className="py-2 font-mono text-xs">{m.transactionKey}</td>
-                  <td className="text-xs text-neutral-400">{m.label ?? "-"}</td>
+                  <td className="py-2 font-mono text-xs">
+                    {editingId === m.id ? (
+                      <input
+                        className="w-full rounded bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs font-mono"
+                        value={editKey}
+                        onChange={(e) => setEditKey(e.target.value)}
+                        // Kunci selalu dicari dalam huruf kecil oleh getMappedAccountId, jadi
+                        // ditampilkan huruf kecil sejak diketik — bukan dikoreksi diam-diam saat
+                        // disimpan, supaya yang terlihat di layar sama dengan yang tersimpan.
+                        onBlur={() => setEditKey((k) => k.trim().toLowerCase())}
+                      />
+                    ) : (
+                      m.transactionKey
+                    )}
+                  </td>
+                  <td className="text-xs text-neutral-400">
+                    {editingId === m.id ? (
+                      <input
+                        className="w-full rounded bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs"
+                        value={editLabel}
+                        placeholder={t("accounting.mapping.placeholderLabelShort", "Nama tampilan (opsional)")}
+                        onChange={(e) => setEditLabel(e.target.value)}
+                      />
+                    ) : (
+                      m.label ?? "-"
+                    )}
+                  </td>
                   <td className="text-xs">
                     {editingId === m.id ? (
                       <SearchableSelect
@@ -502,7 +552,7 @@ function AccountMappingTab({ outletId }: { outletId: string }) {
                       </>
                     ) : (
                       <>
-                        <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => { setEditingId(m.id); setEditAccountId(m.accountId); }}>{t("accounting.common.edit", "Edit")}</Button>
+                        <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => { setEditingId(m.id); setEditAccountId(m.accountId); setEditKey(m.transactionKey); setEditLabel(m.label ?? ""); }}>{t("accounting.common.edit", "Edit")}</Button>
                         <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => toggleActive(m)}>{m.isActive ? t("accounting.mapping.deactivateButton", "Nonaktifkan") : t("accounting.coa.activateButton", "Aktifkan")}</Button>
                         <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => deleteMapping(m)}>{t("accounting.common.delete", "Hapus")}</Button>
                       </>
@@ -717,6 +767,10 @@ function TrialBalanceTab({ outletId }: { outletId: string }) {
   const [rows, setRows] = useState<any[]>([]);
   const [showZero, setShowZero] = useState(false);
   const period = usePeriodState("this_month");
+  // Drill-down per akun — komponen AccountLedgerModal yang sama sudah dipakai Laba Rugi dan Neraca;
+  // Neraca Saldo satu-satunya laporan yang belum punya, padahal justru di sinilah angka mentah
+  // debit/kredit paling sering memunculkan pertanyaan "ini isinya apa".
+  const [drillDown, setDrillDown] = useState<{ accountId: string; code: string; name: string; balance: number } | null>(null);
 
   useEffect(() => {
     const qs = new URLSearchParams({ outletId, ...(period.from ? { from: period.from } : {}), ...(period.to ? { to: period.to } : {}) });
@@ -750,19 +804,62 @@ function TrialBalanceTab({ outletId }: { outletId: string }) {
     return result;
   };
 
+  /*
+   * Saldo yang BERLAWANAN ARAH dengan sifat akunnya.
+   *
+   * computeTrialBalance sudah menandatangani saldo sesuai normalBalance tiap akun, jadi saldo
+   * NEGATIF berarti akunnya bergerak ke arah yang secara akuntansi tidak mungkin: aset yang
+   * jumlahnya kurang dari nol, atau liabilitas yang justru menjadi piutang. Itu bukan sekadar angka
+   * jelek — itu tanda pembukuan sudah tidak cocok dengan kenyataan fisik.
+   *
+   * Sebelumnya angka seperti itu tampil sebagai baris biasa, tidak berbeda dari yang lain. Pada
+   * outlet XTREAM, "Saldo Provider PPOB (1151)" bernilai Rp-69.975 — saldo deposit yang mustahil
+   * negatif di dunia nyata — dan tidak ada apa pun di layar yang menandainya. Penyebabnya:
+   * getPpobProviderSaldoBalance() di lib/ppob/engine.ts memang dibuat untuk menjaga hal ini, tapi
+   * tidak pernah dipanggil dari mana pun, jadi tidak ada yang mencegah saldo menembus nol.
+   *
+   * Dicek di sini, pada tampilan Neraca Saldo, dan bukan hanya untuk PPOB: pemeriksaan ini berlaku
+   * untuk SETIAP akun, sehingga kelas kesalahan yang sama akan ketahuan di mana pun ia muncul lain
+   * kali — bukan hanya di satu modul yang kebetulan sedang diperiksa.
+   *
+   * Akun kontra-pendapatan (49xx, mis. Diskon Penjualan) memang bersaldo berlawanan secara
+   * rancangan dan sengaja dikecualikan.
+   */
+  const isContraAccount = (code: string) => code.startsWith("49");
+  const abnormalRows: { code: string; name: string; balance: number }[] = [];
+  for (const r of rows) {
+    if (!r.isPostingAllowed || isContraAccount(r.code)) continue;
+    if (r.balance < -0.5) abnormalRows.push({ code: r.code, name: coaAccountName(t, r), balance: r.balance });
+  }
+  abnormalRows.sort((a, b) => a.balance - b.balance);
+
   const renderNode = (r: any, depth: number): any => {
     const amounts = computeAmounts(r.accountId);
     const isZero = amounts.debit === 0 && amounts.credit === 0;
     if (isZero && !showZero) return null;
     const kids = childrenOf.get(r.accountId) ?? [];
+    const isAbnormal = r.isPostingAllowed && !isContraAccount(r.code) && amounts.balance < -0.5;
+    /*
+     * Hanya akun yang boleh diposting yang bisa diklik. Akun induk (ASET LANCAR, LIABILITAS, dst.)
+     * tidak pernah punya baris jurnal sendiri — angkanya murni penjumlahan anak-anaknya — jadi
+     * membuka drill-down di sana hanya akan menampilkan daftar kosong dan terasa seperti rusak.
+     */
+    const canDrill = r.isPostingAllowed && !isZero;
     return (
       <Fragment key={r.accountId}>
-        <tr className={`border-b border-neutral-900 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}>
+        <tr
+          className={`border-b border-neutral-900 ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""} ${canDrill ? "cursor-pointer hover:bg-neutral-800/60 transition-colors" : ""}`}
+          onClick={canDrill ? () => setDrillDown({ accountId: r.accountId, code: r.code, name: coaAccountName(t, r), balance: amounts.balance }) : undefined}
+          title={canDrill ? t("accounting.trialBalance.drillDownRowTitle", "Klik untuk melihat isinya") : undefined}
+        >
           <td className="py-1.5 font-mono text-xs" style={{ paddingLeft: depth * 16 }}>{r.code}</td>
           <td className="text-sm">{coaAccountName(t, r)}</td>
           <td className="text-right text-sm">{amounts.debit ? rupiah(amounts.debit) : ""}</td>
           <td className="text-right text-sm">{amounts.credit ? rupiah(amounts.credit) : ""}</td>
-          <td className="text-right text-sm font-medium">{amounts.balance ? rupiah(amounts.balance) : ""}</td>
+          <td className={`text-right text-sm font-medium ${isAbnormal ? "text-amber-400" : ""}`}>
+            {amounts.balance ? rupiah(amounts.balance) : ""}
+            {isAbnormal && <span className="ml-1" title={t("accounting.trialBalance.abnormalTooltip", "Saldo berlawanan arah — lihat peringatan di atas tabel.")}>⚠</span>}
+          </td>
         </tr>
         {kids.map((k) => renderNode(k, depth + 1))}
       </Fragment>
@@ -779,11 +876,52 @@ function TrialBalanceTab({ outletId }: { outletId: string }) {
         <label className="flex items-center gap-1 text-xs text-neutral-400"><input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> {t("accounting.trialBalance.showZeroLabel", "Tampilkan akun bersaldo nol (terinci lengkap)")}</label>
         <span className="text-xs text-neutral-500">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, period.to)}</span>
       </div>
+      <p className="text-[11px] text-neutral-600">{t("accounting.trialBalance.drillDownHint", "Klik baris akun mana pun untuk melihat jurnal yang menyusun angkanya pada periode ini (audit trail). Akun induk yang dicetak tebal hanya menjumlahkan turunannya, jadi tidak bisa diklik.")}</p>
+
+      {/* "Balance ✓" di kaki tabel hanya menjamin total debit = total kredit. Itu jaminan yang
+          jauh lebih lemah daripada kelihatannya: pembukuan bisa seimbang sempurna sambil
+          menyatakan saldo kas atau deposit bernilai negatif. Peringatan ini menutup celah itu. */}
+      {abnormalRows.length > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <div className="text-sm font-semibold text-amber-300">
+            {t("accounting.trialBalance.abnormalTitle", "{n} akun bersaldo berlawanan arah").replace("{n}", String(abnormalRows.length))}
+          </div>
+          <p className="text-xs text-neutral-300 mt-1">
+            {t("accounting.trialBalance.abnormalBody", "Aset tidak bisa bernilai kurang dari nol, dan liabilitas tidak bisa menjadi piutang. Saldo seperti ini berarti ada transaksi yang belum tercatat — paling sering: setoran/top-up yang sudah dilakukan di dunia nyata tapi belum dimasukkan ke sistem. Pembukuan tetap seimbang, jadi \"Balance ✓\" di bawah tidak akan menangkapnya.")}
+          </p>
+          <ul className="mt-2 space-y-1">
+            {abnormalRows.map((r) => (
+              <li key={r.code} className="text-xs flex justify-between gap-4">
+                <span className="text-neutral-300"><span className="font-mono text-neutral-500">{r.code}</span> {r.name}</span>
+                <span className="text-amber-400 font-medium">{rupiah(r.balance)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
     <Card>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-neutral-500 border-b border-neutral-800">
-            <th className="py-2">{t("accounting.trialBalance.table.code", "Kode")}</th><th>{t("accounting.trialBalance.table.account", "Akun")}</th><th className="text-right">{t("accounting.common.debit", "Debit")}</th><th className="text-right">{t("accounting.common.credit", "Kredit")}</th><th className="text-right">{t("accounting.trialBalance.table.balance", "Saldo")}</th>
+            {/* Judul kolom diberi keterangan kecil. Tiga kali dalam satu hari pemilik outlet
+                menyimpulkan ada hutang/aset besar dari kolom Debit dan Kredit, padahal keduanya
+                perputaran dan yang menjawab "berapa sisanya" adalah kolom Saldo. Menjelaskannya
+                berulang kali lewat percakapan bukan solusi; menuliskannya di judul kolom adalah. */}
+            <th className="py-2">{t("accounting.trialBalance.table.code", "Kode")}</th>
+            <th>{t("accounting.trialBalance.table.account", "Akun")}</th>
+            <th className="text-right">
+              {t("accounting.common.debit", "Debit")}
+              <div className="text-[10px] font-normal text-neutral-600">{t("accounting.trialBalance.table.turnoverNote", "perputaran")}</div>
+            </th>
+            <th className="text-right">
+              {t("accounting.common.credit", "Kredit")}
+              <div className="text-[10px] font-normal text-neutral-600">{t("accounting.trialBalance.table.turnoverNote", "perputaran")}</div>
+            </th>
+            <th className="text-right">
+              {t("accounting.trialBalance.table.balance", "Saldo")}
+              <div className="text-[10px] font-normal text-neutral-600">{t("accounting.trialBalance.table.balanceNote", "sisa sebenarnya")}</div>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -801,6 +939,21 @@ function TrialBalanceTab({ outletId }: { outletId: string }) {
         </tfoot>
       </table>
     </Card>
+
+    {drillDown && (
+      <AccountLedgerModal
+        outletId={outletId}
+        accountId={drillDown.accountId}
+        code={drillDown.code}
+        name={drillDown.name}
+        balance={drillDown.balance}
+        from={period.from}
+        to={period.to}
+        periodLabel={describePeriod(period.preset, period.from, period.to)}
+        totalLabel={t("accounting.trialBalance.drillDownTotal", "Saldo (sesuai Neraca Saldo)")}
+        onClose={() => setDrillDown(null)}
+      />
+    )}
     </div>
   );
 }
@@ -833,12 +986,42 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
   const [data, setData] = useState<any>(null);
   const [collectFor, setCollectFor] = useState<{ id: string; orderId: string | null; outstanding: number; method: string; amount: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  const collectFormRef = useRef<HTMLDivElement | null>(null);
 
   const load = () => {
     fetchJsonObject(`/api/accounting/receivables?outletId=${outletId}`).then(setData);
   };
   useEffect(load, [outletId]);
 
+  // Form pelunasan dirender di ATAS tabel, jadi pada daftar piutang yang panjang ia bisa terbuka di
+  // luar layar dan menekan "Terima Bayar" terasa seperti tidak terjadi apa-apa. Digulirkan ke
+  // pandangan setiap kali dibuka.
+  useEffect(() => {
+    if (collectFor) collectFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [collectFor?.id]);
+
+  /*
+   * Pelunasan piutang berjalan dalam DUA panggilan: membuat pembayaran, lalu mengonfirmasinya.
+   *
+   * BUG YANG DIPERBAIKI DI SINI (2026-09-22). Versi sebelumnya memeriksa hasil panggilan pertama,
+   * tapi panggilan kedua ditulis begitu saja:
+   *
+   *     await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
+   *     setCollectFor(null);
+   *     load();
+   *
+   * Hasilnya tidak pernah dilihat. Kalau konfirmasi gagal — apa pun sebabnya — form tetap ditutup
+   * dan daftar tetap dimuat ulang, sehingga dari sisi pemakai: klik, form hilang, piutangnya masih
+   * di situ, tanpa satu pun pesan. Persis keluhan "tidak bisa klik, tidak sukses".
+   *
+   * Yang lebih merusak: pembayaran dari panggilan PERTAMA sudah terlanjur dibuat dan tertinggal
+   * berstatus pending. Setiap klik berikutnya menambah satu lagi. Diam-diam menumpuk pembayaran
+   * menggantung adalah kegagalan yang jauh lebih mahal daripada sekadar tombol yang tidak jalan.
+   *
+   * Sekarang kedua panggilan diperiksa, pesan galat aslinya ditampilkan apa adanya, dan form hanya
+   * ditutup kalau benar-benar berhasil — supaya "tidak terjadi apa-apa" tidak pernah lagi bisa
+   * disalahartikan sebagai berhasil.
+   */
   const collect = async () => {
     if (!collectFor?.orderId) return;
     setBusy(true);
@@ -849,12 +1032,31 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
         body: JSON.stringify({ method: collectFor.method, amount: collectFor.amount }),
       });
       const payment = await res.json();
-      if (!res.ok) return showAlert(payment.error);
-      if (collectFor.method === "cash") {
-        await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
+      if (!res.ok) {
+        return showAlert(
+          t("accounting.receivables.collectFailedCreate", "Gagal mencatat pembayaran: {pesan}").replace("{pesan}", payment?.error ?? "penyebab tidak diketahui")
+        );
       }
+
+      if (collectFor.method === "cash") {
+        const confirmRes = await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
+        if (!confirmRes.ok) {
+          const confirmErr = await confirmRes.json().catch(() => ({}));
+          return showAlert(
+            t(
+              "accounting.receivables.collectFailedConfirm",
+              "Pembayaran sudah dibuat tapi GAGAL dikonfirmasi: {pesan}. Pembayaran itu kini berstatus menunggu — jangan tekan tombol ini berulang kali, karena tiap klik menambah satu pembayaran menggantung. Cek halaman Pembayaran untuk menyelesaikannya."
+            ).replace("{pesan}", confirmErr?.error ?? `HTTP ${confirmRes.status}`)
+          );
+        }
+      }
+
       setCollectFor(null);
       load();
+    } catch (err: unknown) {
+      // Gangguan jaringan pun harus terlihat — tanpa ini, koneksi putus juga tampak seperti
+      // tombol yang tidak berfungsi.
+      showAlert(t("accounting.receivables.collectFailedNetwork", "Gagal menghubungi server: {pesan}").replace("{pesan}", err instanceof Error ? err.message : String(err)));
     } finally {
       setBusy(false);
     }
@@ -871,28 +1073,65 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
       </Card>
       <AgingCards buckets={data.agingBuckets} />
 
+      {/* Form muncul DI ATAS tabel. Kalau pemakai sedang menggulir di daftar piutang yang panjang,
+          menekan "Terima Bayar" terasa seperti tidak terjadi apa-apa — formnya terbuka di luar
+          layar. Karena itu setiap kali form dibuka, ia digulirkan ke pandangan. */}
       {collectFor && (
-        <Card className="space-y-2 border-emerald-500/40">
+        <div ref={collectFormRef}>
+        <Card className="space-y-3 border-emerald-500/40">
           <h2 className="font-medium">{t("accounting.receivables.collectFormHeading", "Terima Pembayaran Piutang")}</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
-              value={collectFor.amount}
-              max={collectFor.outstanding}
-              onChange={(e) => setCollectFor({ ...collectFor, amount: Number(e.target.value) })}
-            />
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={collectFor.method} onChange={(e) => setCollectFor({ ...collectFor, method: e.target.value })}>
-              <option value="cash">{t("accounting.common.methodCash", "Cash")}</option>
-              <option value="transfer">{t("accounting.common.methodTransfer", "Transfer")}</option>
-              <option value="qris">{t("accounting.common.methodQris", "QRIS")}</option>
-              <option value="card">{t("accounting.common.methodCard", "Kartu")}</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="space-y-1 block">
+              <div className="text-xs font-medium text-neutral-300">{t("accounting.receivables.fieldAmount", "Jumlah diterima (Rp)")}</div>
+              <input
+                type="number"
+                className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+                value={collectFor.amount}
+                max={collectFor.outstanding}
+                onChange={(e) => setCollectFor({ ...collectFor, amount: Number(e.target.value) })}
+              />
+              <div className="text-[11px] text-neutral-500">
+                {t("accounting.receivables.fieldAmountHint", "Sisa tagihan {sisa}. Boleh diisi lebih kecil kalau pelanggan bayar sebagian.").replace("{sisa}", rupiah(collectFor.outstanding))}
+              </div>
+            </label>
+            <label className="space-y-1 block">
+              <div className="text-xs font-medium text-neutral-300">{t("accounting.receivables.fieldMethod", "Dibayar dengan apa?")}</div>
+              <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={collectFor.method} onChange={(e) => setCollectFor({ ...collectFor, method: e.target.value })}>
+                <option value="cash">{t("accounting.common.methodCash", "Cash")}</option>
+                <option value="transfer">{t("accounting.common.methodTransfer", "Transfer")}</option>
+                <option value="qris">{t("accounting.common.methodQris", "QRIS")}</option>
+                <option value="card">{t("accounting.common.methodCard", "Kartu")}</option>
+              </select>
+              {/* Jawaban atas pertanyaan yang sebelumnya tidak dijawab di mana pun pada layar ini:
+                  uangnya masuk ke kas yang mana. Ditentukan oleh Account Mapping, bukan dipilih di
+                  sini — jadi yang bisa dan harus dilakukan layar ini adalah menyebutkannya. */}
+              <div className="text-[11px] text-neutral-500">
+                {data.paymentDestinations?.[collectFor.method]
+                  ? t("accounting.receivables.destinationHint", "Uang masuk ke: {akun}. Diatur di tab Account Mapping (modul \"payment\").")
+                      .replace("{akun}", `${data.paymentDestinations[collectFor.method].name} (${data.paymentDestinations[collectFor.method].code})`)
+                  : t("accounting.receivables.destinationUnknown", "Tujuan kas untuk metode ini belum diatur — cek tab Account Mapping.")}
+              </div>
+            </label>
           </div>
           <div className="flex gap-2">
             <Button onClick={collect} disabled={busy}>{busy ? t("accounting.common.processing", "Memproses...") : t("accounting.receivables.collectButton", "Terima Pembayaran")}</Button>
             <Button variant="ghost" onClick={() => setCollectFor(null)}>{t("accounting.common.cancel", "Batal")}</Button>
           </div>
+        </Card>
+        </div>
+      )}
+
+      {/* Piutang yatim: transaksinya sudah dihapus permanen, jadi tidak ada order untuk dibayar.
+          Ditampilkan terang-terangan di atas tabel supaya angkanya tidak diam-diam menggelembungkan
+          Total Piutang Outstanding tanpa penjelasan. */}
+      {data.orphanCount > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <div className="text-sm font-semibold text-amber-300">
+            {t("accounting.receivables.orphanTitle", "{n} piutang tidak bisa ditagih lewat tombol").replace("{n}", String(data.orphanCount))}
+          </div>
+          <p className="text-xs text-neutral-300 mt-1">
+            {t("accounting.receivables.orphanBody", "Transaksi asalnya sudah dihapus permanen, jadi tidak ada order yang bisa dibayar. Nilainya masih terhitung di Total Piutang Outstanding di atas. Kalau pelanggan memang sudah tidak berhutang, catat penghapusannya lewat jurnal manual; kalau masih berhutang, buat ulang transaksinya di Kasir.")}
+          </p>
         </Card>
       )}
 
@@ -913,7 +1152,11 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
                   {r.daysOverdue > 0 ? t("accounting.receivables.daysOverdue", "{n} hari").replace("{n}", String(r.daysOverdue)) : t("accounting.receivables.notYetDue", "Belum jatuh tempo")}
                 </td>
                 <td className="text-right">
-                  {r.orderId && (
+                  {/* Versi lama: `{r.orderId && <Button/>}` — baris tanpa orderId, atau yang
+                      ordernya sudah dihapus, tampil sebagai sel KOSONG tanpa keterangan apa pun.
+                      Dari sisi pemakai itu tidak bisa dibedakan dari tombol yang rusak, dan itulah
+                      yang dilaporkan. Sekarang alasannya selalu tertulis. */}
+                  {r.orderExists ? (
                     <Button
                       variant="secondary"
                       className="text-xs px-2 py-1"
@@ -921,6 +1164,10 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
                     >
                       {t("accounting.receivables.collectRowButton", "Terima Bayar")}
                     </Button>
+                  ) : (
+                    <span className="text-[11px] text-amber-400/80">
+                      {t("accounting.receivables.orderMissing", "Transaksi sudah dihapus")}
+                    </span>
                   )}
                 </td>
               </tr>
@@ -1302,6 +1549,30 @@ function AccountLedgerModal({
           <span>{totalLabel}</span>
           <span>{rupiah(balance)}</span>
         </div>
+
+        {/*
+         * Ringkasan "bertambah / berkurang / sisa" dalam satu baris.
+         *
+         * Tanpa ini, sebuah akun yang sepanjang bulan bergerak Rp1,3 juta lalu berakhir di nol
+         * hanya menampilkan deretan angka besar dengan total Rp0 di bawahnya — dan pembacanya wajar
+         * menyimpulkan ada yang tidak beres, karena dua angka itu terlihat saling bertentangan.
+         * Padahal keduanya benar dan menjawab pertanyaan yang berbeda: berapa yang sempat bergerak,
+         * versus berapa yang tersisa. Dinyatakan terang-terangan supaya tidak perlu disimpulkan
+         * sendiri.
+         */}
+        {lines !== null && lines.length > 0 && (() => {
+          const naik = lines.filter((l) => l.amount > 0).reduce((s, l) => s + l.amount, 0);
+          const turun = lines.filter((l) => l.amount < 0).reduce((s, l) => s - l.amount, 0);
+          if (naik === 0 || turun === 0) return null;
+          return (
+            <div className="rounded-lg bg-neutral-800/50 px-3 py-2 mb-3 text-xs text-neutral-300">
+              {t("accounting.ledger.turnoverSummary", "Selama periode ini akun bertambah {naik} dan berkurang {turun}, sehingga tersisa {sisa}. Angka besar di kolom Debit/Kredit Neraca Saldo adalah pergerakan itu — bukan sisanya.")
+                .replace("{naik}", rupiah(naik))
+                .replace("{turun}", rupiah(turun))
+                .replace("{sisa}", rupiah(balance))}
+            </div>
+          );
+        })()}
 
         {lines === null ? (
           <p className="text-sm text-neutral-500 py-4 text-center">{t("transactions.loading", "Memuat...")}</p>

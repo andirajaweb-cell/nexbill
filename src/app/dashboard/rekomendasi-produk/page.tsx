@@ -6,6 +6,7 @@ import Link from "next/link";
 import { clsx } from "clsx";
 import "@/lib/i18n/dict-rekomendasi-produk";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { pickProductLang } from "@/lib/affiliate/product-lang";
 
 interface AffiliateProduct {
   id: string;
@@ -15,6 +16,27 @@ interface AffiliateProduct {
   shopeeUrl: string;
   priceLabel: string | null;
   category: string | null;
+  /** Judul/deskripsi/kategori dalam lima bahasa selain Indonesia — dibuat otomatis saat produk disimpan; lihat lib/affiliate/translate-product.ts. */
+  translationsJson: string | null;
+}
+
+/**
+ * `priceLabel` adalah teks bebas yang diisi tim NEXBILL lewat /platform-admin/affiliate, jadi isinya
+ * bisa apa saja: "Rp375.000", "mulai 2 jutaan", atau — seperti yang terjadi — angka telanjang
+ * "375000" yang tampil apa adanya di layar merchant dan terbaca seperti data mentah yang bocor.
+ *
+ * Fungsi ini hanya merapikan kasus terakhir itu: bila seluruh isinya angka (boleh berspasi, titik,
+ * atau koma sebagai pemisah ribuan), ditampilkan sebagai Rupiah berformat. Teks yang sudah punya
+ * kata atau simbol dibiarkan UTUH — kurator mungkin sengaja menulis "mulai Rp2 jutaan", dan menebak
+ * maksudnya lalu menimpanya akan lebih merugikan daripada membiarkannya.
+ */
+function formatPriceLabel(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!/^[\d.,\s]+$/.test(trimmed)) return trimmed;
+  const digits = trimmed.replace(/[^\d]/g, "");
+  if (!digits) return trimmed;
+  return `Rp${Number(digits).toLocaleString("id-ID")}`;
 }
 
 /**
@@ -31,7 +53,7 @@ interface AffiliateProduct {
 const ALL_CATEGORY = "Semua";
 
 export default function RekomendasiProdukPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [items, setItems] = useState<AffiliateProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORY);
@@ -43,13 +65,31 @@ export default function RekomendasiProdukPage() {
     });
   }, []);
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach((p) => p.category && set.add(p.category));
-    return [ALL_CATEGORY, ...Array.from(set)];
-  }, [items]);
+  /*
+   * Tiap produk diterjemahkan lebih dulu ke bahasa yang sedang dipilih, tapi NILAI KATEGORI ASLI
+   * (Bahasa Indonesia) tetap disimpan terpisah sebagai `categoryKey`.
+   *
+   * Itu yang menjaga filter tetap utuh saat bahasa diganti: pengelompokan dan pencocokan dilakukan
+   * atas kategori asli, sementara yang ditampilkan di tombol adalah terjemahannya. Kalau filter
+   * memakai teks terjemahan, mengganti bahasa akan membuat pilihan yang sedang aktif tidak lagi
+   * cocok dengan produk mana pun — daftarnya mendadak kosong tanpa sebab yang terlihat.
+   */
+  const localized = useMemo(
+    () => items.map((p) => ({ ...p, ...pickProductLang(p, lang), categoryKey: p.category ?? null })),
+    [items, lang]
+  );
 
-  const filtered = activeCategory === ALL_CATEGORY ? items : items.filter((p) => p.category === activeCategory);
+  const categories = useMemo(() => {
+    // Nama tampilan per kategori diambil dari produk pertama yang memakainya — semua produk dalam
+    // satu kategori menerjemahkan teks yang sama, jadi mana pun yang diambil hasilnya sama.
+    const byKey = new Map<string, string>();
+    localized.forEach((p) => {
+      if (p.categoryKey && !byKey.has(p.categoryKey)) byKey.set(p.categoryKey, p.category ?? p.categoryKey);
+    });
+    return [{ key: ALL_CATEGORY, label: t("rekomendasiProduk.categoryAll", "Semua") }, ...Array.from(byKey, ([key, label]) => ({ key, label }))];
+  }, [localized, t]);
+
+  const filtered = activeCategory === ALL_CATEGORY ? localized : localized.filter((p) => p.categoryKey === activeCategory);
 
   return (
     <div className="min-h-screen bg-[#05060a]">
@@ -87,16 +127,16 @@ export default function RekomendasiProdukPage() {
           <div className="flex flex-wrap justify-center gap-2 mb-10">
             {categories.map((c) => (
               <button
-                key={c}
-                onClick={() => setActiveCategory(c)}
+                key={c.key}
+                onClick={() => setActiveCategory(c.key)}
                 className={clsx(
                   "rounded-full border px-4 py-1.5 text-xs font-medium transition",
-                  activeCategory === c
+                  activeCategory === c.key
                     ? "border-amber-400/50 bg-amber-500/15 text-amber-200 shadow-[0_0_12px_rgba(217,180,90,0.25)]"
                     : "border-white/10 text-neutral-400 hover:border-amber-400/30 hover:text-amber-200/80"
                 )}
               >
-                {c === ALL_CATEGORY ? t("rekomendasiProduk.categoryAll", "Semua") : c}
+                {c.label}
               </button>
             ))}
           </div>
@@ -137,11 +177,22 @@ export default function RekomendasiProdukPage() {
                     <span className="text-[10px] uppercase tracking-widest text-amber-400/70">{p.category}</span>
                   )}
                   <h3 className="gm-heading text-sm font-semibold text-neutral-100 leading-snug">{p.title}</h3>
+                  {/*
+                   * Dulu "line-clamp-2": deskripsi dipotong pada baris kedua dan diakhiri elipsis.
+                   * Di sini itu merugikan — deskripsinya bukan basa-basi pemasaran, melainkan
+                   * alasan kenapa produk ini relevan untuk rental PS ("Internet ISP utama mati
+                   * total bukan berarti operasional rental berhenti..."), dan justru kalimat
+                   * setelah potongan itulah yang menjelaskannya. Menyembunyikan bagian yang paling
+                   * menentukan keputusan beli sama saja membuat kurasinya sia-sia.
+                   *
+                   * Tinggi kartu tetap rapi karena grid meregangkan tiap sel setinggi barisnya, dan
+                   * baris harga dipaku ke bawah dengan mt-auto.
+                   */}
                   {p.description && (
-                    <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">{p.description}</p>
+                    <p className="text-xs text-neutral-500 leading-relaxed whitespace-pre-line">{p.description}</p>
                   )}
                   <div className="mt-auto flex items-center justify-between pt-3">
-                    <span className="text-sm font-medium text-amber-300">{p.priceLabel || t("rekomendasiProduk.viewDetail", "Lihat Detail")}</span>
+                    <span className="text-sm font-medium text-amber-300">{formatPriceLabel(p.priceLabel) || t("rekomendasiProduk.viewDetail", "Lihat Detail")}</span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-200 transition group-hover:bg-amber-500/20">
                       {t("rekomendasiProduk.buyNow", "Beli Sekarang")} <ExternalLink size={11} />
                     </span>

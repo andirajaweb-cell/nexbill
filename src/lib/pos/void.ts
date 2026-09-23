@@ -1,26 +1,28 @@
 import { db } from "@/db/client";
-import { orders, orderItems, payments, journalEntries, journalLines, approvalRequests, staffUsers } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { orders, orderItems, payments, journalEntries, journalLines, approvalRequests, staffUsers, receivables } from "@/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { voidJournal } from "@/lib/accounting/journal";
 import { restockForItem } from "@/lib/inventory/stock";
 import { recomputeBillTotals } from "@/lib/pos/bill";
 import { executeRefundOrder } from "@/lib/pos/refund";
-import { hasPermission, StaffRole, canApproveForRole, roleLabel } from "@/lib/auth/permissions";
+import { hasPermission, StaffRole, canReviewRequestOf, roleLabel } from "@/lib/auth/permissions";
 import { logAudit } from "@/lib/audit/log";
 import { executeCashTransfer, rejectCashTransferRecord } from "@/lib/cash/transfers";
 
 /**
  * Shared by approveRequest/rejectRequest: an approval-hierarchy check on top of the
- * approve_requests permission gate — the reviewer must be strictly more senior (lower
- * ROLE_LEVEL) than whoever filed the request, per the 6-tier level structure in permissions.ts.
- * A request with no requestedBy (shouldn't normally happen) skips the check rather than block.
+ * approve_requests permission gate — the reviewer must outrank whoever filed the request, per
+ * the 6-tier level structure in permissions.ts. Owner/Superuser are exempt, since a request
+ * filed by an Owner has nobody above it inside the outlet and would otherwise hang forever —
+ * see canReviewRequestOf in permissions.ts. A request with no requestedBy (shouldn't normally
+ * happen) skips the check rather than block.
  */
 async function assertCanReviewRequest(request: typeof approvalRequests.$inferSelect, reviewerRole: StaffRole) {
   if (!request.requestedBy) return;
   const [requester] = await db.select({ role: staffUsers.role }).from(staffUsers).where(eq(staffUsers.id, request.requestedBy)).limit(1);
   if (!requester) return;
-  if (!canApproveForRole(reviewerRole, requester.role as StaffRole)) {
-    throw new Error(`Role kamu (${roleLabel(reviewerRole)}) tidak bisa menyetujui/menolak permintaan dari role yang levelnya setara atau lebih tinggi (${roleLabel(requester.role as StaffRole)}).`);
+  if (!canReviewRequestOf(reviewerRole, requester.role as StaffRole)) {
+    throw new Error(`Role kamu (${roleLabel(reviewerRole)}) tidak bisa menyetujui/menolak permintaan dari role yang levelnya setara atau lebih tinggi (${roleLabel(requester.role as StaffRole)}). Minta Owner yang menyetujui.`);
   }
 }
 
@@ -86,21 +88,58 @@ export async function hardDeleteOrder(orderId: string, staffUserId: string) {
       }
     }
 
-    const relatedJournals = await tx.select().from(journalEntries).where(eq(journalEntries.sourceId, orderId));
+    /*
+     * Jurnal yang harus ikut terhapus TIDAK semuanya ber-sourceId = orderId.
+     *
+     * BUG YANG DIPERBAIKI DI SINI (2026-09-20). Versi sebelumnya hanya menghapus entri dengan
+     * sourceId = orderId. Itu membereskan jurnal penjualan, jurnal HPP, dan seluruh pembaliknya
+     * (semuanya mewarisi sourceId order). Tapi jurnal PELUNASAN PIUTANG diposting dengan
+     * sourceId = receivable.id (lihat postReceivableSettlement di postings.ts), jadi sama sekali
+     * tidak tersentuh — dan baris receivables-nya sendiri juga ditinggalkan.
+     *
+     * Akibatnya, menghapus permanen sebuah order yang pernah dibayar sebagian meninggalkan:
+     *  - entri jurnal Dr Kas / Cr Piutang Usaha yang mengacu ke order yang sudah tidak ada, dan
+     *  - baris piutang yatim yang masih muncul di laporan Piutang (AR) atas order yang hilang.
+     *
+     * Saldo Piutang Usaha di Neraca jadi menggantung tanpa ada apa pun yang bisa menjelaskannya:
+     * pengakuan piutangnya (Dr Piutang, di jurnal penjualan) ikut terhapus, sementara pelunasannya
+     * (Cr Piutang) tetap berdiri — mendorong akun itu ke arah negatif sebanyak nilai yang sudah
+     * dilunasi. Persis kelas kerusakan yang paling sulit ditelusuri belakangan, karena tidak ada
+     * satu pun order tersisa yang menunjuk ke sana.
+     *
+     * Dikerjakan SEBELUM baris receivables dihapus, karena id-nya masih dibutuhkan untuk menemukan
+     * jurnal-jurnal itu.
+     */
+    const orderReceivables = await tx.select().from(receivables).where(eq(receivables.orderId, orderId));
+    const journalSourceIds = [orderId, ...orderReceivables.map((r) => r.id)];
+
+    const relatedJournals = await tx.select().from(journalEntries).where(inArray(journalEntries.sourceId, journalSourceIds));
     for (const j of relatedJournals) {
       await tx.delete(journalLines).where(eq(journalLines.journalEntryId, j.id));
     }
     if (relatedJournals.length) {
-      await tx.delete(journalEntries).where(eq(journalEntries.sourceId, orderId));
+      await tx.delete(journalEntries).where(inArray(journalEntries.sourceId, journalSourceIds));
+    }
+    if (orderReceivables.length) {
+      await tx.delete(receivables).where(eq(receivables.orderId, orderId));
     }
 
     await tx.delete(payments).where(eq(payments.orderId, orderId));
     await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
     await tx.delete(orders).where(eq(orders.id, orderId));
 
-    await logAudit({ outletId: order.outletId, staffUserId, action: "delete_order", entityType: "order", entityId: orderId, before: order });
+    // Snapshot piutang ikut disimpan di audit: begitu barisnya terhapus, tidak ada lagi tempat
+    // untuk merekonstruksi berapa yang pernah tercatat sebagai piutang atas order ini.
+    await logAudit({
+      outletId: order.outletId,
+      staffUserId,
+      action: "delete_order",
+      entityType: "order",
+      entityId: orderId,
+      before: { order, receivables: orderReceivables, journalEntryIds: relatedJournals.map((j) => j.id) },
+    });
 
-    return { orderId, journalsDeleted: relatedJournals.length };
+    return { orderId, journalsDeleted: relatedJournals.length, receivablesDeleted: orderReceivables.length };
   });
 }
 

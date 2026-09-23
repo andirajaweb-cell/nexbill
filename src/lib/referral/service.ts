@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { referralPartners, referralConversions, referralCommissions, referralPayouts, outlets, subscriptionInvoices } from "@/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
+import { planCommissionAccruals, readInvoiceOutletLines, type RefereeLink } from "./commission-split";
 
 const round = (n: number) => Math.round(n);
 
@@ -149,45 +150,97 @@ export async function applyRefereeSignupDiscount(outletId: string, originalUnitP
  * call is a safe no-op. No-ops entirely for an outlet that wasn't referred.
  */
 export async function accrueReferralCommission(invoice: typeof subscriptionInvoices.$inferSelect) {
-  if (invoice.type !== "subscription_fee") return null;
+  /*
+   * "group_renewal" IKUT DITERIMA sejak 2026-09-22 — sebelumnya baris ini berbunyi
+   * `if (invoice.type !== "subscription_fee") return null`, dan itu diam-diam menutup seluruh
+   * merchant multi-cabang dari program referral.
+   *
+   * Penyebabnya: cabang-cabang sebuah merchant ditagih lewat SATU faktur gabungan bertipe
+   * "group_renewal" (ensureGroupRenewalInvoiceExists di lib/subscription/service.ts), bukan satu
+   * faktur "subscription_fee" per cabang. Jadi penyaring lama membuang persis referral yang paling
+   * bernilai, tanpa galat apa pun — partner pengajak sekadar tidak pernah dibayar, dan tidak ada
+   * satu pun layar yang bisa menjelaskan kenapa.
+   *
+   * Jenis faktur lain (ai_addon, deposit_topup, extra_console, smart_plug_purchase, setup_service)
+   * memang sengaja tetap ditolak: komisi referral dihitung atas biaya LANGGANAN, bukan atas
+   * pembelian perangkat atau top-up saldo.
+   */
+  if (invoice.type !== "subscription_fee" && invoice.type !== "group_renewal") return null;
 
-  const [outlet] = await db.select({ referredByPartnerId: outlets.referredByPartnerId }).from(outlets).where(eq(outlets.id, invoice.outletId)).limit(1);
-  if (!outlet?.referredByPartnerId) return null;
+  // Rincian per outlet: faktur gabungan menyimpannya di lineItemsJson, faktur satu outlet jatuh ke
+  // satu baris berisi seluruh nilainya. Lihat readInvoiceOutletLines.
+  const lines = readInvoiceOutletLines(invoice);
+  const outletIds = Array.from(new Set(lines.map((l) => l.outletId)));
+  if (outletIds.length === 0) return null;
 
-  const [alreadyAccrued] = await db.select({ id: referralCommissions.id }).from(referralCommissions).where(eq(referralCommissions.sourceInvoiceId, invoice.id)).limit(1);
-  if (alreadyAccrued) return null;
+  const outletRows = await db
+    .select({ id: outlets.id, referredByPartnerId: outlets.referredByPartnerId })
+    .from(outlets)
+    .where(inArray(outlets.id, outletIds));
+  const referredOutlets = outletRows.filter((o) => !!o.referredByPartnerId);
+  if (referredOutlets.length === 0) return null;
 
-  const [partner] = await db.select().from(referralPartners).where(eq(referralPartners.id, outlet.referredByPartnerId)).limit(1);
-  if (!partner || !partner.isActive) return null;
+  const [partnerRows, conversionRows, existingRows] = await Promise.all([
+    db.select().from(referralPartners).where(inArray(referralPartners.id, referredOutlets.map((o) => o.referredByPartnerId as string))),
+    db.select().from(referralConversions).where(inArray(referralConversions.refereeOutletId, referredOutlets.map((o) => o.id))),
+    db.select({ referralConversionId: referralCommissions.referralConversionId }).from(referralCommissions).where(eq(referralCommissions.sourceInvoiceId, invoice.id)),
+  ]);
 
-  const [conversion] = await db.select().from(referralConversions).where(eq(referralConversions.refereeOutletId, invoice.outletId)).limit(1);
-  if (!conversion) return null;
+  const partnerById = new Map(partnerRows.map((p) => [p.id, p]));
+  const conversionByOutlet = new Map(conversionRows.map((c) => [c.refereeOutletId, c]));
 
-  const amount = round(invoice.amount * (partner.commissionPercent / 100));
-  if (amount <= 0) return null;
-
-  const [commission] = await db
-    .insert(referralCommissions)
-    .values({
+  const refereeLinks: RefereeLink[] = [];
+  for (const o of referredOutlets) {
+    const partner = partnerById.get(o.referredByPartnerId as string);
+    const conversion = conversionByOutlet.get(o.id);
+    if (!partner || !conversion) continue;
+    refereeLinks.push({
+      outletId: o.id,
       referralPartnerId: partner.id,
       referralConversionId: conversion.id,
-      sourceInvoiceId: invoice.id,
-      sourceInvoiceAmount: invoice.amount,
       commissionPercent: partner.commissionPercent,
-      amount,
-    })
-    .returning();
-
-  await db
-    .update(referralPartners)
-    .set({ totalCommissionEarned: partner.totalCommissionEarned + amount, balanceAvailable: partner.balanceAvailable + amount })
-    .where(eq(referralPartners.id, partner.id));
-
-  if (conversion.status !== "active") {
-    await db.update(referralConversions).set({ status: "active" }).where(eq(referralConversions.id, conversion.id));
+      partnerIsActive: partner.isActive,
+    });
   }
 
-  return commission;
+  const accruals = planCommissionAccruals(lines, refereeLinks, new Set(existingRows.map((r) => r.referralConversionId)));
+  if (accruals.length === 0) return null;
+
+  const created: ReferralCommissionRow[] = [];
+  for (const a of accruals) {
+    const [commission] = await db
+      .insert(referralCommissions)
+      .values({
+        referralPartnerId: a.referralPartnerId,
+        referralConversionId: a.referralConversionId,
+        sourceInvoiceId: invoice.id,
+        sourceInvoiceAmount: a.sourceInvoiceAmount,
+        commissionPercent: a.commissionPercent,
+        amount: a.amount,
+      })
+      .returning();
+    created.push(commission);
+
+    const partner = partnerById.get(a.referralPartnerId)!;
+    await db
+      .update(referralPartners)
+      .set({ totalCommissionEarned: partner.totalCommissionEarned + a.amount, balanceAvailable: partner.balanceAvailable + a.amount })
+      .where(eq(referralPartners.id, partner.id));
+    // Saldo partner di memori ikut dinaikkan — satu faktur gabungan bisa memuat dua outlet yang
+    // diajak partner yang SAMA, dan tanpa ini akrual kedua akan menulis ulang saldo dari nilai lama
+    // sehingga akrual pertama hilang.
+    partner.totalCommissionEarned += a.amount;
+    partner.balanceAvailable += a.amount;
+
+    const conversion = conversionByOutlet.get(a.outletId);
+    if (conversion && conversion.status !== "active") {
+      await db.update(referralConversions).set({ status: "active" }).where(eq(referralConversions.id, conversion.id));
+    }
+  }
+
+  // Satu baris dikembalikan apa adanya untuk pemanggil lama yang hanya memeriksa "ada/tidak";
+  // seluruh barisnya tersedia di `created` bagi pemanggil yang butuh rinciannya.
+  return created.length === 1 ? created[0] : created;
 }
 
 /** Platform-admin-only: records a manual payout and debits the partner's available balance. Balance is clamped at 0 rather than allowed to go negative on a fat-fingered overpay. */

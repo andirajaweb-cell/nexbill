@@ -4,6 +4,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { postJournal, voidJournal, JournalLineInput } from "@/lib/accounting/journal";
 import { computeTrialBalance } from "@/lib/accounting/reports";
 import { getMappedAccountId } from "@/lib/accounting/account-mapping";
+import { isPeriodLocked } from "@/lib/accounting/periods";
 import { logAudit } from "@/lib/audit/log";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 
@@ -311,10 +312,26 @@ export async function postPpobSettlementJournal(ppobTxId: string, staffUserId?: 
 
   const label = `PPOB ${row.product}${row.serviceRef ? " - " + row.serviceRef : ""}`;
 
+  /*
+   * Jurnal pelunasan dicatat pada TANGGAL TRANSAKSINYA, bukan tanggal tombol ditekan.
+   *
+   * Tanpa ini, membereskan transaksi tertanggal 6 September pada hari ini akan menaruh
+   * "Dr Utang Provider / Cr Saldo Deposit" di tanggal hari ini — utangnya muncul di September dan
+   * pelunasannya di bulan lain, sehingga Neraca menampilkan utang provider yang menggantung untuk
+   * periode di antaranya, dan saldo deposit ikut meleset di kedua bulan.
+   *
+   * Ini kelas kesalahan yang sama persis dengan yang sudah diperbaiki di voidJournal dan
+   * postAndAdvance (expense): jurnal koreksi harus mendarat di periode kejadiannya, bukan periode
+   * koreksinya. Kalau periode asal sudah ditutup lewat Tutup Periode, barulah mundur ke hari ini —
+   * buku yang sudah dikunci tidak boleh disisipi entri baru.
+   */
+  const txDate = row.createdAt;
+  const entryDate = (await isPeriodLocked(row.outletId, txDate)) ? new Date().toISOString() : txDate;
+
   return db.transaction(async (tx) => {
     const lines = await buildPpobSettlementLines(row.outletId, label, row.principal, funding, tx);
     const journalId = await postJournal(
-      { outletId: row.outletId, description: `Settlement ${label} ke provider`, sourceType: "ppob", sourceId: row.id, staffUserId, lines },
+      { outletId: row.outletId, entryDate, description: `Settlement ${label} ke provider`, sourceType: "ppob", sourceId: row.id, staffUserId, lines },
       tx
     );
     await tx

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { hasPermission, canApproveForRole, setFullEffectiveMatrix, DEFAULT_ROLE_PERMISSIONS, ALL_PERMISSIONS, ROLE_LEVEL } from "./permissions";
+import { hasPermission, canApproveForRole, canReviewRequestOf, isFullAuthorityRole, setFullEffectiveMatrix, DEFAULT_ROLE_PERMISSIONS, ALL_PERMISSIONS, ROLE_LEVEL } from "./permissions";
 
 /**
  * Task #63 — RBAC around accounting actions (post_manual_journal, close_period, reopen_period,
@@ -90,5 +90,58 @@ describe("canApproveForRole — approval hierarchy", () => {
     expect(ROLE_LEVEL.kitchen).toBe(ROLE_LEVEL.cashier);
     expect(canApproveForRole("kitchen", "cashier")).toBe(false);
     expect(canApproveForRole("cashier", "kitchen")).toBe(false);
+  });
+});
+
+/*
+ * Perbaikan 2026-09-23 — kebuntuan approval di puncak hierarki.
+ *
+ * Gejala yang dilaporkan pemilik: expense yang DIAJUKAN Owner tidak bisa disetujui maupun ditolak
+ * oleh Owner mana pun, dengan pesan "Role kamu (Owner) tidak bisa menyetujui/menolak expense dari
+ * role yang levelnya setara atau lebih tinggi (Owner)". Karena Cancel hanya berlaku untuk
+ * draft/pending dan tidak ada level di atas Owner di dalam outlet, expense itu menggantung
+ * permanen. canReviewRequestOf membuka jalan keluarnya TANPA melonggarkan aturan untuk role lain.
+ */
+describe("canReviewRequestOf — jalan keluar untuk puncak hierarki", () => {
+  it("Owner bisa menyetujui pengajuan sesama Owner — kasus yang sebelumnya buntu", () => {
+    expect(canApproveForRole("owner", "owner")).toBe(false); // aturan lama: buntu
+    expect(canReviewRequestOf("owner", "owner")).toBe(true); // aturan baru: bisa
+  });
+
+  it("Owner bisa menyetujui pengajuannya sendiri, karena uangnya memang miliknya", () => {
+    // Fungsi ini membandingkan ROLE, jadi Owner-menyetujui-dirinya-sendiri adalah kasus yang sama
+    // persis dengan Owner-menyetujui-Owner-lain. Jejaknya tetap tercatat di audit log.
+    expect(canReviewRequestOf("owner", "owner")).toBe(true);
+  });
+
+  it("Superuser tetap bisa menyetujui siapa pun, termasuk Owner dan sesama Superuser", () => {
+    expect(canReviewRequestOf("superuser", "owner")).toBe(true);
+    expect(canReviewRequestOf("superuser", "superuser")).toBe(true);
+  });
+
+  it("role di tengah hierarki TIDAK ikut dilonggarkan — ini inti perbaikannya", () => {
+    expect(canReviewRequestOf("manager", "manager")).toBe(false);
+    expect(canReviewRequestOf("supervisor", "supervisor")).toBe(false);
+    expect(canReviewRequestOf("cashier", "cashier")).toBe(false);
+    expect(canReviewRequestOf("accountant", "accountant")).toBe(false);
+  });
+
+  it("bawahan tetap tidak bisa menyetujui atasan", () => {
+    expect(canReviewRequestOf("manager", "owner")).toBe(false);
+    expect(canReviewRequestOf("supervisor", "manager")).toBe(false);
+    expect(canReviewRequestOf("cashier", "supervisor")).toBe(false);
+  });
+
+  it("atasan yang memang lebih senior tetap bisa, persis seperti sebelumnya", () => {
+    expect(canReviewRequestOf("owner", "cashier")).toBe(true);
+    expect(canReviewRequestOf("manager", "cashier")).toBe(true);
+    expect(canReviewRequestOf("supervisor", "accountant")).toBe(true);
+  });
+
+  it("hanya Owner dan Superuser yang berwenang penuh", () => {
+    expect(isFullAuthorityRole("owner")).toBe(true);
+    expect(isFullAuthorityRole("superuser")).toBe(true);
+    expect(isFullAuthorityRole("manager")).toBe(false);
+    expect(isFullAuthorityRole("supervisor")).toBe(false);
   });
 });

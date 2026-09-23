@@ -39,6 +39,7 @@ export type Permission =
   | "manage_home_rental" // operate Home Rental (Sewa Dibawa Pulang): booking, checkout, return, katalog produk/aset/paket
   | "manage_feature_flags" // toggle Home Rental (and future) feature flags in Settings > Feature Management — owner/superuser only, enforced additionally by a hard role check server-side
   | "manage_membership" // sell/renew paid membership tiers (collects cash/QRIS, posts to accounting) — Membership & CRM tier/reward/voucher CRUD itself stays owner/superuser-only (see membership/page.tsx), this only gates the front-desk "Jual Keanggotaan" money-collecting action
+  | "manage_marketplace" // pasang/tutup barang di Marketplace Antar-Outlet, ajukan & setujui kesepakatan jual-beli antar-outlet
   | "manage_cash_deposit" // record a cash pickup/deposit (till -> kas besar/saldo deposit virtual/kas kecil/prive/dividen)
   | "void_cash_deposit" // reverse an already-posted cash deposit
   | "close_period" // lock an accounting period (month) so no new journal can post into it
@@ -54,6 +55,7 @@ export const PERMISSION_GROUPS: { group: string; permissions: Permission[] }[] =
     permissions: ["void_order_direct", "refund_order", "approve_requests", "manage_bookings", "manage_ppob", "manage_membership", "kitchen_display"],
   },
   { group: "Pendapatan Lain-lain", permissions: ["manage_other_income"] },
+  { group: "Marketplace Antar-Outlet", permissions: ["manage_marketplace"] },
   { group: "Setoran Kas", permissions: ["manage_cash_deposit", "void_cash_deposit"] },
   { group: "Home Rental (Sewa Dibawa Pulang)", permissions: ["manage_home_rental", "manage_feature_flags"] },
   { group: "Inventori & Harga", permissions: ["manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history", "permanently_delete_purchase_history"] },
@@ -94,6 +96,7 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   manage_home_rental: "Operasikan Home Rental (Booking, Checkout, Return, Katalog)",
   manage_feature_flags: "Kelola Feature Management (aktif/nonaktifkan modul)",
   manage_membership: "Jual/Perpanjang Keanggotaan (terima pembayaran)",
+  manage_marketplace: "Jual/Beli di Marketplace Antar-Outlet",
   manage_cash_deposit: "Catat Setoran Kas (Kas Besar/Saldo Deposit/Kas Kecil/Prive/Dividen)",
   void_cash_deposit: "Batalkan Setoran Kas yang Sudah Diposting",
   close_period: "Tutup Periode Akuntansi (Kunci Bulan)",
@@ -119,7 +122,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
     "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history", "permanently_delete_purchase_history",
     "view_reports", "manage_devices", "manage_admin_data", "kitchen_display",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_settings", "manage_bookings", "manage_ppob", "manage_coa", "manage_other_income",
-    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit", "close_period", "reopen_period",
+    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_marketplace", "manage_cash_deposit", "void_cash_deposit", "close_period", "reopen_period",
   ],
   // The self-service top role for an outlet/merchant to manage its own business — same
   // permission set as "superuser" (see StaffRole comment above for the rationale for keeping
@@ -129,13 +132,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
     "void_order_direct", "refund_order", "approve_requests", "manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history", "permanently_delete_purchase_history",
     "view_reports", "manage_devices", "manage_admin_data", "kitchen_display",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_settings", "manage_bookings", "manage_ppob", "manage_coa", "manage_other_income",
-    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_cash_deposit", "void_cash_deposit", "close_period", "reopen_period",
+    "manage_home_rental", "manage_feature_flags", "manage_membership", "manage_marketplace", "manage_cash_deposit", "void_cash_deposit", "close_period", "reopen_period",
   ],
   manager: [
     "view_dashboard_owner", "view_accounting", "void_order_direct", "refund_order", "approve_requests",
     "manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history", "view_reports", "manage_devices",
     "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "manage_bookings", "manage_ppob", "manage_other_income",
-    "manage_home_rental", "manage_membership", "manage_cash_deposit", "void_cash_deposit",
+    "manage_home_rental", "manage_membership", "manage_marketplace", "manage_cash_deposit", "void_cash_deposit",
   ],
   // Books the entries and can reverse mistakes, but nominal-based sign-off on
   // spending itself is a manager/owner call — no approve_expenses here.
@@ -246,4 +249,44 @@ export const ROLE_LEVEL: Record<StaffRole, number> = {
 /** True only if `reviewerRole` is strictly more senior (lower level number) than `requesterRole` — equal or junior levels can never approve/reject each other's requests, regardless of what approve_requests/approve_expenses says. */
 export function canApproveForRole(reviewerRole: StaffRole, requesterRole: StaffRole): boolean {
   return ROLE_LEVEL[reviewerRole] < ROLE_LEVEL[requesterRole];
+}
+
+/**
+ * Roles that answer to nobody inside the outlet: "owner" (pemilik outlet/merchant) and
+ * "superuser" (pemilik aplikasi NEXBILL).
+ */
+export const FULL_AUTHORITY_ROLES: StaffRole[] = ["superuser", "owner"];
+
+export function isFullAuthorityRole(role: StaffRole): boolean {
+  return FULL_AUTHORITY_ROLES.includes(role);
+}
+
+/**
+ * Siapa yang boleh menyetujui/menolak permintaan (expense, void, refund) milik siapa.
+ *
+ * KENAPA INI BUKAN canApproveForRole SAJA (diperbaiki 2026-09-23). Aturan "harus lebih senior"
+ * benar untuk role di tengah hierarki — supervisor memang tidak boleh menyetujui permintaan
+ * supervisor lain, karena selalu ADA atasan yang bisa. Tapi di puncak hierarki aturan itu
+ * berbalik jadi jebakan: expense yang diajukan seorang Owner tidak punya siapa pun di atasnya di
+ * dalam outlet, sehingga permintaannya menggantung di "pending_approval" SELAMANYA — tidak bisa
+ * disetujui, tidak bisa ditolak, dan (karena Cancel hanya menyentuh draft/pending) satu-satunya
+ * jalan keluar adalah mengubah database langsung. Itulah pesan "Role kamu (Owner) tidak bisa
+ * menyetujui/menolak expense dari role yang levelnya setara atau lebih tinggi (Owner)" yang
+ * dilaporkan pemilik.
+ *
+ * Satu-satunya level di atas Owner adalah Superuser — staf NEXBILL, bukan orang outlet. Menuntut
+ * Superuser menyetujui belanja harian merchant berarti NEXBILL ikut campur dalam uang merchant,
+ * yang tidak masuk akal secara bisnis maupun secara akuntansi: uangnya milik Owner.
+ *
+ * Maka Owner dan Superuser boleh menyetujui permintaan siapa pun, termasuk sesama Owner dan
+ * termasuk permintaannya sendiri. Segregation of duty tidak hilang, hanya pindah tempat: setiap
+ * approval tetap dicatat di audit log lengkap dengan SIAPA yang menyetujui, jadi Owner yang
+ * menyetujui pengajuannya sendiri terlihat jelas di jejak audit — berbeda dengan sebelumnya, saat
+ * jalan satu-satunya adalah mengedit database tanpa jejak sama sekali.
+ *
+ * Untuk role selain keduanya, aturan lamanya tidak berubah sedikit pun.
+ */
+export function canReviewRequestOf(reviewerRole: StaffRole, requesterRole: StaffRole): boolean {
+  if (isFullAuthorityRole(reviewerRole)) return true;
+  return canApproveForRole(reviewerRole, requesterRole);
 }

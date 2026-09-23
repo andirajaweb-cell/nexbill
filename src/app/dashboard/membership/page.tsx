@@ -11,6 +11,7 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-membership";
+import { isPaidTier, summarizeTierBenefits, isMembershipActive, sisaHariKeanggotaan } from "@/lib/membership/tier-benefits";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const TABS = ["Customer", "Membership Tier", "Reward", "Voucher"] as const;
@@ -98,7 +99,8 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
   useEffect(() => { load(); }, [search]);
   useEffect(() => { fetchJsonArray(`/api/loyalty-rewards?outletId=${outletId}&activeOnly=true`).then(setRewards); }, [outletId]);
   useEffect(() => { fetchJsonArray(`/api/membership-tiers?outletId=${outletId}`).then(setTiers); }, [outletId]);
-  const payableTiers = tiers.filter((tier) => tier.feeAmount > 0);
+  const payableTiers = tiers.filter(isPaidTier);
+  const tierTerpilih = payableTiers.find((tier) => tier.id === sellForm.membershipTierId) ?? null;
 
   // Auto-open the deep-linked customer's detail panel once, on arrival from Rental's Member flow.
   useEffect(() => {
@@ -206,8 +208,15 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
               <div className="font-medium">{detail.customer.name}</div>
               <div className="font-mono text-xs text-emerald-400">{detail.customer.memberNumber ?? "-"}</div>
               <div className="text-xs text-neutral-500">{detail.customer.phone}</div>
-              {detail.tier && <Badge status="available">{detail.tier.name}</Badge>}
+              {detail.tier && <MembershipStatusBadge tier={detail.tier} expiresAt={detail.customer.membershipExpiresAt} />}
             </div>
+            {/*
+              Keuntungan tier yang sedang dipegang customer ditampilkan langsung di sini, bukan
+              hanya di tab Membership Tier. Di sinilah kasir berdiri saat member bertanya "saya
+              dapat apa?" — memaksanya pindah tab untuk menjawab adalah alasan paling umum
+              keuntungan member akhirnya tidak pernah diberikan.
+            */}
+            {detail.tier && <TierBenefitList tier={detail.tier} />}
             <div className="text-sm">{t("membership.totalSpendingLabel", "Total Belanja")}: {rupiah(detail.customer.totalSpending)}</div>
             <div className="text-sm">{t("membership.loyaltyPointsLabel", "Poin Loyalty")}: {detail.customer.loyaltyPoints}</div>
 
@@ -226,6 +235,22 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
                       <option value="">{t("membership.selectTierOption", "Pilih tier...")}</option>
                       {payableTiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name} — {rupiah(tier.feeAmount)}</option>)}
                     </select>
+                    {/*
+                      Keuntungan tier yang dipilih ditampilkan SEBELUM tombol bayar ditekan.
+                      Kasir yang menawarkan kartu member perlu bisa menyebutkan isinya tanpa
+                      menghafal, dan customer berhak tahu persis apa yang dibelinya sebelum
+                      uangnya berpindah.
+                    */}
+                    {tierTerpilih && (
+                      <div className="rounded-lg bg-black/30 p-2">
+                        <div className="text-[11px] text-neutral-400">
+                          {tierTerpilih.validityDays > 0
+                            ? t("membership.sellValidity", "Berlaku {n} hari sejak dibayar").replace("{n}", String(tierTerpilih.validityDays))
+                            : t("membership.sellValidityForever", "Berlaku seumur hidup")}
+                        </div>
+                        <TierBenefitList tier={tierTerpilih} className="mt-1.5" />
+                      </div>
+                    )}
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-1.5 text-xs">
                         <input type="radio" checked={sellForm.paymentMethod === "cash"} onChange={() => setSellForm({ ...sellForm, paymentMethod: "cash" })} /> {t("membership.cashLabel", "Cash")}
@@ -365,36 +390,193 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
   );
 }
 
-const emptyTierForm = { name: "", minSpending: 0, feeAmount: 0, pointMultiplier: 1, discountPercent: 0 };
+const emptyTierForm = {
+  name: "",
+  berbayar: true,
+  feeAmount: 0,
+  validityDays: 30,
+  minSpending: 0,
+  pointMultiplier: 1,
+  discountPercent: 0,
+  freePlayMinutes: 0,
+  freeFnbAmount: 0,
+  benefits: "",
+};
+type TierForm = typeof emptyTierForm;
+
+/** Mengubah baris tabel jadi isian form — `berbayar` tidak disimpan di database, melainkan diturunkan dari ada/tidaknya biaya keanggotaan. */
+const tierToForm = (tier: any): TierForm => ({
+  name: tier.name ?? "",
+  berbayar: (tier.feeAmount ?? 0) > 0,
+  feeAmount: tier.feeAmount ?? 0,
+  validityDays: tier.validityDays ?? 0,
+  minSpending: tier.minSpending ?? 0,
+  pointMultiplier: tier.pointMultiplier ?? 1,
+  discountPercent: tier.discountPercent ?? 0,
+  freePlayMinutes: tier.freePlayMinutes ?? 0,
+  freeFnbAmount: tier.freeFnbAmount ?? 0,
+  benefits: tier.benefits ?? "",
+});
+
+/** Kebalikannya — tier gratis dipaksa biaya 0 dan tanpa masa berlaku, supaya tidak mungkin tersimpan "gratis tapi berbiaya". */
+const formToPayload = (f: TierForm) => ({
+  name: f.name.trim(),
+  minSpending: f.minSpending,
+  feeAmount: f.berbayar ? f.feeAmount : 0,
+  validityDays: f.berbayar ? f.validityDays : 0,
+  pointMultiplier: f.pointMultiplier,
+  discountPercent: f.discountPercent,
+  freePlayMinutes: f.freePlayMinutes,
+  freeFnbAmount: f.freeFnbAmount,
+  benefits: f.benefits.trim() || null,
+});
+
+const labelKecil = "block text-[11px] uppercase tracking-wide text-neutral-500 mb-1";
+const isian = "w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm";
+
+/**
+ * Satu form dipakai untuk Tambah maupun Edit.
+ *
+ * Sebelumnya keduanya adalah dua blok JSX terpisah dengan lima isian yang sama persis, dan tiap
+ * kolom baru berarti menambahkannya di dua tempat — kalau lupa satu, kolomnya bisa diisi saat
+ * membuat tapi hilang diam-diam saat mengedit. Dengan sepuluh isian sekarang, risiko itu tidak
+ * lagi sepadan.
+ *
+ * Isiannya BERLABEL, bukan sekadar placeholder abu-abu. Alasannya sama dengan perombakan Form
+ * Expense: placeholder hilang begitu kolomnya diisi, sehingga merchant yang kembali sehari
+ * kemudian melihat deretan angka tanpa tahu angka mana artinya apa.
+ */
+function TierFormFields({ form, setForm }: { form: TierForm; setForm: (f: TierForm) => void }) {
+  const { t } = useDashboardLang();
+  const set = (patch: Partial<TierForm>) => setForm({ ...form, ...patch });
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className={labelKecil}>{t("membership.fieldTierName", "1. Nama Tier")}</label>
+        <input className={isian} placeholder={t("membership.tierNamePlaceholder", "Nama tier")} value={form.name} onChange={(e) => set({ name: e.target.value })} />
+      </div>
+
+      <div>
+        <label className={labelKecil}>{t("membership.fieldTierType", "2. Cara Customer Mendapatkannya")}</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => set({ berbayar: true })}
+            className={`rounded-lg border px-3 py-2 text-left text-xs transition ${form.berbayar ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300" : "border-neutral-700 bg-neutral-800 text-neutral-400"}`}
+          >
+            <div className="font-medium">{t("membership.tierTypePaid", "Berbayar (Kartu Member)")}</div>
+            <div className="mt-0.5 text-[11px] opacity-80">{t("membership.tierTypePaidHint", "Dijual di kasir — uangnya masuk Cash/QRIS")}</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => set({ berbayar: false })}
+            className={`rounded-lg border px-3 py-2 text-left text-xs transition ${!form.berbayar ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300" : "border-neutral-700 bg-neutral-800 text-neutral-400"}`}
+          >
+            <div className="font-medium">{t("membership.tierTypeFree", "Gratis (Naik Sendiri)")}</div>
+            <div className="mt-0.5 text-[11px] opacity-80">{t("membership.tierTypeFreeHint", "Didapat otomatis dari total belanja")}</div>
+          </button>
+        </div>
+      </div>
+
+      {form.berbayar ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className={labelKecil}>{t("membership.fieldFee", "3. Harga Kartu Member (Rp)")}</label>
+            <input type="number" min={0} className={isian} value={form.feeAmount || ""} onChange={(e) => set({ feeAmount: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className={labelKecil}>{t("membership.fieldValidity", "4. Masa Berlaku (hari)")}</label>
+            <input type="number" min={0} className={isian} value={form.validityDays} onChange={(e) => set({ validityDays: Number(e.target.value) })} />
+            <p className="mt-1 text-[11px] text-neutral-600">{t("membership.fieldValidityHint", "Isi 0 kalau berlaku seumur hidup. 30 = sebulan, 365 = setahun. Perpanjangan ditambahkan di atas sisa yang masih ada.")}</p>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <label className={labelKecil}>{t("membership.fieldMinSpending", "3. Naik Tier Setelah Belanja (Rp)")}</label>
+          <input type="number" min={0} className={isian} value={form.minSpending || ""} onChange={(e) => set({ minSpending: Number(e.target.value) })} />
+          <p className="mt-1 text-[11px] text-neutral-600">{t("membership.fieldMinSpendingHint", "Customer otomatis naik ke tier ini begitu total belanjanya tembus angka ini.")}</p>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-3">
+        <div>
+          <div className="text-xs font-medium text-emerald-300">{t("membership.autoBenefitsTitle", "Keuntungan Otomatis")}</div>
+          <p className="text-[11px] text-neutral-500">{t("membership.autoBenefitsHint", "Dipotong sendiri oleh sistem. Kasir tidak perlu mengingatnya.")}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelKecil}>{t("membership.fieldDiscount", "Diskon Tarif Main (%)")}</label>
+            <input type="number" min={0} max={100} className={isian} value={form.discountPercent || ""} onChange={(e) => set({ discountPercent: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className={labelKecil}>{t("membership.fieldMultiplier", "Pengali Poin Loyalty")}</label>
+            <input type="number" min={0} step={0.1} className={isian} value={form.pointMultiplier} onChange={(e) => set({ pointMultiplier: Number(e.target.value) })} />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-3">
+        <div>
+          <div className="text-xs font-medium text-amber-300">{t("membership.manualBenefitsTitle", "Keuntungan yang Diberikan Kasir")}</div>
+          <p className="text-[11px] text-neutral-500">
+            {t("membership.manualBenefitsHint", "Sistem hanya MENAMPILKAN ini sebagai pengingat di layar kasir — tidak memotongnya sendiri. Kasir yang memberikannya lewat diskon atau item gratis di bill.")}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelKecil}>{t("membership.fieldFreeMinutes", "Gratis Main (menit)")}</label>
+            <input type="number" min={0} className={isian} value={form.freePlayMinutes || ""} onChange={(e) => set({ freePlayMinutes: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className={labelKecil}>{t("membership.fieldFreeFnb", "Gratis Makanan/Minuman (Rp)")}</label>
+            <input type="number" min={0} className={isian} value={form.freeFnbAmount || ""} onChange={(e) => set({ freeFnbAmount: Number(e.target.value) })} />
+          </div>
+        </div>
+        <div>
+          <label className={labelKecil}>{t("membership.fieldBenefits", "Keuntungan Lain (satu per baris)")}</label>
+          <textarea
+            rows={3}
+            className={`${isian} resize-y`}
+            placeholder={t("membership.fieldBenefitsPlaceholder", "Prioritas booking akhir pekan\nGratis 1 jam saat ulang tahun\nBoleh bawa 2 teman dengan harga member")}
+            value={form.benefits}
+            onChange={(e) => set({ benefits: e.target.value })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TierTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { user } = useAuth();
   const canManage = isSuperRole(user?.role);
   const [tiers, setTiers] = useState<any[]>([]);
-  const [form, setForm] = useState(emptyTierForm);
+  const [form, setForm] = useState<TierForm>(emptyTierForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState(emptyTierForm);
+  const [editForm, setEditForm] = useState<TierForm>(emptyTierForm);
 
   const load = () => fetchJsonArray(`/api/membership-tiers?outletId=${outletId}`).then(setTiers);
   useEffect(() => { load(); }, [outletId]);
 
   const create = async () => {
-    if (!form.name) return;
-    await fetch("/api/membership-tiers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId }) });
+    if (!form.name.trim()) return showAlert(t("membership.tierNameRequired", "Nama tier wajib diisi."));
+    if (form.berbayar && !(form.feeAmount > 0)) return showAlert(t("membership.tierFeeRequired", "Tier berbayar harus punya harga kartu member di atas 0."));
+    const res = await fetch("/api/membership-tiers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...formToPayload(form), outletId }) });
+    const data = await res.json();
+    if (!res.ok) return showAlert(data.error);
     setForm(emptyTierForm);
     load();
   };
 
-  const startEdit = (tier: any) => {
-    setEditingId(tier.id);
-    setEditForm({ name: tier.name, minSpending: tier.minSpending, feeAmount: tier.feeAmount ?? 0, pointMultiplier: tier.pointMultiplier, discountPercent: tier.discountPercent });
-  };
+  const startEdit = (tier: any) => { setEditingId(tier.id); setEditForm(tierToForm(tier)); };
   const cancelEdit = () => { setEditingId(null); setEditForm(emptyTierForm); };
 
   const saveEdit = async (id: string) => {
-    if (!editForm.name) return showAlert(t("membership.tierNameRequired", "Nama tier wajib diisi."));
-    const res = await fetch(`/api/membership-tiers/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editForm) });
+    if (!editForm.name.trim()) return showAlert(t("membership.tierNameRequired", "Nama tier wajib diisi."));
+    if (editForm.berbayar && !(editForm.feeAmount > 0)) return showAlert(t("membership.tierFeeRequired", "Tier berbayar harus punya harga kartu member di atas 0."));
+    const res = await fetch(`/api/membership-tiers/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formToPayload(editForm)) });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
     cancelEdit();
@@ -412,27 +594,20 @@ function TierTab({ outletId }: { outletId: string }) {
   return (
     <div className="space-y-4">
       <Card>
-        <h2 className="font-medium mb-3">{t("membership.addTierTitle", "Tambah Tier")}</h2>
-        <p className="text-xs text-neutral-500 mb-2">{t("membership.tierFormDesc", 'Min belanja = tier didapat otomatis begitu total belanja customer tembus angka ini. Biaya Keanggotaan = tier ini juga bisa langsung "dijual" (Cash/QRIS) di detail customer, tanpa perlu menunggu belanja — isi 0 kalau tidak mau dijual langsung.')}</p>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-          <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("membership.tierNamePlaceholder", "Nama tier")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("membership.minSpendingPlaceholder", "Min belanja")} value={form.minSpending || ""} onChange={(e) => setForm({ ...form, minSpending: Number(e.target.value) })} />
-          <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("membership.feeAmountPlaceholder", "Biaya Keanggotaan (Rp)")} value={form.feeAmount || ""} onChange={(e) => setForm({ ...form, feeAmount: Number(e.target.value) })} />
-          <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("membership.pointMultiplierPlaceholder", "Multiplier poin")} value={form.pointMultiplier} onChange={(e) => setForm({ ...form, pointMultiplier: Number(e.target.value) })} />
-          <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("membership.discountPercentPlaceholder", "Diskon %")} value={form.discountPercent || ""} onChange={(e) => setForm({ ...form, discountPercent: Number(e.target.value) })} />
-        </div>
-        <Button className="mt-2" onClick={create}>{t("membership.saveTierBtn", "Simpan Tier")}</Button>
+        <h2 className="font-medium mb-1">{t("membership.addTierTitle", "Tambah Tier")}</h2>
+        <p className="text-xs text-neutral-500 mb-4">
+          {t("membership.tierFormDesc2", "Outlet Anda yang menentukan sendiri: mau keanggotaan gratis yang naik sendiri dari belanja, atau kartu member berbayar yang dijual di kasir — lengkap dengan harga, masa berlaku, dan keuntungannya.")}
+        </p>
+        <TierFormFields form={form} setForm={setForm} />
+        <Button className="mt-4" onClick={create}>{t("membership.saveTierBtn", "Simpan Tier")}</Button>
       </Card>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {tiers.map((tier) => (
           <Card key={tier.id}>
             {editingId === tier.id ? (
-              <div className="space-y-2">
-                <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm" placeholder={t("membership.minSpendingPlaceholder", "Min belanja")} value={editForm.minSpending} onChange={(e) => setEditForm({ ...editForm, minSpending: Number(e.target.value) })} />
-                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm" placeholder={t("membership.feeAmountPlaceholder", "Biaya Keanggotaan (Rp)")} value={editForm.feeAmount} onChange={(e) => setEditForm({ ...editForm, feeAmount: Number(e.target.value) })} />
-                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm" placeholder={t("membership.pointMultiplierPlaceholder", "Multiplier poin")} value={editForm.pointMultiplier} onChange={(e) => setEditForm({ ...editForm, pointMultiplier: Number(e.target.value) })} />
-                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm" placeholder={t("membership.discountPercentPlaceholder", "Diskon %")} value={editForm.discountPercent} onChange={(e) => setEditForm({ ...editForm, discountPercent: Number(e.target.value) })} />
+              <div className="space-y-3">
+                <TierFormFields form={editForm} setForm={setEditForm} />
                 <div className="flex gap-2">
                   <Button className="text-xs" onClick={() => saveEdit(tier.id)}>{t("membership.saveBtn", "Simpan")}</Button>
                   <button className="text-xs text-neutral-400" onClick={cancelEdit}>{t("membership.cancelBtn", "Batal")}</button>
@@ -441,24 +616,112 @@ function TierTab({ outletId }: { outletId: string }) {
             ) : (
               <>
                 <div className="flex justify-between items-start">
-                  <div className="font-medium">{tier.name}</div>
+                  <div>
+                    <div className="font-medium">{tier.name}</div>
+                    {isPaidTier(tier) ? (
+                      <div className="text-xs text-emerald-400">
+                        {rupiah(tier.feeAmount)}
+                        {tier.validityDays > 0
+                          ? ` · ${t("membership.validForDays", "berlaku {n} hari").replace("{n}", String(tier.validityDays))}`
+                          : ` · ${t("membership.validForever", "seumur hidup")}`}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-neutral-500">{t("membership.freeTierLabel", "Gratis — naik sendiri setelah belanja {amount}").replace("{amount}", rupiah(tier.minSpending))}</div>
+                    )}
+                  </div>
                   {canManage && (
-                    <div className="flex gap-2 text-xs">
+                    <div className="flex gap-2 text-xs shrink-0">
                       <button className="text-emerald-400" onClick={() => startEdit(tier)}>{t("membership.editBtn", "Edit")}</button>
                       <button className="text-red-400" onClick={() => remove(tier)}>{t("membership.deleteBtn", "Hapus")}</button>
                     </div>
                   )}
                 </div>
-                <div className="text-xs text-neutral-500">{t("membership.minSpendingLabel", "Min belanja {amount}").replace("{amount}", rupiah(tier.minSpending))}</div>
-                <div className="text-xs text-neutral-500">{t("membership.pointsMultiplierDiscountLabel", "Poin x{multiplier} · Diskon {percent}%").replace("{multiplier}", String(tier.pointMultiplier)).replace("{percent}", String(tier.discountPercent))}</div>
-                <div className="text-xs mt-0.5">
-                  {tier.feeAmount > 0 ? <span className="text-emerald-400">{t("membership.sellableLabel", "Bisa dijual: {amount}").replace("{amount}", rupiah(tier.feeAmount))}</span> : <span className="text-neutral-600">{t("membership.notSellableLabel", "Tidak dijual langsung (via belanja saja)")}</span>}
-                </div>
+                <TierBenefitList tier={tier} className="mt-3" />
               </>
             )}
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Status keanggotaan customer: aktif, sisa harinya menipis, atau sudah habis.
+ *
+ * Kedaluwarsa SENGAJA tetap menampilkan nama tier-nya, bukan menghilangkannya. Sistem memang
+ * berhenti memberi diskon (lihat computeEffectiveHourlyRate), tapi kasir perlu melihat "Gold —
+ * sudah habis" untuk tahu ada perpanjangan yang bisa ditawarkan detik itu juga. Menghapus
+ * statusnya dari layar justru membuang penjualan yang paling mudah.
+ */
+function MembershipStatusBadge({ tier, expiresAt }: { tier: any; expiresAt: string | null | undefined }) {
+  const { t } = useDashboardLang();
+  const aktif = isMembershipActive(expiresAt);
+  const sisa = sisaHariKeanggotaan(expiresAt);
+
+  if (!aktif) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <Badge status="failed">{tier.name}</Badge>
+        <span className="text-[11px] text-rose-400">{t("membership.expiredLabel", "Masa berlaku habis")}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      <Badge status="available">{tier.name}</Badge>
+      {sisa !== null && (
+        <span className={`text-[11px] ${sisa <= 7 ? "text-amber-400" : "text-neutral-500"}`}>
+          {t("membership.daysLeftLabel", "sisa {n} hari").replace("{n}", String(sisa))}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Daftar keuntungan sebuah tier, dipisah tegas antara yang berjalan otomatis dan yang harus
+ * diberikan kasir sendiri — pembagiannya ditentukan summarizeTierBenefits(), bukan di sini.
+ *
+ * Pemisahan ini bukan kosmetik. "Diskon 10%" memang dipotong sistem saat sesi dihitung, tapi
+ * "gratis 30 menit" tidak ada kodenya di mana pun. Menampilkan keduanya dalam satu daftar rata
+ * akan membuat merchant mengira sistem mengurusnya, lalu member menagih jam gratis yang tidak
+ * pernah muncul di bill.
+ */
+function TierBenefitList({ tier, className = "" }: { tier: any; className?: string }) {
+  const { t } = useDashboardLang();
+  const s = summarizeTierBenefits(tier);
+  const otomatis: string[] = [];
+  if (s.otomatis.discountPercent > 0) otomatis.push(t("membership.benefitDiscount", "Diskon tarif main {n}%").replace("{n}", String(s.otomatis.discountPercent)));
+  if (s.otomatis.pointMultiplier > 1) otomatis.push(t("membership.benefitMultiplier", "Poin loyalty x{n}").replace("{n}", String(s.otomatis.pointMultiplier)));
+
+  const manual: string[] = [];
+  if (s.manual.freePlayMinutes > 0) manual.push(t("membership.benefitFreeMinutes", "Gratis main {n} menit").replace("{n}", String(s.manual.freePlayMinutes)));
+  if (s.manual.freeFnbAmount > 0) manual.push(t("membership.benefitFreeFnb", "Gratis makanan/minuman {amount}").replace("{amount}", rupiah(s.manual.freeFnbAmount)));
+  manual.push(...s.manual.catatan);
+
+  if (otomatis.length === 0 && manual.length === 0) {
+    return <p className={`text-xs text-neutral-600 ${className}`}>{t("membership.noBenefitsYet", "Belum ada keuntungan yang diatur untuk tier ini.")}</p>;
+  }
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {otomatis.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-emerald-500/80">{t("membership.autoBenefitsTitle", "Keuntungan Otomatis")}</div>
+          <ul className="mt-0.5 space-y-0.5">
+            {otomatis.map((b, i) => <li key={i} className="text-xs text-neutral-300">• {b}</li>)}
+          </ul>
+        </div>
+      )}
+      {manual.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-amber-500/80">{t("membership.manualBenefitsShort", "Diberikan Kasir")}</div>
+          <ul className="mt-0.5 space-y-0.5">
+            {manual.map((b, i) => <li key={i} className="text-xs text-neutral-400">• {b}</li>)}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

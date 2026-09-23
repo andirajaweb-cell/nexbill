@@ -59,6 +59,8 @@
  * 127.0.0.1 only, closing off RELAY_WS_PORT from the LAN/internet entirely.
  */
 
+import type { RelayAction, RelayCapability } from "./capabilities";
+
 // WebSocket port: agents connect here (outbound from the outlet).
 export const RELAY_WS_PORT = Number(process.env.RELAY_WS_PORT || 8081);
 
@@ -109,17 +111,38 @@ export const RELAY_COMMAND_TIMEOUT_MS = 15_000;
 export const RELAY_HEARTBEAT_INTERVAL_MS = 20_000;
 export const RELAY_HEARTBEAT_TIMEOUT_MS = 45_000;
 
-export type RelayAction = "turnOn" | "turnOff" | "getState";
+// Daftar perintah + kemampuan agent dipindah ke lib/relay/capabilities.ts (modul murni yang juga
+// dipakai adapter dan, nanti, agent v1.2). Diekspor ulang di sini supaya setiap import lama
+// `RelayAction` dari file ini tetap jalan tanpa diubah. (import-nya ada di bagian atas file.)
+export type { RelayAction, RelayCapability };
 
-/** Agent -> Hub, first message after connecting. */
+/**
+ * Agent -> Hub, first message after connecting.
+ *
+ * agentVersion/capabilities/os ditambahkan untuk agent v1.2 dan SEMUANYA OPSIONAL: agent v1.1
+ * yang sudah terpasang di outlet hanya mengirim `token`, dan hub harus tetap menerimanya
+ * (lihat normalizeHandshake di lib/relay/capabilities.ts, yang memperlakukannya sebagai v1.1).
+ */
 export interface RelayAuthMessage {
   type: "auth";
   token: string;
+  agentVersion?: string;
+  capabilities?: string[];
+  os?: string;
 }
 
-/** Hub -> Agent, reply to auth. */
+/**
+ * Hub -> Agent, reply to auth.
+ *
+ * lang/updateChannel baru di tahap 1 v1.2 dan opsional. Agent v1.1 hanya memeriksa
+ * `msg.type === 'auth_ok'` dan mengabaikan kolom lain, jadi aman dikirim ke agent lama.
+ */
 export interface RelayAuthOkMessage {
   type: "auth_ok";
+  /** Bahasa outlet (outlets.preferredLang) — dipakai agent v1.2 untuk teks di jendela konsolnya. */
+  lang?: string;
+  /** Jalur update: "stable" untuk semua outlet, "beta" untuk outlet uji. */
+  updateChannel?: "stable" | "beta";
 }
 export interface RelayAuthErrorMessage {
   type: "auth_error";
@@ -134,6 +157,17 @@ export interface RelayCommandMessage {
   ip: string;
   port: number;
   adbPath?: string;
+  /** Hanya untuk action "switchHdmi" — 1..4, sudah divalidasi hub (dan divalidasi ULANG oleh agent). */
+  hdmiPort?: number;
+  /** Hanya untuk action "openScreensaver" — paket browser yang dipakai saat pairing, sudah divalidasi hub. */
+  browserPackage?: string;
+}
+
+/** Info TV dari action "getTvInfo". */
+export interface RelayTvInfo {
+  brand?: string;
+  model?: string;
+  android?: string;
 }
 
 /** Agent -> Hub, the result of executing a command. */
@@ -143,6 +177,7 @@ export interface RelayResultMessage {
   ok: boolean;
   state?: "on" | "off" | "unknown";
   error?: string;
+  info?: RelayTvInfo;
 }
 
 /** Agent -> Hub heartbeat / Hub -> Agent reply. */
@@ -167,10 +202,20 @@ export interface RelayDispatchRequest {
   ip: string;
   port: number;
   adbPath?: string;
+  hdmiPort?: number;
+  browserPackage?: string;
 }
+
+/**
+ * Kode kegagalan yang bisa dibaca mesin — supaya app (tahap 2) bisa membedakan "agent ini belum
+ * mampu, pakai perintah lama saja" dari "agent sedang mati" tanpa mencocokkan teks pesan galat.
+ */
+export type RelayDispatchErrorCode = "UNKNOWN_ACTION" | "UNSUPPORTED_ACTION" | "INVALID_PARAMS" | "AGENT_OFFLINE" | "TIMEOUT";
 
 export interface RelayDispatchResponse {
   ok: boolean;
   state?: "on" | "off" | "unknown";
   error?: string;
+  code?: RelayDispatchErrorCode;
+  info?: RelayTvInfo;
 }

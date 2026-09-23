@@ -98,9 +98,15 @@ function connect() {
         } else if (msg.action === "turnOff") {
           await adbSleep(target);
           send(ws, { type: "result", id: msg.id, ok: true });
-        } else {
+        } else if (msg.action === "getState") {
           const state = await adbGetState(target);
           send(ws, { type: "result", id: msg.id, ok: true, state });
+        } else {
+          // Dulu cabang `else` ini langsung menjalankan getState dan membalas ok: true untuk
+          // perintah APA PUN — perintah yang tidak dikenal dilaporkan berhasil. Agent skrip ini
+          // tidak melaporkan versi, jadi hub memperlakukannya sebagai v1.1 dan tidak akan
+          // mengirim perintah baru; cabang ini jaring pengaman kedua kalau aturan itu berubah.
+          send(ws, { type: "result", id: msg.id, ok: false, error: `Perintah "${msg.action}" tidak didukung agent ini.` });
         }
       } catch (err: unknown) {
         send(ws, { type: "result", id: msg.id, ok: false, error: describeError(err) || "Perintah gagal." });

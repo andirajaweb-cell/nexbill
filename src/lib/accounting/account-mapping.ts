@@ -261,7 +261,23 @@ const PAYMENT_METHOD_FALLBACK_CODE: Record<string, string> = {
   card: "1125",
   transfer: "1121",
   bank: "1121", // legacy/free-text alias still used by some non-order payment flows
-  fastpay_h2h: "1137",
+  /*
+   * DULU "1137". Diubah ke 1131 (QRIS) pada 2026-09-21 — 1137 sudah tidak ada di DEFAULT_COA sejak
+   * Fastpay dicabut (16/9), sementara baris ini tertinggal dan tidak ikut dibersihkan.
+   *
+   * Kenapa itu berbahaya meski channel-nya sudah mati: getAccountIdByCode MELEMPAR ERROR kalau
+   * kodenya tidak ada. Jadi pada outlet yang di-seed setelah 16/9, satu pembayaran bermetode
+   * fastpay_h2h akan menggagalkan seluruh posting jurnalnya, dan ordernya berakhir sebagai
+   * "Belum Terposting" di Rekonsiliasi tanpa petunjuk apa pun bahwa penyebabnya sebuah kode akun
+   * yatim.
+   *
+   * Dialihkan ke 1131 karena channel ini memang berbasis QRIS, dan Transaction Center pun sudah
+   * mengelompokkannya di bawah "QRIS" (PAYMENT_METHOD_GROUP di lib/reports/transactions.ts).
+   * Outlet lama yang punya baris Account Mapping eksplisit untuk fastpay_h2h TIDAK terpengaruh —
+   * mapping selalu menang atas fallback ini; yang berubah hanya outlet yang mengandalkan fallback,
+   * dan bagi mereka pilihannya adalah masuk ke QRIS atau gagal total.
+   */
+  fastpay_h2h: "1131",
   // iPaymu channels — QRIS/DANA/ShopeePay settle into the SAME "what's our QRIS/DANA/ShopeePay
   // balance" bucket regardless of which gateway processed the scan (a customer's QRIS payment
   // looks identical to the merchant whether Fastpay or iPaymu settled it), reusing the existing
@@ -300,6 +316,41 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = { ...SHARED_PAYMENT_METHOD_
  * old lumped Bank account and are not retroactively migrated; only new
  * payments from now on route to the correct channel).
  */
+/**
+ * Versi HANYA-BACA dari getCashBankAccountIdForPaymentMethod di bawah — untuk memberi tahu pemakai
+ * ke akun mana uangnya akan masuk, SEBELUM pembayarannya benar-benar dibuat.
+ *
+ * Kenapa perlu fungsi terpisah: getCashBankAccountIdForPaymentMethod MEMBUAT baris cashBankAccounts
+ * kalau belum ada. Perilaku itu benar saat memproses pembayaran sungguhan, tapi menjadi efek
+ * samping yang tidak diinginkan kalau dipanggil hanya untuk menampilkan label di layar — sekadar
+ * membuka halaman Piutang tidak boleh menambah akun kas baru ke buku besar outlet.
+ *
+ * Dibuat untuk tab Piutang (AR), yang sebelumnya sama sekali tidak menyebutkan ke kas mana
+ * pelunasan akan masuk. Pemilik outlet menanyakannya secara langsung, dan memang tidak ada satu pun
+ * petunjuk di layar itu — padahal jawabannya menentukan laci kas mana yang saldonya bertambah.
+ */
+export async function previewPaymentDestinationAccount(
+  outletId: string,
+  method: string,
+  dbc: DbOrTx = db
+): Promise<{ code: string; name: string } | null> {
+  const key = method.toLowerCase();
+  const fallbackCode = PAYMENT_METHOD_FALLBACK_CODE[key] ?? "1121";
+  const accountId = await getMappedAccountId(outletId, "payment", key, fallbackCode, dbc);
+  const [account] = await dbc.select({ code: accounts.code, name: accounts.name }).from(accounts).where(eq(accounts.id, accountId)).limit(1);
+  if (!account) return null;
+
+  // Nama baris cashBankAccounts (kalau sudah ada) lebih dikenal pemakai daripada nama akun COA-nya,
+  // karena itulah nama yang muncul di tutup shift dan di form pengeluaran.
+  const [wrapper] = await dbc
+    .select({ name: cashBankAccounts.name })
+    .from(cashBankAccounts)
+    .where(and(eq(cashBankAccounts.outletId, outletId), eq(cashBankAccounts.accountId, accountId)))
+    .limit(1);
+
+  return { code: account.code, name: wrapper?.name ?? PAYMENT_METHOD_LABEL[key] ?? account.name };
+}
+
 export async function getCashBankAccountIdForPaymentMethod(outletId: string, method: string, dbc: DbOrTx = db): Promise<string> {
   const key = method.toLowerCase();
   const fallbackCode = PAYMENT_METHOD_FALLBACK_CODE[key] ?? "1121";

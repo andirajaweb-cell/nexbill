@@ -5,6 +5,7 @@ import { postJournal, voidJournal } from "@/lib/accounting/journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
 import { logAudit } from "@/lib/audit/log";
 import { resolvePaymentFee, feeExpenseLine } from "@/lib/accounting/payment-fee";
+import { computeMembershipExpiry } from "./tier-benefits";
 
 /**
  * Paid membership signups/renewals — "Jual Keanggotaan" on the Membership & CRM page. A customer
@@ -99,8 +100,23 @@ export async function sellMembership(input: SellMembershipInput) {
   });
 
   await db.update(membershipPayments).set({ journalEntryId: journalId }).where(eq(membershipPayments.id, row.id));
-  // Assign/upgrade the customer to this tier immediately — the whole point of paying.
-  await db.update(customers).set({ membershipTierId: tier.id }).where(eq(customers.id, input.customerId));
+
+  /*
+   * Assign/upgrade the customer to this tier immediately — the whole point of paying — dan pasang
+   * tanggal berakhirnya sesuai validityDays tier.
+   *
+   * Perpanjangan ditumpuk di atas sisa masa berlaku yang masih ada, bukan dimulai ulang dari hari
+   * ini; alasannya ada di computeMembershipExpiry(). Sisa itu hanya diperhitungkan kalau member
+   * memperpanjang tier YANG SAMA — pindah ke tier lain adalah keanggotaan baru, dan menambahkan
+   * sisa hari tier lama ke tier baru yang harganya berbeda akan memberi masa berlaku yang tidak
+   * pernah dibayar siapa pun.
+   */
+  const memperpanjangTierYangSama = customer.membershipTierId === tier.id;
+  const membershipExpiresAt = computeMembershipExpiry(
+    tier.validityDays,
+    memperpanjangTierYangSama ? customer.membershipExpiresAt : null
+  );
+  await db.update(customers).set({ membershipTierId: tier.id, membershipExpiresAt }).where(eq(customers.id, input.customerId));
 
   await logAudit({
     outletId: input.outletId,
