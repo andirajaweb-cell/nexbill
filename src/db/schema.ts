@@ -342,6 +342,17 @@ export const tvScreens = pgTable(
     hdmiPort: integer("hdmi_port"),
     /** Paket browser yang dipakai saat pairing — openScreensaver harus membuka browser yang SAMA supaya token pairing di penyimpanannya tetap terbaca. */
     browserPackage: text("browser_package"),
+    /**
+     * Kapan staf MENGONFIRMASI (migrasi 0011) bahwa di TV ini screensaver benar-benar terbuka dan
+     * TV benar-benar pindah ke HDMI PlayStation. Ini konfirmasi MANUSIA, bukan hasil perintah:
+     * `input keyevent 243` bisa dibalas "berhasil" oleh agent sementara TV merek tertentu diam-diam
+     * mengabaikannya. Hanya mata di depan TV yang bisa memastikan. autoSwitchEnabled tidak bisa
+     * dinyalakan selama kolom ini NULL, dan kolom ini di-NULL-kan lagi setiap kali unit, port HDMI,
+     * atau browser diganti — pengaturan yang berubah harus dites ulang.
+     */
+    autoSwitchVerifiedAt: text("auto_switch_verified_at"),
+    /** Hasil terakhir "Deteksi TV" (getTvInfo) sebagai JSON: merek, model, versi Android, daftar browser. */
+    tvInfo: text("tv_info"),
     ...timestamps,
   },
   (t) => [index("tv_screens_outlet_idx").on(t.outletId), uniqueIndex("tv_screens_pairing_code_idx").on(t.pairingCode)]

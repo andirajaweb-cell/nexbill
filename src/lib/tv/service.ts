@@ -308,6 +308,14 @@ export async function updateTvScreen(
   if (patch.rentalUnitId !== undefined) {
     if (patch.rentalUnitId) await assertUnitCanHaveScreen(outletId, patch.rentalUnitId);
     set.rentalUnitId = patch.rentalUnitId || null;
+    // Layar dipindah ke unit lain → hasil tes otomatisasi (NexbillAgent v1.2) tidak berlaku lagi:
+    // yang dites dulu adalah TV unit LAMA. Otomatisasi dimatikan sampai dites ulang. Hanya
+    // dilakukan kalau unitnya benar-benar berubah, bukan setiap kali formulir disimpan.
+    const [current] = await db.select({ rentalUnitId: tvScreens.rentalUnitId }).from(tvScreens).where(and(eq(tvScreens.id, screenId), eq(tvScreens.outletId, outletId))).limit(1);
+    if (current && (current.rentalUnitId ?? null) !== (patch.rentalUnitId || null)) {
+      set.autoSwitchVerifiedAt = null;
+      set.autoSwitchEnabled = false;
+    }
   }
   if (patch.isActive !== undefined) set.isActive = !!patch.isActive;
 

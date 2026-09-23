@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { createTvScreen, listTvScreens } from "@/lib/tv/service";
 
@@ -26,6 +27,11 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    // Diperiksa di server, bukan hanya dengan menyembunyikan form di Pengaturan — lihat catatan di
+    // screens/[id]/route.ts.
+    if (!hasPermission(session.role as StaffRole, "manage_settings")) {
+      return NextResponse.json({ error: "Role kamu tidak punya izin menambah layar TV." }, { status: 403 });
+    }
 
     const body = await req.json();
     const screen = await createTvScreen(session.outletId, body.name, body.rentalUnitId ?? null);

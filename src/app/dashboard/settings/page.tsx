@@ -1789,8 +1789,14 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
   const [newName, setNewName] = useState("");
   const [newUnitId, setNewUnitId] = useState("");
 
+  const [automation, setAutomation] = useState<Record<string, TvAutomationStatus>>({});
+
   const loadSettings = () => fetchJsonObject<TvSettingsData>("/api/tv/settings").then((d) => d && setSettings(d));
-  const loadScreens = () => fetchJsonArray<TvScreenData>("/api/tv/screens").then((d) => setScreens(d ?? []));
+  const loadAutomation = () =>
+    fetchJsonObject<Record<string, TvAutomationStatus>>("/api/tv/screens/automation").then((d) => setAutomation(d ?? {}));
+  // Otomatisasi dimuat ulang bersama daftar layar: mengganti unit sebuah layar mengubah kesiapan
+  // otomatisasinya (dan membatalkan verifikasinya), jadi keduanya tidak boleh tampil tidak sinkron.
+  const loadScreens = () => Promise.all([fetchJsonArray<TvScreenData>("/api/tv/screens").then((d) => setScreens(d ?? [])), loadAutomation()]);
 
   useEffect(() => {
     loadSettings();
@@ -2138,11 +2144,259 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
                     </Button>
                   </div>
                 )}
+                {s.rentalUnitId && automation[s.id] && (
+                  <ScreenAutomationPanel screenId={s.id} status={automation[s.id]} canManage={canManage} onChanged={loadAutomation} />
+                )}
               </div>
             ))}
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+/** Cermin ScreenAutomationStatus di lib/tv/automation.ts. */
+interface TvAutomationStatus {
+  readiness: {
+    viaRelay: boolean;
+    canOpenScreensaver: boolean;
+    canSwitchHdmi: boolean;
+    canReadTvInfo: boolean;
+    agentName: string | null;
+    agentVersion: string | null;
+    agentOnline: boolean;
+    blocker: string | null;
+  };
+  hdmiPort: number | null;
+  browserPackage: string | null;
+  autoSwitchEnabled: boolean;
+  verifiedAt: string | null;
+  tvInfo: { brand?: string; model?: string; android?: string; browsers?: string[] } | null;
+}
+
+type TvTestKind = "openScreensaver" | "switchHdmi" | "getTvInfo";
+type TvTestResult = { ok: boolean; error?: string };
+
+/**
+ * Otomatisasi per layar: "sesi selesai → screensaver, sesi mulai → HDMI PlayStation" (NexbillAgent
+ * v1.2). Logikanya di lib/tv/automation.ts; di sini hanya urutan langkah untuk merchant.
+ *
+ * URUTAN YANG DIPAKSA: port HDMI → dua tes → konfirmasi dengan mata sendiri → baru saklar bisa
+ * dinyalakan. Server menegakkan hal yang sama (canEnableAutoSwitch), jadi urutan di layar ini
+ * hanya supaya merchant tidak menabrak penolakan server tanpa tahu langkah mana yang terlewat.
+ *
+ * Tombol konfirmasi baru muncul setelah KEDUA tes di halaman ini membalas berhasil. "Berhasil" dari
+ * server hanya berarti agent menjalankan perintahnya, bukan bahwa TV bereaksi — itu sebabnya
+ * kalimat tombolnya meminta staf menyatakan apa yang ia lihat di TV, bukan sekadar "lanjut".
+ */
+function ScreenAutomationPanel({
+  screenId,
+  status,
+  canManage,
+  onChanged,
+}: {
+  screenId: string;
+  status: TvAutomationStatus;
+  canManage: boolean;
+  onChanged: () => Promise<unknown>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [results, setResults] = useState<Partial<Record<TvTestKind, TvTestResult>>>({});
+  const [browserDraft, setBrowserDraft] = useState(status.browserPackage ?? "");
+  const r = status.readiness;
+
+  useEffect(() => setBrowserDraft(status.browserPackage ?? ""), [status.browserPackage]);
+
+  // Smart plug / belum ada perangkat: satu baris keterangan saja. Semua outlet saat ini memakai
+  // smart plug, jadi panel lengkap di setiap layar hanya akan jadi kebisingan.
+  if (!r.viaRelay) {
+    return (
+      <div className="basis-full text-xs text-neutral-600">
+        Otomatisasi mulai/selesai sesi: tidak tersedia — {r.blocker}
+      </div>
+    );
+  }
+
+  const patch = async (body: Record<string, unknown>) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/tv/screens/${screenId}/automation`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        await showAlert(data.error ?? "Gagal menyimpan.");
+        return false;
+      }
+      // Mengganti port HDMI atau browser membatalkan verifikasi di server — hasil tes di layar ini
+      // juga harus ikut dibuang, supaya tombol konfirmasi tidak muncul untuk kombinasi yang belum dites.
+      if (body.hdmiPort !== undefined || body.browserPackage !== undefined) setResults({});
+      await onChanged();
+      return true;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runTest = async (kind: TvTestKind) => {
+    if (kind !== "getTvInfo") {
+      const ok = await showConfirm("Tes ini benar-benar mengubah tampilan TV. Pastikan bilik ini sedang TIDAK dipakai pelanggan. Lanjutkan?");
+      if (!ok) return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/tv/screens/${screenId}/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind }),
+      });
+      const data = await res.json();
+      const result: TvTestResult = res.ok ? { ok: !!data.ok, error: data.error } : { ok: false, error: data.error ?? "Tes gagal dijalankan." };
+      setResults((prev) => ({ ...prev, [kind]: result }));
+      if (kind === "getTvInfo" && result.ok) await onChanged();
+    } catch {
+      setResults((prev) => ({ ...prev, [kind]: { ok: false, error: "Tidak bisa menghubungi server." } }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const bothTestsPassed = !!results.openScreensaver?.ok && !!results.switchHdmi?.ok;
+  const info = status.tvInfo;
+
+  const resultLine = (kind: TvTestKind, successText: string) => {
+    const res = results[kind];
+    if (!res) return null;
+    return res.ok ? (
+      <div className="text-emerald-300/90">{successText}</div>
+    ) : (
+      <div className="text-rose-300/90">Gagal: {res.error}</div>
+    );
+  };
+
+  return (
+    <div className="basis-full mt-2 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3 space-y-3 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="font-medium text-sm text-neutral-200">Otomatisasi sesi (Relay Agent)</div>
+        <div className="text-neutral-500">
+          {r.agentName ?? "Agent"} · versi {r.agentVersion ?? "—"} · {r.agentOnline ? <span className="text-emerald-400">online</span> : <span className="text-amber-400">offline</span>}
+        </div>
+      </div>
+
+      <p className="text-neutral-500">
+        Saat aktif: sesi <span className="text-neutral-300">selesai</span> → TV membuka screensaver NEXBILL; sesi <span className="text-neutral-300">mulai</span> → TV
+        pindah ke HDMI PlayStation. Kalau salah satu gagal, sesi tetap jalan dan kasir mendapat peringatan.
+      </p>
+
+      {r.blocker ? (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-amber-200">{r.blocker}</div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="1. PlayStation dicolok di HDMI">
+              <select
+                className={inputCls}
+                disabled={!canManage || busy}
+                value={status.hdmiPort ?? ""}
+                onChange={(e) => patch({ hdmiPort: e.target.value === "" ? null : Number(e.target.value) })}
+              >
+                <option value="">— pilih —</option>
+                {[1, 2, 3, 4].map((p) => (
+                  <option key={p} value={p}>
+                    HDMI {p}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Browser di TV (opsional)">
+              {info?.browsers && info.browsers.length > 0 ? (
+                <select
+                  className={inputCls}
+                  disabled={!canManage || busy}
+                  value={status.browserPackage ?? ""}
+                  onChange={(e) => patch({ browserPackage: e.target.value || null })}
+                >
+                  <option value="">Browser bawaan TV</option>
+                  {info.browsers.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className={inputCls}
+                  disabled={!canManage || busy}
+                  placeholder="kosongkan = browser bawaan"
+                  value={browserDraft}
+                  onChange={(e) => setBrowserDraft(e.target.value)}
+                  onBlur={() => {
+                    if ((browserDraft.trim() || null) !== (status.browserPackage ?? null)) patch({ browserPackage: browserDraft.trim() || null });
+                  }}
+                />
+              )}
+            </Field>
+
+            {r.canReadTvInfo && (
+              <Button variant="secondary" disabled={!canManage || busy} onClick={() => runTest("getTvInfo")}>
+                Deteksi TV
+              </Button>
+            )}
+          </div>
+
+          {info && (info.brand || info.model) && (
+            <div className="text-neutral-500">
+              TV terdeteksi: <span className="text-neutral-300">{[info.brand, info.model].filter(Boolean).join(" ")}</span>
+              {info.android ? ` · Android ${info.android}` : ""}
+            </div>
+          )}
+          {results.getTvInfo && !results.getTvInfo.ok && <div className="text-rose-300/90">Deteksi gagal: {results.getTvInfo.error}</div>}
+          <p className="text-neutral-600">
+            Pilih browser yang SAMA dengan yang dipakai saat pairing di <span className="text-neutral-400">nexbill.id/tv</span> — kalau berbeda, TV akan meminta kode pairing
+            lagi setiap kali sesi selesai.
+          </p>
+
+          <div className="space-y-2">
+            <div className="text-neutral-400">2. Tes di TV sungguhan — jalankan saat bilik kosong, lalu LIHAT layar TV-nya.</div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" disabled={!canManage || busy} onClick={() => runTest("openScreensaver")}>
+                Tes buka screensaver
+              </Button>
+              <Button variant="secondary" disabled={!canManage || busy || !status.hdmiPort} onClick={() => runTest("switchHdmi")}>
+                Tes pindah ke HDMI {status.hdmiPort ?? "?"}
+              </Button>
+            </div>
+            {resultLine("openScreensaver", "Perintah terkirim. Lihat TV-nya: apakah screensaver NEXBILL terbuka, tanpa diminta kode pairing?")}
+            {resultLine("switchHdmi", `Perintah terkirim. Lihat TV-nya: apakah sekarang menampilkan HDMI ${status.hdmiPort}?`)}
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-neutral-400">3. Konfirmasi dan nyalakan</div>
+            {status.verifiedAt ? (
+              <div className="text-emerald-300/90">Terverifikasi {formatDate(status.verifiedAt)}.</div>
+            ) : bothTestsPassed ? (
+              <Button disabled={!canManage || busy} onClick={() => patch({ confirmVerified: true })}>
+                Saya sudah melihat di TV: screensaver terbuka & pindah ke HDMI berhasil
+              </Button>
+            ) : (
+              <div className="text-neutral-600">Jalankan kedua tes di atas dulu. Mengganti port HDMI atau browser mengharuskan tes diulang.</div>
+            )}
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                disabled={!canManage || busy || !status.verifiedAt || !status.hdmiPort}
+                checked={status.autoSwitchEnabled}
+                onChange={(e) => patch({ autoSwitchEnabled: e.target.checked })}
+              />
+              <span>Otomatis saat sesi mulai & selesai</span>
+            </label>
+          </div>
+        </>
+      )}
     </div>
   );
 }

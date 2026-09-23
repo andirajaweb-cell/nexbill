@@ -178,12 +178,12 @@ registerDict({
     vi: "Bước 2 — Tải ứng dụng NexbillAgent",
   },
   "devices.guide.tv.step2Body": {
-    id: "Unduh sesuai bahasa yang kamu pakai di dashboard ini (sudah otomatis dipilihkan), lalu extract file zip-nya ke folder mana saja di PC outlet.",
-    en: "Download the version matching the language you're using on this dashboard (already auto-selected), then extract the zip file to any folder on the outlet's PC.",
-    ms: "Muat turun mengikut bahasa yang anda guna di papan pemuka ini (sudah dipilih secara automatik), kemudian extract fail zip itu ke mana-mana folder di PC outlet.",
-    th: "ดาวน์โหลดตามภาษาที่คุณใช้ในแดชบอร์ดนี้ (เลือกให้อัตโนมัติแล้ว) จากนั้นแตกไฟล์ zip ไปยังโฟลเดอร์ใดก็ได้บน PC ของสาขา",
-    fil: "I-download ang bersyon na tugma sa wikang ginagamit mo sa dashboard na ito (na-auto-select na), pagkatapos i-extract ang zip file sa kahit anong folder sa PC ng outlet.",
-    vi: "Tải phiên bản khớp với ngôn ngữ bạn đang dùng trên dashboard này (đã tự động chọn sẵn), sau đó giải nén file zip vào bất kỳ thư mục nào trên PC của chi nhánh.",
+    id: "Unduh file zip-nya, lalu extract ke folder mana saja di PC outlet. Satu file untuk semua bahasa — bahasanya dipilih saat aplikasi pertama kali dijalankan.",
+    en: "Download the zip file, then extract it to any folder on the outlet's PC. One file for every language — you choose the language the first time the app runs.",
+    ms: "Muat turun fail zip, kemudian extract ke mana-mana folder di PC outlet. Satu fail untuk semua bahasa — bahasa dipilih semasa aplikasi dijalankan kali pertama.",
+    th: "ดาวน์โหลดไฟล์ zip แล้วแตกไฟล์ไปยังโฟลเดอร์ใดก็ได้บน PC ของสาขา ไฟล์เดียวใช้ได้ทุกภาษา — เลือกภาษาได้เมื่อเปิดแอปครั้งแรก",
+    fil: "I-download ang zip file, pagkatapos i-extract sa kahit anong folder sa PC ng outlet. Iisang file para sa lahat ng wika — pipiliin ang wika sa unang pagpapatakbo ng app.",
+    vi: "Tải file zip, sau đó giải nén vào bất kỳ thư mục nào trên PC của chi nhánh. Một file cho mọi ngôn ngữ — bạn chọn ngôn ngữ khi chạy ứng dụng lần đầu.",
   },
   "devices.guide.tv.downloadButton": {
     id: "Unduh NexbillAgent",
@@ -203,12 +203,12 @@ registerDict({
     vi: "Bước 3 — Chạy ứng dụng & Dán Token",
   },
   "devices.guide.tv.step3Body": {
-    id: 'Buka folder hasil extract, jalankan NexbillAgent.exe. Saat pertama kali dijalankan, aplikasi akan minta "Masukkan Agent Token" — tempel token dari Langkah 1. Setelah itu token tersimpan otomatis, tidak perlu diketik ulang tiap buka aplikasinya.',
-    en: 'Open the extracted folder and run NexbillAgent.exe. The first time it runs, it will ask you to "Enter the Agent Token" — paste the token from Step 1. After that it is saved automatically, so you won\'t need to type it again each time you open the app.',
-    ms: 'Buka folder hasil extract, jalankan NexbillAgent.exe. Kali pertama dijalankan, aplikasi akan minta "Masukkan Agent Token" — tampal token dari Langkah 1. Selepas itu token disimpan secara automatik, tidak perlu ditaip semula setiap kali buka aplikasi.',
-    th: 'เปิดโฟลเดอร์ที่แตกไฟล์แล้วรัน NexbillAgent.exe ครั้งแรกที่รัน แอปจะขอให้ "ใส่ Agent Token" — วางโทเค็นจากขั้นตอนที่ 1 หลังจากนั้นโทเค็นจะถูกบันทึกอัตโนมัติ ไม่ต้องพิมพ์ใหม่ทุกครั้งที่เปิดแอป',
-    fil: 'Buksan ang na-extract na folder, patakbuhin ang NexbillAgent.exe. Sa unang beses na patakbuhin, hihilingin ng app na "Ilagay ang Agent Token" — i-paste ang token mula sa Hakbang 1. Pagkatapos noon, awtomatikong nase-save ang token, hindi na kailangang i-type ulit tuwing bubuksan ang app.',
-    vi: 'Mở thư mục đã giải nén, chạy NexbillAgent.exe. Lần đầu chạy, ứng dụng sẽ yêu cầu "Nhập Agent Token" — dán token từ Bước 1. Sau đó token được lưu tự động, không cần nhập lại mỗi lần mở ứng dụng.',
+    id: 'Buka folder hasil extract, jalankan NexbillAgent.exe. Saat pertama kali dijalankan, pilih bahasa (ketik angkanya, atau langsung Enter untuk Bahasa Indonesia), lalu aplikasi akan minta "Masukkan Agent Token" — tempel token dari Langkah 1. Setelah itu token tersimpan otomatis, dan NexbillAgent menyala sendiri setiap kali PC ini login.',
+    en: 'Open the extracted folder and run NexbillAgent.exe. The first time it runs, choose your language (type its number), then it will ask you to "Enter the Agent Token" — paste the token from Step 1. After that the token is saved automatically, and NexbillAgent starts by itself every time this PC logs in.',
+    ms: 'Buka folder hasil extract, jalankan NexbillAgent.exe. Kali pertama dijalankan, pilih bahasa (taip nombornya), kemudian aplikasi akan minta "Masukkan Token Ejen" — tampal token dari Langkah 1. Selepas itu token disimpan secara automatik, dan NexbillAgent bermula sendiri setiap kali PC ini log masuk.',
+    th: 'เปิดโฟลเดอร์ที่แตกไฟล์แล้วรัน NexbillAgent.exe ครั้งแรกที่รัน ให้เลือกภาษา (พิมพ์หมายเลข) แล้วแอปจะขอให้ "ใส่ Agent Token" — วางโทเค็นจากขั้นตอนที่ 1 หลังจากนั้นโทเค็นจะถูกบันทึกอัตโนมัติ และ NexbillAgent จะเริ่มทำงานเองทุกครั้งที่เข้าสู่ระบบ PC นี้',
+    fil: 'Buksan ang na-extract na folder, patakbuhin ang NexbillAgent.exe. Sa unang pagpapatakbo, piliin ang wika (i-type ang numero nito), at hihilingin ng app na "Ilagay ang Agent Token" — i-paste ang token mula sa Hakbang 1. Pagkatapos noon, awtomatikong nase-save ang token, at kusang bubukas ang NexbillAgent tuwing magla-log in sa PC na ito.',
+    vi: 'Mở thư mục đã giải nén, chạy NexbillAgent.exe. Lần đầu chạy, hãy chọn ngôn ngữ (nhập số tương ứng), rồi ứng dụng sẽ yêu cầu "Nhập Agent Token" — dán token từ Bước 1. Sau đó token được lưu tự động, và NexbillAgent sẽ tự khởi động mỗi khi đăng nhập vào PC này.',
   },
 
   "devices.guide.tv.step4Heading": {

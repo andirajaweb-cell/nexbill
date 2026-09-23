@@ -3,6 +3,16 @@ import { rentalSessions, rentalUnits, devices, promos, promoBundleItems, product
 import { eq, and, inArray, lte, gt, ne } from "drizzle-orm";
 import { turnDeviceOn, turnDeviceOff, getDeviceState } from "@/lib/devices";
 import { describeError } from "@/lib/api/error";
+import { releaseRelayTv, switchRelayTvToConsole } from "@/lib/tv/automation";
+
+/**
+ * TV Android yang dikontrol lewat Relay Agent. HANYA perangkat ini yang melewati otomatisasi
+ * screensaver/HDMI (lib/tv/automation.ts, NexbillAgent v1.2); setiap protokol lain — smart plug
+ * Tuya, Tasmota, dan seterusnya — tetap memakai baris turnDeviceOn/turnDeviceOff yang sama persis
+ * seperti sebelum fitur itu ada. Cast ke string karena enum `protocol` di skema Drizzle belum
+ * mencantumkan android_tv_relay (kolomnya teks biasa di database).
+ */
+const isRelayTv = (device: { protocol: unknown }) => (device.protocol as string) === "android_tv_relay";
 
 /**
  * Turns a device on/off as part of starting/stopping/transferring a session, tolerating failure
@@ -228,6 +238,12 @@ export async function startRentalSession(input: StartSessionInput) {
     const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
     if (device) {
       deviceWarning = await runDeviceOnCommand(device as any, `Gagal menyalakan device untuk unit ${unit.name}:`);
+      if (isRelayTv(device)) {
+        // TV mungkin sedang menampilkan screensaver NEXBILL (dibuka otomatis saat sesi
+        // sebelumnya selesai) — pindahkan ke HDMI PlayStation. null kalau otomatisasi tidak aktif.
+        const hdmiWarning = await switchRelayTvToConsole(unit, device as any);
+        if (hdmiWarning) deviceWarning = deviceWarning ? `${deviceWarning} ${hdmiWarning}` : hdmiWarning;
+      }
     } else {
       deviceWarning = `Unit ${unit.name} terhubung ke device yang sudah tidak ada (mungkin terhapus) — atur ulang di halaman Kontrol Perangkat.`;
     }
@@ -420,7 +436,10 @@ export async function stopRentalSession(sessionId: string) {
     if (unit.deviceId) {
       const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
       if (device) {
-        deviceWarning = await runDeviceCommand(turnDeviceOff(device as any), `Gagal mematikan device untuk unit ${unit.name}:`);
+        const label = `Gagal mematikan device untuk unit ${unit.name}:`;
+        // TV lewat Relay Agent: buka screensaver kalau otomatisasi aktif, selain itu tidurkan
+        // seperti biasa (releaseRelayTv sendiri yang jatuh kembali ke turnDeviceOff).
+        deviceWarning = isRelayTv(device) ? await releaseRelayTv(unit, device as any, label) : await runDeviceCommand(turnDeviceOff(device as any), label);
       } else {
         deviceWarning = `Unit ${unit.name} terhubung ke device yang sudah tidak ada (mungkin terhapus) — atur ulang di halaman Kontrol Perangkat.`;
       }
@@ -528,7 +547,8 @@ export async function transferRentalSession(sessionId: string, newRentalUnitId: 
     if (oldUnit.deviceId) {
       const [device] = await db.select().from(devices).where(eq(devices.id, oldUnit.deviceId)).limit(1);
       if (device) {
-        const warning = await runDeviceCommand(turnDeviceOff(device as any), `Gagal mematikan device untuk unit ${oldUnit.name}:`);
+        const label = `Gagal mematikan device untuk unit ${oldUnit.name}:`;
+        const warning = isRelayTv(device) ? await releaseRelayTv(oldUnit, device as any, label) : await runDeviceCommand(turnDeviceOff(device as any), label);
         if (warning) deviceWarnings.push(warning);
       }
     }
@@ -540,6 +560,10 @@ export async function transferRentalSession(sessionId: string, newRentalUnitId: 
     if (device) {
       const warning = await runDeviceOnCommand(device as any, `Gagal menyalakan device untuk unit ${newUnit.name}:`);
       if (warning) deviceWarnings.push(warning);
+      if (isRelayTv(device)) {
+        const hdmiWarning = await switchRelayTvToConsole(newUnit, device as any);
+        if (hdmiWarning) deviceWarnings.push(hdmiWarning);
+      }
     } else {
       deviceWarnings.push(`Unit ${newUnit.name} terhubung ke device yang sudah tidak ada (mungkin terhapus) — atur ulang di halaman Kontrol Perangkat.`);
     }

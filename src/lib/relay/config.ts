@@ -168,6 +168,8 @@ export interface RelayTvInfo {
   brand?: string;
   model?: string;
   android?: string;
+  /** Paket aplikasi di TV yang bisa membuka alamat web — dipakai dashboard untuk menawarkan pilihan browser, supaya merchant tidak perlu mengetik nama paket. */
+  browsers?: string[];
 }
 
 /** Agent -> Hub, the result of executing a command. */
@@ -210,7 +212,16 @@ export interface RelayDispatchRequest {
  * Kode kegagalan yang bisa dibaca mesin — supaya app (tahap 2) bisa membedakan "agent ini belum
  * mampu, pakai perintah lama saja" dari "agent sedang mati" tanpa mencocokkan teks pesan galat.
  */
-export type RelayDispatchErrorCode = "UNKNOWN_ACTION" | "UNSUPPORTED_ACTION" | "INVALID_PARAMS" | "AGENT_OFFLINE" | "TIMEOUT";
+export type RelayDispatchErrorCode =
+  | "UNKNOWN_ACTION"
+  | "UNSUPPORTED_ACTION"
+  | "INVALID_PARAMS"
+  | "AGENT_OFFLINE"
+  | "TIMEOUT"
+  // Dua kode di bawah dibuat oleh APP (adapters/android-tv-relay.ts), bukan hub — hub-nya sendiri
+  // tidak bisa dijangkau, atau menolak kunci rahasia dispatch.
+  | "HUB_UNREACHABLE"
+  | "HUB_REJECTED";
 
 export interface RelayDispatchResponse {
   ok: boolean;

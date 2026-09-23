@@ -2,15 +2,22 @@ import { DeviceAdapter, DeviceRecord, DevicePowerState } from "../types";
 import { db } from "@/db/client";
 import { relayAgents } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { RELAY_HTTP_PORT, RELAY_HUB_DISPATCH_URL, RELAY_HUB_DISPATCH_SECRET, RelayDispatchRequest, RelayDispatchResponse } from "@/lib/relay/config";
+import {
+  RELAY_HTTP_PORT,
+  RELAY_HUB_DISPATCH_URL,
+  RELAY_HUB_DISPATCH_SECRET,
+  RelayAction,
+  RelayDispatchRequest,
+  RelayDispatchResponse,
+} from "@/lib/relay/config";
 
 /**
  * Android TV control via the Relay Agent — for when the Next.js app is NOT
  * on the same local network as the TV (e.g. cloud-hosted). Talks to the
  * relay hub (scripts/relay-hub.ts, a separate always-on process), which
  * forwards the command over an already-open WebSocket to the outlet's Relay
- * Agent (scripts/relay-agent.ts), which runs the actual `adb` command
- * locally and reports back.
+ * Agent (nexbill-agent-dist/index.js → NexbillAgent.exe), which runs the actual
+ * `adb` command locally and reports back.
  *
  * Device config JSON (set via the Devices page):
  *   { "relayAgentId": "<id of a row in relay_agents>", "ip": "192.168.1.50", "port": 5555, "adbPath": "adb" }
@@ -25,6 +32,13 @@ import { RELAY_HTTP_PORT, RELAY_HUB_DISPATCH_URL, RELAY_HUB_DISPATCH_SECRET, Rel
  *    RELAY_HUB_DISPATCH_URL (the hub's public https URL, behind a reverse
  *    proxy) and RELAY_HUB_DISPATCH_SECRET (must match the hub's env) on this
  *    app's environment — dispatch() then uses those instead.
+ *
+ * AGENT v1.2 (2026-09-23): sendRelayCommand() di bawah bisa mengirim perintah baru
+ * (openScreensaver, switchHdmi, getTvInfo) dan MENGEMBALIKAN balasan hub apa adanya — termasuk
+ * `code` seperti UNSUPPORTED_ACTION — alih-alih melempar galat. Pemanggil otomatisasi
+ * (lib/tv/automation.ts) butuh itu untuk memutuskan jatuh kembali ke perilaku lama. Tiga fungsi
+ * adapter (turnOn/turnOff/getState) tetap melempar galat seperti sebelumnya, jadi perilaku
+ * nyala/mati TV yang sudah ada tidak berubah.
  */
 
 interface RelayDeviceConfig {
@@ -34,7 +48,7 @@ interface RelayDeviceConfig {
   adbPath?: string;
 }
 
-function parseConfig(device: DeviceRecord): RelayDeviceConfig {
+export function parseRelayDeviceConfig(device: Pick<DeviceRecord, "config">): RelayDeviceConfig {
   if (!device.config) return {};
   try {
     return JSON.parse(device.config);
@@ -43,8 +57,22 @@ function parseConfig(device: DeviceRecord): RelayDeviceConfig {
   }
 }
 
-async function dispatch(device: DeviceRecord, action: "turnOn" | "turnOff" | "getState"): Promise<RelayDispatchResponse> {
-  const cfg = parseConfig(device);
+export interface RelayCommandParams {
+  hdmiPort?: number;
+  browserPackage?: string;
+}
+
+/**
+ * Mengirim satu perintah ke agent lewat hub, dan mengembalikan balasannya.
+ *
+ * MELEMPAR galat hanya untuk kesalahan konfigurasi perangkat (belum dipasangkan ke agent, IP
+ * kosong, agent terhapus/milik outlet lain) — itu masalah pengaturan yang harus dibereskan
+ * manusia. Kegagalan di jalan (hub tak terjangkau, agent offline, perintah tidak didukung, TV
+ * tidak merespon) DIKEMBALIKAN sebagai { ok: false, code, error }, supaya pemanggil bisa memilih
+ * jalan cadangan.
+ */
+export async function sendRelayCommand(device: DeviceRecord, action: RelayAction, params: RelayCommandParams = {}): Promise<RelayDispatchResponse> {
+  const cfg = parseRelayDeviceConfig(device);
   if (!cfg.relayAgentId) throw new Error(`Device "${device.name}" belum dipasangkan ke Relay Agent.`);
   if (!cfg.ip) throw new Error(`Device "${device.name}" belum diisi alamat IP TV.`);
 
@@ -69,6 +97,9 @@ async function dispatch(device: DeviceRecord, action: "turnOn" | "turnOff" | "ge
     ip: cfg.ip,
     port: cfg.port || 5555,
     adbPath: cfg.adbPath,
+    // Hanya parameter milik perintahnya yang ikut — hub juga menyaring ulang.
+    ...(action === "switchHdmi" && params.hdmiPort !== undefined ? { hdmiPort: params.hdmiPort } : {}),
+    ...(action === "openScreensaver" && params.browserPackage ? { browserPackage: params.browserPackage } : {}),
   };
 
   const dispatchUrl = RELAY_HUB_DISPATCH_URL || `http://127.0.0.1:${RELAY_HTTP_PORT}/dispatch`;
@@ -87,20 +118,33 @@ async function dispatch(device: DeviceRecord, action: "turnOn" | "turnOff" | "ge
       signal: AbortSignal.timeout(8000),
     });
   } catch {
-    throw new Error(
-      RELAY_HUB_DISPATCH_URL
+    return {
+      ok: false,
+      code: "HUB_UNREACHABLE",
+      error: RELAY_HUB_DISPATCH_URL
         ? `Tidak bisa menghubungi Relay Hub di ${dispatchUrl}. Pastikan proses "npm run relay:hub" berjalan di server tersebut dan bisa diakses publik.`
-        : `Tidak bisa menghubungi Relay Hub di server ini (port ${RELAY_HTTP_PORT}). Pastikan proses "npm run relay:hub" sedang berjalan. Kalau app ini dan Relay Hub berada di server yang berbeda (mis. app di Vercel), set env RELAY_HUB_DISPATCH_URL.`
-    );
+        : `Tidak bisa menghubungi Relay Hub di server ini (port ${RELAY_HTTP_PORT}). Pastikan proses "npm run relay:hub" sedang berjalan. Kalau app ini dan Relay Hub berada di server yang berbeda (mis. app di Vercel), set env RELAY_HUB_DISPATCH_URL.`,
+    };
   }
   if (res.status === 401) {
-    throw new Error("Relay Hub menolak permintaan (401) — RELAY_HUB_DISPATCH_SECRET di app ini tidak cocok dengan yang di server Relay Hub.");
+    return {
+      ok: false,
+      code: "HUB_REJECTED",
+      error: "Relay Hub menolak permintaan (401) — RELAY_HUB_DISPATCH_SECRET di app ini tidak cocok dengan yang di server Relay Hub.",
+    };
   }
 
-  const result = (await res.json()) as RelayDispatchResponse;
-  if (!result.ok) {
-    throw new Error(result.error || `Relay Agent "${agent.name}" gagal menjalankan perintah.`);
+  try {
+    return (await res.json()) as RelayDispatchResponse;
+  } catch {
+    return { ok: false, code: "HUB_UNREACHABLE", error: `Relay Hub membalas dengan format yang tidak dikenali (HTTP ${res.status}).` };
   }
+}
+
+/** Perilaku lama untuk turnOn/turnOff/getState: ok:false dijadikan galat. */
+async function dispatch(device: DeviceRecord, action: "turnOn" | "turnOff" | "getState"): Promise<RelayDispatchResponse> {
+  const result = await sendRelayCommand(device, action);
+  if (!result.ok) throw new Error(result.error || `Relay Agent gagal menjalankan perintah "${action}".`);
   return result;
 }
 

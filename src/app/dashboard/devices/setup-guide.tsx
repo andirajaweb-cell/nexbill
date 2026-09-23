@@ -7,18 +7,25 @@ import { showAlert } from "@/lib/ui/dialog";
 import { setPsCursorLoading } from "@/lib/ui/ps-cursor";
 import "@/lib/i18n/dict-devices-guide";
 
-/** One zip per dashboard language, matching the folders in nexbill-agent-dist/ (ID/EN/MY/TH/PH/VN) —
- * see public/downloads/nexbill-agent/. Filenames on disk are actually "NexbillRelay-v1.0-<code>.zip"
- * (not "NexbillAgent-<code>.zip" — this map used the wrong prefix, which 404'd on every download
- * click: "File wasn't available on site"), and the Vietnamese file is named with "vn", not "vi" —
- * matching the dashboard's own lang code for Vietnamese would 404 too if left as "vi" here. */
+/**
+ * NexbillAgent v1.2 (2026-09-24): SATU zip untuk semua bahasa. Agent v1.2 memuat enam bahasa dalam
+ * satu .exe dan menampilkan menu bahasa saat pertama kali dijalankan (lihat nexbill-agent-dist/
+ * index.js, chooseLanguage) — enam zip per bahasa seperti di v1.0 tidak lagi dibutuhkan.
+ *
+ * ISI ZIP HANYA EMPAT FILE: NexbillAgent.exe, adb.exe, AdbWinApi.dll, AdbWinUsbApi.dll. Jangan pernah
+ * ikut memasukkan config.json, agent.lock, atau agent.log — config.json berisi TOKEN relay agent
+ * outlet yang menjalankannya, dan file di public/ bisa diunduh siapa saja yang tahu alamatnya.
+ *
+ * Zip v1.0 lama masih ada di folder yang sama tapi sudah tidak ditautkan dari sini.
+ */
+const AGENT_DOWNLOAD_URL = "/downloads/nexbill-agent/NexbillRelay-v1.2.zip";
 const DOWNLOAD_BY_LANG: Record<LangCode, string> = {
-  id: "/downloads/nexbill-agent/NexbillRelay-v1.0-id.zip",
-  en: "/downloads/nexbill-agent/NexbillRelay-v1.0-en.zip",
-  ms: "/downloads/nexbill-agent/NexbillRelay-v1.0-ms.zip",
-  th: "/downloads/nexbill-agent/NexbillRelay-v1.0-th.zip",
-  fil: "/downloads/nexbill-agent/NexbillRelay-v1.0-fil.zip",
-  vi: "/downloads/nexbill-agent/NexbillRelay-v1.0-vn.zip",
+  id: AGENT_DOWNLOAD_URL,
+  en: AGENT_DOWNLOAD_URL,
+  ms: AGENT_DOWNLOAD_URL,
+  th: AGENT_DOWNLOAD_URL,
+  fil: AGENT_DOWNLOAD_URL,
+  vi: AGENT_DOWNLOAD_URL,
 };
 
 const linkButtonCls =
@@ -160,7 +167,7 @@ export function DeviceSetupGuide() {
                       <p>
                         {t(
                           "devices.guide.tv.step2Body",
-                          "Unduh sesuai bahasa yang kamu pakai di dashboard ini (sudah otomatis dipilihkan), lalu extract file zip-nya ke folder mana saja di PC outlet."
+                          "Unduh file zip-nya, lalu extract ke folder mana saja di PC outlet. Satu file untuk semua bahasa — bahasanya dipilih saat aplikasi pertama kali dijalankan."
                         )}
                       </p>
                       <a className={linkButtonCls} href={DOWNLOAD_BY_LANG[lang] ?? DOWNLOAD_BY_LANG.id} download>
@@ -173,7 +180,7 @@ export function DeviceSetupGuide() {
                       <p>
                         {t(
                           "devices.guide.tv.step3Body",
-                          'Buka folder hasil extract, jalankan NexbillAgent.exe. Saat pertama kali dijalankan, aplikasi akan minta "Masukkan Agent Token" — tempel token dari Langkah 1. Setelah itu token tersimpan otomatis, tidak perlu diketik ulang tiap buka aplikasinya.'
+                          'Buka folder hasil extract, jalankan NexbillAgent.exe. Saat pertama kali dijalankan, pilih bahasa (ketik angkanya, atau langsung Enter untuk Bahasa Indonesia), lalu aplikasi akan minta "Masukkan Agent Token" — tempel token dari Langkah 1. Setelah itu token tersimpan otomatis, dan NexbillAgent menyala sendiri setiap kali PC ini login.'
                         )}
                       </p>
                     </div>
