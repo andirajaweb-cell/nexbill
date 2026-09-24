@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-maintenance";
+import { IndikatorLive, PemeriksaanTerpandu } from "./doctor";
 
 /**
  * Live controller (gamepad) tester — pure client-side, built on the browser's standard Gamepad
@@ -195,6 +196,93 @@ function GamepadCard({ snap, t }: { snap: Snapshot; t: (k: string, f: string) =>
           "Lepas kedua stick — kalau titik biru tidak balik ke tengah lingkaran, kemungkinan stick sudah drift dan perlu diservis/diganti."
         )}
       </p>
+
+      <div className="border-t border-white/5 pt-4">
+        <IndikatorLive snap={snap} standar={!nonStandard} />
+      </div>
+      <div className="border-t border-white/5 pt-4">
+        <PemeriksaanTerpandu snap={snap} standar={!nonStandard} labelController={FAMILY_LABEL[family]} />
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Panduan stik PS3 (DualShock 3). Windows TIDAK punya driver bawaan yang meneruskan input DS3 —
+ * stik tercolok & lampunya berkedip, tapi navigator.getGamepads() tetap kosong. Tidak ada yang bisa
+ * dilakukan halaman web untuk itu lewat Gamepad API; solusinya driver DsHidMini (Nefarius, open
+ * source) dalam mode XInput, atau membuka halaman ini di Android yang membaca DS3 secara native.
+ */
+/*
+ * Driver PS3 yang disematkan. Salinan TANPA PERUBAHAN dari rilis resmi, disimpan di
+ * public/downloads/ps3-driver/ bersama LICENSE-DsHidMini.txt (syarat redistribusi BSD-3). Bila
+ * berkas lokalnya belum ada di deploy ini (lupa disalin), tombol otomatis jatuh ke tautan unduhan
+ * langsung dari rilis GitHub resmi — outlet tidak pernah menekan tombol yang berujung 404.
+ * Saat memperbarui versi: ganti ketiga konstanta di bawah + berkas MSI-nya + teks ps3Download.
+ */
+const DRIVER_PS3_VERSI = "3.5.1";
+const DRIVER_PS3_LOKAL = `/downloads/ps3-driver/Nefarius_DsHidMini_Drivers_x64_arm64_v${DRIVER_PS3_VERSI}.msi`;
+const DRIVER_PS3_GITHUB = `https://github.com/nefarius/DsHidMini/releases/download/setup-v${DRIVER_PS3_VERSI}/Nefarius_DsHidMini_Drivers_x64_arm64_v${DRIVER_PS3_VERSI}.msi`;
+
+function useUrlDriverPs3() {
+  const [url, setUrl] = useState(DRIVER_PS3_GITHUB);
+  useEffect(() => {
+    let batal = false;
+    fetch(DRIVER_PS3_LOKAL, { method: "HEAD" })
+      .then((r) => { if (!batal && r.ok) setUrl(DRIVER_PS3_LOKAL); })
+      .catch(() => {});
+    return () => { batal = true; };
+  }, []);
+  return url;
+}
+
+function BantuanPs3({ t, terbuka }: { t: (k: string, f: string) => string; terbuka: boolean }) {
+  const [buka, setBuka] = useState<boolean | null>(null);
+  const tampil = buka ?? terbuka; // ikut kondisi otomatis sampai pengguna menekan tombolnya sendiri
+  const urlDriver = useUrlDriverPs3();
+  return (
+    <Card className={`space-y-2 border ${terbuka ? "border-amber-500/30 bg-amber-500/5" : "border-white/10"}`}>
+      <button type="button" onClick={() => setBuka(!tampil)} className="flex w-full items-center justify-between text-left">
+        <h2 className="font-medium text-sm text-amber-300">{t("maintenance.gamepad.ps3Heading", "Stik PS3 (DualShock 3) tidak terdeteksi?")}</h2>
+        <span className="text-xs text-neutral-500">{tampil ? "▲" : "▼"}</span>
+      </button>
+      {tampil && (
+        <>
+          <p className="text-xs text-neutral-300 leading-relaxed">
+            {t(
+              "maintenance.gamepad.ps3Why",
+              "Ini bukan kerusakan stik. Windows tidak punya driver bawaan untuk stik PS3: stik tercolok dan lampunya berkedip, tapi Windows tidak meneruskan tombolnya ke browser, sehingga halaman ini tidak bisa membacanya. Stik PS4 dan PS5 tidak butuh langkah ini."
+            )}
+          </p>
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-black/30 px-3 py-2">
+            <a
+              href={urlDriver}
+              download={urlDriver === DRIVER_PS3_LOKAL ? `Nefarius_DsHidMini_Drivers_x64_arm64_v${DRIVER_PS3_VERSI}.msi` : undefined}
+              className="inline-block rounded-lg bg-amber-500/20 border border-amber-400/40 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-500/30"
+            >
+              ⬇ {t("maintenance.gamepad.ps3Download", `Unduh Driver PS3 (DsHidMini v${DRIVER_PS3_VERSI})`)}
+            </a>
+            <span className="text-[11px] text-neutral-500 flex-1 min-w-[200px]">
+              {t("maintenance.gamepad.ps3Credit", "Driver gratis & open source buatan Nefarius (lisensi BSD-3), bukan buatan NEXBILL. Versi 3.5.1 masih berlabel BETA. Hanya untuk Windows 10/11 64-bit.")}
+            </span>
+          </div>
+          <p className="text-xs text-neutral-300 leading-relaxed whitespace-pre-line">
+            {t("maintenance.gamepad.ps3Steps", "1) Windows 10/11 64-bit, kabel mini-USB data.\n2) Unduh & jalankan .msi.\n3) Colok stik, tekan PS.\n4) Cek joy.cpl.\n5) Tekan tombol di halaman ini.")}
+          </p>
+          <p className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-neutral-300 leading-relaxed">
+            {t("maintenance.gamepad.ps3Clone", "Penting: driver ini hanya dijamin untuk stik PS3 ORIGINAL Sony. Stik KW sering tidak terbaca.")}
+          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+            <a href="https://github.com/nefarius/DsHidMini" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Sumber: github.com/nefarius/DsHidMini</a>
+            <a href={`https://github.com/nefarius/DsHidMini/releases/tag/setup-v${DRIVER_PS3_VERSI}`} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Catatan rilis v{DRIVER_PS3_VERSI}</a>
+            <a href="https://docs.nefarius.at/projects/DsHidMini/v3/How-to-Install/" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Panduan resmi (Inggris)</a>
+            <a href="/downloads/ps3-driver/LICENSE-DsHidMini.txt" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Lisensi BSD-3</a>
+          </div>
+          <p className="text-xs text-neutral-400 leading-relaxed">
+            {t("maintenance.gamepad.ps3Alt", "Tanpa memasang driver: buka halaman ini di HP Android lewat Chrome, lalu colok stik PS3 pakai kabel OTG.")}
+          </p>
+        </>
+      )}
     </Card>
   );
 }
@@ -258,6 +346,15 @@ export default function GamepadTesterPage() {
           <GamepadCard key={s.index} snap={s} t={t} />
         ))}
       </div>
+
+      {supported && (
+        <BantuanPs3
+          t={t}
+          // Terbuka otomatis saat belum ada controller sama sekali, atau saat stik PS3 terbaca tapi mapping-nya
+          // non-standar — dua gejala yang sama-sama disebabkan driver Windows, bukan stiknya.
+          terbuka={snapshots.length === 0 || snapshots.some((s) => detectFamily(s.id) === "ps3" && s.mapping !== "standard")}
+        />
+      )}
 
       <Card className="space-y-2 border border-white/10">
         <h2 className="font-medium text-sm text-neutral-200">{t("maintenance.gamepad.helpHeading", "Soal Akurasi")}</h2>

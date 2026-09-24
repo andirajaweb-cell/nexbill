@@ -325,7 +325,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
               value={cashOutForm.accountId}
               onChange={(v) => setCashOutForm({ ...cashOutForm, accountId: v })}
               placeholder={t("expenses.optionCategoryAccount", "Kategori (Akun Beban)")}
-              options={bundle.accounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+              options={bundle.accounts.filter((a: any) => a.isPostingAllowed !== false).map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
             />
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderAmountRp", "Nominal (Rp)")} value={cashOutForm.amount} onChange={(e) => setCashOutForm({ ...cashOutForm, amount: e.target.value })} />
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderNote", "Catatan (opsional)")} value={cashOutForm.note} onChange={(e) => setCashOutForm({ ...cashOutForm, note: e.target.value })} />
@@ -382,7 +382,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                   value={form.accountId}
                   onChange={(v) => setForm({ ...form, accountId: v })}
                   placeholder={t("expenses.fieldAccountPlaceholder", "Pilih jenis biaya...")}
-                  options={bundle.accounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+                  options={bundle.accounts.filter((a: any) => a.isPostingAllowed !== false).map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
                 />
                 <div className="text-[11px] text-neutral-500">{t("expenses.fieldAccountHint", "Contoh: Listrik, Gaji, Internet, Pemeliharaan PlayStation. Ini yang menentukan pengeluaran masuk ke baris mana di Laba Rugi.")}</div>
               </label>
@@ -761,7 +761,7 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
               value={form.accountId}
               onChange={(v) => setForm({ ...form, accountId: v })}
               placeholder={t("expenses.optionAccountCoa", "Akun Beban (COA)")}
-              options={accounts.map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
+              options={accounts.filter((a: any) => a.isPostingAllowed !== false).map((a: any) => ({ value: a.id, label: `${a.code} ${coaAccountName(t, a)}` }))}
             />
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderCategoryPlain", "Kategori")} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.amountLabel", "Nominal")} value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />

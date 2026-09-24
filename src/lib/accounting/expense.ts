@@ -77,6 +77,21 @@ async function assertExpenseAccount(accountId: string) {
   const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
   if (!account) throw new Error("Akun COA untuk expense tidak ditemukan.");
   if (account.type !== "expense") throw new Error(`Akun "${account.name}" bukan akun beban (type=${account.type}) — pilih akun COA bertipe expense.`);
+  /*
+   * Akun Header (mis. 5300 INVENTORY ADJUSTMENT) hanya pengelompok di laporan — jurnal harus masuk
+   * ke salah satu akun turunannya. Dicek DI SINI, sebelum baris expense dibuat: dulu pengecekan ini
+   * baru terjadi saat jurnal diposting di submitExpense(), sehingga expense-nya sudah telanjur
+   * tersimpan sebagai draft yatim, dan pesannya tidak menyebut akun mana yang seharusnya dipilih.
+   */
+  if (!account.isPostingAllowed) {
+    const turunan = await db
+      .select({ code: accounts.code, name: accounts.name })
+      .from(accounts)
+      .where(and(eq(accounts.parentId, account.id), eq(accounts.isActive, true), eq(accounts.isPostingAllowed, true)))
+      .orderBy(accounts.code);
+    const saran = turunan.length ? ` Pilih salah satu: ${turunan.map((a) => `${a.code} ${a.name}`).join(", ")}.` : "";
+    throw new Error(`"${account.code} ${account.name}" adalah akun Header (judul kelompok), bukan akun untuk mencatat biaya.${saran}`);
+  }
   return account;
 }
 
