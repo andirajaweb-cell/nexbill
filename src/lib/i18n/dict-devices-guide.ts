@@ -194,6 +194,40 @@ registerDict({
     vi: "Tải NexbillAgent",
   },
 
+  // --- Panduan lengkap (public/downloads/nexbill-agent/panduan-nexbillagent.html) ---
+  "devices.guide.tv.fullGuideHeading": {
+    id: "Panduan Lengkap NexbillAgent",
+    en: "Complete NexbillAgent Guide",
+    ms: "Panduan Lengkap NexbillAgent",
+    th: "คู่มือ NexbillAgent ฉบับสมบูรณ์",
+    fil: "Kumpletong Gabay sa NexbillAgent",
+    vi: "Hướng dẫn đầy đủ NexbillAgent",
+  },
+  "devices.guide.tv.fullGuideBody": {
+    id: "Baca dulu sebelum memasang. Berisi langkah demi langkah untuk PC kasir dan TV Android, cara mengunci IP TV, pengaturan daya TV, TV Screensaver, 28 masalah umum beserta solusinya (kode P01–P28), risiko dan cara mencegahnya, serta daftar cek harian. Tersedia dalam 6 bahasa dan bisa dicetak atau disimpan sebagai PDF.",
+    en: "Read this before installing. It covers the cashier PC and Android TV step by step, locking the TV's IP, TV power settings, TV Screensaver, 28 common problems with solutions (codes P01–P28), risks and how to prevent them, and a daily checklist. Available in 6 languages; can be printed or saved as PDF.",
+    ms: "Baca dahulu sebelum memasang. Mengandungi langkah demi langkah untuk PC juruwang dan TV Android, cara mengunci IP TV, tetapan kuasa TV, TV Screensaver, 28 masalah biasa beserta penyelesaian (kod P01–P28), risiko dan cara mencegahnya, serta senarai semak harian. Tersedia dalam 6 bahasa dan boleh dicetak atau disimpan sebagai PDF.",
+    th: "อ่านก่อนติดตั้ง มีขั้นตอนทีละขั้นสำหรับ PC แคชเชียร์และทีวี Android วิธีล็อก IP ทีวี การตั้งค่าพลังงานทีวี TV Screensaver ปัญหาที่พบบ่อย 28 ข้อพร้อมวิธีแก้ (รหัส P01–P28) ความเสี่ยงและวิธีป้องกัน และรายการตรวจสอบประจำวัน มี 6 ภาษา พิมพ์หรือบันทึกเป็น PDF ได้",
+    fil: "Basahin muna bago mag-install. Nandito ang sunud-sunod na hakbang para sa PC ng kahera at Android TV, pag-lock ng IP ng TV, setting ng power ng TV, TV Screensaver, 28 karaniwang problema at solusyon (code P01–P28), mga panganib at paano iwasan, at pang-araw-araw na checklist. May 6 na wika; puwedeng i-print o i-save bilang PDF.",
+    vi: "Hãy đọc trước khi cài đặt. Gồm các bước cho máy tính thu ngân và Android TV, cách khóa IP TV, cài đặt nguồn TV, TV Screensaver, 28 sự cố thường gặp kèm cách khắc phục (mã P01–P28), rủi ro và cách phòng tránh, cùng danh sách kiểm tra hằng ngày. Có 6 ngôn ngữ; có thể in hoặc lưu thành PDF.",
+  },
+  "devices.guide.tv.fullGuideRead": {
+    id: "Baca Panduan",
+    en: "Read Guide",
+    ms: "Baca Panduan",
+    th: "อ่านคู่มือ",
+    fil: "Basahin ang Gabay",
+    vi: "Đọc hướng dẫn",
+  },
+  "devices.guide.tv.fullGuideDownload": {
+    id: "Unduh Panduan",
+    en: "Download Guide",
+    ms: "Muat Turun Panduan",
+    th: "ดาวน์โหลดคู่มือ",
+    fil: "I-download ang Gabay",
+    vi: "Tải hướng dẫn",
+  },
+
   "devices.guide.tv.step3Heading": {
     id: "Langkah 3 — Jalankan & Tempel Token",
     en: "Step 3 — Run It & Paste the Token",

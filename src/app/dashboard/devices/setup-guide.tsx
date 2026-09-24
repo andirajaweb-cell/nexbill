@@ -28,6 +28,14 @@ const DOWNLOAD_BY_LANG: Record<LangCode, string> = {
   vi: AGENT_DOWNLOAD_URL,
 };
 
+/**
+ * Panduan lengkap untuk outlet (PC kasir, TV Android, masalah P01–P28, risiko). Satu file HTML
+ * mandiri berisi enam bahasa; bahasa dipilih lewat ?lang= (lalu bahasa browser, lalu Indonesia),
+ * dan punya tombol "Cetak / Simpan PDF" sendiri. Kode masalah P01–P28 sama di semua bahasa, jadi
+ * Customer Service bisa merujuk kode yang sama apa pun bahasa outlet-nya.
+ */
+const FULL_GUIDE_URL = "/downloads/nexbill-agent/panduan-nexbillagent.html";
+
 const linkButtonCls =
   "inline-block rounded-lg px-3 py-2 text-xs font-medium transition bg-white/5 border border-white/10 text-neutral-100 hover:bg-white/10 hover:border-cyan-400/40";
 
@@ -148,6 +156,31 @@ export function DeviceSetupGuide() {
                         "Untuk mengontrol Android TV / Google TV (nyalakan-matikan dari jauh) lewat aplikasi kecil bernama NexbillAgent yang jalan di PC outlet. Ikuti 5 langkah ini secara berurutan — cukup sekali saja per outlet."
                       )}
                     </p>
+
+                    <div className="rounded-lg border border-cyan-400/30 bg-cyan-400/5 p-3 space-y-2">
+                      <div className="text-neutral-200 font-medium">
+                        {t("devices.guide.tv.fullGuideHeading", "Panduan Lengkap NexbillAgent")}
+                      </div>
+                      <p>
+                        {t(
+                          "devices.guide.tv.fullGuideBody",
+                          "Baca dulu sebelum memasang. Berisi langkah demi langkah untuk PC kasir dan TV Android, cara mengunci IP TV, pengaturan daya TV, TV Screensaver, 28 masalah umum beserta solusinya (kode P01–P28), risiko dan cara mencegahnya, serta daftar cek harian. Tersedia dalam 6 bahasa dan bisa dicetak atau disimpan sebagai PDF."
+                        )}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          className={linkButtonCls}
+                          href={`${FULL_GUIDE_URL}?lang=${lang}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {t("devices.guide.tv.fullGuideRead", "Baca Panduan")}
+                        </a>
+                        <a className={linkButtonCls} href={FULL_GUIDE_URL} download="Panduan-NexbillAgent.html">
+                          {t("devices.guide.tv.fullGuideDownload", "Unduh Panduan")}
+                        </a>
+                      </div>
+                    </div>
 
                     <div className="space-y-1">
                       <div className="text-neutral-300 font-medium">{t("devices.guide.tv.step1Heading", "Langkah 1 — Minta Token")}</div>
