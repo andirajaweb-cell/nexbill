@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       negotiable: body.negotiable,
       city: body.city,
       contactPhone: body.contactPhone,
-      imageUrl: body.imageUrl,
+      imageUrls: body.imageUrls,
       staffUserId: session.sub,
     });
     return NextResponse.json(row);

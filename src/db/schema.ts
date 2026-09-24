@@ -2518,8 +2518,24 @@ export const marketplaceListings = pgTable(
     negotiable: boolean("negotiable").notNull().default(true),
     city: text("city"),
     contactPhone: text("contact_phone"),
+    /** Foto utama (sampul) — selalu sama dengan elemen pertama imageUrls. */
     imageUrl: text("image_url"),
+    /**
+     * Semua foto barang (maks. 5) sebagai JSON array string URL, urut: pertama = sampul. Hanya URL
+     * dari bucket Storage "marketplace" milik NEXBILL yang diterima — lihat lib/marketplace/photos.ts.
+     *
+     * PERINGATAN URUTAN DEPLOY: ditambahkan migrasi 0012. listMyListings/listPublicListings memakai
+     * select() tanpa daftar kolom, jadi migrasinya WAJIB dijalankan sebelum deploy.
+     */
+    imageUrls: text("image_urls"),
     status: text("status", { enum: ["active", "reserved", "sold", "closed"] }).notNull().default("active"),
+    /**
+     * Alasan penjual menarik barang (status "closed"), wajib sejak migrasi 0012 — lihat
+     * ALASAN_TARIK di lib/marketplace/anti-bypass.ts. Barang yang ditarik setelah ada penawaran
+     * adalah sinyal utama transaksi yang diselesaikan di luar aplikasi.
+     */
+    closedReason: text("closed_reason"),
+    closedNote: text("closed_note"),
     ...timestamps,
   },
   (t) => [index("marketplace_listings_status_idx").on(t.status), index("marketplace_listings_outlet_idx").on(t.outletId)]
@@ -2545,6 +2561,12 @@ export const marketplaceDeals = pgTable(
     platformFeeInvoiceId: text("platform_fee_invoice_id"),
     status: text("status", { enum: ["requested", "accepted", "completed", "rejected", "cancelled"] }).notNull().default("requested"),
     buyerNote: text("buyer_note"),
+    /**
+     * No. HP pembeli (migrasi 0012). Seperti contact_phone penjual, baru ditampilkan ke pihak lain
+     * setelah penawaran DITERIMA — sebelum itu, nomor HP adalah jalan pintas termudah untuk
+     * menyelesaikan transaksi di luar aplikasi. Lihat kontakBolehDibuka() di anti-bypass.ts.
+     */
+    buyerContactPhone: text("buyer_contact_phone"),
     sellerNote: text("seller_note"),
     /** Cara pembeli membayar penjual — dicatat apa adanya, karena uangnya tidak lewat NEXBILL. */
     settlementMethod: text("settlement_method", { enum: ["cash", "transfer", "qris", "other"] }),
@@ -2552,9 +2574,84 @@ export const marketplaceDeals = pgTable(
     sellerOtherIncomeId: text("seller_other_income_id"),
     completedAt: text("completed_at"),
     closedReason: text("closed_reason"),
+    /**
+     * Keamanan transaksi (migrasi 0013). payoutSnapshot = salinan rekening penjual (JSON) SAAT
+     * penawaran diterima — pembeli membayar ke rekening ini, bukan ke rekening "terbaru", sehingga
+     * penggantian rekening di tengah transaksi (modus penipuan umum) langsung terlihat.
+     * Bukti bayar diunggah pembeli, bukti serah-terima/kirim diunggah penjual.
+     */
+    payoutSnapshot: text("payout_snapshot"),
+    buyerPaymentProofUrl: text("buyer_payment_proof_url"),
+    buyerPaymentProofAt: text("buyer_payment_proof_at"),
+    sellerHandoverProofUrl: text("seller_handover_proof_url"),
+    sellerHandoverProofAt: text("seller_handover_proof_at"),
     ...timestamps,
   },
   (t) => [index("marketplace_deals_seller_idx").on(t.sellerOutletId), index("marketplace_deals_buyer_idx").on(t.buyerOutletId)]
+);
+
+/**
+ * Keamanan Marketplace per outlet (migrasi 0013): rekening penerima + penangguhan oleh
+ * platform-admin. Satu baris per outlet, dibuat saat pertama kali dibutuhkan.
+ */
+export const marketplaceOutletTrust = pgTable("marketplace_outlet_trust", {
+  outletId: text("outlet_id").primaryKey().references(() => outlets.id),
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  bankAccountHolder: text("bank_account_holder"),
+  bankUpdatedAt: text("bank_updated_at"),
+  suspended: boolean("suspended").notNull().default(false),
+  suspendedReason: text("suspended_reason"),
+  suspendedAt: text("suspended_at"),
+  suspendedBy: text("suspended_by"),
+  warningCount: integer("warning_count").notNull().default(0),
+  ...timestamps,
+});
+
+/** Rating & ulasan setelah kesepakatan selesai — satu per pihak per kesepakatan (migrasi 0013). */
+export const marketplaceReviews = pgTable(
+  "marketplace_reviews",
+  {
+    id: id(),
+    dealId: text("deal_id").notNull().references(() => marketplaceDeals.id),
+    reviewerOutletId: text("reviewer_outlet_id").notNull().references(() => outlets.id),
+    revieweeOutletId: text("reviewee_outlet_id").notNull().references(() => outlets.id),
+    rating: integer("rating").notNull(),
+    comment: text("comment"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("marketplace_reviews_deal_reviewer_idx").on(t.dealId, t.reviewerOutletId), index("marketplace_reviews_reviewee_idx").on(t.revieweeOutletId)]
+);
+
+/**
+ * Aduan & sengketa antar-outlet (migrasi 0013). Diputuskan MANUAL oleh platform-admin setelah
+ * membaca bukti kedua pihak — lihat lib/marketplace/trust-service.ts.
+ */
+export const marketplaceDisputes = pgTable(
+  "marketplace_disputes",
+  {
+    id: id(),
+    dealId: text("deal_id").notNull().references(() => marketplaceDeals.id),
+    reporterOutletId: text("reporter_outlet_id").notNull().references(() => outlets.id),
+    reportedOutletId: text("reported_outlet_id").notNull().references(() => outlets.id),
+    category: text("category").notNull(),
+    description: text("description").notNull(),
+    evidenceUrls: text("evidence_urls"),
+    respondentStatement: text("respondent_statement"),
+    respondentEvidenceUrls: text("respondent_evidence_urls"),
+    respondentAt: text("respondent_at"),
+    status: text("status", { enum: ["open", "resolved"] }).notNull().default("open"),
+    resolution: text("resolution", { enum: ["dismissed", "warning", "suspended"] }),
+    adminNote: text("admin_note"),
+    resolvedBy: text("resolved_by"),
+    resolvedAt: text("resolved_at"),
+    ...timestamps,
+  },
+  (t) => [
+    index("marketplace_disputes_status_idx").on(t.status),
+    index("marketplace_disputes_reported_idx").on(t.reportedOutletId),
+    index("marketplace_disputes_deal_idx").on(t.dealId),
+  ]
 );
 
 export const platformAnnouncements = pgTable("platform_announcements", {

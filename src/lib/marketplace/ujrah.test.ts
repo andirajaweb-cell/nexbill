@@ -8,8 +8,20 @@ import {
   statusListingSetelah,
   TRANSISI_SAH,
   UJRAH_CONFIG_DEFAULT,
+  UJRAH_AKTIF,
+  ujrahConfigBerlaku,
   type DealStatus,
 } from "./ujrah";
+
+describe("saklar arsip ujrah (Marketplace gratis sementara, 2026-09-24)", () => {
+  it("selama diarsipkan, tidak ada ujrah untuk nilai berapa pun dan penjual menerima utuh", () => {
+    if (UJRAH_AKTIF) return; // saklar sudah dinyalakan lagi — uji ini tidak berlaku
+    for (const harga of [15_000, 20_000, 350_000, 9_000_000]) {
+      expect(computeUjrah(harga, 1, ujrahConfigBerlaku())).toBe(0);
+      expect(bersihUntukPenjual(harga, 2, ujrahConfigBerlaku())).toBe(harga * 2);
+    }
+  });
+});
 
 /*
  * Uji Marketplace Antar-Outlet (2026-09-23).

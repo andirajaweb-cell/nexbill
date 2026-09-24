@@ -18,6 +18,7 @@ const NAV = [
   { href: "/platform-admin/products", label: "Etalase Produk" },
   { href: "/platform-admin/affiliate", label: "Rekomendasi Produk" },
   { href: "/platform-admin/referrals", label: "Program Referral" },
+  { href: "/platform-admin/marketplace-disputes", label: "Sengketa Marketplace" },
   { href: "/platform-admin/ipaymu", label: "iPaymu (Gateway)" },
   { href: "/platform-admin/relay-agents", label: "Relay Agent (TV)" },
   { href: "/platform-admin/hardware", label: "Hardware (Smart Plug)" },

@@ -1,9 +1,20 @@
 import { db } from "@/db/client";
-import { marketplaceListings, marketplaceDeals, outlets } from "@/db/schema";
-import { eq, and, ne, desc, or, sql } from "drizzle-orm";
+import { marketplaceListings, marketplaceDeals, marketplaceReviews, outlets } from "@/db/schema";
+import { eq, and, ne, desc, or, sql, inArray } from "drizzle-orm";
 import { logAudit } from "@/lib/audit/log";
 import { createOtherIncome } from "@/lib/accounting/other-income";
 import { bebankanUjrah } from "./billing";
+import { bersihkanFotoBarang, daftarFotoBarang } from "./photos";
+import { pastikanTanpaKontak, normalisasiNoHp, kontakBolehDibuka, alasanTarikSah, ALASAN_TARIK } from "./anti-bypass";
+import { periksaBatasNilaiBarang, rekeningBaruDiganti, type ProfilKepercayaan } from "./trust";
+import {
+  profilSatuOutlet,
+  ambilProfilKepercayaan,
+  daftarOutletDitangguhkan,
+  outletDitangguhkan,
+  ambilBarisTrust,
+  rekeningDariBaris,
+} from "./trust-service";
 import {
   computeUjrah,
   bolehPindahStatus,
@@ -12,8 +23,29 @@ import {
   type DealStatus,
   type PeranDeal,
   UJRAH_CONFIG_DEFAULT,
+  UJRAH_AKTIF,
+  UJRAH_CONFIG_NONAKTIF,
   type UjrahConfig,
 } from "./ujrah";
+
+/** Ringkasan profil yang aman dikirim ke outlet lain (tanpa data internal). */
+const ringkasProfil = (p: ProfilKepercayaan | undefined) =>
+  p
+    ? {
+        level: p.level,
+        label: p.label,
+        ageDays: p.ageDays,
+        completedDeals: p.completedDeals,
+        avgRating: p.avgRating,
+        ratingCount: p.ratingCount,
+        provenDisputes: p.provenDisputes,
+        openDisputesAgainst: p.openDisputesAgainst,
+        isNew: p.isNew,
+        peringatan: p.peringatan,
+      }
+    : null;
+
+const PESAN_DITANGGUHKAN = "Akses Marketplace outlet Anda sedang ditangguhkan oleh tim NEXBILL. Kesepakatan yang sudah berjalan tetap bisa diselesaikan. Hubungi Customer Service untuk informasi.";
 
 /**
  * Marketplace Antar-Outlet — outlet menjual stok berlebihnya ke outlet lain di jaringan NEXBILL.
@@ -31,6 +63,8 @@ const round = (n: number) => Math.round(n);
  * lingkungan tidak boleh diam-diam menagih merchant dengan nominal yang aneh.
  */
 export function ujrahConfig(): UjrahConfig {
+  // Diarsipkan: Marketplace gratis sementara — lihat UJRAH_AKTIF di ujrah.ts.
+  if (!UJRAH_AKTIF) return UJRAH_CONFIG_NONAKTIF;
   const dariEnv = Number(process.env.MARKETPLACE_UJRAH);
   return Number.isFinite(dariEnv) && dariEnv >= 0 ? { ...UJRAH_CONFIG_DEFAULT, nominal: Math.round(dariEnv) } : UJRAH_CONFIG_DEFAULT;
 }
@@ -48,13 +82,21 @@ export interface CreateListingInput {
   negotiable?: boolean;
   city?: string;
   contactPhone?: string;
-  imageUrl?: string;
+  /** Maks. 5 URL dari /api/marketplace/upload, urut: pertama = foto utama. */
+  imageUrls?: unknown;
   staffUserId?: string;
 }
 
 export async function createListing(input: CreateListingInput) {
   if (!input.title?.trim()) throw new Error("Nama barang wajib diisi.");
   if (!(input.price > 0)) throw new Error("Harga harus lebih dari 0.");
+  // Kontak di teks bebas = jalan pintas transaksi di luar aplikasi. Lihat anti-bypass.ts.
+  pastikanTanpaKontak({ "Nama Barang": input.title, Keterangan: input.description, Kota: input.city });
+  // Wajib: nomor ini TIDAK tampil di etalase, hanya dibuka ke pembeli setelah penawarannya diterima.
+  const contactPhone = normalisasiNoHp(input.contactPhone);
+  const foto = bersihkanFotoBarang(input.imageUrls, process.env.NEXT_PUBLIC_SUPABASE_URL);
+  // Ditangguhkan → ditolak; outlet baru → nilai barang dibatasi (lihat periksaBatasNilaiBarang di trust.ts).
+  periksaBatasNilaiBarang(await profilSatuOutlet(input.outletId), input.price, input.qty ?? 1);
 
   const [row] = await db
     .insert(marketplaceListings)
@@ -68,13 +110,14 @@ export async function createListing(input: CreateListingInput) {
       price: round(input.price),
       negotiable: input.negotiable ?? true,
       city: input.city?.trim() || null,
-      contactPhone: input.contactPhone?.trim() || null,
-      imageUrl: input.imageUrl?.trim() || null,
+      contactPhone,
+      imageUrl: foto[0] ?? null,
+      imageUrls: foto.length > 0 ? JSON.stringify(foto) : null,
     })
     .returning();
 
-  await logAudit({ outletId: input.outletId, staffUserId: input.staffUserId, action: "create_marketplace_listing", entityType: "marketplace_listing", entityId: row.id, after: { title: row.title, price: row.price } });
-  return row;
+  await logAudit({ outletId: input.outletId, staffUserId: input.staffUserId, action: "create_marketplace_listing", entityType: "marketplace_listing", entityId: row.id, after: { title: row.title, price: row.price, foto: foto.length } });
+  return { ...row, photos: foto };
 }
 
 /**
@@ -102,20 +145,70 @@ export async function listPublicListings(viewerOutletId: string, filter?: { cate
     .where(and(...conditions))
     .orderBy(desc(marketplaceListings.createdAt));
 
-  return rows.map((r) => ({ ...r.listing, outletName: r.outletName ?? "Outlet", ujrah: computeUjrah(r.listing.price, r.listing.qty, ujrahConfig()) }));
+  // Barang milik outlet yang ditangguhkan tidak ditampilkan; sisanya diberi profil kepercayaan penjual.
+  const ditangguhkan = await daftarOutletDitangguhkan();
+  const tampil = rows.filter((r) => !ditangguhkan.has(r.listing.outletId));
+  const profil = await ambilProfilKepercayaan(tampil.map((r) => r.listing.outletId));
+
+  return tampil.map((r) => {
+    /*
+     * contact_phone SENGAJA dibuang di sini, di server — bukan sekadar tidak ditampilkan di layar.
+     * Sebelumnya kolom ini ikut terkirim ke setiap outlet dan bisa dibaca lewat DevTools browser,
+     * sehingga pembeli bisa langsung menghubungi penjual tanpa pernah membuat kesepakatan.
+     * Nomornya dibuka lewat listDeals() setelah penawaran diterima.
+     */
+    const { contactPhone, closedReason, closedNote, ...listing } = r.listing;
+    void contactPhone; void closedReason; void closedNote; // dibuang dengan sengaja
+    return {
+    ...listing,
+    photos: daftarFotoBarang(r.listing),
+    outletName: r.outletName ?? "Outlet",
+    sellerProfile: ringkasProfil(profil.get(r.listing.outletId)),
+    ujrah: computeUjrah(r.listing.price, r.listing.qty, ujrahConfig()),
+    };
+  });
 }
 
 export async function listMyListings(outletId: string) {
-  return db.select().from(marketplaceListings).where(eq(marketplaceListings.outletId, outletId)).orderBy(desc(marketplaceListings.createdAt));
+  const rows = await db.select().from(marketplaceListings).where(eq(marketplaceListings.outletId, outletId)).orderBy(desc(marketplaceListings.createdAt));
+  return rows.map((r) => ({ ...r, photos: daftarFotoBarang(r) }));
 }
 
-export async function closeListing(listingId: string, outletId: string, staffUserId?: string) {
+/**
+ * Menarik barang dari etalase. Alasan WAJIB (ALASAN_TARIK di anti-bypass.ts).
+ *
+ * Tidak ada pilihan "terjual ke outlet NEXBILL" di sini — penjualan ke sesama outlet harus lewat
+ * "Ajukan Beli" supaya tercatat. Jumlah penawaran yang pernah masuk ikut dicatat di audit log:
+ * barang yang ditarik dengan alasan "terjual di luar NEXBILL" SETELAH ada penawaran dari outlet lain
+ * adalah pola utama yang perlu diperiksa platform-admin.
+ */
+export async function closeListing(listingId: string, outletId: string, alasan: unknown, catatan?: string, staffUserId?: string) {
   const [existing] = await db.select().from(marketplaceListings).where(eq(marketplaceListings.id, listingId)).limit(1);
   if (!existing || existing.outletId !== outletId) throw new Error("Barang tidak ditemukan.");
   if (existing.status === "reserved") throw new Error("Barang ini sedang dalam kesepakatan yang belum selesai — batalkan kesepakatannya dulu.");
+  if (existing.status !== "active") throw new Error("Barang ini sudah tidak ada di etalase.");
+  if (!alasanTarikSah(alasan)) throw new Error("Pilih alasan menarik barang.");
+  const catatanBersih = catatan?.trim() || null;
+  if (alasan === "other" && !catatanBersih) throw new Error("Tuliskan alasannya untuk pilihan \"Lainnya\".");
 
-  const [row] = await db.update(marketplaceListings).set({ status: "closed", updatedAt: new Date().toISOString() }).where(eq(marketplaceListings.id, listingId)).returning();
-  await logAudit({ outletId, staffUserId, action: "close_marketplace_listing", entityType: "marketplace_listing", entityId: listingId, after: { status: "closed" } });
+  const [{ n: jumlahPenawaran }] = (await db
+    .select({ n: sql<number>`count(*)` })
+    .from(marketplaceDeals)
+    .where(eq(marketplaceDeals.listingId, listingId))) as { n: number }[];
+
+  const [row] = await db
+    .update(marketplaceListings)
+    .set({ status: "closed", closedReason: alasan, closedNote: catatanBersih, updatedAt: new Date().toISOString() })
+    .where(eq(marketplaceListings.id, listingId))
+    .returning();
+  await logAudit({
+    outletId,
+    staffUserId,
+    action: "close_marketplace_listing",
+    entityType: "marketplace_listing",
+    entityId: listingId,
+    after: { status: "closed", alasan, alasanLabel: ALASAN_TARIK[alasan], catatan: catatanBersih, jumlahPenawaranSebelumnya: Number(jumlahPenawaran) },
+  });
   return row;
 }
 
@@ -133,6 +226,8 @@ export interface CreateDealInput {
   /** Harga yang ditawarkan pembeli. Kosong = setuju harga pasang. */
   agreedPrice?: number;
   buyerNote?: string;
+  /** No. HP pembeli — wajib, baru terlihat oleh penjual setelah penawaran diterima. */
+  buyerContactPhone?: string;
   staffUserId?: string;
 }
 
@@ -149,6 +244,11 @@ export async function createDeal(input: CreateDealInput) {
   if (!listing) throw new Error("Barang tidak ditemukan.");
   if (listing.status !== "active") throw new Error("Barang ini sudah tidak tersedia.");
   if (listing.outletId === input.buyerOutletId) throw new Error("Tidak bisa membeli barang milik outlet sendiri.");
+  if (await outletDitangguhkan(input.buyerOutletId)) throw new Error(PESAN_DITANGGUHKAN);
+  if (await outletDitangguhkan(listing.outletId)) throw new Error("Barang ini sudah tidak tersedia.");
+  // Catatan penawaran terlihat penjual SEBELUM diterima — nomor HP di sini membuka jalan pintas yang sama.
+  pastikanTanpaKontak({ "Catatan untuk penjual": input.buyerNote });
+  const buyerContactPhone = normalisasiNoHp(input.buyerContactPhone);
 
   const qty = Math.max(1, Math.min(Math.floor(input.qty ?? 1), listing.qty));
   const agreedPrice = round(input.agreedPrice && input.agreedPrice > 0 ? input.agreedPrice : listing.price);
@@ -169,6 +269,7 @@ export async function createDeal(input: CreateDealInput) {
       platformFeeAmount: computeUjrah(agreedPrice, qty, ujrahConfig()),
       status: "requested",
       buyerNote: input.buyerNote?.trim() || null,
+      buyerContactPhone,
       sellerNote: listing.title,
     })
     .returning();
@@ -191,12 +292,77 @@ export async function listDeals(outletId: string) {
     namaRows.forEach((o) => namaOutlet.set(o.id, o.name));
   }
 
-  return rows.map((r) => ({
-    ...r,
-    peran: (r.sellerOutletId === outletId ? "seller" : "buyer") as PeranDeal,
-    sellerOutletName: namaOutlet.get(r.sellerOutletId) ?? "Outlet",
-    buyerOutletName: namaOutlet.get(r.buyerOutletId) ?? "Outlet",
-  }));
+  // Nomor HP penjual & foto sampul barang, dari listing masing-masing kesepakatan.
+  const listingIds = Array.from(new Set(rows.map((r) => r.listingId)));
+  const infoListing = new Map<string, { contactPhone: string | null; photos: string[] }>();
+  if (listingIds.length > 0) {
+    const lrows = await db
+      .select({ id: marketplaceListings.id, contactPhone: marketplaceListings.contactPhone, imageUrl: marketplaceListings.imageUrl, imageUrls: marketplaceListings.imageUrls })
+      .from(marketplaceListings)
+      .where(inArray(marketplaceListings.id, listingIds));
+    lrows.forEach((l) => infoListing.set(l.id, { contactPhone: l.contactPhone, photos: daftarFotoBarang(l) }));
+  }
+
+  // Keamanan: profil pihak lawan, ulasan yang sudah saya berikan, rekening penjual saat ini.
+  const profil = await ambilProfilKepercayaan(outletIds);
+  const dealIds = rows.map((r) => r.id);
+  const sudahDiulas = new Set<string>();
+  if (dealIds.length > 0) {
+    const rv = await db
+      .select({ dealId: marketplaceReviews.dealId })
+      .from(marketplaceReviews)
+      .where(and(inArray(marketplaceReviews.dealId, dealIds), eq(marketplaceReviews.reviewerOutletId, outletId)));
+    rv.forEach((x) => sudahDiulas.add(x.dealId));
+  }
+  const rekeningSekarang = new Map<string, { rek: ReturnType<typeof rekeningDariBaris>; bankUpdatedAt: string | null }>();
+  for (const sellerId of Array.from(new Set(rows.filter((r) => r.buyerOutletId === outletId).map((r) => r.sellerOutletId)))) {
+    const t = await ambilBarisTrust(sellerId);
+    rekeningSekarang.set(sellerId, { rek: rekeningDariBaris(t), bankUpdatedAt: t?.bankUpdatedAt ?? null });
+  }
+
+  return rows.map((r) => {
+    /*
+     * Kontak KEDUA pihak hanya dikirim bila kesepakatan sudah diterima/selesai. buyerContactPhone
+     * dibuang dari spread untuk status lain — tanpa itu, penjual bisa membaca nomor pembeli dari
+     * respons API pada penawaran yang belum (atau tidak akan pernah) ia terima. Rekening mengikuti
+     * aturan yang sama.
+     */
+    const { buyerContactPhone, payoutSnapshot, ...deal } = r;
+    const buka = kontakBolehDibuka(r.status as DealStatus);
+    const info = infoListing.get(r.listingId);
+    const peran = (r.sellerOutletId === outletId ? "seller" : "buyer") as PeranDeal;
+    const lawan = peran === "seller" ? r.buyerOutletId : r.sellerOutletId;
+
+    let payout: { bankName: string; accountNumber: string; holder: string } | null = null;
+    try {
+      payout = buka && payoutSnapshot ? JSON.parse(payoutSnapshot) : null;
+    } catch {
+      payout = null;
+    }
+    /*
+     * Modus penipuan paling umum tanpa escrow: "rekening saya ganti, transfer ke sini saja". Pembeli
+     * diberi tahu bila rekening penjual SEKARANG berbeda dari yang terkunci di kesepakatan ini, atau
+     * baru saja diganti.
+     */
+    const rs = peran === "buyer" ? rekeningSekarang.get(r.sellerOutletId) : undefined;
+    const rekeningBerubahSetelahDiterima = !!(payout && rs?.rek && (rs.rek.accountNumber !== payout.accountNumber || rs.rek.bankName !== payout.bankName));
+    const rekeningBaru = !!(payout && rekeningBaruDiganti(rs?.bankUpdatedAt));
+
+    return {
+      ...deal,
+      peran,
+      sellerOutletName: namaOutlet.get(r.sellerOutletId) ?? "Outlet",
+      buyerOutletName: namaOutlet.get(r.buyerOutletId) ?? "Outlet",
+      sellerContactPhone: buka ? info?.contactPhone ?? null : null,
+      buyerContactPhone: buka ? buyerContactPhone ?? null : null,
+      photo: info?.photos[0] ?? null,
+      counterpartProfile: ringkasProfil(profil.get(lawan)),
+      payout,
+      rekeningBerubahSetelahDiterima,
+      rekeningBaru,
+      sudahDiulas: sudahDiulas.has(r.id),
+    };
+  });
 }
 
 export interface TransitionDealInput {
@@ -239,11 +405,30 @@ export async function transitionDeal(input: TransitionDealInput) {
     throw new Error(`Hanya ${siapa} yang bisa melakukan ini.`);
   }
 
+  // Alasan tolak/batal terbaca pihak lain — "tolak di sini, hubungi saya di 08…" adalah jalan pintas yang sama.
+  pastikanTanpaKontak({ Alasan: input.alasan });
+
   const now = new Date().toISOString();
   const patch: Record<string, unknown> = { status: input.ke, updatedAt: now };
   if (input.alasan?.trim()) patch.closedReason = input.alasan.trim();
 
   let sellerOtherIncomeId: string | null = null;
+
+  if (input.ke === "accepted") {
+    /*
+     * Menerima penawaran = mengikat diri. Dua syarat keamanan di titik ini:
+     *   1. Outlet yang ditangguhkan tidak boleh memulai kesepakatan baru.
+     *   2. Rekening penerima WAJIB terdaftar, dan SALINANNYA dikunci ke kesepakatan ini. Pembeli
+     *      diarahkan membayar ke rekening yang terkunci itu — penggantian rekening sesudahnya
+     *      langsung terlihat di layar pembeli (lihat listDeals), bukan hanya diklaim di chat.
+     */
+    if (await outletDitangguhkan(deal.sellerOutletId)) throw new Error(PESAN_DITANGGUHKAN);
+    const rek = rekeningDariBaris(await ambilBarisTrust(deal.sellerOutletId));
+    if (!rek) {
+      throw new Error("Daftarkan dulu rekening penerima di tab Keamanan & Rekening. Pembeli hanya akan diarahkan membayar ke rekening itu.");
+    }
+    patch.payoutSnapshot = JSON.stringify(rek);
+  }
 
   if (input.ke === "completed") {
     patch.completedAt = now;
@@ -302,5 +487,8 @@ export async function transitionDeal(input: TransitionDealInput) {
     after: { status: input.ke, alasan: input.alasan ?? null },
   });
 
-  return { ...updated, sellerOtherIncomeId };
+  // Respons ini dikirim ke pihak mana pun yang menekan tombol — nomor pembeli ikut aturan yang sama dengan listDeals().
+  const { buyerContactPhone, payoutSnapshot, ...tanpaKontak } = updated;
+  void payoutSnapshot; // layar memuat ulang lewat listDeals(), yang menerapkan aturan buka/tutupnya
+  return { ...tanpaKontak, buyerContactPhone: kontakBolehDibuka(updated.status as DealStatus) ? buyerContactPhone : null, sellerOtherIncomeId };
 }

@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { subscriptionInvoices, subscriptions, marketplaceDeals, outlets } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { UJRAH_AKTIF } from "./ujrah";
 
 /**
  * Penagihan ujrah Marketplace Antar-Outlet.
@@ -64,7 +65,9 @@ export async function bebankanUjrah(dealId: string): Promise<{ invoiceId: string
   const [deal] = await db.select().from(marketplaceDeals).where(eq(marketplaceDeals.id, dealId)).limit(1);
   if (!deal) return null;
   if (deal.platformFeeStatus !== "pending") return null; // sudah ditagih atau dibebaskan — jangan tagih dua kali
-  if (!(deal.platformFeeAmount > 0)) {
+  // Ujrah diarsipkan (UJRAH_AKTIF = false): kesepakatan yang sempat tercatat ber-ujrah sebelum saklar
+  // dimatikan ikut dibebaskan, supaya tidak ada faktur marketplace_fee yang terbit selama masa gratis.
+  if (!UJRAH_AKTIF || !(deal.platformFeeAmount > 0)) {
     await db.update(marketplaceDeals).set({ platformFeeStatus: "waived" }).where(eq(marketplaceDeals.id, dealId));
     return null;
   }

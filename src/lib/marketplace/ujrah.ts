@@ -37,6 +37,31 @@ export interface UjrahConfig {
 export const UJRAH_CONFIG_DEFAULT: UjrahConfig = { nominal: UJRAH_DEFAULT, hargaMinimum: UJRAH_HARGA_MINIMUM };
 
 /**
+ * SAKLAR ARSIP UJRAH — keputusan pemilik 2026-09-24: Marketplace Antar-Outlet GRATIS untuk
+ * sementara. Seluruh mekanisme ujrah (perhitungan, penyalinan ke kesepakatan, faktur
+ * "marketplace_fee" di billing.ts, tampilan di layar) SENGAJA dipertahankan utuh dan hanya
+ * dimatikan lewat saklar ini, supaya mengaktifkannya lagi cukup satu baris: ubah ke `true`.
+ *
+ * Selama `false`:
+ *   - kesepakatan baru tercatat dengan platform_fee_amount = 0 (lihat ujrahConfigBerlaku);
+ *   - bebankanUjrah() membebaskan (waived) kesepakatan lama yang sempat tercatat ber-ujrah,
+ *     sehingga tidak ada satu pun faktur marketplace_fee yang terbit;
+ *   - layar menampilkan "Gratis" dan menyembunyikan semua angka & klausul ujrah;
+ *   - variabel lingkungan MARKETPLACE_UJRAH diabaikan.
+ *
+ * Saat mengaktifkan kembali, umumkan dulu ke merchant — ujrah adalah akad yang harus diketahui
+ * di muka (ma'lumah), tidak boleh berlaku diam-diam atas penawaran yang sudah berjalan.
+ */
+export const UJRAH_AKTIF: boolean = false;
+
+export const UJRAH_CONFIG_NONAKTIF: UjrahConfig = { nominal: 0, hargaMinimum: 0 };
+
+/** Konfigurasi yang benar-benar berlaku sekarang (tanpa env) — dipakai layar. Server memakai ujrahConfig() di service.ts. */
+export function ujrahConfigBerlaku(): UjrahConfig {
+  return UJRAH_AKTIF ? UJRAH_CONFIG_DEFAULT : UJRAH_CONFIG_NONAKTIF;
+}
+
+/**
  * Menghitung ujrah untuk satu kesepakatan.
  *
  * Dua pembebasan yang disengaja:
