@@ -57,7 +57,7 @@ export interface LandingCopy {
     statLabel: string; kasirLabel: string; videoHint: string; laporanLabel: string;
   };
   solusi: { kicker: string; title: string; sub: string; points: PainPoint[] };
-  fitur: { kicker: string; title: string; sub: string; items: Feature[] };
+  fitur: { kicker: string; title: string; sub: string; catalogCta: string; catalogNote: string; items: Feature[] };
   // Competitive-gap section (page.tsx, between #fitur and #harga) — features most generic PS
   // rental billing/POS software doesn't have. Deliberately does not name any competitor by name
   // (see docs/SEO-ARCHITECTURE.md §8 guardrails: no misleading/unsubstantiated claims) — every
@@ -142,6 +142,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Fitur Lengkap", title: "Semua yang dibutuhkan rental PS, dalam satu sistem",
       sub: "Bukan cuma kasir. Sembilan modul ini menutupi seluruh alur operasional outlet — dari sesi pertama pelanggan duduk sampai laporan laba rugi akhir bulan.",
+      catalogCta: "Lihat Katalog Fitur Lengkap", catalogNote: "18 kategori, 100+ fitur — bisa dicetak atau disimpan sebagai PDF.",
       items: [
         { title: "Timer Sewa Presisi Detik", desc: "Tap start, sistem hitung durasi & tagihan otomatis sampai ke detik — akurat untuk tarif per jam, paket hemat, maupun harga member, tanpa stopwatch atau kalkulator manual." },
         { title: "Manajemen Unit PS4, PS5 & PS6", desc: "Setiap unit dicatat terpisah lengkap dengan kondisi, tipe TV, dan riwayat pemakaian. Pelanggan booking online tahu persis unit generasi mana yang kosong dan spesifikasinya." },
@@ -289,6 +290,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Full Feature Set", title: "Everything a PS rental needs, in one system",
       sub: "It's not just a POS. These nine modules cover the entire outlet workflow — from the moment a customer sits down to the month-end P&L report.",
+      catalogCta: "See the Full Feature Catalog", catalogNote: "18 categories, 100+ features — printable or save as PDF.",
       items: [
         { title: "Per-Second Precision Rental Timer", desc: "Tap start, and the system automatically calculates duration and billing down to the second — accurate for hourly rates, saver packages, or member pricing, with no stopwatch or manual calculator needed." },
         { title: "PS4, PS5 & PS6 Unit Management", desc: "Every unit is tracked separately with its condition, TV type, and usage history. Online booking customers know exactly which generation of unit is free and its specs." },
@@ -436,6 +438,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Ciri Lengkap", title: "Semua yang diperlukan outlet sewa PS, dalam satu sistem",
       sub: "Bukan sekadar kaunter jualan. Sembilan modul ini merangkumi seluruh aliran operasi outlet — dari saat pertama pelanggan duduk sehingga laporan untung rugi akhir bulan.",
+      catalogCta: "Lihat Katalog Ciri Penuh", catalogNote: "18 kategori, 100+ ciri — boleh dicetak atau disimpan sebagai PDF.",
       items: [
         { title: "Pemasa Sewa Ketepatan Saat", desc: "Tekan mula, sistem kira tempoh & bil automatik sehingga ke saat — tepat untuk kadar sejam, pakej jimat, mahupun harga ahli, tanpa jam randik atau kalkulator manual." },
         { title: "Pengurusan Unit PS4, PS5 & PS6", desc: "Setiap unit dicatat berasingan lengkap dengan keadaan, jenis TV, dan sejarah penggunaan. Pelanggan tempahan atas talian tahu tepat unit generasi mana yang kosong dan spesifikasinya." },
@@ -586,6 +589,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "ฟีเจอร์ครบครัน", title: "ทุกสิ่งที่ร้านเช่า PS ต้องการ ในระบบเดียว",
       sub: "ไม่ใช่แค่แคชเชียร์ เก้าโมดูลนี้ครอบคลุมการทำงานทั้งหมดของร้าน — ตั้งแต่ลูกค้านั่งลงครั้งแรกไปจนถึงรายงานกำไรขาดทุนสิ้นเดือน",
+      catalogCta: "ดูแคตตาล็อกฟีเจอร์ทั้งหมด", catalogNote: "18 หมวด ฟีเจอร์กว่า 100 รายการ — พิมพ์หรือบันทึกเป็น PDF ได้",
       items: [
         { title: "นาฬิกาจับเวลาเช่าละเอียดถึงวินาที", desc: "แตะเริ่ม ระบบคำนวณระยะเวลาและค่าบริการอัตโนมัติถึงวินาที — แม่นยำทั้งอัตรารายชั่วโมง แพ็กเกจประหยัด หรือราคาสมาชิก โดยไม่ต้องใช้นาฬิกาจับเวลาหรือเครื่องคิดเลข" },
         { title: "จัดการเครื่อง PS4, PS5 และ PS6", desc: "แต่ละเครื่องถูกบันทึกแยกกันพร้อมสภาพ ประเภททีวี และประวัติการใช้งาน ลูกค้าที่จองออนไลน์รู้ชัดเจนว่าเครื่องรุ่นไหนว่างและสเปกเป็นอย่างไร" },
@@ -736,6 +740,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Tính năng đầy đủ", title: "Mọi thứ cửa hàng cho thuê PS cần, trong một hệ thống",
       sub: "Không chỉ là thu ngân. Chín module này bao quát toàn bộ quy trình vận hành cửa hàng — từ lúc khách hàng ngồi xuống đến báo cáo lãi lỗ cuối tháng.",
+      catalogCta: "Xem danh mục tính năng đầy đủ", catalogNote: "18 nhóm, hơn 100 tính năng — có thể in hoặc lưu thành PDF.",
       items: [
         { title: "Đồng hồ tính giờ thuê chính xác đến giây", desc: "Chạm bắt đầu, hệ thống tự động tính thời lượng & hóa đơn chính xác đến từng giây — đúng cho giá theo giờ, gói tiết kiệm, hay giá hội viên, không cần đồng hồ bấm giờ hay máy tính thủ công." },
         { title: "Quản lý thiết bị PS4, PS5 & PS6", desc: "Mỗi thiết bị được ghi nhận riêng biệt kèm tình trạng, loại TV, và lịch sử sử dụng. Khách đặt chỗ trực tuyến biết chính xác thiết bị thế hệ nào đang trống và thông số của nó." },
@@ -886,6 +891,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Kumpletong Feature", title: "Lahat ng kailangan ng PS rental, sa isang sistema",
       sub: "Hindi lang cashier. Ang siyam na module na ito ang sumasaklaw sa buong daloy ng operasyon ng outlet — mula sa unang pagupo ng customer hanggang sa profit-and-loss report sa katapusan ng buwan.",
+      catalogCta: "Tingnan ang Buong Katalogo ng Feature", catalogNote: "18 kategorya, 100+ feature — puwedeng i-print o i-save bilang PDF.",
       items: [
         { title: "Rental Timer na Tumpak Hanggang Segundo", desc: "I-tap ang start, awtomatikong bibilangin ng sistema ang tagal at bayarin hanggang sa segundo — tumpak para sa per-hour rate, savings package, o presyo ng miyembro, walang kailangang stopwatch o manual na kalkulator." },
         { title: "Pamamahala ng PS4, PS5 & PS6 Unit", desc: "Bawat unit ay naitatala nang hiwalay kasama ang kondisyon, uri ng TV, at history ng paggamit. Alam mismo ng customer na nag-book online kung aling generation ng unit ang bakante at ano ang specs nito." },

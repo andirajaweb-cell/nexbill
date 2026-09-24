@@ -1103,6 +1103,18 @@ function LandingPageInner() {
               </div>
             ))}
           </div>
+          {/* Full merchant feature catalog (static multilingual page in /public/downloads). */}
+          <div style={{ textAlign: 'center', marginTop: 32 }}>
+            <a
+              href={`/downloads/katalog-fitur-nexbill.html?lang=${lang}`}
+              target="_blank"
+              rel="noopener"
+              className="btn btn-primary"
+            >
+              {t.fitur.catalogCta} →
+            </a>
+            <p style={{ marginTop: 10, fontSize: 13, opacity: 0.7 }}>{t.fitur.catalogNote}</p>
+          </div>
         </div>
       </section>
 

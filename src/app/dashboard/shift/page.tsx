@@ -10,7 +10,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getCashDenominations, denominationLabel } from "@/lib/shift/denominations";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { useOutletFormat } from "@/lib/format/client";
@@ -250,7 +250,12 @@ export default function ShiftPage() {
 
   /** Owner/Manager sign-off on a shift auto-flagged by the anti-fraud check (see fraud-detection.ts) — approving/rejecting here doesn't undo anything on the shift itself, it's a review acknowledgment, same approval_requests mechanism as void/refund. */
   const decideReview = async (reviewId: string, action: "approve" | "reject") => {
-    const note = action === "reject" ? (prompt(t("shift.review.rejectNotePrompt", "Catatan penolakan (opsional)?")) ?? undefined) : undefined;
+    let note: string | undefined;
+    if (action === "reject") {
+      const r = await showPrompt(t("shift.review.rejectNotePrompt", "Catatan penolakan (opsional)?"), { tone: "danger", multiline: true });
+      if (r === null) return; // Batal = tidak jadi menolak
+      note = r || undefined;
+    }
     setReviewingId(reviewId);
     try {
       const res = await fetch(`/api/approvals/${reviewId}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
@@ -918,7 +923,7 @@ function CashDepositTab({
   };
 
   const voidDeposit = async (id: string) => {
-    const reason = prompt(t("cashDeposit.promptVoidReason", "Alasan pembatalan setoran ini?")) ?? "";
+    const reason = (await showPrompt(t("cashDeposit.promptVoidReason", "Alasan pembatalan setoran ini?"), { tone: "danger", required: true, multiline: true })) ?? "";
     if (!reason) return;
     const res = await fetch(`/api/cash-deposits/${id}/void`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
     const data = await res.json();
@@ -1106,7 +1111,12 @@ function CashTransferTab({
   };
 
   const decide = async (approvalRequestId: string, action: "approve" | "reject") => {
-    const note = action === "reject" ? (prompt(t("cashTransfer.rejectNotePrompt", "Catatan penolakan (opsional)?")) ?? undefined) : undefined;
+    let note: string | undefined;
+    if (action === "reject") {
+      const r = await showPrompt(t("cashTransfer.rejectNotePrompt", "Catatan penolakan (opsional)?"), { tone: "danger", multiline: true });
+      if (r === null) return; // Batal = tidak jadi menolak
+      note = r || undefined;
+    }
     setDecidingId(approvalRequestId);
     try {
       const res = await fetch(`/api/approvals/${approvalRequestId}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
@@ -1119,7 +1129,7 @@ function CashTransferTab({
   };
 
   const voidTransfer = async (id: string) => {
-    const reason = prompt(t("cashTransfer.promptVoidReason", "Alasan pembatalan pindah kas ini?")) ?? "";
+    const reason = (await showPrompt(t("cashTransfer.promptVoidReason", "Alasan pembatalan pindah kas ini?"), { tone: "danger", required: true, multiline: true })) ?? "";
     if (!reason) return;
     const res = await fetch(`/api/cash-transfers/${id}/void`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
     const data = await res.json();

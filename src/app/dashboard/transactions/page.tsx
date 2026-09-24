@@ -8,7 +8,7 @@ import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-transactions";
 
@@ -296,7 +296,14 @@ function TransactionListTab({ outletId }: { outletId: string }) {
   const duplicateFlags = useMemo(() => computeDuplicateFlags(rows), [rows]);
 
   const doAction = async (id: string, kind: "refund" | "void") => {
-    const reason = prompt(kind === "refund" ? t("transactions.prompt.refundReason", "Alasan refund?") : t("transactions.prompt.voidReason", "Alasan void?")) ?? "";
+    // Dulu: menekan "Cancel" di prompt bawaan browser TETAP mengirim permintaan refund/void (alasan kosong).
+    const reason = await showPrompt(kind === "refund" ? t("transactions.prompt.refundReason", "Alasan refund?") : t("transactions.prompt.voidReason", "Alasan void?"), {
+      tone: "danger",
+      required: true,
+      multiline: true,
+      confirmLabel: kind === "refund" ? t("transactions.action.refund", "Refund") : t("transactions.action.void", "Batalkan"),
+    });
+    if (reason === null) return;
     const res = await fetch(`/api/orders/${id}/${kind === "refund" ? "refund-request" : "void-request"}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }),
     });

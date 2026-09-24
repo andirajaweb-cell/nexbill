@@ -8,7 +8,8 @@ import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
+import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import { outletDateYmd } from "@/lib/time/outlet-time";
@@ -170,6 +171,8 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   const canManage = hasPermission(role, "manage_expenses");
   const canApprove = hasPermission(role, "approve_expenses");
   const canVoid = hasPermission(role, "void_expense");
+  // Penjaga klik ganda untuk semua aksi yang menyimpan data di tab ini — lihat use-proses-tunggal.ts.
+  const proses = useProsesTunggal();
 
   // Cash Out Cepat — a minimal 3-field shortcut for small register spending (parkir, beli air
   // galon, dll) that doesn't need the full expense form below. It's still a real Expense under
@@ -180,7 +183,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   const [cashOutBusy, setCashOutBusy] = useState(false);
   const defaultCashAccount = cashBankAccounts.find((c: any) => c.type === "cash" && c.isDefault) ?? cashBankAccounts.find((c: any) => c.type === "cash");
 
-  const submitCashOut = async () => {
+  const submitCashOut = () => proses.jalankan("cashout", async () => {
     if (!cashOutForm.accountId || !cashOutForm.amount) return showAlert(t("expenses.alert.selectCategoryAndAmount", "Pilih kategori beban dan isi nominal."));
     if (!defaultCashAccount) return showAlert(t("expenses.alert.noCashAccount", "Belum ada akun Kas — atur dulu di halaman Pembayaran."));
     setCashOutBusy(true);
@@ -212,7 +215,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
     } finally {
       setCashOutBusy(false);
     }
-  };
+  });
 
   const load = () => {
     const qs = statusFilter ? `&status=${statusFilter}` : "";
@@ -260,13 +263,14 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
     }
   };
 
-  const submitCreate = async () => {
+  const submitCreate = () => proses.jalankan("create", async () => {
     // Pesan menyebut nama kolom PERSIS seperti yang tertulis di layar — versi lama menyebut "Akun"
     // dan "centang 'Catat sebagai hutang'", dua sebutan yang tidak pernah muncul di form itu
     // sendiri, sehingga pemakainya harus menebak kotak mana yang dimaksud.
     if (!form.accountId || !form.category || !form.amount) {
       return showAlert(t("expenses.alert.requiredFields", "Lengkapi dulu: Jenis biaya, Kategori, dan Nominal (langkah 1 dan 2)."));
     }
+    if (uploading) return showAlert(t("expenses.alert.waitUpload", "Tunggu sampai unggahan bukti selesai."));
     if (!form.recordAsPayable && !form.cashBankAccountId) {
       return showAlert(t("expenses.alert.selectCashBankOrPayable", "Di langkah 4, pilih dulu \"Uangnya diambil dari mana?\" — atau ubah ke \"Belum dibayar (hutang)\" kalau uangnya memang belum keluar."));
     }
@@ -293,23 +297,39 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
     setForm({ accountId: "", category: "", description: "", payeeName: "", supplierId: "", qty: 1, amount: 0, taxAmount: 0, paymentMethod: "cash", cashBankAccountId: "", recordAsPayable: false, costCenterId: "", rentalUnitId: "", dueDate: "", attachmentUrl: "", expenseDate: todayYmd });
     setShowForm(false);
     load();
+  });
+
+  /** Aksi per baris. Kuncinya per BARIS (`row:<id>`), jadi satu baris yang sedang diproses tidak mengunci baris lain. */
+  const act = (id: string, action: "submit" | "approve" | "cancel" | "reject" | "void", extra?: any) =>
+    proses.jalankan(`row:${id}`, async () => {
+      const res = await fetch(`/api/expenses/${id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(extra ?? {}) });
+      const data = await res.json().catch(() => ({ error: "Gagal memproses. Coba lagi." }));
+      if (!res.ok) return showAlert(data.error);
+      load();
+    });
+
+  /** Alasan wajib — dulu prompt() bawaan browser (tidak sesuai tema, dan "Cancel" bisa lolos dengan alasan kosong). */
+  const minta = async (id: string, action: "cancel" | "reject" | "void", pesan: string, judul: string) => {
+    if (proses.sibuk(`row:${id}`)) return;
+    const alasan = await showPrompt(pesan, {
+      title: judul,
+      required: true,
+      multiline: true,
+      tone: action === "void" || action === "cancel" ? "danger" : "default",
+      placeholder: t("expenses.reasonPlaceholder", "mis. input ganda, salah nominal, salah akun"),
+      confirmLabel: judul,
+    });
+    if (alasan) await act(id, action, { reason: alasan });
   };
 
-  const act = async (id: string, action: "submit" | "approve" | "cancel" | "reject" | "void", extra?: any) => {
-    const res = await fetch(`/api/expenses/${id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(extra ?? {}) });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
-    load();
-  };
-
-  const submitPay = async () => {
+  const submitPay = () => proses.jalankan("pay", async () => {
     if (!payFor?.cashBankAccountId) return showAlert(t("expenses.alert.selectCashBank", "Pilih akun kas/bank."));
     const res = await fetch(`/api/expenses/${payFor.id}/pay`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: payFor.method, cashBankAccountId: payFor.cashBankAccountId }) });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
     setPayFor(null);
     load();
-  };
+  });
 
   return (
     <div className="space-y-4">
@@ -587,7 +607,9 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
             })()}
           </div>
 
-          <Button onClick={submitCreate}>{t("expenses.saveAndSubmit", "Simpan & Submit")}</Button>
+          <Button onClick={submitCreate} disabled={proses.sibuk("create") || uploading}>
+            {proses.sibuk("create") ? t("expenses.saving", "Menyimpan...") : t("expenses.saveAndSubmit", "Simpan & Submit")}
+          </Button>
         </Card>
       )}
 
@@ -606,8 +628,8 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
             />
           </div>
           <div className="flex gap-2">
-            <Button onClick={submitPay}>{t("expenses.action.pay", "Bayar")}</Button>
-            <Button variant="ghost" onClick={() => setPayFor(null)}>{t("expenses.action.batal", "Batal")}</Button>
+            <Button onClick={submitPay} disabled={proses.sibuk("pay")}>{proses.sibuk("pay") ? t("expenses.processing", "Memproses...") : t("expenses.action.pay", "Bayar")}</Button>
+            <Button variant="ghost" onClick={() => setPayFor(null)} disabled={proses.sibuk("pay")}>{t("expenses.action.batal", "Batal")}</Button>
           </div>
         </Card>
       )}
@@ -631,22 +653,51 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                 <td className="text-xs">{staffName(e.staffUserId)}</td>
                 <td className="text-right space-y-1">
                   <div className="flex flex-col items-end gap-1">
-                    {e.status === "draft" && canManage && <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => act(e.id, "submit")}>{t("expenses.action.submit", "Submit")}</Button>}
-                    {e.status === "rejected" && canManage && <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => act(e.id, "submit")}>{t("expenses.action.submitAgain", "Submit Ulang")}</Button>}
+                    {proses.sibuk(`row:${e.id}`) && <span className="text-[11px] text-cyan-300 animate-pulse">{t("expenses.processing", "Memproses...")}</span>}
+                    {e.status === "draft" && canManage && <Button variant="secondary" className="text-xs px-2 py-1" disabled={proses.sibuk(`row:${e.id}`)} onClick={() => act(e.id, "submit")}>{t("expenses.action.submit", "Submit")}</Button>}
+                    {e.status === "rejected" && canManage && <Button variant="secondary" className="text-xs px-2 py-1" disabled={proses.sibuk(`row:${e.id}`)} onClick={() => act(e.id, "submit")}>{t("expenses.action.submitAgain", "Submit Ulang")}</Button>}
                     {["draft", "pending_approval"].includes(e.status) && canManage && (
-                      <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => { const r = prompt(t("expenses.promptCancelReason", "Alasan cancel?")); if (r !== null) act(e.id, "cancel", { reason: r }); }}>{t("expenses.action.cancel", "Cancel")}</Button>
+                      <Button
+                        variant="ghost"
+                        className="text-xs px-2 py-1 text-red-400"
+                        disabled={proses.sibuk(`row:${e.id}`)}
+                        onClick={() => minta(e.id, "cancel", `${e.expenseNumber} — ${t("expenses.promptCancelReason", "Alasan cancel?")}`, t("expenses.action.cancel", "Cancel"))}
+                      >
+                        {t("expenses.action.cancel", "Cancel")}
+                      </Button>
                     )}
                     {e.status === "pending_approval" && canApprove && (
                       <>
-                        <Button className="text-xs px-2 py-1" onClick={() => act(e.id, "approve")}>{t("expenses.action.approve", "Approve")}</Button>
-                        <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => { const r = prompt(t("expenses.promptRejectReason", "Alasan reject?")); if (r) act(e.id, "reject", { reason: r }); }}>{t("expenses.action.reject", "Reject")}</Button>
+                        <Button className="text-xs px-2 py-1" disabled={proses.sibuk(`row:${e.id}`)} onClick={() => act(e.id, "approve")}>{t("expenses.action.approve", "Approve")}</Button>
+                        <Button
+                          variant="ghost"
+                          className="text-xs px-2 py-1 text-red-400"
+                          disabled={proses.sibuk(`row:${e.id}`)}
+                          onClick={() => minta(e.id, "reject", `${e.expenseNumber} — ${t("expenses.promptRejectReason", "Alasan reject?")}`, t("expenses.action.reject", "Reject"))}
+                        >
+                          {t("expenses.action.reject", "Reject")}
+                        </Button>
                       </>
                     )}
                     {e.status === "approved" && e.recordAsPayable && canManage && (
-                      <Button className="text-xs px-2 py-1" onClick={() => setPayFor({ id: e.id, method: "cash", cashBankAccountId: "" })}>{t("expenses.action.pay", "Bayar")}</Button>
+                      <Button className="text-xs px-2 py-1" disabled={proses.sibuk(`row:${e.id}`)} onClick={() => setPayFor({ id: e.id, method: "cash", cashBankAccountId: "" })}>{t("expenses.action.pay", "Bayar")}</Button>
                     )}
                     {["approved", "paid"].includes(e.status) && canVoid && (
-                      <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => { const r = prompt(t("expenses.promptVoidReason", "Alasan pembatalan (akan membalik jurnal)?")); if (r) act(e.id, "void", { reason: r }); }}>{t("expenses.action.void", "Batalkan")}</Button>
+                      <Button
+                        variant="ghost"
+                        className="text-xs px-2 py-1 text-red-400"
+                        disabled={proses.sibuk(`row:${e.id}`)}
+                        onClick={() =>
+                          minta(
+                            e.id,
+                            "void",
+                            `${e.expenseNumber} · ${e.description || e.category} · ${rupiah(e.amount + (e.taxAmount ?? 0))}\n\n${t("expenses.promptVoidReason", "Alasan pembatalan (akan membalik jurnal)?")}`,
+                            t("expenses.action.void", "Batalkan")
+                          )
+                        }
+                      >
+                        {t("expenses.action.void", "Batalkan")}
+                      </Button>
                     )}
                     {e.attachmentUrl && <a href={e.attachmentUrl} target="_blank" className="text-[10px] text-neutral-500 underline">{t("expenses.proofLink", "bukti")}</a>}
                   </div>
@@ -669,15 +720,16 @@ function CostCenterTab({ outletId, role }: { outletId: string; role: StaffRole }
 
   const load = () => fetchJsonArray(`/api/cost-centers?outletId=${outletId}`).then(setRows);
   useEffect(() => { load(); }, [outletId]);
+  const proses = useProsesTunggal();
 
-  const create = async () => {
+  const create = () => proses.jalankan("create", async () => {
     if (!form.name) return;
     const res = await fetch("/api/cost-centers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId }) });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
     setForm({ name: "", code: "" });
     load();
-  };
+  });
 
   return (
     <div className="space-y-4">
@@ -688,7 +740,7 @@ function CostCenterTab({ outletId, role }: { outletId: string; role: StaffRole }
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderNameCostCenter", "Nama (mis. Kitchen)")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("expenses.placeholderCode", "Kode (opsional)")} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-            <Button onClick={create}>{t("expenses.addButton", "Tambah")}</Button>
+            <Button onClick={create} disabled={proses.sibuk("create")}>{proses.sibuk("create") ? t("expenses.saving", "Menyimpan...") : t("expenses.addButton", "Tambah")}</Button>
           </div>
         </Card>
       )}
@@ -716,23 +768,33 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
     fetchJsonObject(`/api/expenses?outletId=${outletId}`).then((d: any) => d && setAccounts(d.accounts));
   };
   useEffect(() => { load(); }, [outletId]);
+  const proses = useProsesTunggal();
 
-  const create = async () => {
+  const create = () => proses.jalankan("create", async () => {
     if (!form.name || !form.accountId || !form.category || !form.amount || !form.nextDueDate) return showAlert(t("expenses.alert.recurringRequiredFields", "Nama, akun, kategori, nominal, dan tanggal jatuh tempo berikutnya wajib diisi."));
     const res = await fetch("/api/expenses/recurring", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId, amount: Number(form.amount), taxAmount: Number(form.taxAmount) || 0, dayOfMonth: Number(form.dayOfMonth) || undefined, nextDueDate: new Date(form.nextDueDate).toISOString() }) });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
     setForm({ name: "", accountId: "", category: "", amount: 0, taxAmount: 0, recordAsPayable: true, frequency: "monthly", dayOfMonth: 1, nextDueDate: "" });
     load();
-  };
+  });
 
-  const deactivate = async (id: string) => {
-    if (!await showConfirm(t("expenses.confirmDeactivateRecurring", "Nonaktifkan recurring expense ini?"))) return;
-    await fetch(`/api/expenses/recurring/${id}`, { method: "DELETE" });
+  const deactivate = (id: string) => proses.jalankan(`row:${id}`, async () => {
+    if (!await showConfirm(t("expenses.confirmDeactivateRecurring", "Nonaktifkan recurring expense ini?"), { tone: "danger" })) return;
+    const res = await fetch(`/api/expenses/recurring/${id}`, { method: "DELETE" });
+    // Dulu hasilnya tidak dicek sama sekali: gagal pun layar diam, dan template tetap aktif tanpa pemberitahuan.
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: "Gagal menonaktifkan template." }));
+      return showAlert(data.error);
+    }
     load();
-  };
+  });
 
-  const generate = async () => {
+  /*
+   * Generate paling berbahaya bila tertekan dua kali: tiap tekanan membuat draft untuk semua
+   * template yang jatuh tempo. `generating` (state) saja bisa tembus klik cepat — dijaga ref juga.
+   */
+  const generate = () => proses.jalankan("generate", async () => {
     setGenerating(true);
     try {
       const res = await fetch("/api/expenses/recurring/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId }) });
@@ -743,7 +805,7 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
     } finally {
       setGenerating(false);
     }
-  };
+  });
 
   const frequencyLabel = (f: string) => f === "monthly" ? t("expenses.frequency.monthly", "Bulanan") : f === "weekly" ? t("expenses.frequency.weekly", "Mingguan") : t("expenses.frequency.yearly", "Tahunan");
 
@@ -773,7 +835,7 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
               <input type="checkbox" checked={form.recordAsPayable} onChange={(e) => setForm({ ...form, recordAsPayable: e.target.checked })} /> {t("expenses.recordAsPayableAtCreation", "Catat sebagai hutang saat dibuat")}
             </label>
           </div>
-          <Button onClick={create}>{t("expenses.saveTemplate", "Simpan Template")}</Button>
+          <Button onClick={create} disabled={proses.sibuk("create")}>{proses.sibuk("create") ? t("expenses.saving", "Menyimpan...") : t("expenses.saveTemplate", "Simpan Template")}</Button>
         </Card>
       )}
 
@@ -812,7 +874,7 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
               <div className="text-sm font-medium">{r.name} {!r.isActive && <span className="text-xs text-neutral-500">{t("expenses.inactive", "(nonaktif)")}</span>}</div>
               <div className="text-xs text-neutral-500">{rupiah(r.amount)} · {frequencyLabel(r.frequency)} · {t("expenses.nextDueDate", "Jatuh tempo berikutnya")} {new Date(r.nextDueDate).toLocaleDateString("id-ID")}</div>
             </div>
-            {canManage && r.isActive && <Button variant="ghost" className="text-xs text-red-400" onClick={() => deactivate(r.id)}>{t("expenses.deactivate", "Nonaktifkan")}</Button>}
+            {canManage && r.isActive && <Button variant="ghost" className="text-xs text-red-400" disabled={proses.sibuk(`row:${r.id}`)} onClick={() => deactivate(r.id)}>{t("expenses.deactivate", "Nonaktifkan")}</Button>}
           </Card>
         ))}
         {rows.length === 0 && <div className="text-sm text-neutral-500">{t("expenses.emptyRecurring", "Belum ada template recurring.")}</div>}

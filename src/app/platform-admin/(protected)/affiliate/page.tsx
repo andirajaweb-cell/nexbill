@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
+import { showAlert, showConfirm } from "@/lib/ui/dialog";
 
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 
@@ -116,8 +117,12 @@ export default function PlatformAffiliatePage() {
   };
 
   const removeItem = async (p: any) => {
-    if (!confirm(`Hapus produk "${p.title}" dari daftar rekomendasi? Tindakan ini permanen.`)) return;
-    await fetch(`/api/platform-admin/affiliate-products/${p.id}`, { method: "DELETE" });
+    if (!(await showConfirm(`Hapus produk "${p.title}" dari daftar rekomendasi? Tindakan ini permanen.`, { tone: "danger", confirmLabel: "Hapus" }))) return;
+    const res = await fetch(`/api/platform-admin/affiliate-products/${p.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const out = await res.json().catch(() => ({}));
+      return showAlert(out?.error ?? "Gagal menghapus produk.");
+    }
     await load();
   };
 

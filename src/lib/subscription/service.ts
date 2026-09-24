@@ -15,6 +15,7 @@ import {
   orders,
 } from "@/db/schema";
 import { eq, and, sql, inArray, lte, desc, gte } from "drizzle-orm";
+import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { DeviceProtocol } from "@/lib/devices/types";
 import {
   ipaymuCrossBorderGateway,
@@ -541,9 +542,9 @@ export async function computeTvComposition(outletId: string) {
   return { androidTv, nonAndroidTv, total: units.length };
 }
 
-async function generateInvoiceNumber(): Promise<string> {
-  const [{ n }] = (await db.select({ n: sql<number>`count(*)` }).from(subscriptionInvoices)) as { n: number }[];
-  return `SUB-INV-${String(n + 1).padStart(5, "0")}`;
+/** invoice_number UNIQUE secara global — lihat lib/db/nomor-urut.ts untuk bug count(*)+1 yang digantikan. */
+function generateInvoiceNumber(): Promise<string> {
+  return nomorBerikutnya(subscriptionInvoices, subscriptionInvoices.invoiceNumber, "SUB-INV");
 }
 
 async function createInvoice(input: {

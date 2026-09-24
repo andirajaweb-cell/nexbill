@@ -5,6 +5,7 @@ import { logAudit } from "@/lib/audit/log";
 import { createOtherIncome } from "@/lib/accounting/other-income";
 import { bebankanUjrah } from "./billing";
 import { bersihkanFotoBarang, daftarFotoBarang } from "./photos";
+import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { pastikanTanpaKontak, normalisasiNoHp, kontakBolehDibuka, alasanTarikSah, ALASAN_TARIK } from "./anti-bypass";
 import { periksaBatasNilaiBarang, rekeningBaruDiganti, type ProfilKepercayaan } from "./trust";
 import {
@@ -214,9 +215,9 @@ export async function closeListing(listingId: string, outletId: string, alasan: 
 
 /** ================= KESEPAKATAN ================= */
 
-async function nomorKesepakatan(): Promise<string> {
-  const [{ n }] = (await db.select({ n: sql<number>`count(*)` }).from(marketplaceDeals)) as { n: number }[];
-  return `MP-${String(n + 1).padStart(5, "0")}`;
+/** deal_number UNIQUE secara global — lihat lib/db/nomor-urut.ts untuk bug count(*)+1 yang digantikan. */
+function nomorKesepakatan(): Promise<string> {
+  return nomorBerikutnya(marketplaceDeals, marketplaceDeals.dealNumber, "MP");
 }
 
 export interface CreateDealInput {

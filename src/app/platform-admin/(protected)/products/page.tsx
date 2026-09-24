@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
+import { showAlert, showConfirm } from "@/lib/ui/dialog";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
@@ -40,7 +41,7 @@ export default function PlatformProductsPage() {
     fd.append("file", file);
     const res = await fetch("/api/platform-admin/upload", { method: "POST", body: fd });
     const data = await res.json();
-    if (!res.ok) { alert(data.error ?? "Gagal upload foto."); return null; }
+    if (!res.ok) { showAlert(data.error ?? "Gagal upload foto."); return null; }
     return data.url as string;
   };
 
@@ -114,7 +115,7 @@ export default function PlatformProductsPage() {
   };
 
   const removeProduct = async (p: any) => {
-    if (!confirm(`Hapus produk "${p.name}" dari katalog? Faktur outlet yang sudah lewat tidak terpengaruh — isinya disimpan sebagai salinan, bukan rujukan.`)) return;
+    if (!(await showConfirm(`Hapus produk "${p.name}" dari katalog? Faktur outlet yang sudah lewat tidak terpengaruh — isinya disimpan sebagai salinan, bukan rujukan.`, { tone: "danger", confirmLabel: "Hapus" }))) return;
     // Hasilnya diperiksa, bukan diabaikan: endpoint ini bisa MENGHAPUS atau hanya MENONAKTIFKAN
     // tergantung apakah produknya masih dipakai di catatan Pembelian/COGS, dan admin berhak tahu
     // mana yang barusan terjadi. Versi sebelumnya membuang seluruh respons, jadi kedua hasil itu
@@ -123,10 +124,10 @@ export default function PlatformProductsPage() {
     const res = await fetch(`/api/platform-admin/products/${p.id}`, { method: "DELETE" });
     const out = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(out?.error ?? "Gagal menghapus produk.");
+      showAlert(out?.error ?? "Gagal menghapus produk.");
       return;
     }
-    if (out?.mode === "deactivated") alert(out.pesan);
+    if (out?.mode === "deactivated") showAlert(out.pesan);
     await load();
   };
 

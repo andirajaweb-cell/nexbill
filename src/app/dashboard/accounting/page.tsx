@@ -9,7 +9,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PeriodBar, PeriodPreset, resolvePeriodPreset, describePeriod } from "@/components/reports/PeriodPicker";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import { useCurrency } from "@/lib/currency/client";
@@ -645,7 +645,7 @@ function JournalTab({ outletId }: { outletId: string }) {
   };
 
   const voidEntry = async (e: any) => {
-    const reason = prompt(t("accounting.journal.voidPrompt", 'Alasan pembatalan jurnal "{description}"?').replace("{description}", e.description));
+    const reason = await showPrompt(t("accounting.journal.voidPrompt", 'Alasan pembatalan jurnal "{description}"?').replace("{description}", e.description), { tone: "danger", multiline: true, confirmLabel: "Void" });
     if (reason === null) return;
     const res = await fetch(`/api/accounting/journal/${e.id}/void`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: reason || undefined }) });
     const data = await res.json();
@@ -2156,7 +2156,7 @@ function PeriodLockTab() {
   };
 
   const doReopen = async (period: string) => {
-    const reason = prompt(t("accounting.periodLock.reopenPrompt", 'Alasan membuka kembali periode "{period}"?').replace("{period}", monthLabel(period)));
+    const reason = await showPrompt(t("accounting.periodLock.reopenPrompt", 'Alasan membuka kembali periode "{period}"?').replace("{period}", monthLabel(period)), { tone: "danger", multiline: true });
     if (reason === null) return;
     const res = await fetch("/api/accounting/periods/reopen", {
       method: "POST",
@@ -2301,7 +2301,7 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
   };
 
   const voidExisting = async () => {
-    const reason = prompt(t("accounting.openingBalance.voidPrompt", "Alasan void Saldo Awal ini? (mis. salah input, mau diganti)")) ?? "";
+    const reason = (await showPrompt(t("accounting.openingBalance.voidPrompt", "Alasan void Saldo Awal ini? (mis. salah input, mau diganti)"), { tone: "danger", required: true, multiline: true, confirmLabel: "Void" })) ?? "";
     if (!reason.trim()) return;
     const res = await fetch("/api/accounting/opening-balance", {
       method: "DELETE",

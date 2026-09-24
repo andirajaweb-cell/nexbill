@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { membershipPayments, membershipTiers, customers, cashBankAccounts } from "@/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
+import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { postJournal, voidJournal } from "@/lib/accounting/journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
 import { logAudit } from "@/lib/audit/log";
@@ -22,12 +23,9 @@ export type MembershipPaymentMethod = (typeof MEMBERSHIP_PAYMENT_METHODS)[number
 
 const round = (n: number) => Math.round(n);
 
-async function generatePaymentNumber(outletId: string): Promise<string> {
-  const [{ count }] = (await db
-    .select({ count: sql<number>`count(*)` })
-    .from(membershipPayments)
-    .where(eq(membershipPayments.outletId, outletId))) as { count: number }[];
-  return `MBR-${String(count + 1).padStart(5, "0")}`;
+/** payment_number UNIQUE secara global — lihat lib/db/nomor-urut.ts untuk bug count(*)+1 yang digantikan. */
+function generatePaymentNumber(): Promise<string> {
+  return nomorBerikutnya(membershipPayments, membershipPayments.paymentNumber, "MBR");
 }
 
 export interface SellMembershipInput {
@@ -64,7 +62,7 @@ export async function sellMembership(input: SellMembershipInput) {
   const feeAmount = await resolvePaymentFee(input.outletId, input.paymentMethod, amount);
   const netAmount = amount - feeAmount;
 
-  const paymentNumber = await generatePaymentNumber(input.outletId);
+  const paymentNumber = await generatePaymentNumber();
 
   const [row] = await db
     .insert(membershipPayments)

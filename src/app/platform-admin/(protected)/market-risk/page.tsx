@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { LANG_OPTIONS } from "@/lib/i18n/registry";
+import { showConfirm } from "@/lib/ui/dialog";
 
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 
@@ -146,7 +147,7 @@ export default function MarketRiskPage() {
   };
 
   const deleteCurrency = async (r: CurrencyRow) => {
-    if (!confirm(`Hapus mata uang ${r.code}? Tindakan ini tidak bisa dibatalkan.`)) return;
+    if (!(await showConfirm(`Hapus mata uang ${r.code}? Tindakan ini tidak bisa dibatalkan.`, { tone: "danger", confirmLabel: "Hapus" }))) return;
     setBusy(true);
     setFormError(null);
     try {

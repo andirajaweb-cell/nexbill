@@ -1,0 +1,1818 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Katalog Fitur NEXBILL</title>
+<meta name="description" content="NEXBILL feature catalog — PlayStation rental billing, online booking, POS & F&B, automatic TV control, cashier anti-fraud, automatic bookkeeping. Available in 6 languages.">
+<style>
+  :root{
+    --ink:#0f172a; --muted:#475569; --soft:#64748b; --line:#e2e8f0; --bg:#ffffff; --tint:#f1f5f9;
+    --cyan:#0891b2; --cyan-soft:#ecfeff; --emerald:#059669; --emerald-soft:#ecfdf5; --amber:#b45309; --amber-soft:#fffbeb;
+    --dark:#0b0e1a;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:"Segoe UI",Calibri,Arial,"Noto Sans Thai",Tahoma,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;font-size:15px}
+  a{color:var(--cyan)}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  [hidden]{display:none!important}
+
+  /* bar bahasa */
+  .langbar{background:#05060d;color:#cbd5e1;font-size:13px}
+  .langbar .wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 20px}
+  .langbar button{font:inherit;font-size:12.5px;border:1px solid rgba(255,255,255,.15);background:transparent;color:#cbd5e1;border-radius:7px;padding:4px 10px;cursor:pointer}
+  .langbar button[aria-pressed="true"]{background:#22d3ee;color:#0b0e1a;border-color:#22d3ee;font-weight:700}
+  .langbar .print{margin-left:auto}
+
+  /* hero */
+  header.hero{background:var(--dark);color:#e8ecf4;padding:52px 0 42px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;border-radius:50%;background:rgba(34,211,238,.14)}
+  .brand{font-weight:800;letter-spacing:.06em;color:#22d3ee;font-size:15px}
+  .hero h1{font-size:40px;line-height:1.15;margin:10px 0 12px;max-width:760px}
+  .hero p.lead{font-size:18px;color:#b6bfd3;max-width:720px;margin:0 0 22px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:6px 12px;font-size:13px;color:#e8ecf4}
+  .cta{display:inline-block;margin-top:24px;background:#22d3ee;color:#0b0e1a;font-weight:700;padding:12px 20px;border-radius:10px;text-decoration:none}
+  .cta.alt{background:transparent;color:#22d3ee;border:1px solid #22d3ee;margin-left:8px}
+  .cta.solid{background:#0891b2;color:#fff}
+
+  /* navigasi bagian */
+  .toolbar{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.96);border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
+  .toolbar .wrap{display:flex;gap:6px;overflow-x:auto;padding:10px 20px;white-space:nowrap}
+  .toolbar a{font-size:13px;text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;background:var(--tint)}
+  .toolbar a:hover{color:var(--cyan)}
+
+  section{padding:34px 0;border-bottom:1px solid var(--line)}
+  .grid{display:grid;gap:14px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:820px){.g3{grid-template-columns:1fr}.hero h1{font-size:30px}}
+  .box{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff}
+  .box h3{margin:0 0 4px;font-size:16px}
+  .box p{margin:0;color:var(--muted);font-size:14px}
+  .kicker{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--cyan)}
+  h2.sec{font-size:26px;margin:4px 0 6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .num{flex:none;width:38px;height:38px;border-radius:50%;background:var(--cyan);color:#fff;font-size:16px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+  .sec-lead{color:var(--muted);margin:0 0 18px;max-width:820px}
+
+  .feats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 18px}
+  @media(max-width:820px){.feats{grid-template-columns:1fr}}
+  .feat{position:relative;padding:12px 14px 12px 34px;border-radius:12px;background:var(--tint)}
+  .feat::before{content:"";position:absolute;left:14px;top:19px;width:10px;height:10px;border-radius:50%;background:var(--cyan)}
+  .feat b{display:block;font-size:14.5px}
+  .feat span{color:var(--muted);font-size:13.5px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:2px}
+  .tag.soon{background:var(--amber-soft);color:var(--amber)}
+  .tag.addon{background:var(--emerald-soft);color:var(--emerald)}
+  .tag.opt{background:var(--cyan-soft);color:var(--cyan)}
+  .tag.free{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+
+  .steps{counter-reset:s;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:820px){.steps{grid-template-columns:1fr}}
+  .step{border:1px solid var(--line);border-radius:14px;padding:18px}
+  .step::before{counter-increment:s;content:counter(s);display:inline-flex;width:32px;height:32px;border-radius:50%;background:var(--dark);color:#22d3ee;font-weight:800;align-items:center;justify-content:center;margin-bottom:8px}
+  .step h3{margin:0 0 4px;font-size:16px}
+  .step p{margin:0;color:var(--muted);font-size:14px}
+
+  footer{padding:30px 0 50px;color:var(--soft);font-size:13px}
+  .note{background:var(--tint);border-radius:12px;padding:14px 16px;color:var(--muted);font-size:13px}
+
+  @media print{
+    .langbar,.toolbar,.cta{display:none!important}
+    header.hero{background:#fff;color:var(--ink);padding:10px 0}
+    header.hero::after{display:none}
+    .hero p.lead,.chip{color:var(--muted)}
+    .chip{border-color:var(--line)}
+    section{padding:18px 0}
+    .feat,.box,.step{break-inside:avoid}
+    body{font-size:12.5px}
+  }
+</style>
+</head>
+<body>
+
+<div class="langbar">
+  <div class="wrap">
+    <button type="button" data-set-lang="id">Bahasa Indonesia</button>
+    <button type="button" data-set-lang="en">English</button>
+    <button type="button" data-set-lang="ms">Bahasa Melayu</button>
+    <button type="button" data-set-lang="th">ภาษาไทย</button>
+    <button type="button" data-set-lang="fil">Filipino</button>
+    <button type="button" data-set-lang="vi">Tiếng Việt</button>
+    <button type="button" class="print" id="printButton" onclick="window.print()">Cetak / Simpan PDF</button>
+  </div>
+</div>
+
+<!-- ============================================================ BAHASA INDONESIA -->
+<article data-lang="id">
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">NEXBILL · KATALOG FITUR</div>
+    <h1>Semua yang dibutuhkan bisnis rental PlayStation, dalam satu aplikasi.</h1>
+    <p class="lead">Dari argo sewa, booking online, kasir &amp; F&amp;B, TV yang menyala otomatis, sampai laporan keuangan — tanpa buku catatan, tanpa hitung manual, tanpa khawatir uang bocor.</p>
+    <div class="chips"><span class="chip">Bisa di HP, tablet &amp; PC</span><span class="chip">Pantau dari mana saja</span><span class="chip">Multi-cabang</span><span class="chip">6 bahasa</span><span class="chip">Pembukuan otomatis</span></div>
+    <a class="cta" href="https://dashboard.nexbill.id/daftar">Coba Gratis</a><a class="cta alt" href="#id-mulai">Cara Mulai</a>
+  </div>
+</header>
+<nav class="toolbar" aria-label="Daftar isi"><div class="wrap">
+  <a href="#id-1">Rental</a><a href="#id-2">Booking</a><a href="#id-3">Kasir &amp; F&amp;B</a><a href="#id-4">TV Otomatis</a><a href="#id-5">Anti-Kecurangan</a><a href="#id-6">Member</a><a href="#id-7">Chat &amp; WA</a><a href="#id-8">PPOB</a><a href="#id-9">Stok</a><a href="#id-10">Pembukuan</a><a href="#id-11">Pengeluaran</a><a href="#id-12">Maintenance</a><a href="#id-13">Home Rental</a><a href="#id-14">Marketplace</a><a href="#id-15">Laporan &amp; AI</a><a href="#id-16">Tim &amp; Cabang</a><a href="#id-17">Keamanan</a><a href="#id-18">Dukungan</a>
+</div></nav>
+<main>
+<section><div class="wrap">
+  <div class="kicker">Cocok untuk</div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="box"><h3>Rental PS rumahan &amp; kecil</h3><p>Mulai dari beberapa unit. Argo, kasir, dan laporan harian langsung rapi tanpa perlu keahlian komputer.</p></div>
+    <div class="box"><h3>Gaming lounge &amp; kafe</h3><p>Sewa PS, makanan &amp; minuman, booking online, member, dan layar promosi di TV — semua dalam satu tagihan.</p></div>
+    <div class="box"><h3>Pemilik multi-cabang</h3><p>Pantau omzet, kas, dan kinerja kasir setiap cabang dari HP, secara realtime, tanpa harus datang ke outlet.</p></div>
+  </div>
+</div></section>
+
+<section id="id-1"><div class="wrap">
+  <h2 class="sec"><span class="num">1</span>Rental &amp; Billing PS</h2>
+  <p class="sec-lead">Argo berjalan otomatis, tagihan dihitung sistem. Tidak ada lagi jam main yang terlewat atau salah hitung.</p>
+  <div class="feats">
+    <div class="feat"><b>Mulai, jeda, lanjut, perpanjang, stop</b><span>Kendalikan sesi setiap unit dengan satu klik — argo berhenti saat dijeda.</span></div>
+    <div class="feat"><b>Pindah unit &amp; ganti pelanggan</b><span>Pelanggan pindah TV/konsol di tengah main tanpa kehilangan waktu yang sudah berjalan.</span></div>
+    <div class="feat"><b>Paket durasi</b><span>Buat preset 1 jam, 3 jam, paket malam, dan lainnya — kasir tinggal pilih.</span></div>
+    <div class="feat"><b>Aksesori per sesi</b><span>Stik tambahan dan lainnya, tarif per jam atau per pakai, bisa ditambah/dilepas kapan saja.</span></div>
+    <div class="feat"><b>Pengaturan tarif fleksibel</b><span>Pembulatan tagihan, service charge, dan pajak sesuai kebijakan outlet Anda.</span></div>
+    <div class="feat"><b>Live Billing Board</b><span>Layar status semua unit: kosong, sedang main, sisa waktu — terlihat sekilas.</span></div>
+    <div class="feat"><b>Kelola unit &amp; konsol</b><span>Data tiap unit, tipe TV, dan status servis — unit yang sedang diperbaiki tidak bisa disewakan.</span></div>
+    <div class="feat"><b>Dashboard Owner</b><span>Ringkasan omzet dan performa outlet hari ini, langsung saat dibuka.</span></div>
+  </div>
+</div></section>
+
+<section id="id-2"><div class="wrap">
+  <h2 class="sec"><span class="num">2</span>Booking &amp; Reservasi Online</h2>
+  <p class="sec-lead">Pelanggan pesan sendiri lewat HP, 24 jam. Jadwal tidak pernah bentrok.</p>
+  <div class="feats">
+    <div class="feat"><b>Halaman booking online outlet Anda</b><span>Pelanggan melihat unit yang kosong, memilih jam, dan memesan sendiri.</span></div>
+    <div class="feat"><b>DP (uang muka)</b><span>Kurangi pelanggan yang pesan lalu tidak datang.</span></div>
+    <div class="feat"><b>Anti-bentrok &amp; jeda antar-booking</b><span>Sistem menolak jadwal yang tumpang tindih dan memberi waktu bersih-bersih antar sesi.</span></div>
+    <div class="feat"><b>QR booking &amp; cek kode</b><span>Pelanggan tunjukkan QR saat datang, kasir check-in dalam hitungan detik.</span></div>
+    <div class="feat"><b>Konfirmasi, reschedule, pindah unit, batal</b><span>Semua perubahan tercatat rapi, termasuk tandai &amp; urungkan no-show.</span></div>
+    <div class="feat"><b>Lepas otomatis bila tidak datang</b><span>Unit yang dipesan tapi kosong dikembalikan ke daftar sewa secara otomatis.</span></div>
+    <div class="feat"><b>Banner promo di halaman booking</b><span>Tampilkan promo dan info outlet kepada pelanggan yang sedang memesan.</span></div>
+    <div class="feat"><b>Notifikasi WhatsApp</b><span>Konfirmasi dan pengingat booking terkirim otomatis ke pelanggan.</span></div>
+  </div>
+</div></section>
+
+<section id="id-3"><div class="wrap">
+  <h2 class="sec"><span class="num">3</span>Kasir (POS), F&amp;B &amp; Dapur</h2>
+  <p class="sec-lead">Sewa PS, makanan, dan minuman dalam satu tagihan. Pesanan langsung masuk ke layar dapur.</p>
+  <div class="feats">
+    <div class="feat"><b>Kasir lengkap</b><span>Buat pesanan, tagih, dan bayar dengan berbagai metode — termasuk bayar sebagian/kombinasi.</span></div>
+    <div class="feat"><b>Tunai, QRIS &amp; pembayaran digital</b><span>Pilihan pembayaran sesuai kebiasaan pelanggan sekarang.</span></div>
+    <div class="feat"><b>Produk &amp; kategori</b><span>Impor ratusan produk sekaligus dari Excel memakai template yang disediakan.</span></div>
+    <div class="feat"><b>Resep F&amp;B</b><span>Setiap menu terjual otomatis memotong stok bahan bakunya.</span></div>
+    <div class="feat"><b>Voucher</b><span>Buat kode voucher; sistem memeriksa keabsahannya saat dipakai.</span></div>
+    <div class="feat"><b>Struk digital &amp; cetak</b><span>Kirim struk lewat tautan, atau cetak ke printer kasir (58 mm dan lainnya).</span></div>
+    <div class="feat"><b>Kitchen Display</b><span>Antrean pesanan dapur dengan status: masuk, dimasak, siap — plus pembatalan item.</span></div>
+    <div class="feat"><b>Refund &amp; void terkontrol</b><span>Per pesanan atau per item, dengan persetujuan atasan dan alasan wajib.</span></div>
+  </div>
+</div></section>
+
+<section id="id-4"><div class="wrap">
+  <h2 class="sec"><span class="num">4</span>Kontrol TV &amp; Perangkat Otomatis</h2>
+  <p class="sec-lead">Sesi dimulai, TV menyala sendiri. Sesi selesai, TV mati atau menampilkan promosi outlet. Staf tidak perlu bolak-balik.</p>
+  <div class="feats">
+    <div class="feat"><b>Android TV / Google TV</b><span>Dinyalakan, dimatikan, dan dipindah ke HDMI PlayStation otomatis lewat aplikasi NexbillAgent di PC kasir.</span></div>
+    <div class="feat"><b>Smart plug</b><span>Tuya / Smart Life, Sonoff eWeLink, Tasmota, dan perangkat HTTP — untuk TV non-Android atau konsol.</span></div>
+    <div class="feat"><b>TV Screensaver (layar promosi)</b><span>Saat unit kosong, TV menampilkan nama outlet, harga, QR booking, jam, dan status unit.</span></div>
+    <div class="feat"><b>Otomatis mengikuti sesi</b><span>Sesi selesai → screensaver; sesi mulai → langsung ke PlayStation. Bisa diuji dari dashboard.</span></div>
+    <div class="feat"><b>PIN &amp; mode malam</b><span>Kunci layar dengan PIN, dan redupkan tampilan di jam malam.</span></div>
+    <div class="feat"><b>Update otomatis &amp; aman</b><span>NexbillAgent memperbarui dirinya sendiri di luar jam operasional dan kembali ke versi lama bila gagal.</span></div>
+    <div class="feat"><b>Pemantauan perangkat</b><span>Status tersambung/terputus setiap perangkat terlihat di dashboard.</span></div>
+    <div class="feat"><b>Panduan lengkap 6 bahasa</b><span>Setting PC &amp; TV langkah demi langkah, plus 28 masalah umum beserta solusinya.</span></div>
+  </div>
+</div></section>
+
+<section id="id-5"><div class="wrap">
+  <h2 class="sec"><span class="num">5</span>Shift, Kas &amp; Anti-Kecurangan</h2>
+  <p class="sec-lead">Tahu persis berapa uang yang seharusnya ada di laci — dan siapa yang bertanggung jawab.</p>
+  <div class="feats">
+    <div class="feat"><b>Buka &amp; tutup shift kasir</b><span>Setiap kasir menghitung uangnya sendiri; selisih langsung terlihat.</span></div>
+    <div class="feat"><b>Deteksi kejanggalan otomatis</b><span>Shift dengan pola mencurigakan ditandai dan wajib direview Owner/Manager.</span></div>
+    <div class="feat"><b>Deteksi transaksi ganda</b><span>Transaksi yang tercatat dua kali ditandai sebelum menjadi masalah.</span></div>
+    <div class="feat"><b>Persetujuan berjenjang</b><span>Void, refund, dan pemindahan kas butuh persetujuan atasan.</span></div>
+    <div class="feat"><b>Setoran kas &amp; pindah kas</b><span>Catat setoran ke pemilik/bank dan perpindahan uang antar-akun.</span></div>
+    <div class="feat"><b>Laporan shift</b><span>Ekspor rekap setiap shift untuk arsip atau diperiksa.</span></div>
+  </div>
+</div></section>
+
+<section id="id-6"><div class="wrap">
+  <h2 class="sec"><span class="num">6</span>Pelanggan, Member &amp; Promo</h2>
+  <p class="sec-lead">Buat pelanggan kembali lagi dan lagi.</p>
+  <div class="feats">
+    <div class="feat"><b>Data &amp; riwayat pelanggan</b><span>Siapa yang sering datang, berapa belanjanya, kapan terakhir main.</span></div>
+    <div class="feat"><b>Tingkatan member</b><span>Silver, Gold, dst. — lengkap dengan benefit dan masa berlaku.</span></div>
+    <div class="feat"><b>Jual keanggotaan</b><span>Pelanggan membeli member di kasir, tunai atau QRIS.</span></div>
+    <div class="feat"><b>Poin &amp; hadiah</b><span>Pelanggan mengumpulkan poin dan menukarnya dengan hadiah dari katalog Anda.</span></div>
+    <div class="feat"><b>Promo &amp; paket</b><span>Promo jam sepi, paket hemat, dan diskon khusus.</span></div>
+  </div>
+</div></section>
+
+<section id="id-7"><div class="wrap">
+  <h2 class="sec"><span class="num">7</span>Chat Pelanggan, WhatsApp &amp; Instagram</h2>
+  <p class="sec-lead">Balas pertanyaan pelanggan dari satu tempat — bahkan saat Anda sibuk.</p>
+  <div class="feats">
+    <div class="feat"><b>Kotak masuk terpadu</b><span>Pesan pelanggan dalam satu inbox, dibalas oleh tim Anda.</span></div>
+    <div class="feat"><b>Balasan otomatis AI <span class="tag addon">Add-on</span></b><span>AI menjawab pertanyaan umum; bisa dinyalakan/dimatikan per percakapan.</span></div>
+    <div class="feat"><b>Instagram DM</b><span>Pesan Instagram masuk ke inbox yang sama.</span></div>
+    <div class="feat"><b>WhatsApp otomatis</b><span>Notifikasi booking, pengingat, dan konfirmasi terkirim sendiri.</span></div>
+  </div>
+</div></section>
+
+<section id="id-8"><div class="wrap">
+  <h2 class="sec"><span class="num">8</span>PPOB — Penghasilan Tambahan <span class="tag opt">Opsional</span></h2>
+  <p class="sec-lead">Jual produk digital di kasir yang sama, tanpa aplikasi terpisah.</p>
+  <div class="feats">
+    <div class="feat"><b>Transaksi PPOB</b><span>Catat, selesaikan, dan batalkan transaksi produk digital.</span></div>
+    <div class="feat"><b>Atur harga jual &amp; keuntungan</b><span>Tentukan markup Anda sendiri per produk.</span></div>
+    <div class="feat"><b>Saldo deposit</b><span>Kelola saluran saldo untuk transaksi PPOB.</span></div>
+    <div class="feat"><b>Laporan PPOB</b><span>Ringkasan penjualan dan keuntungan PPOB.</span></div>
+  </div>
+</div></section>
+
+<section id="id-9"><div class="wrap">
+  <h2 class="sec"><span class="num">9</span>Stok &amp; Pembelian</h2>
+  <p class="sec-lead">Stok tidak pernah kosong mendadak, dan modal barang terhitung akurat.</p>
+  <div class="feats">
+    <div class="feat"><b>Stok multi-gudang</b><span>Pisahkan stok gudang dan etalase/dapur.</span></div>
+    <div class="feat"><b>Peringatan stok menipis</b><span>Diberi tahu sebelum barang habis.</span></div>
+    <div class="feat"><b>Stock opname</b><span>Hitung stok fisik; selisih langsung tercatat di pembukuan.</span></div>
+    <div class="feat"><b>Supplier &amp; Purchase Order</b><span>Buat PO (bisa diisi otomatis dari stok menipis), lalu terima barang.</span></div>
+    <div class="feat"><b>Faktur &amp; retur pembelian</b><span>Catat hutang ke supplier, pembayaran, dan pengembalian barang.</span></div>
+    <div class="feat"><b>HPP akurat</b><span>Harga pokok penjualan dihitung otomatis dari pembelian Anda.</span></div>
+  </div>
+</div></section>
+
+<section id="id-10"><div class="wrap">
+  <h2 class="sec"><span class="num">10</span>Pembukuan &amp; Laporan Keuangan Otomatis</h2>
+  <p class="sec-lead">Setiap transaksi langsung tercatat di pembukuan. Laporan keuangan siap kapan saja — tanpa aplikasi akuntansi terpisah.</p>
+  <div class="feats">
+    <div class="feat"><b>Laba Rugi</b><span>Untung atau rugi bulan ini, bisa dirinci sampai per akun.</span></div>
+    <div class="feat"><b>Neraca &amp; Arus Kas</b><span>Posisi aset, hutang, modal, dan aliran uang masuk-keluar.</span></div>
+    <div class="feat"><b>Piutang &amp; Hutang</b><span>Siapa yang belum bayar, dan tagihan apa yang harus Anda bayar.</span></div>
+    <div class="feat"><b>Daftar akun (COA) siap pakai</b><span>Sudah disiapkan untuk bisnis rental; bisa disesuaikan.</span></div>
+    <div class="feat"><b>Jurnal &amp; kunci periode</b><span>Koreksi jurnal, dan kunci bulan yang sudah ditutup agar tidak berubah.</span></div>
+    <div class="feat"><b>Saldo awal &amp; impor data lama</b><span>Pindahkan data dari pembukuan sebelumnya memakai template.</span></div>
+    <div class="feat"><b>Rekonsiliasi</b><span>Cocokkan catatan sistem dengan kas dan bank.</span></div>
+    <div class="feat"><b>Ekspor laporan</b><span>Unduh laporan untuk akuntan, bank, atau pajak.</span></div>
+  </div>
+</div></section>
+
+<section id="id-11"><div class="wrap">
+  <h2 class="sec"><span class="num">11</span>Pengeluaran, Pendapatan Lain &amp; Aset</h2>
+  <p class="sec-lead">Semua uang keluar tercatat dengan bukti dan persetujuan.</p>
+  <div class="feats">
+    <div class="feat"><b>Pengeluaran dengan persetujuan</b><span>Di bawah batas tertentu disetujui otomatis; di atasnya menunggu Owner.</span></div>
+    <div class="feat"><b>Cash Out Cepat</b><span>Catat pengeluaran kecil (parkir, galon) dalam 3 isian.</span></div>
+    <div class="feat"><b>Bukti &amp; hutang</b><span>Lampirkan foto nota; catat yang belum dibayar sebagai hutang.</span></div>
+    <div class="feat"><b>Biaya rutin otomatis</b><span>Listrik, internet, sewa, gaji — dibuatkan draf tiap periode.</span></div>
+    <div class="feat"><b>Cost center</b><span>Pisahkan biaya per bagian: rental, F&amp;B, dapur, administrasi.</span></div>
+    <div class="feat"><b>Pendapatan lain-lain</b><span>Catat pemasukan di luar sewa &amp; kasir, termasuk potongan biaya QRIS.</span></div>
+    <div class="feat"><b>Aset tetap</b><span>Konsol, TV, dan peralatan — dengan penyusutan otomatis dan riwayat perawatan.</span></div>
+  </div>
+</div></section>
+
+<section id="id-12"><div class="wrap">
+  <h2 class="sec"><span class="num">12</span>Maintenance &amp; Dokter Stik</h2>
+  <p class="sec-lead">Ketahui stik yang bermasalah sebelum pelanggan komplain.</p>
+  <div class="feats">
+    <div class="feat"><b>Tiket perbaikan</b><span>Catat kerusakan, status perbaikan, dan suku cadang yang dipakai.</span></div>
+    <div class="feat"><b>Gamepad Tester</b><span>Tes stik PS3, PS4, dan PS5 langsung dari browser.</span></div>
+    <div class="feat"><b>Dokter Stik</b><span>Ukur drift analog, keseimbangan, tekanan tombol &amp; trigger — hasilnya skor kesehatan, analisa kerusakan, dan rekomendasi servis.</span></div>
+    <div class="feat"><b>Driver stik PS3</b><span>Unduh driver &amp; panduan instalnya langsung dari aplikasi.</span></div>
+  </div>
+</div></section>
+
+<section id="id-13"><div class="wrap">
+  <h2 class="sec"><span class="num">13</span>Home Rental — Sewa Bawa Pulang <span class="tag opt">Opsional</span></h2>
+  <p class="sec-lead">Sewakan PS dan TV untuk dibawa pulang pelanggan, dengan risiko yang terkendali.</p>
+  <div class="feats">
+    <div class="feat"><b>Produk &amp; paket sewa</b><span>PS3, PS4, PS5, Playbox, dan TV berbagai ukuran — setiap unit dilacak.</span></div>
+    <div class="feat"><b>Verifikasi identitas</b><span>Unggah KTP/kartu pelajar sebelum barang keluar.</span></div>
+    <div class="feat"><b>Skor risiko &amp; blacklist</b><span>Pelanggan yang pernah telat atau merusak ditandai; booking berisiko butuh persetujuan.</span></div>
+    <div class="feat"><b>Deposit keamanan</b><span>Dicatat terpisah dari pendapatan sampai barang kembali.</span></div>
+    <div class="feat"><b>Antar-jemput &amp; ongkir</b><span>Ongkir dihitung otomatis per area.</span></div>
+    <div class="feat"><b>Pengingat otomatis</b><span>Jadwal ambil, jatuh tempo, dan keterlambatan — lewat WhatsApp.</span></div>
+    <div class="feat"><b>Kontrak digital &amp; inspeksi foto <span class="tag soon">Segera</span></b><span>Tanda tangan digital dan foto kondisi sebelum/sesudah sewa.</span></div>
+    <div class="feat"><b>Klaim kerusakan &amp; kehilangan <span class="tag soon">Segera</span></b><span>Pencatatan kerusakan dan potongan deposit.</span></div>
+  </div>
+</div></section>
+
+<section id="id-14"><div class="wrap">
+  <h2 class="sec"><span class="num">14</span>Marketplace Antar-Outlet <span class="tag free">Gratis</span></h2>
+  <p class="sec-lead">Jual stik, konsol, TV, atau kursi yang tidak terpakai ke outlet lain — atau beli dengan harga bekas.</p>
+  <div class="feats">
+    <div class="feat"><b>Etalase dengan foto</b><span>Pasang barang dengan sampai 5 foto; lihat barang dari outlet lain.</span></div>
+    <div class="feat"><b>Tawar &amp; sepakati di aplikasi</b><span>Ajukan beli, terima penawaran, lalu tandai selesai.</span></div>
+    <div class="feat"><b>Profil kepercayaan &amp; rating</b><span>Lihat umur akun, transaksi selesai, rating, dan catatan aduan lawan transaksi.</span></div>
+    <div class="feat"><b>Rekening terkunci &amp; bukti</b><span>Pembeli hanya diarahkan ke rekening penjual yang terdaftar; bukti bayar &amp; serah-terima tersimpan.</span></div>
+    <div class="feat"><b>Jalur aduan</b><span>Laporkan masalah; tim NEXBILL meninjau bukti kedua pihak.</span></div>
+    <div class="feat"><b>Tercatat di pembukuan</b><span>Penjualan otomatis masuk sebagai pendapatan penjual.</span></div>
+  </div>
+</div></section>
+
+<section id="id-15"><div class="wrap">
+  <h2 class="sec"><span class="num">15</span>Laporan &amp; AI</h2>
+  <p class="sec-lead">Keputusan berdasarkan data, bukan tebakan.</p>
+  <div class="feats">
+    <div class="feat"><b>Laporan penjualan &amp; rental</b><span>Jam ramai, unit terlaris, omzet per hari/bulan.</span></div>
+    <div class="feat"><b>Laporan stok, pengeluaran &amp; pelanggan</b><span>Semua sudut bisnis dalam satu menu.</span></div>
+    <div class="feat"><b>Performa kasir</b><span>Bandingkan kinerja setiap kasir.</span></div>
+    <div class="feat"><b>Kesehatan keuangan</b><span>Indikator sederhana: apakah bisnis Anda sehat bulan ini?</span></div>
+    <div class="feat"><b>AI Business Intelligence <span class="tag addon">Add-on</span></b><span>Insight, rekomendasi, dan asisten AI untuk menjawab pertanyaan bisnis Anda.</span></div>
+  </div>
+</div></section>
+
+<section id="id-16"><div class="wrap">
+  <h2 class="sec"><span class="num">16</span>Tim, Cabang &amp; Pengaturan</h2>
+  <p class="sec-lead">Satu akun untuk semua cabang, dengan akses yang tepat untuk setiap orang.</p>
+  <div class="feats">
+    <div class="feat"><b>Peran &amp; hak akses</b><span>Owner, Manager, Kasir, dll. — atur siapa boleh melakukan apa.</span></div>
+    <div class="feat"><b>Multi-cabang</b><span>Berpindah cabang dalam satu klik, atau lihat semua cabang sekaligus.</span></div>
+    <div class="feat"><b>Pengaturan outlet</b><span>Profil, logo, pajak &amp; NPWP, printer, notifikasi, dan aturan booking.</span></div>
+    <div class="feat"><b>Nyalakan fitur sesuai kebutuhan</b><span>Fitur tambahan (Home Rental, PPOB, TV Screensaver) diaktifkan per outlet.</span></div>
+    <div class="feat"><b>6 bahasa</b><span>Indonesia, Inggris, Melayu, Thai, Filipino, dan Vietnam.</span></div>
+    <div class="feat"><b>Login mudah</b><span>Email atau akun Google, dengan verifikasi email dan reset password.</span></div>
+  </div>
+</div></section>
+
+<section id="id-17"><div class="wrap">
+  <h2 class="sec"><span class="num">17</span>Keamanan &amp; Keandalan</h2>
+  <p class="sec-lead">Data bisnis Anda aman, dan setiap perubahan bisa dilacak.</p>
+  <div class="feats">
+    <div class="feat"><b>Jejak aktivitas (audit log)</b><span>Siapa mengubah apa, dan kapan.</span></div>
+    <div class="feat"><b>Alasan wajib untuk pembatalan</b><span>Void, refund, dan pembatalan tidak bisa dilakukan tanpa alasan tertulis.</span></div>
+    <div class="feat"><b>Anti input ganda</b><span>Tombol simpan terkunci selama diproses; transaksi kembar ditolak.</span></div>
+    <div class="feat"><b>Data terpisah per outlet</b><span>Outlet lain tidak bisa melihat data Anda.</span></div>
+    <div class="feat"><b>Nomor dokumen berurutan</b><span>Setiap pengeluaran, booking, dan transaksi punya nomor unik yang rapi.</span></div>
+    <div class="feat"><b>Berbasis cloud</b><span>Tidak perlu server sendiri; data tersimpan online dan bisa diakses dari mana saja.</span></div>
+  </div>
+</div></section>
+
+<section id="id-18"><div class="wrap">
+  <h2 class="sec"><span class="num">18</span>Dukungan &amp; Program</h2>
+  <p class="sec-lead">Anda tidak sendirian menjalankan bisnis.</p>
+  <div class="feats">
+    <div class="feat"><b>Pusat Bantuan</b><span>SOP harian, checklist setup outlet baru, dan panduan setiap menu.</span></div>
+    <div class="feat"><b>Chat Customer Service</b><span>Hubungi tim NEXBILL langsung dari aplikasi, bisa kirim foto &amp; video.</span></div>
+    <div class="feat"><b>Onboarding terpandu</b><span>Rencana setup langkah demi langkah untuk outlet baru.</span></div>
+    <div class="feat"><b>Program Referral</b><span>Ajak outlet lain memakai NEXBILL dan dapatkan komisi.</span></div>
+    <div class="feat"><b>Rekomendasi Produk</b><span>Kurasi perlengkapan rental (stik, aksesori, perangkat) pilihan tim NEXBILL.</span></div>
+    <div class="feat"><b>Hardware siap pakai</b><span>Smart plug dan perangkat kontrol bisa dibeli bersama langganan.</span></div>
+  </div>
+</div></section>
+
+<section id="id-mulai"><div class="wrap">
+  <div class="kicker">Mulai dalam 3 langkah</div>
+  <div class="steps" style="margin-top:12px">
+    <div class="step"><h3>Daftar &amp; coba gratis</h3><p>Buat akun di dashboard.nexbill.id — tanpa instalasi, langsung dari browser.</p></div>
+    <div class="step"><h3>Isi unit &amp; tarif</h3><p>Ikuti checklist setup: tambahkan unit PS, paket durasi, dan produk kasir.</p></div>
+    <div class="step"><h3>Mulai sewa pertama</h3><p>Tekan Mulai di unit — argo berjalan, dan laporan terisi otomatis sejak hari pertama.</p></div>
+  </div>
+  <a class="cta solid" href="https://dashboard.nexbill.id/daftar">Coba NEXBILL Gratis</a>
+</div></section>
+</main>
+<footer><div class="wrap">
+  <div class="note">Ketersediaan fitur dapat berbeda sesuai paket langganan. <span class="tag addon">Add-on</span> dikenakan biaya tambahan; <span class="tag opt">Opsional</span> diaktifkan per outlet; <span class="tag soon">Segera</span> sedang dikembangkan. Kontrol Android TV membutuhkan PC di outlet yang menjalankan NexbillAgent.</div>
+  <p style="margin-top:16px">© NEXBILL · Katalog Fitur · dashboard.nexbill.id</p>
+</div></footer>
+</article>
+
+<!-- ============================================================ ENGLISH -->
+<article data-lang="en" hidden>
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">NEXBILL · FEATURE CATALOG</div>
+    <h1>Everything a PlayStation rental business needs, in one app.</h1>
+    <p class="lead">From the rental timer, online booking, POS &amp; F&amp;B, and TVs that switch on automatically, all the way to financial reports — no notebooks, no manual math, no worrying about leaking revenue.</p>
+    <div class="chips"><span class="chip">Works on phone, tablet &amp; PC</span><span class="chip">Monitor from anywhere</span><span class="chip">Multi-branch</span><span class="chip">6 languages</span><span class="chip">Automatic bookkeeping</span></div>
+    <a class="cta" href="https://dashboard.nexbill.id/daftar">Try It Free</a><a class="cta alt" href="#en-mulai">How to Start</a>
+  </div>
+</header>
+<nav class="toolbar" aria-label="Contents"><div class="wrap">
+  <a href="#en-1">Rental</a><a href="#en-2">Booking</a><a href="#en-3">POS &amp; F&amp;B</a><a href="#en-4">Auto TV</a><a href="#en-5">Anti-Fraud</a><a href="#en-6">Members</a><a href="#en-7">Chat &amp; WA</a><a href="#en-8">PPOB</a><a href="#en-9">Stock</a><a href="#en-10">Bookkeeping</a><a href="#en-11">Expenses</a><a href="#en-12">Maintenance</a><a href="#en-13">Home Rental</a><a href="#en-14">Marketplace</a><a href="#en-15">Reports &amp; AI</a><a href="#en-16">Team &amp; Branches</a><a href="#en-17">Security</a><a href="#en-18">Support</a>
+</div></nav>
+<main>
+<section><div class="wrap">
+  <div class="kicker">Built for</div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="box"><h3>Small &amp; home-based PS rentals</h3><p>Start with just a few units. Timers, POS, and daily reports are organized from day one — no computer skills needed.</p></div>
+    <div class="box"><h3>Gaming lounges &amp; cafés</h3><p>PS rental, food &amp; drinks, online booking, members, and promo screens on the TVs — all on one bill.</p></div>
+    <div class="box"><h3>Multi-branch owners</h3><p>Track revenue, cash, and cashier performance for every branch from your phone, in real time, without visiting the outlet.</p></div>
+  </div>
+</div></section>
+
+<section id="en-1"><div class="wrap">
+  <h2 class="sec"><span class="num">1</span>PS Rental &amp; Billing</h2>
+  <p class="sec-lead">The timer runs automatically and the system calculates the bill. No more missed playtime or wrong totals.</p>
+  <div class="feats">
+    <div class="feat"><b>Start, pause, resume, extend, stop</b><span>Control each unit's session in one click — the timer stops while paused.</span></div>
+    <div class="feat"><b>Switch units &amp; change customer</b><span>Customers can move to another TV/console mid-session without losing their elapsed time.</span></div>
+    <div class="feat"><b>Duration packages</b><span>Create presets like 1 hour, 3 hours, or night packages — cashiers just pick one.</span></div>
+    <div class="feat"><b>Accessories per session</b><span>Extra controllers and more, charged per hour or per use, added or removed any time.</span></div>
+    <div class="feat"><b>Flexible pricing rules</b><span>Bill rounding, service charge, and tax to match your outlet's policy.</span></div>
+    <div class="feat"><b>Live Billing Board</b><span>One screen showing every unit: free, in play, time remaining — at a glance.</span></div>
+    <div class="feat"><b>Manage units &amp; consoles</b><span>Unit details, TV type, and service status — units under repair can't be rented out.</span></div>
+    <div class="feat"><b>Owner Dashboard</b><span>Today's revenue and outlet performance, the moment you open it.</span></div>
+  </div>
+</div></section>
+
+<section id="en-2"><div class="wrap">
+  <h2 class="sec"><span class="num">2</span>Online Booking &amp; Reservations</h2>
+  <p class="sec-lead">Customers book by themselves on their phones, 24/7. Schedules never clash.</p>
+  <div class="feats">
+    <div class="feat"><b>Your outlet's online booking page</b><span>Customers see free units, pick a time, and book on their own.</span></div>
+    <div class="feat"><b>Down payment</b><span>Cut down on customers who book and never show up.</span></div>
+    <div class="feat"><b>No clashes &amp; buffer between bookings</b><span>The system rejects overlapping slots and leaves cleaning time between sessions.</span></div>
+    <div class="feat"><b>Booking QR &amp; code lookup</b><span>Customers show a QR on arrival; the cashier checks them in within seconds.</span></div>
+    <div class="feat"><b>Confirm, reschedule, move unit, cancel</b><span>Every change is recorded, including marking and undoing no-shows.</span></div>
+    <div class="feat"><b>Auto-release for no-shows</b><span>Booked units left empty go back to the rental pool automatically.</span></div>
+    <div class="feat"><b>Promo banners on the booking page</b><span>Show promotions and outlet info to customers while they book.</span></div>
+    <div class="feat"><b>WhatsApp notifications</b><span>Booking confirmations and reminders are sent to customers automatically.</span></div>
+  </div>
+</div></section>
+
+<section id="en-3"><div class="wrap">
+  <h2 class="sec"><span class="num">3</span>POS, F&amp;B &amp; Kitchen</h2>
+  <p class="sec-lead">PS rental, food, and drinks on one bill. Orders go straight to the kitchen screen.</p>
+  <div class="feats">
+    <div class="feat"><b>Complete POS</b><span>Create orders, bill, and take payment by any method — including split and partial payments.</span></div>
+    <div class="feat"><b>Cash, QRIS &amp; digital payments</b><span>The payment options customers use today.</span></div>
+    <div class="feat"><b>Products &amp; categories</b><span>Import hundreds of products at once from Excel using the provided template.</span></div>
+    <div class="feat"><b>F&amp;B recipes</b><span>Every menu item sold automatically deducts its ingredients from stock.</span></div>
+    <div class="feat"><b>Vouchers</b><span>Create voucher codes; the system validates them when used.</span></div>
+    <div class="feat"><b>Digital &amp; printed receipts</b><span>Send receipts as a link, or print to a cashier printer (58 mm and others).</span></div>
+    <div class="feat"><b>Kitchen Display</b><span>Kitchen order queue with statuses: received, cooking, ready — plus item cancellation.</span></div>
+    <div class="feat"><b>Controlled refunds &amp; voids</b><span>Per order or per item, with supervisor approval and a required reason.</span></div>
+  </div>
+</div></section>
+
+<section id="en-4"><div class="wrap">
+  <h2 class="sec"><span class="num">4</span>Automatic TV &amp; Device Control</h2>
+  <p class="sec-lead">A session starts, the TV turns on by itself. It ends, the TV turns off or shows your outlet's promo screen. No more running back and forth.</p>
+  <div class="feats">
+    <div class="feat"><b>Android TV / Google TV</b><span>Turned on, off, and switched to the PlayStation's HDMI automatically via the NexbillAgent app on the cashier PC.</span></div>
+    <div class="feat"><b>Smart plugs</b><span>Tuya / Smart Life, Sonoff eWeLink, Tasmota, and HTTP devices — for non-Android TVs or consoles.</span></div>
+    <div class="feat"><b>TV Screensaver (promo screen)</b><span>When a unit is free, the TV shows your outlet name, prices, booking QR, clock, and unit status.</span></div>
+    <div class="feat"><b>Follows the session automatically</b><span>Session ends → screensaver; session starts → straight to PlayStation. Testable from the dashboard.</span></div>
+    <div class="feat"><b>PIN &amp; night mode</b><span>Lock the screen with a PIN and dim it at night.</span></div>
+    <div class="feat"><b>Safe automatic updates</b><span>NexbillAgent updates itself outside business hours and rolls back if an update fails.</span></div>
+    <div class="feat"><b>Device monitoring</b><span>See whether each device is connected or offline from the dashboard.</span></div>
+    <div class="feat"><b>Full guide in 6 languages</b><span>Step-by-step PC &amp; TV setup, plus 28 common problems and their fixes.</span></div>
+  </div>
+</div></section>
+
+<section id="en-5"><div class="wrap">
+  <h2 class="sec"><span class="num">5</span>Shifts, Cash &amp; Anti-Fraud</h2>
+  <p class="sec-lead">Know exactly how much money should be in the drawer — and who is responsible for it.</p>
+  <div class="feats">
+    <div class="feat"><b>Open &amp; close cashier shifts</b><span>Each cashier counts their own cash; discrepancies show up immediately.</span></div>
+    <div class="feat"><b>Automatic anomaly detection</b><span>Shifts with suspicious patterns are flagged and must be reviewed by the Owner/Manager.</span></div>
+    <div class="feat"><b>Duplicate transaction detection</b><span>Transactions recorded twice are flagged before they become a problem.</span></div>
+    <div class="feat"><b>Tiered approvals</b><span>Voids, refunds, and cash transfers need a supervisor's approval.</span></div>
+    <div class="feat"><b>Cash deposits &amp; cash transfers</b><span>Record handovers to the owner/bank and money moved between accounts.</span></div>
+    <div class="feat"><b>Shift reports</b><span>Export each shift's summary for your records or for review.</span></div>
+  </div>
+</div></section>
+
+<section id="en-6"><div class="wrap">
+  <h2 class="sec"><span class="num">6</span>Customers, Members &amp; Promos</h2>
+  <p class="sec-lead">Keep customers coming back again and again.</p>
+  <div class="feats">
+    <div class="feat"><b>Customer data &amp; history</b><span>Who comes often, how much they spend, when they last played.</span></div>
+    <div class="feat"><b>Membership tiers</b><span>Silver, Gold, and more — with benefits and validity periods.</span></div>
+    <div class="feat"><b>Sell memberships</b><span>Customers buy a membership at the cashier, by cash or QRIS.</span></div>
+    <div class="feat"><b>Points &amp; rewards</b><span>Customers collect points and redeem them for rewards from your catalog.</span></div>
+    <div class="feat"><b>Promos &amp; packages</b><span>Off-peak promos, saver packages, and special discounts.</span></div>
+  </div>
+</div></section>
+
+<section id="en-7"><div class="wrap">
+  <h2 class="sec"><span class="num">7</span>Customer Chat, WhatsApp &amp; Instagram</h2>
+  <p class="sec-lead">Answer customers from one place — even when you're busy.</p>
+  <div class="feats">
+    <div class="feat"><b>Unified inbox</b><span>Customer messages in one inbox, answered by your team.</span></div>
+    <div class="feat"><b>AI auto-replies <span class="tag addon">Add-on</span></b><span>AI answers common questions; switch it on or off per conversation.</span></div>
+    <div class="feat"><b>Instagram DM</b><span>Instagram messages land in the same inbox.</span></div>
+    <div class="feat"><b>Automatic WhatsApp</b><span>Booking notifications, reminders, and confirmations are sent on their own.</span></div>
+  </div>
+</div></section>
+
+<section id="en-8"><div class="wrap">
+  <h2 class="sec"><span class="num">8</span>PPOB — Extra Income <span class="tag opt">Optional</span></h2>
+  <p class="sec-lead">Sell digital products (bill payments &amp; top-ups) at the same cashier, no separate app.</p>
+  <div class="feats">
+    <div class="feat"><b>PPOB transactions</b><span>Record, settle, and void digital product transactions.</span></div>
+    <div class="feat"><b>Set your selling price &amp; margin</b><span>Choose your own markup per product.</span></div>
+    <div class="feat"><b>Deposit balance</b><span>Manage the balance channels used for PPOB transactions.</span></div>
+    <div class="feat"><b>PPOB reports</b><span>A summary of PPOB sales and profit.</span></div>
+  </div>
+</div></section>
+
+<section id="en-9"><div class="wrap">
+  <h2 class="sec"><span class="num">9</span>Stock &amp; Purchasing</h2>
+  <p class="sec-lead">Stock never runs out unexpectedly, and your cost of goods is calculated accurately.</p>
+  <div class="feats">
+    <div class="feat"><b>Multi-warehouse stock</b><span>Keep storeroom stock separate from the display/kitchen.</span></div>
+    <div class="feat"><b>Low-stock alerts</b><span>Get notified before items run out.</span></div>
+    <div class="feat"><b>Stock take</b><span>Count physical stock; differences are posted to your books automatically.</span></div>
+    <div class="feat"><b>Suppliers &amp; purchase orders</b><span>Create POs (auto-filled from low stock), then receive the goods.</span></div>
+    <div class="feat"><b>Purchase invoices &amp; returns</b><span>Record supplier payables, payments, and returned goods.</span></div>
+    <div class="feat"><b>Accurate COGS</b><span>Cost of goods sold is calculated automatically from your purchases.</span></div>
+  </div>
+</div></section>
+
+<section id="en-10"><div class="wrap">
+  <h2 class="sec"><span class="num">10</span>Automatic Bookkeeping &amp; Financial Reports</h2>
+  <p class="sec-lead">Every transaction is posted to your books instantly. Financial statements are ready any time — no separate accounting software.</p>
+  <div class="feats">
+    <div class="feat"><b>Profit &amp; Loss</b><span>This month's profit or loss, drillable down to each account.</span></div>
+    <div class="feat"><b>Balance Sheet &amp; Cash Flow</b><span>Your assets, liabilities, equity, and money coming in and going out.</span></div>
+    <div class="feat"><b>Receivables &amp; Payables</b><span>Who hasn't paid yet, and which bills you need to pay.</span></div>
+    <div class="feat"><b>Ready-made chart of accounts</b><span>Pre-built for rental businesses; fully adjustable.</span></div>
+    <div class="feat"><b>Journals &amp; period locking</b><span>Correct journals, and lock closed months so they can't change.</span></div>
+    <div class="feat"><b>Opening balances &amp; historical import</b><span>Bring in data from your previous books using a template.</span></div>
+    <div class="feat"><b>Reconciliation</b><span>Match system records against your cash and bank.</span></div>
+    <div class="feat"><b>Report export</b><span>Download reports for your accountant, bank, or tax filing.</span></div>
+  </div>
+</div></section>
+
+<section id="en-11"><div class="wrap">
+  <h2 class="sec"><span class="num">11</span>Expenses, Other Income &amp; Assets</h2>
+  <p class="sec-lead">Every outgoing payment is recorded with proof and approval.</p>
+  <div class="feats">
+    <div class="feat"><b>Expenses with approval</b><span>Below a set limit they're approved automatically; above it they wait for the Owner.</span></div>
+    <div class="feat"><b>Quick Cash Out</b><span>Record small expenses (parking, water refills) in 3 fields.</span></div>
+    <div class="feat"><b>Receipts &amp; payables</b><span>Attach a photo of the receipt; record unpaid bills as payables.</span></div>
+    <div class="feat"><b>Automatic recurring costs</b><span>Electricity, internet, rent, salaries — drafted every period.</span></div>
+    <div class="feat"><b>Cost centers</b><span>Split costs by area: rental, F&amp;B, kitchen, administration.</span></div>
+    <div class="feat"><b>Other income</b><span>Record income outside rentals &amp; POS, including QRIS fee deductions.</span></div>
+    <div class="feat"><b>Fixed assets</b><span>Consoles, TVs, and equipment — with automatic depreciation and maintenance history.</span></div>
+  </div>
+</div></section>
+
+<section id="en-12"><div class="wrap">
+  <h2 class="sec"><span class="num">12</span>Maintenance &amp; Controller Doctor</h2>
+  <p class="sec-lead">Find faulty controllers before customers complain.</p>
+  <div class="feats">
+    <div class="feat"><b>Repair tickets</b><span>Log damage, repair status, and the spare parts used.</span></div>
+    <div class="feat"><b>Gamepad Tester</b><span>Test PS3, PS4, and PS5 controllers right in the browser.</span></div>
+    <div class="feat"><b>Controller Doctor</b><span>Measures analog drift, balance, button &amp; trigger pressure — giving a health score, fault analysis, and service recommendations.</span></div>
+    <div class="feat"><b>PS3 controller driver</b><span>Download the driver and its install guide straight from the app.</span></div>
+  </div>
+</div></section>
+
+<section id="en-13"><div class="wrap">
+  <h2 class="sec"><span class="num">13</span>Home Rental — Take-Home Rentals <span class="tag opt">Optional</span></h2>
+  <p class="sec-lead">Rent out PS consoles and TVs for customers to take home, with risk kept under control.</p>
+  <div class="feats">
+    <div class="feat"><b>Rental products &amp; packages</b><span>PS3, PS4, PS5, Playbox, and TVs in various sizes — every unit is tracked.</span></div>
+    <div class="feat"><b>Identity verification</b><span>Upload an ID card before items leave the store.</span></div>
+    <div class="feat"><b>Risk score &amp; blacklist</b><span>Customers who were late or caused damage are flagged; risky bookings need approval.</span></div>
+    <div class="feat"><b>Security deposit</b><span>Kept separate from revenue until the items come back.</span></div>
+    <div class="feat"><b>Delivery &amp; shipping fees</b><span>Shipping fees calculated automatically by area.</span></div>
+    <div class="feat"><b>Automatic reminders</b><span>Pickup, due date, and overdue reminders — via WhatsApp.</span></div>
+    <div class="feat"><b>Digital contracts &amp; photo inspection <span class="tag soon">Coming soon</span></b><span>Digital signatures and before/after condition photos.</span></div>
+    <div class="feat"><b>Damage &amp; loss claims <span class="tag soon">Coming soon</span></b><span>Record damage and deduct from the deposit.</span></div>
+  </div>
+</div></section>
+
+<section id="en-14"><div class="wrap">
+  <h2 class="sec"><span class="num">14</span>Outlet-to-Outlet Marketplace <span class="tag free">Free</span></h2>
+  <p class="sec-lead">Sell unused controllers, consoles, TVs, or chairs to other outlets — or buy them second-hand.</p>
+  <div class="feats">
+    <div class="feat"><b>Listings with photos</b><span>List items with up to 5 photos; browse items from other outlets.</span></div>
+    <div class="feat"><b>Negotiate &amp; close deals in the app</b><span>Make an offer, accept it, then mark the deal complete.</span></div>
+    <div class="feat"><b>Trust profiles &amp; ratings</b><span>See the other party's account age, completed deals, rating, and complaint record.</span></div>
+    <div class="feat"><b>Locked bank account &amp; proof</b><span>Buyers are only directed to the seller's registered account; payment &amp; handover proof is stored.</span></div>
+    <div class="feat"><b>Complaint channel</b><span>Report a problem; the NEXBILL team reviews evidence from both sides.</span></div>
+    <div class="feat"><b>Posted to your books</b><span>Sales are recorded automatically as the seller's income.</span></div>
+  </div>
+</div></section>
+
+<section id="en-15"><div class="wrap">
+  <h2 class="sec"><span class="num">15</span>Reports &amp; AI</h2>
+  <p class="sec-lead">Decisions based on data, not guesswork.</p>
+  <div class="feats">
+    <div class="feat"><b>Sales &amp; rental reports</b><span>Peak hours, best-performing units, daily/monthly revenue.</span></div>
+    <div class="feat"><b>Stock, expense &amp; customer reports</b><span>Every corner of the business in one menu.</span></div>
+    <div class="feat"><b>Cashier performance</b><span>Compare how each cashier performs.</span></div>
+    <div class="feat"><b>Financial health</b><span>A simple indicator: is your business healthy this month?</span></div>
+    <div class="feat"><b>AI Business Intelligence <span class="tag addon">Add-on</span></b><span>Insights, recommendations, and an AI assistant that answers your business questions.</span></div>
+  </div>
+</div></section>
+
+<section id="en-16"><div class="wrap">
+  <h2 class="sec"><span class="num">16</span>Team, Branches &amp; Settings</h2>
+  <p class="sec-lead">One account for every branch, with the right access for each person.</p>
+  <div class="feats">
+    <div class="feat"><b>Roles &amp; permissions</b><span>Owner, Manager, Cashier, and more — decide who can do what.</span></div>
+    <div class="feat"><b>Multi-branch</b><span>Switch branches in one click, or view all branches at once.</span></div>
+    <div class="feat"><b>Outlet settings</b><span>Profile, logo, tax details, printer, notifications, and booking rules.</span></div>
+    <div class="feat"><b>Turn on only what you need</b><span>Extra features (Home Rental, PPOB, TV Screensaver) are enabled per outlet.</span></div>
+    <div class="feat"><b>6 languages</b><span>Indonesian, English, Malay, Thai, Filipino, and Vietnamese.</span></div>
+    <div class="feat"><b>Easy sign-in</b><span>Email or Google account, with email verification and password reset.</span></div>
+  </div>
+</div></section>
+
+<section id="en-17"><div class="wrap">
+  <h2 class="sec"><span class="num">17</span>Security &amp; Reliability</h2>
+  <p class="sec-lead">Your business data is safe, and every change can be traced.</p>
+  <div class="feats">
+    <div class="feat"><b>Activity trail (audit log)</b><span>Who changed what, and when.</span></div>
+    <div class="feat"><b>Reasons required for cancellations</b><span>Voids, refunds, and cancellations can't be done without a written reason.</span></div>
+    <div class="feat"><b>No double entries</b><span>Save buttons lock while processing; identical duplicate transactions are rejected.</span></div>
+    <div class="feat"><b>Data separated per outlet</b><span>Other outlets can't see your data.</span></div>
+    <div class="feat"><b>Sequential document numbers</b><span>Every expense, booking, and transaction has a clean, unique number.</span></div>
+    <div class="feat"><b>Cloud-based</b><span>No server of your own needed; data is stored online and accessible anywhere.</span></div>
+  </div>
+</div></section>
+
+<section id="en-18"><div class="wrap">
+  <h2 class="sec"><span class="num">18</span>Support &amp; Programs</h2>
+  <p class="sec-lead">You don't have to run the business alone.</p>
+  <div class="feats">
+    <div class="feat"><b>Help Center</b><span>Daily SOPs, a new-outlet setup checklist, and a guide for every menu.</span></div>
+    <div class="feat"><b>Customer Service chat</b><span>Contact the NEXBILL team straight from the app, including photos &amp; videos.</span></div>
+    <div class="feat"><b>Guided onboarding</b><span>A step-by-step setup plan for new outlets.</span></div>
+    <div class="feat"><b>Referral Program</b><span>Invite other outlets to NEXBILL and earn a commission.</span></div>
+    <div class="feat"><b>Product Recommendations</b><span>Rental gear (controllers, accessories, devices) curated by the NEXBILL team.</span></div>
+    <div class="feat"><b>Ready-to-use hardware</b><span>Smart plugs and control devices can be bought together with your subscription.</span></div>
+  </div>
+</div></section>
+
+<section id="en-mulai"><div class="wrap">
+  <div class="kicker">Get started in 3 steps</div>
+  <div class="steps" style="margin-top:12px">
+    <div class="step"><h3>Sign up &amp; try it free</h3><p>Create an account at dashboard.nexbill.id — nothing to install, right from your browser.</p></div>
+    <div class="step"><h3>Add units &amp; rates</h3><p>Follow the setup checklist: add your PS units, duration packages, and POS products.</p></div>
+    <div class="step"><h3>Start your first rental</h3><p>Tap Start on a unit — the timer runs, and your reports fill in automatically from day one.</p></div>
+  </div>
+  <a class="cta solid" href="https://dashboard.nexbill.id/daftar">Try NEXBILL Free</a>
+</div></section>
+</main>
+<footer><div class="wrap">
+  <div class="note">Feature availability may vary by subscription plan. <span class="tag addon">Add-on</span> costs extra; <span class="tag opt">Optional</span> is enabled per outlet; <span class="tag soon">Coming soon</span> is in development. Android TV control requires a PC at the outlet running NexbillAgent.</div>
+  <p style="margin-top:16px">© NEXBILL · Feature Catalog · dashboard.nexbill.id</p>
+</div></footer>
+</article>
+
+<!-- ============================================================ BAHASA MELAYU -->
+<article data-lang="ms" hidden>
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">NEXBILL · KATALOG CIRI</div>
+    <h1>Semua yang diperlukan perniagaan sewa PlayStation, dalam satu aplikasi.</h1>
+    <p class="lead">Daripada pemasa sewa, tempahan atas talian, kaunter jualan &amp; F&amp;B, TV yang menyala secara automatik, sehingga laporan kewangan — tanpa buku catatan, tanpa kira manual, tanpa risau duit bocor.</p>
+    <div class="chips"><span class="chip">Boleh di telefon, tablet &amp; PC</span><span class="chip">Pantau dari mana-mana</span><span class="chip">Pelbagai cawangan</span><span class="chip">6 bahasa</span><span class="chip">Perakaunan automatik</span></div>
+    <a class="cta" href="https://dashboard.nexbill.id/daftar">Cuba Percuma</a><a class="cta alt" href="#ms-mulai">Cara Bermula</a>
+  </div>
+</header>
+<nav class="toolbar" aria-label="Kandungan"><div class="wrap">
+  <a href="#ms-1">Sewa</a><a href="#ms-2">Tempahan</a><a href="#ms-3">Kaunter &amp; F&amp;B</a><a href="#ms-4">TV Automatik</a><a href="#ms-5">Anti-Penipuan</a><a href="#ms-6">Ahli</a><a href="#ms-7">Chat &amp; WA</a><a href="#ms-8">PPOB</a><a href="#ms-9">Stok</a><a href="#ms-10">Perakaunan</a><a href="#ms-11">Perbelanjaan</a><a href="#ms-12">Penyelenggaraan</a><a href="#ms-13">Home Rental</a><a href="#ms-14">Marketplace</a><a href="#ms-15">Laporan &amp; AI</a><a href="#ms-16">Pasukan &amp; Cawangan</a><a href="#ms-17">Keselamatan</a><a href="#ms-18">Sokongan</a>
+</div></nav>
+<main>
+<section><div class="wrap">
+  <div class="kicker">Sesuai untuk</div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="box"><h3>Sewa PS kecil &amp; di rumah</h3><p>Mula dengan beberapa unit. Pemasa, kaunter, dan laporan harian terus teratur tanpa perlu kemahiran komputer.</p></div>
+    <div class="box"><h3>Gaming lounge &amp; kafe</h3><p>Sewa PS, makanan &amp; minuman, tempahan atas talian, ahli, dan skrin promosi di TV — semuanya dalam satu bil.</p></div>
+    <div class="box"><h3>Pemilik pelbagai cawangan</h3><p>Pantau jualan, tunai, dan prestasi juruwang setiap cawangan dari telefon, secara masa nyata, tanpa perlu ke outlet.</p></div>
+  </div>
+</div></section>
+
+<section id="ms-1"><div class="wrap">
+  <h2 class="sec"><span class="num">1</span>Sewa &amp; Billing PS</h2>
+  <p class="sec-lead">Pemasa berjalan automatik, bil dikira oleh sistem. Tiada lagi masa main yang terlepas atau silap kira.</p>
+  <div class="feats">
+    <div class="feat"><b>Mula, jeda, sambung, lanjut, henti</b><span>Kawal sesi setiap unit dengan satu klik — pemasa berhenti ketika dijeda.</span></div>
+    <div class="feat"><b>Tukar unit &amp; tukar pelanggan</b><span>Pelanggan berpindah TV/konsol di tengah permainan tanpa kehilangan masa yang sudah berjalan.</span></div>
+    <div class="feat"><b>Pakej tempoh</b><span>Cipta pratetap 1 jam, 3 jam, pakej malam dan lain-lain — juruwang hanya perlu pilih.</span></div>
+    <div class="feat"><b>Aksesori setiap sesi</b><span>Alat kawalan tambahan dan lain-lain, kadar sejam atau sekali guna, boleh ditambah/ditanggalkan bila-bila masa.</span></div>
+    <div class="feat"><b>Tetapan kadar fleksibel</b><span>Pembundaran bil, caj perkhidmatan, dan cukai mengikut polisi outlet anda.</span></div>
+    <div class="feat"><b>Live Billing Board</b><span>Skrin status semua unit: kosong, sedang dimain, baki masa — nampak sekali pandang.</span></div>
+    <div class="feat"><b>Urus unit &amp; konsol</b><span>Data setiap unit, jenis TV, dan status servis — unit yang sedang dibaiki tidak boleh disewa.</span></div>
+    <div class="feat"><b>Papan Pemuka Pemilik</b><span>Ringkasan jualan dan prestasi outlet hari ini, sebaik sahaja dibuka.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-2"><div class="wrap">
+  <h2 class="sec"><span class="num">2</span>Tempahan &amp; Reservasi Atas Talian</h2>
+  <p class="sec-lead">Pelanggan menempah sendiri melalui telefon, 24 jam. Jadual tidak pernah bertembung.</p>
+  <div class="feats">
+    <div class="feat"><b>Halaman tempahan atas talian outlet anda</b><span>Pelanggan melihat unit yang kosong, memilih masa, dan menempah sendiri.</span></div>
+    <div class="feat"><b>Deposit (wang pendahuluan)</b><span>Kurangkan pelanggan yang menempah tetapi tidak datang.</span></div>
+    <div class="feat"><b>Anti-pertembungan &amp; jeda antara tempahan</b><span>Sistem menolak jadual yang bertindih dan memberi masa mengemas antara sesi.</span></div>
+    <div class="feat"><b>QR tempahan &amp; semak kod</b><span>Pelanggan tunjuk QR ketika tiba, juruwang daftar masuk dalam beberapa saat.</span></div>
+    <div class="feat"><b>Sahkan, jadual semula, tukar unit, batal</b><span>Semua perubahan direkod dengan kemas, termasuk tanda &amp; batal tanda no-show.</span></div>
+    <div class="feat"><b>Dilepaskan automatik jika tidak datang</b><span>Unit yang ditempah tetapi kosong dikembalikan ke senarai sewa secara automatik.</span></div>
+    <div class="feat"><b>Sepanduk promo di halaman tempahan</b><span>Paparkan promo dan maklumat outlet kepada pelanggan yang sedang menempah.</span></div>
+    <div class="feat"><b>Notifikasi WhatsApp</b><span>Pengesahan dan peringatan tempahan dihantar automatik kepada pelanggan.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-3"><div class="wrap">
+  <h2 class="sec"><span class="num">3</span>Kaunter Jualan (POS), F&amp;B &amp; Dapur</h2>
+  <p class="sec-lead">Sewa PS, makanan, dan minuman dalam satu bil. Pesanan terus masuk ke skrin dapur.</p>
+  <div class="feats">
+    <div class="feat"><b>Kaunter jualan lengkap</b><span>Buat pesanan, bil, dan bayar dengan pelbagai kaedah — termasuk bayaran sebahagian/gabungan.</span></div>
+    <div class="feat"><b>Tunai, QR &amp; pembayaran digital</b><span>Pilihan pembayaran mengikut kebiasaan pelanggan kini.</span></div>
+    <div class="feat"><b>Produk &amp; kategori</b><span>Import ratusan produk sekali gus dari Excel menggunakan templat yang disediakan.</span></div>
+    <div class="feat"><b>Resipi F&amp;B</b><span>Setiap menu yang terjual memotong stok bahan mentahnya secara automatik.</span></div>
+    <div class="feat"><b>Baucar</b><span>Cipta kod baucar; sistem menyemak kesahihannya ketika digunakan.</span></div>
+    <div class="feat"><b>Resit digital &amp; cetak</b><span>Hantar resit melalui pautan, atau cetak ke pencetak kaunter (58 mm dan lain-lain).</span></div>
+    <div class="feat"><b>Kitchen Display</b><span>Barisan pesanan dapur dengan status: masuk, dimasak, siap — serta pembatalan item.</span></div>
+    <div class="feat"><b>Bayaran balik &amp; void terkawal</b><span>Setiap pesanan atau item, dengan kelulusan penyelia dan sebab wajib.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-4"><div class="wrap">
+  <h2 class="sec"><span class="num">4</span>Kawalan TV &amp; Peranti Automatik</h2>
+  <p class="sec-lead">Sesi bermula, TV menyala sendiri. Sesi tamat, TV dimatikan atau memaparkan promosi outlet. Kakitangan tidak perlu berulang-alik.</p>
+  <div class="feats">
+    <div class="feat"><b>Android TV / Google TV</b><span>Dihidupkan, dimatikan, dan ditukar ke HDMI PlayStation secara automatik melalui aplikasi NexbillAgent di PC juruwang.</span></div>
+    <div class="feat"><b>Palam pintar</b><span>Tuya / Smart Life, Sonoff eWeLink, Tasmota, dan peranti HTTP — untuk TV bukan Android atau konsol.</span></div>
+    <div class="feat"><b>TV Screensaver (skrin promosi)</b><span>Ketika unit kosong, TV memaparkan nama outlet, harga, QR tempahan, jam, dan status unit.</span></div>
+    <div class="feat"><b>Automatik mengikut sesi</b><span>Sesi tamat → screensaver; sesi mula → terus ke PlayStation. Boleh diuji dari papan pemuka.</span></div>
+    <div class="feat"><b>PIN &amp; mod malam</b><span>Kunci skrin dengan PIN, dan malapkan paparan pada waktu malam.</span></div>
+    <div class="feat"><b>Kemas kini automatik &amp; selamat</b><span>NexbillAgent mengemas kini dirinya di luar waktu operasi dan kembali ke versi lama jika gagal.</span></div>
+    <div class="feat"><b>Pemantauan peranti</b><span>Status bersambung/terputus setiap peranti kelihatan di papan pemuka.</span></div>
+    <div class="feat"><b>Panduan lengkap 6 bahasa</b><span>Tetapan PC &amp; TV langkah demi langkah, serta 28 masalah biasa beserta penyelesaian.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-5"><div class="wrap">
+  <h2 class="sec"><span class="num">5</span>Syif, Tunai &amp; Anti-Penipuan</h2>
+  <p class="sec-lead">Tahu dengan tepat berapa wang yang sepatutnya ada di laci — dan siapa yang bertanggungjawab.</p>
+  <div class="feats">
+    <div class="feat"><b>Buka &amp; tutup syif juruwang</b><span>Setiap juruwang mengira wangnya sendiri; perbezaan terus kelihatan.</span></div>
+    <div class="feat"><b>Pengesanan kejanggalan automatik</b><span>Syif dengan corak mencurigakan ditanda dan wajib disemak Pemilik/Pengurus.</span></div>
+    <div class="feat"><b>Pengesanan transaksi berganda</b><span>Transaksi yang direkod dua kali ditanda sebelum menjadi masalah.</span></div>
+    <div class="feat"><b>Kelulusan berperingkat</b><span>Void, bayaran balik, dan pemindahan tunai memerlukan kelulusan penyelia.</span></div>
+    <div class="feat"><b>Serahan tunai &amp; pindahan tunai</b><span>Rekod serahan kepada pemilik/bank dan pergerakan wang antara akaun.</span></div>
+    <div class="feat"><b>Laporan syif</b><span>Eksport ringkasan setiap syif untuk arkib atau semakan.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-6"><div class="wrap">
+  <h2 class="sec"><span class="num">6</span>Pelanggan, Ahli &amp; Promosi</h2>
+  <p class="sec-lead">Buat pelanggan datang lagi dan lagi.</p>
+  <div class="feats">
+    <div class="feat"><b>Data &amp; sejarah pelanggan</b><span>Siapa yang kerap datang, berapa perbelanjaannya, bila kali terakhir bermain.</span></div>
+    <div class="feat"><b>Tahap keahlian</b><span>Silver, Gold dan seterusnya — lengkap dengan faedah dan tempoh sah.</span></div>
+    <div class="feat"><b>Jual keahlian</b><span>Pelanggan membeli keahlian di kaunter, tunai atau QR.</span></div>
+    <div class="feat"><b>Mata &amp; hadiah</b><span>Pelanggan mengumpul mata dan menebusnya dengan hadiah dari katalog anda.</span></div>
+    <div class="feat"><b>Promosi &amp; pakej</b><span>Promo waktu lengang, pakej jimat, dan diskaun khas.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-7"><div class="wrap">
+  <h2 class="sec"><span class="num">7</span>Chat Pelanggan, WhatsApp &amp; Instagram</h2>
+  <p class="sec-lead">Balas soalan pelanggan dari satu tempat — walaupun ketika anda sibuk.</p>
+  <div class="feats">
+    <div class="feat"><b>Peti masuk bersepadu</b><span>Mesej pelanggan dalam satu peti masuk, dibalas oleh pasukan anda.</span></div>
+    <div class="feat"><b>Balasan automatik AI <span class="tag addon">Add-on</span></b><span>AI menjawab soalan lazim; boleh dihidupkan/dimatikan bagi setiap perbualan.</span></div>
+    <div class="feat"><b>Instagram DM</b><span>Mesej Instagram masuk ke peti masuk yang sama.</span></div>
+    <div class="feat"><b>WhatsApp automatik</b><span>Notifikasi tempahan, peringatan, dan pengesahan dihantar sendiri.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-8"><div class="wrap">
+  <h2 class="sec"><span class="num">8</span>PPOB — Pendapatan Tambahan <span class="tag opt">Pilihan</span></h2>
+  <p class="sec-lead">Jual produk digital (bayaran bil &amp; tambah nilai) di kaunter yang sama, tanpa aplikasi berasingan.</p>
+  <div class="feats">
+    <div class="feat"><b>Transaksi PPOB</b><span>Rekod, selesaikan, dan batalkan transaksi produk digital.</span></div>
+    <div class="feat"><b>Tetapkan harga jual &amp; keuntungan</b><span>Tentukan markup anda sendiri bagi setiap produk.</span></div>
+    <div class="feat"><b>Baki deposit</b><span>Urus saluran baki untuk transaksi PPOB.</span></div>
+    <div class="feat"><b>Laporan PPOB</b><span>Ringkasan jualan dan keuntungan PPOB.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-9"><div class="wrap">
+  <h2 class="sec"><span class="num">9</span>Stok &amp; Pembelian</h2>
+  <p class="sec-lead">Stok tidak pernah habis tiba-tiba, dan kos barang dikira dengan tepat.</p>
+  <div class="feats">
+    <div class="feat"><b>Stok pelbagai gudang</b><span>Asingkan stok stor dan paparan/dapur.</span></div>
+    <div class="feat"><b>Amaran stok rendah</b><span>Dimaklumkan sebelum barang habis.</span></div>
+    <div class="feat"><b>Kiraan stok</b><span>Kira stok fizikal; perbezaan terus direkod dalam perakaunan.</span></div>
+    <div class="feat"><b>Pembekal &amp; Pesanan Belian</b><span>Buat PO (boleh diisi automatik dari stok rendah), kemudian terima barang.</span></div>
+    <div class="feat"><b>Invois &amp; pulangan belian</b><span>Rekod hutang kepada pembekal, bayaran, dan pemulangan barang.</span></div>
+    <div class="feat"><b>Kos barang dijual yang tepat</b><span>Dikira automatik daripada pembelian anda.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-10"><div class="wrap">
+  <h2 class="sec"><span class="num">10</span>Perakaunan &amp; Laporan Kewangan Automatik</h2>
+  <p class="sec-lead">Setiap transaksi terus direkod dalam perakaunan. Laporan kewangan sedia bila-bila masa — tanpa perisian perakaunan berasingan.</p>
+  <div class="feats">
+    <div class="feat"><b>Untung Rugi</b><span>Untung atau rugi bulan ini, boleh diperincikan sehingga setiap akaun.</span></div>
+    <div class="feat"><b>Kunci Kira-kira &amp; Aliran Tunai</b><span>Kedudukan aset, liabiliti, modal, dan aliran wang masuk-keluar.</span></div>
+    <div class="feat"><b>Penghutang &amp; Pemiutang</b><span>Siapa yang belum bayar, dan bil apa yang perlu anda bayar.</span></div>
+    <div class="feat"><b>Carta akaun sedia guna</b><span>Disediakan untuk perniagaan sewa; boleh disesuaikan.</span></div>
+    <div class="feat"><b>Jurnal &amp; kunci tempoh</b><span>Betulkan jurnal, dan kunci bulan yang sudah ditutup supaya tidak berubah.</span></div>
+    <div class="feat"><b>Baki awal &amp; import data lama</b><span>Pindahkan data dari perakaunan sebelumnya menggunakan templat.</span></div>
+    <div class="feat"><b>Penyesuaian</b><span>Padankan rekod sistem dengan tunai dan bank.</span></div>
+    <div class="feat"><b>Eksport laporan</b><span>Muat turun laporan untuk akauntan, bank, atau cukai.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-11"><div class="wrap">
+  <h2 class="sec"><span class="num">11</span>Perbelanjaan, Pendapatan Lain &amp; Aset</h2>
+  <p class="sec-lead">Semua wang keluar direkod dengan bukti dan kelulusan.</p>
+  <div class="feats">
+    <div class="feat"><b>Perbelanjaan dengan kelulusan</b><span>Di bawah had tertentu diluluskan automatik; di atasnya menunggu Pemilik.</span></div>
+    <div class="feat"><b>Cash Out Pantas</b><span>Rekod perbelanjaan kecil (parkir, air galon) dalam 3 ruangan.</span></div>
+    <div class="feat"><b>Bukti &amp; hutang</b><span>Lampirkan foto resit; rekod yang belum dibayar sebagai hutang.</span></div>
+    <div class="feat"><b>Kos berulang automatik</b><span>Elektrik, internet, sewa, gaji — draf disediakan setiap tempoh.</span></div>
+    <div class="feat"><b>Pusat kos</b><span>Asingkan kos mengikut bahagian: sewa, F&amp;B, dapur, pentadbiran.</span></div>
+    <div class="feat"><b>Pendapatan lain-lain</b><span>Rekod pendapatan di luar sewa &amp; kaunter, termasuk potongan caj QR.</span></div>
+    <div class="feat"><b>Aset tetap</b><span>Konsol, TV, dan peralatan — dengan susut nilai automatik dan sejarah penyelenggaraan.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-12"><div class="wrap">
+  <h2 class="sec"><span class="num">12</span>Penyelenggaraan &amp; Doktor Alat Kawalan</h2>
+  <p class="sec-lead">Kenal pasti alat kawalan bermasalah sebelum pelanggan mengadu.</p>
+  <div class="feats">
+    <div class="feat"><b>Tiket pembaikan</b><span>Rekod kerosakan, status pembaikan, dan alat ganti yang digunakan.</span></div>
+    <div class="feat"><b>Gamepad Tester</b><span>Uji alat kawalan PS3, PS4, dan PS5 terus dari pelayar.</span></div>
+    <div class="feat"><b>Doktor Alat Kawalan</b><span>Ukur drift analog, keseimbangan, tekanan butang &amp; picu — hasilnya skor kesihatan, analisis kerosakan, dan cadangan servis.</span></div>
+    <div class="feat"><b>Pemacu alat kawalan PS3</b><span>Muat turun pemacu &amp; panduan pemasangannya terus dari aplikasi.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-13"><div class="wrap">
+  <h2 class="sec"><span class="num">13</span>Home Rental — Sewa Bawa Pulang <span class="tag opt">Pilihan</span></h2>
+  <p class="sec-lead">Sewakan PS dan TV untuk dibawa pulang pelanggan, dengan risiko yang terkawal.</p>
+  <div class="feats">
+    <div class="feat"><b>Produk &amp; pakej sewa</b><span>PS3, PS4, PS5, Playbox, dan TV pelbagai saiz — setiap unit dijejak.</span></div>
+    <div class="feat"><b>Pengesahan identiti</b><span>Muat naik kad pengenalan sebelum barang dibawa keluar.</span></div>
+    <div class="feat"><b>Skor risiko &amp; senarai hitam</b><span>Pelanggan yang pernah lewat atau merosakkan ditanda; tempahan berisiko memerlukan kelulusan.</span></div>
+    <div class="feat"><b>Deposit keselamatan</b><span>Direkod berasingan daripada pendapatan sehingga barang dipulangkan.</span></div>
+    <div class="feat"><b>Hantar-ambil &amp; kos penghantaran</b><span>Kos penghantaran dikira automatik mengikut kawasan.</span></div>
+    <div class="feat"><b>Peringatan automatik</b><span>Jadual ambil, tarikh akhir, dan kelewatan — melalui WhatsApp.</span></div>
+    <div class="feat"><b>Kontrak digital &amp; pemeriksaan foto <span class="tag soon">Akan datang</span></b><span>Tandatangan digital dan foto keadaan sebelum/selepas sewa.</span></div>
+    <div class="feat"><b>Tuntutan kerosakan &amp; kehilangan <span class="tag soon">Akan datang</span></b><span>Rekod kerosakan dan potongan deposit.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-14"><div class="wrap">
+  <h2 class="sec"><span class="num">14</span>Marketplace Antara Outlet <span class="tag free">Percuma</span></h2>
+  <p class="sec-lead">Jual alat kawalan, konsol, TV, atau kerusi yang tidak digunakan kepada outlet lain — atau beli pada harga terpakai.</p>
+  <div class="feats">
+    <div class="feat"><b>Etalase dengan foto</b><span>Pasang barang dengan sehingga 5 foto; lihat barang dari outlet lain.</span></div>
+    <div class="feat"><b>Tawar &amp; capai persetujuan dalam aplikasi</b><span>Buat tawaran, terima tawaran, kemudian tanda selesai.</span></div>
+    <div class="feat"><b>Profil kepercayaan &amp; penilaian</b><span>Lihat umur akaun, transaksi selesai, penilaian, dan rekod aduan pihak lawan.</span></div>
+    <div class="feat"><b>Akaun bank dikunci &amp; bukti</b><span>Pembeli hanya diarahkan ke akaun penjual yang berdaftar; bukti bayaran &amp; serahan disimpan.</span></div>
+    <div class="feat"><b>Saluran aduan</b><span>Laporkan masalah; pasukan NEXBILL menyemak bukti kedua-dua pihak.</span></div>
+    <div class="feat"><b>Direkod dalam perakaunan</b><span>Jualan automatik direkod sebagai pendapatan penjual.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-15"><div class="wrap">
+  <h2 class="sec"><span class="num">15</span>Laporan &amp; AI</h2>
+  <p class="sec-lead">Keputusan berdasarkan data, bukan tekaan.</p>
+  <div class="feats">
+    <div class="feat"><b>Laporan jualan &amp; sewa</b><span>Waktu sibuk, unit paling laris, jualan harian/bulanan.</span></div>
+    <div class="feat"><b>Laporan stok, perbelanjaan &amp; pelanggan</b><span>Semua sudut perniagaan dalam satu menu.</span></div>
+    <div class="feat"><b>Prestasi juruwang</b><span>Bandingkan prestasi setiap juruwang.</span></div>
+    <div class="feat"><b>Kesihatan kewangan</b><span>Petunjuk mudah: adakah perniagaan anda sihat bulan ini?</span></div>
+    <div class="feat"><b>AI Business Intelligence <span class="tag addon">Add-on</span></b><span>Pandangan, cadangan, dan pembantu AI untuk menjawab soalan perniagaan anda.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-16"><div class="wrap">
+  <h2 class="sec"><span class="num">16</span>Pasukan, Cawangan &amp; Tetapan</h2>
+  <p class="sec-lead">Satu akaun untuk semua cawangan, dengan akses yang betul untuk setiap orang.</p>
+  <div class="feats">
+    <div class="feat"><b>Peranan &amp; hak akses</b><span>Pemilik, Pengurus, Juruwang dan lain-lain — tetapkan siapa boleh buat apa.</span></div>
+    <div class="feat"><b>Pelbagai cawangan</b><span>Tukar cawangan dengan satu klik, atau lihat semua cawangan sekali gus.</span></div>
+    <div class="feat"><b>Tetapan outlet</b><span>Profil, logo, butiran cukai, pencetak, notifikasi, dan peraturan tempahan.</span></div>
+    <div class="feat"><b>Hidupkan ciri mengikut keperluan</b><span>Ciri tambahan (Home Rental, PPOB, TV Screensaver) diaktifkan bagi setiap outlet.</span></div>
+    <div class="feat"><b>6 bahasa</b><span>Indonesia, Inggeris, Melayu, Thai, Filipino, dan Vietnam.</span></div>
+    <div class="feat"><b>Log masuk mudah</b><span>E-mel atau akaun Google, dengan pengesahan e-mel dan tetapan semula kata laluan.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-17"><div class="wrap">
+  <h2 class="sec"><span class="num">17</span>Keselamatan &amp; Kebolehpercayaan</h2>
+  <p class="sec-lead">Data perniagaan anda selamat, dan setiap perubahan boleh dijejak.</p>
+  <div class="feats">
+    <div class="feat"><b>Jejak aktiviti (log audit)</b><span>Siapa mengubah apa, dan bila.</span></div>
+    <div class="feat"><b>Sebab wajib untuk pembatalan</b><span>Void, bayaran balik, dan pembatalan tidak boleh dibuat tanpa sebab bertulis.</span></div>
+    <div class="feat"><b>Anti input berganda</b><span>Butang simpan dikunci ketika diproses; transaksi berganda ditolak.</span></div>
+    <div class="feat"><b>Data diasingkan bagi setiap outlet</b><span>Outlet lain tidak boleh melihat data anda.</span></div>
+    <div class="feat"><b>Nombor dokumen berturutan</b><span>Setiap perbelanjaan, tempahan, dan transaksi ada nombor unik yang kemas.</span></div>
+    <div class="feat"><b>Berasaskan awan</b><span>Tidak perlu pelayan sendiri; data disimpan atas talian dan boleh dicapai dari mana-mana.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-18"><div class="wrap">
+  <h2 class="sec"><span class="num">18</span>Sokongan &amp; Program</h2>
+  <p class="sec-lead">Anda tidak berseorangan menjalankan perniagaan.</p>
+  <div class="feats">
+    <div class="feat"><b>Pusat Bantuan</b><span>SOP harian, senarai semak persediaan outlet baharu, dan panduan setiap menu.</span></div>
+    <div class="feat"><b>Chat Khidmat Pelanggan</b><span>Hubungi pasukan NEXBILL terus dari aplikasi, boleh hantar foto &amp; video.</span></div>
+    <div class="feat"><b>Onboarding berpandu</b><span>Pelan persediaan langkah demi langkah untuk outlet baharu.</span></div>
+    <div class="feat"><b>Program Rujukan</b><span>Ajak outlet lain menggunakan NEXBILL dan dapatkan komisen.</span></div>
+    <div class="feat"><b>Cadangan Produk</b><span>Kurasi kelengkapan sewa (alat kawalan, aksesori, peranti) pilihan pasukan NEXBILL.</span></div>
+    <div class="feat"><b>Perkakasan sedia guna</b><span>Palam pintar dan peranti kawalan boleh dibeli bersama langganan.</span></div>
+  </div>
+</div></section>
+
+<section id="ms-mulai"><div class="wrap">
+  <div class="kicker">Mula dalam 3 langkah</div>
+  <div class="steps" style="margin-top:12px">
+    <div class="step"><h3>Daftar &amp; cuba percuma</h3><p>Buat akaun di dashboard.nexbill.id — tanpa pemasangan, terus dari pelayar.</p></div>
+    <div class="step"><h3>Isi unit &amp; kadar</h3><p>Ikut senarai semak persediaan: tambah unit PS, pakej tempoh, dan produk kaunter.</p></div>
+    <div class="step"><h3>Mulakan sewa pertama</h3><p>Tekan Mula pada unit — pemasa berjalan, dan laporan terisi automatik sejak hari pertama.</p></div>
+  </div>
+  <a class="cta solid" href="https://dashboard.nexbill.id/daftar">Cuba NEXBILL Percuma</a>
+</div></section>
+</main>
+<footer><div class="wrap">
+  <div class="note">Ketersediaan ciri mungkin berbeza mengikut pakej langganan. <span class="tag addon">Add-on</span> dikenakan bayaran tambahan; <span class="tag opt">Pilihan</span> diaktifkan bagi setiap outlet; <span class="tag soon">Akan datang</span> sedang dibangunkan. Kawalan Android TV memerlukan PC di outlet yang menjalankan NexbillAgent.</div>
+  <p style="margin-top:16px">© NEXBILL · Katalog Ciri · dashboard.nexbill.id</p>
+</div></footer>
+</article>
+
+<!-- ============================================================ THAI -->
+<article data-lang="th" hidden>
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">NEXBILL · แคตตาล็อกฟีเจอร์</div>
+    <h1>ทุกอย่างที่ธุรกิจร้านเช่า PlayStation ต้องการ ในแอปเดียว</h1>
+    <p class="lead">ตั้งแต่ตัวจับเวลาเช่า การจองออนไลน์ แคชเชียร์และ F&amp;B ทีวีที่เปิดเองอัตโนมัติ ไปจนถึงรายงานการเงิน — ไม่ต้องจดสมุด ไม่ต้องคิดเลขเอง ไม่ต้องกังวลเงินรั่ว</p>
+    <div class="chips"><span class="chip">ใช้ได้บนมือถือ แท็บเล็ต และ PC</span><span class="chip">ดูได้จากทุกที่</span><span class="chip">หลายสาขา</span><span class="chip">6 ภาษา</span><span class="chip">บัญชีอัตโนมัติ</span></div>
+    <a class="cta" href="https://dashboard.nexbill.id/daftar">ทดลองใช้ฟรี</a><a class="cta alt" href="#th-mulai">วิธีเริ่มต้น</a>
+  </div>
+</header>
+<nav class="toolbar" aria-label="สารบัญ"><div class="wrap">
+  <a href="#th-1">ให้เช่า</a><a href="#th-2">การจอง</a><a href="#th-3">แคชเชียร์ &amp; F&amp;B</a><a href="#th-4">ทีวีอัตโนมัติ</a><a href="#th-5">กันทุจริต</a><a href="#th-6">สมาชิก</a><a href="#th-7">แชต &amp; WA</a><a href="#th-8">PPOB</a><a href="#th-9">สต็อก</a><a href="#th-10">บัญชี</a><a href="#th-11">ค่าใช้จ่าย</a><a href="#th-12">ซ่อมบำรุง</a><a href="#th-13">Home Rental</a><a href="#th-14">Marketplace</a><a href="#th-15">รายงาน &amp; AI</a><a href="#th-16">ทีม &amp; สาขา</a><a href="#th-17">ความปลอดภัย</a><a href="#th-18">การช่วยเหลือ</a>
+</div></nav>
+<main>
+<section><div class="wrap">
+  <div class="kicker">เหมาะสำหรับ</div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="box"><h3>ร้านเช่า PS ขนาดเล็กและร้านในบ้าน</h3><p>เริ่มจากไม่กี่เครื่อง ตัวจับเวลา แคชเชียร์ และรายงานรายวันเป็นระเบียบทันทีโดยไม่ต้องเก่งคอมพิวเตอร์</p></div>
+    <div class="box"><h3>เกมมิ่งเลานจ์และคาเฟ่</h3><p>เช่า PS อาหารและเครื่องดื่ม จองออนไลน์ สมาชิก และหน้าจอโปรโมชันบนทีวี — ทั้งหมดในบิลเดียว</p></div>
+    <div class="box"><h3>เจ้าของหลายสาขา</h3><p>ดูยอดขาย เงินสด และผลงานแคชเชียร์ทุกสาขาจากมือถือแบบเรียลไทม์ โดยไม่ต้องไปที่ร้าน</p></div>
+  </div>
+</div></section>
+
+<section id="th-1"><div class="wrap">
+  <h2 class="sec"><span class="num">1</span>การเช่าและบิล PS</h2>
+  <p class="sec-lead">ตัวจับเวลาเดินเอง บิลคำนวณโดยระบบ ไม่มีเวลาเล่นหลุดหรือคิดเงินผิดอีกต่อไป</p>
+  <div class="feats">
+    <div class="feat"><b>เริ่ม หยุดชั่วคราว เล่นต่อ ต่อเวลา หยุด</b><span>ควบคุมเซสชันแต่ละเครื่องด้วยคลิกเดียว — เวลาหยุดนับขณะพัก</span></div>
+    <div class="feat"><b>ย้ายเครื่องและเปลี่ยนลูกค้า</b><span>ลูกค้าย้ายทีวี/คอนโซลกลางเกมได้โดยไม่เสียเวลาที่เล่นไปแล้ว</span></div>
+    <div class="feat"><b>แพ็กเกจเวลา</b><span>ตั้งค่าล่วงหน้า 1 ชม. 3 ชม. แพ็กเกจกลางคืน ฯลฯ — แคชเชียร์แค่เลือก</span></div>
+    <div class="feat"><b>อุปกรณ์เสริมต่อเซสชัน</b><span>จอยเพิ่ม ฯลฯ คิดรายชั่วโมงหรือครั้งเดียว เพิ่ม/ถอดได้ตลอด</span></div>
+    <div class="feat"><b>ตั้งค่าราคายืดหยุ่น</b><span>การปัดเศษบิล ค่าบริการ และภาษีตามนโยบายร้านของคุณ</span></div>
+    <div class="feat"><b>Live Billing Board</b><span>หน้าจอสถานะทุกเครื่อง: ว่าง กำลังเล่น เวลาที่เหลือ — เห็นในพริบตา</span></div>
+    <div class="feat"><b>จัดการเครื่องและคอนโซล</b><span>ข้อมูลแต่ละเครื่อง ประเภททีวี และสถานะซ่อม — เครื่องที่กำลังซ่อมจะเช่าไม่ได้</span></div>
+    <div class="feat"><b>แดชบอร์ดเจ้าของ</b><span>สรุปยอดขายและผลงานร้านวันนี้ทันทีที่เปิด</span></div>
+  </div>
+</div></section>
+
+<section id="th-2"><div class="wrap">
+  <h2 class="sec"><span class="num">2</span>การจองและสำรองออนไลน์</h2>
+  <p class="sec-lead">ลูกค้าจองเองผ่านมือถือได้ 24 ชั่วโมง ตารางไม่มีวันชนกัน</p>
+  <div class="feats">
+    <div class="feat"><b>หน้าจองออนไลน์ของร้านคุณ</b><span>ลูกค้าดูเครื่องว่าง เลือกเวลา และจองได้เอง</span></div>
+    <div class="feat"><b>มัดจำ</b><span>ลดลูกค้าที่จองแล้วไม่มา</span></div>
+    <div class="feat"><b>กันจองซ้อนและเว้นช่วงระหว่างการจอง</b><span>ระบบปฏิเสธตารางที่ทับกัน และเว้นเวลาเก็บเครื่องระหว่างเซสชัน</span></div>
+    <div class="feat"><b>QR การจองและตรวจรหัส</b><span>ลูกค้าแสดง QR เมื่อมาถึง แคชเชียร์เช็กอินได้ในไม่กี่วินาที</span></div>
+    <div class="feat"><b>ยืนยัน เลื่อน ย้ายเครื่อง ยกเลิก</b><span>ทุกการเปลี่ยนแปลงบันทึกไว้เรียบร้อย รวมถึงการทำเครื่องหมายและยกเลิก no-show</span></div>
+    <div class="feat"><b>ปล่อยคืนอัตโนมัติเมื่อไม่มา</b><span>เครื่องที่จองไว้แต่ว่างจะกลับเข้ารายการให้เช่าโดยอัตโนมัติ</span></div>
+    <div class="feat"><b>แบนเนอร์โปรโมชันในหน้าจอง</b><span>แสดงโปรโมชันและข้อมูลร้านให้ลูกค้าที่กำลังจอง</span></div>
+    <div class="feat"><b>แจ้งเตือนทาง WhatsApp</b><span>ส่งการยืนยันและการเตือนการจองให้ลูกค้าโดยอัตโนมัติ</span></div>
+  </div>
+</div></section>
+
+<section id="th-3"><div class="wrap">
+  <h2 class="sec"><span class="num">3</span>แคชเชียร์ (POS), F&amp;B และครัว</h2>
+  <p class="sec-lead">เช่า PS อาหาร และเครื่องดื่มในบิลเดียว ออเดอร์ส่งตรงไปที่จอครัว</p>
+  <div class="feats">
+    <div class="feat"><b>แคชเชียร์ครบวงจร</b><span>สร้างออเดอร์ บิล และชำระหลายวิธี — รวมถึงชำระบางส่วน/ผสม</span></div>
+    <div class="feat"><b>เงินสด QR และการชำระดิจิทัล</b><span>ตัวเลือกการชำระตามที่ลูกค้าคุ้นเคยในปัจจุบัน</span></div>
+    <div class="feat"><b>สินค้าและหมวดหมู่</b><span>นำเข้าสินค้าหลายร้อยรายการพร้อมกันจาก Excel ด้วยเทมเพลตที่เตรียมไว้</span></div>
+    <div class="feat"><b>สูตรอาหาร F&amp;B</b><span>ทุกเมนูที่ขายได้จะตัดสต็อกวัตถุดิบอัตโนมัติ</span></div>
+    <div class="feat"><b>บัตรกำนัล</b><span>สร้างรหัสบัตรกำนัล ระบบตรวจสอบความถูกต้องเมื่อใช้งาน</span></div>
+    <div class="feat"><b>ใบเสร็จดิจิทัลและพิมพ์</b><span>ส่งใบเสร็จผ่านลิงก์ หรือพิมพ์ด้วยเครื่องพิมพ์แคชเชียร์ (58 มม. ฯลฯ)</span></div>
+    <div class="feat"><b>Kitchen Display</b><span>คิวออเดอร์ครัวพร้อมสถานะ: รับแล้ว กำลังทำ เสร็จ — รวมถึงการยกเลิกรายการ</span></div>
+    <div class="feat"><b>คืนเงินและ void แบบควบคุม</b><span>ต่อออเดอร์หรือต่อรายการ ต้องให้หัวหน้าอนุมัติและระบุเหตุผล</span></div>
+  </div>
+</div></section>
+
+<section id="th-4"><div class="wrap">
+  <h2 class="sec"><span class="num">4</span>ควบคุมทีวีและอุปกรณ์อัตโนมัติ</h2>
+  <p class="sec-lead">เซสชันเริ่ม ทีวีเปิดเอง เซสชันจบ ทีวีปิดหรือแสดงโปรโมชันร้าน พนักงานไม่ต้องเดินไปมา</p>
+  <div class="feats">
+    <div class="feat"><b>Android TV / Google TV</b><span>เปิด ปิด และสลับไปยัง HDMI ของ PlayStation อัตโนมัติผ่านแอป NexbillAgent บน PC แคชเชียร์</span></div>
+    <div class="feat"><b>ปลั๊กอัจฉริยะ</b><span>Tuya / Smart Life, Sonoff eWeLink, Tasmota และอุปกรณ์ HTTP — สำหรับทีวีที่ไม่ใช่ Android หรือคอนโซล</span></div>
+    <div class="feat"><b>TV Screensaver (หน้าจอโปรโมชัน)</b><span>เมื่อเครื่องว่าง ทีวีแสดงชื่อร้าน ราคา QR การจอง นาฬิกา และสถานะเครื่อง</span></div>
+    <div class="feat"><b>อัตโนมัติตามเซสชัน</b><span>เซสชันจบ → screensaver เซสชันเริ่ม → เข้า PlayStation ทันที ทดสอบได้จากแดชบอร์ด</span></div>
+    <div class="feat"><b>PIN และโหมดกลางคืน</b><span>ล็อกหน้าจอด้วย PIN และหรี่จอตอนกลางคืน</span></div>
+    <div class="feat"><b>อัปเดตอัตโนมัติอย่างปลอดภัย</b><span>NexbillAgent อัปเดตตัวเองนอกเวลาทำการ และย้อนกลับเวอร์ชันเดิมหากล้มเหลว</span></div>
+    <div class="feat"><b>ตรวจสอบอุปกรณ์</b><span>สถานะเชื่อมต่อ/ขาดการเชื่อมต่อของแต่ละอุปกรณ์แสดงบนแดชบอร์ด</span></div>
+    <div class="feat"><b>คู่มือครบ 6 ภาษา</b><span>ตั้งค่า PC และทีวีทีละขั้นตอน พร้อม 28 ปัญหาที่พบบ่อยและวิธีแก้</span></div>
+  </div>
+</div></section>
+
+<section id="th-5"><div class="wrap">
+  <h2 class="sec"><span class="num">5</span>กะงาน เงินสด และกันทุจริต</h2>
+  <p class="sec-lead">รู้แน่ชัดว่าในลิ้นชักควรมีเงินเท่าไร — และใครรับผิดชอบ</p>
+  <div class="feats">
+    <div class="feat"><b>เปิดและปิดกะแคชเชียร์</b><span>แคชเชียร์แต่ละคนนับเงินของตัวเอง ส่วนต่างเห็นได้ทันที</span></div>
+    <div class="feat"><b>ตรวจจับความผิดปกติอัตโนมัติ</b><span>กะที่มีรูปแบบน่าสงสัยจะถูกทำเครื่องหมายและต้องให้เจ้าของ/ผู้จัดการตรวจสอบ</span></div>
+    <div class="feat"><b>ตรวจจับธุรกรรมซ้ำ</b><span>ธุรกรรมที่บันทึกซ้ำจะถูกทำเครื่องหมายก่อนกลายเป็นปัญหา</span></div>
+    <div class="feat"><b>อนุมัติหลายระดับ</b><span>void คืนเงิน และโอนเงินสดต้องได้รับอนุมัติจากหัวหน้า</span></div>
+    <div class="feat"><b>ส่งมอบเงินสดและโอนเงินสด</b><span>บันทึกการส่งเงินให้เจ้าของ/ธนาคาร และการเคลื่อนย้ายเงินระหว่างบัญชี</span></div>
+    <div class="feat"><b>รายงานกะ</b><span>ส่งออกสรุปแต่ละกะเพื่อเก็บหรือตรวจสอบ</span></div>
+  </div>
+</div></section>
+
+<section id="th-6"><div class="wrap">
+  <h2 class="sec"><span class="num">6</span>ลูกค้า สมาชิก และโปรโมชัน</h2>
+  <p class="sec-lead">ทำให้ลูกค้ากลับมาซ้ำแล้วซ้ำอีก</p>
+  <div class="feats">
+    <div class="feat"><b>ข้อมูลและประวัติลูกค้า</b><span>ใครมาบ่อย ใช้จ่ายเท่าไร เล่นครั้งล่าสุดเมื่อไร</span></div>
+    <div class="feat"><b>ระดับสมาชิก</b><span>Silver, Gold ฯลฯ — พร้อมสิทธิประโยชน์และอายุการใช้งาน</span></div>
+    <div class="feat"><b>ขายสมาชิก</b><span>ลูกค้าซื้อสมาชิกที่แคชเชียร์ ด้วยเงินสดหรือ QR</span></div>
+    <div class="feat"><b>แต้มและของรางวัล</b><span>ลูกค้าสะสมแต้มและแลกของรางวัลจากแคตตาล็อกของคุณ</span></div>
+    <div class="feat"><b>โปรโมชันและแพ็กเกจ</b><span>โปรช่วงเวลาเงียบ แพ็กเกจประหยัด และส่วนลดพิเศษ</span></div>
+  </div>
+</div></section>
+
+<section id="th-7"><div class="wrap">
+  <h2 class="sec"><span class="num">7</span>แชตลูกค้า WhatsApp และ Instagram</h2>
+  <p class="sec-lead">ตอบคำถามลูกค้าจากที่เดียว — แม้ในเวลาที่คุณยุ่ง</p>
+  <div class="feats">
+    <div class="feat"><b>กล่องข้อความรวม</b><span>ข้อความลูกค้าอยู่ในกล่องเดียว ทีมของคุณตอบได้</span></div>
+    <div class="feat"><b>AI ตอบอัตโนมัติ <span class="tag addon">Add-on</span></b><span>AI ตอบคำถามทั่วไป เปิด/ปิดได้ในแต่ละบทสนทนา</span></div>
+    <div class="feat"><b>Instagram DM</b><span>ข้อความ Instagram เข้ากล่องข้อความเดียวกัน</span></div>
+    <div class="feat"><b>WhatsApp อัตโนมัติ</b><span>แจ้งเตือนการจอง การเตือน และการยืนยันส่งเอง</span></div>
+  </div>
+</div></section>
+
+<section id="th-8"><div class="wrap">
+  <h2 class="sec"><span class="num">8</span>PPOB — รายได้เสริม <span class="tag opt">ไม่บังคับ</span></h2>
+  <p class="sec-lead">ขายสินค้าดิจิทัล (ชำระบิลและเติมเงิน) ที่แคชเชียร์เดียวกัน ไม่ต้องใช้แอปแยก</p>
+  <div class="feats">
+    <div class="feat"><b>ธุรกรรม PPOB</b><span>บันทึก ดำเนินการให้เสร็จ และยกเลิกธุรกรรมสินค้าดิจิทัล</span></div>
+    <div class="feat"><b>ตั้งราคาขายและกำไร</b><span>กำหนดส่วนเพิ่มเองสำหรับแต่ละสินค้า</span></div>
+    <div class="feat"><b>ยอดเงินฝาก</b><span>จัดการช่องทางยอดเงินสำหรับธุรกรรม PPOB</span></div>
+    <div class="feat"><b>รายงาน PPOB</b><span>สรุปยอดขายและกำไร PPOB</span></div>
+  </div>
+</div></section>
+
+<section id="th-9"><div class="wrap">
+  <h2 class="sec"><span class="num">9</span>สต็อกและการจัดซื้อ</h2>
+  <p class="sec-lead">สต็อกไม่หมดกะทันหัน และต้นทุนสินค้าคำนวณได้แม่นยำ</p>
+  <div class="feats">
+    <div class="feat"><b>สต็อกหลายคลัง</b><span>แยกสต็อกคลังกับหน้าร้าน/ครัว</span></div>
+    <div class="feat"><b>แจ้งเตือนสต็อกต่ำ</b><span>รู้ก่อนที่สินค้าจะหมด</span></div>
+    <div class="feat"><b>ตรวจนับสต็อก</b><span>นับสต็อกจริง ส่วนต่างบันทึกลงบัญชีทันที</span></div>
+    <div class="feat"><b>ซัพพลายเออร์และใบสั่งซื้อ</b><span>สร้าง PO (เติมอัตโนมัติจากสต็อกต่ำได้) แล้วรับสินค้า</span></div>
+    <div class="feat"><b>ใบแจ้งหนี้และการคืนสินค้า</b><span>บันทึกหนี้ต่อซัพพลายเออร์ การชำระ และการคืนสินค้า</span></div>
+    <div class="feat"><b>ต้นทุนขายที่แม่นยำ</b><span>คำนวณอัตโนมัติจากการซื้อของคุณ</span></div>
+  </div>
+</div></section>
+
+<section id="th-10"><div class="wrap">
+  <h2 class="sec"><span class="num">10</span>บัญชีและรายงานการเงินอัตโนมัติ</h2>
+  <p class="sec-lead">ทุกธุรกรรมลงบัญชีทันที รายงานการเงินพร้อมเสมอ — ไม่ต้องใช้ซอฟต์แวร์บัญชีแยก</p>
+  <div class="feats">
+    <div class="feat"><b>กำไรขาดทุน</b><span>เดือนนี้กำไรหรือขาดทุน เจาะลึกได้ถึงแต่ละบัญชี</span></div>
+    <div class="feat"><b>งบดุลและกระแสเงินสด</b><span>สถานะสินทรัพย์ หนี้สิน ทุน และเงินเข้า-ออก</span></div>
+    <div class="feat"><b>ลูกหนี้และเจ้าหนี้</b><span>ใครยังไม่จ่าย และบิลใดที่คุณต้องจ่าย</span></div>
+    <div class="feat"><b>ผังบัญชีพร้อมใช้</b><span>ออกแบบมาสำหรับธุรกิจให้เช่า ปรับแต่งได้</span></div>
+    <div class="feat"><b>สมุดรายวันและปิดงวด</b><span>แก้ไขรายการ และล็อกเดือนที่ปิดแล้วไม่ให้เปลี่ยน</span></div>
+    <div class="feat"><b>ยอดยกมาและนำเข้าข้อมูลเก่า</b><span>ย้ายข้อมูลจากระบบบัญชีเดิมด้วยเทมเพลต</span></div>
+    <div class="feat"><b>กระทบยอด</b><span>จับคู่บันทึกในระบบกับเงินสดและธนาคาร</span></div>
+    <div class="feat"><b>ส่งออกรายงาน</b><span>ดาวน์โหลดรายงานสำหรับนักบัญชี ธนาคาร หรือภาษี</span></div>
+  </div>
+</div></section>
+
+<section id="th-11"><div class="wrap">
+  <h2 class="sec"><span class="num">11</span>ค่าใช้จ่าย รายได้อื่น และสินทรัพย์</h2>
+  <p class="sec-lead">เงินออกทุกบาทบันทึกพร้อมหลักฐานและการอนุมัติ</p>
+  <div class="feats">
+    <div class="feat"><b>ค่าใช้จ่ายพร้อมการอนุมัติ</b><span>ต่ำกว่าวงเงินอนุมัติอัตโนมัติ สูงกว่านั้นรอเจ้าของอนุมัติ</span></div>
+    <div class="feat"><b>Cash Out ด่วน</b><span>บันทึกค่าใช้จ่ายเล็กน้อย (ค่าจอดรถ น้ำดื่ม) ใน 3 ช่อง</span></div>
+    <div class="feat"><b>หลักฐานและหนี้ค้างจ่าย</b><span>แนบรูปใบเสร็จ บันทึกรายการที่ยังไม่จ่ายเป็นหนี้</span></div>
+    <div class="feat"><b>ค่าใช้จ่ายประจำอัตโนมัติ</b><span>ค่าไฟ อินเทอร์เน็ต ค่าเช่า เงินเดือน — สร้างร่างให้ทุกงวด</span></div>
+    <div class="feat"><b>ศูนย์ต้นทุน</b><span>แยกต้นทุนตามส่วน: ให้เช่า F&amp;B ครัว ธุรการ</span></div>
+    <div class="feat"><b>รายได้อื่น</b><span>บันทึกรายได้นอกเหนือการเช่าและแคชเชียร์ รวมถึงการหักค่าธรรมเนียม QR</span></div>
+    <div class="feat"><b>สินทรัพย์ถาวร</b><span>คอนโซล ทีวี และอุปกรณ์ — พร้อมค่าเสื่อมราคาอัตโนมัติและประวัติการซ่อม</span></div>
+  </div>
+</div></section>
+
+<section id="th-12"><div class="wrap">
+  <h2 class="sec"><span class="num">12</span>ซ่อมบำรุงและหมอจอย</h2>
+  <p class="sec-lead">รู้ว่าจอยตัวไหนมีปัญหาก่อนลูกค้าจะบ่น</p>
+  <div class="feats">
+    <div class="feat"><b>ใบงานซ่อม</b><span>บันทึกความเสียหาย สถานะการซ่อม และอะไหล่ที่ใช้</span></div>
+    <div class="feat"><b>Gamepad Tester</b><span>ทดสอบจอย PS3, PS4 และ PS5 ได้โดยตรงจากเบราว์เซอร์</span></div>
+    <div class="feat"><b>หมอจอย</b><span>วัดอาการอนาล็อกดริฟต์ สมดุล แรงกดปุ่มและทริกเกอร์ — ได้คะแนนสุขภาพ การวิเคราะห์ความเสียหาย และคำแนะนำการซ่อม</span></div>
+    <div class="feat"><b>ไดรเวอร์จอย PS3</b><span>ดาวน์โหลดไดรเวอร์และคู่มือการติดตั้งได้โดยตรงจากแอป</span></div>
+  </div>
+</div></section>
+
+<section id="th-13"><div class="wrap">
+  <h2 class="sec"><span class="num">13</span>Home Rental — ให้เช่ากลับบ้าน <span class="tag opt">ไม่บังคับ</span></h2>
+  <p class="sec-lead">ให้เช่า PS และทีวีกลับบ้าน โดยควบคุมความเสี่ยงได้</p>
+  <div class="feats">
+    <div class="feat"><b>สินค้าและแพ็กเกจเช่า</b><span>PS3, PS4, PS5, Playbox และทีวีหลายขนาด — ติดตามได้ทุกเครื่อง</span></div>
+    <div class="feat"><b>ยืนยันตัวตน</b><span>อัปโหลดบัตรประชาชนก่อนนำสินค้าออก</span></div>
+    <div class="feat"><b>คะแนนความเสี่ยงและบัญชีดำ</b><span>ลูกค้าที่เคยคืนช้าหรือทำเสียหายจะถูกทำเครื่องหมาย การจองที่เสี่ยงต้องได้รับอนุมัติ</span></div>
+    <div class="feat"><b>เงินประกัน</b><span>บันทึกแยกจากรายได้จนกว่าจะคืนสินค้า</span></div>
+    <div class="feat"><b>รับ-ส่งและค่าขนส่ง</b><span>คำนวณค่าขนส่งอัตโนมัติตามพื้นที่</span></div>
+    <div class="feat"><b>แจ้งเตือนอัตโนมัติ</b><span>ตารางรับ กำหนดคืน และการคืนช้า — ผ่าน WhatsApp</span></div>
+    <div class="feat"><b>สัญญาดิจิทัลและตรวจสภาพด้วยภาพ <span class="tag soon">เร็ว ๆ นี้</span></b><span>ลายเซ็นดิจิทัลและภาพสภาพก่อน/หลังเช่า</span></div>
+    <div class="feat"><b>เคลมความเสียหายและสูญหาย <span class="tag soon">เร็ว ๆ นี้</span></b><span>บันทึกความเสียหายและหักเงินประกัน</span></div>
+  </div>
+</div></section>
+
+<section id="th-14"><div class="wrap">
+  <h2 class="sec"><span class="num">14</span>Marketplace ระหว่างร้าน <span class="tag free">ฟรี</span></h2>
+  <p class="sec-lead">ขายจอย คอนโซล ทีวี หรือเก้าอี้ที่ไม่ได้ใช้ให้ร้านอื่น — หรือซื้อมือสองในราคาย่อมเยา</p>
+  <div class="feats">
+    <div class="feat"><b>หน้าร้านพร้อมรูปภาพ</b><span>ลงสินค้าได้สูงสุด 5 รูป ดูสินค้าจากร้านอื่นได้</span></div>
+    <div class="feat"><b>ต่อรองและตกลงในแอป</b><span>ยื่นข้อเสนอ รับข้อเสนอ แล้วทำเครื่องหมายว่าเสร็จสิ้น</span></div>
+    <div class="feat"><b>โปรไฟล์ความน่าเชื่อถือและคะแนน</b><span>ดูอายุบัญชี ธุรกรรมที่สำเร็จ คะแนน และประวัติข้อพิพาทของคู่ค้า</span></div>
+    <div class="feat"><b>บัญชีธนาคารที่ล็อกและหลักฐาน</b><span>ผู้ซื้อจะถูกส่งไปยังบัญชีที่ผู้ขายลงทะเบียนไว้เท่านั้น เก็บหลักฐานการโอนและการส่งมอบ</span></div>
+    <div class="feat"><b>ช่องทางร้องเรียน</b><span>แจ้งปัญหา ทีม NEXBILL ตรวจสอบหลักฐานของทั้งสองฝ่าย</span></div>
+    <div class="feat"><b>บันทึกลงบัญชี</b><span>ยอดขายบันทึกเป็นรายได้ของผู้ขายโดยอัตโนมัติ</span></div>
+  </div>
+</div></section>
+
+<section id="th-15"><div class="wrap">
+  <h2 class="sec"><span class="num">15</span>รายงานและ AI</h2>
+  <p class="sec-lead">ตัดสินใจด้วยข้อมูล ไม่ใช่การคาดเดา</p>
+  <div class="feats">
+    <div class="feat"><b>รายงานยอดขายและการเช่า</b><span>ช่วงเวลาที่คึกคัก เครื่องที่ขายดีที่สุด ยอดขายรายวัน/รายเดือน</span></div>
+    <div class="feat"><b>รายงานสต็อก ค่าใช้จ่าย และลูกค้า</b><span>ทุกมุมของธุรกิจในเมนูเดียว</span></div>
+    <div class="feat"><b>ผลงานแคชเชียร์</b><span>เปรียบเทียบผลงานแคชเชียร์แต่ละคน</span></div>
+    <div class="feat"><b>สุขภาพการเงิน</b><span>ตัวชี้วัดง่าย ๆ: เดือนนี้ธุรกิจของคุณแข็งแรงไหม?</span></div>
+    <div class="feat"><b>AI Business Intelligence <span class="tag addon">Add-on</span></b><span>ข้อมูลเชิงลึก คำแนะนำ และผู้ช่วย AI ตอบคำถามธุรกิจของคุณ</span></div>
+  </div>
+</div></section>
+
+<section id="th-16"><div class="wrap">
+  <h2 class="sec"><span class="num">16</span>ทีม สาขา และการตั้งค่า</h2>
+  <p class="sec-lead">บัญชีเดียวสำหรับทุกสาขา พร้อมสิทธิ์ที่เหมาะสมสำหรับแต่ละคน</p>
+  <div class="feats">
+    <div class="feat"><b>บทบาทและสิทธิ์การเข้าถึง</b><span>เจ้าของ ผู้จัดการ แคชเชียร์ ฯลฯ — กำหนดว่าใครทำอะไรได้</span></div>
+    <div class="feat"><b>หลายสาขา</b><span>สลับสาขาด้วยคลิกเดียว หรือดูทุกสาขาพร้อมกัน</span></div>
+    <div class="feat"><b>ตั้งค่าร้าน</b><span>โปรไฟล์ โลโก้ ข้อมูลภาษี เครื่องพิมพ์ การแจ้งเตือน และกฎการจอง</span></div>
+    <div class="feat"><b>เปิดฟีเจอร์ตามต้องการ</b><span>ฟีเจอร์เสริม (Home Rental, PPOB, TV Screensaver) เปิดใช้แยกตามร้าน</span></div>
+    <div class="feat"><b>6 ภาษา</b><span>อินโดนีเซีย อังกฤษ มลายู ไทย ฟิลิปปินส์ และเวียดนาม</span></div>
+    <div class="feat"><b>เข้าสู่ระบบง่าย</b><span>อีเมลหรือบัญชี Google พร้อมยืนยันอีเมลและรีเซ็ตรหัสผ่าน</span></div>
+  </div>
+</div></section>
+
+<section id="th-17"><div class="wrap">
+  <h2 class="sec"><span class="num">17</span>ความปลอดภัยและความน่าเชื่อถือ</h2>
+  <p class="sec-lead">ข้อมูลธุรกิจของคุณปลอดภัย และทุกการเปลี่ยนแปลงตรวจสอบย้อนหลังได้</p>
+  <div class="feats">
+    <div class="feat"><b>ร่องรอยกิจกรรม (audit log)</b><span>ใครเปลี่ยนอะไร และเมื่อไร</span></div>
+    <div class="feat"><b>ต้องระบุเหตุผลเมื่อยกเลิก</b><span>void คืนเงิน และยกเลิกทำไม่ได้หากไม่มีเหตุผลเป็นลายลักษณ์อักษร</span></div>
+    <div class="feat"><b>กันบันทึกซ้ำ</b><span>ปุ่มบันทึกถูกล็อกระหว่างประมวลผล ธุรกรรมซ้ำจะถูกปฏิเสธ</span></div>
+    <div class="feat"><b>ข้อมูลแยกตามร้าน</b><span>ร้านอื่นไม่สามารถเห็นข้อมูลของคุณ</span></div>
+    <div class="feat"><b>เลขเอกสารเรียงลำดับ</b><span>ทุกค่าใช้จ่าย การจอง และธุรกรรมมีเลขเฉพาะที่เป็นระเบียบ</span></div>
+    <div class="feat"><b>บนคลาวด์</b><span>ไม่ต้องมีเซิร์ฟเวอร์เอง ข้อมูลเก็บออนไลน์และเข้าถึงได้จากทุกที่</span></div>
+  </div>
+</div></section>
+
+<section id="th-18"><div class="wrap">
+  <h2 class="sec"><span class="num">18</span>การช่วยเหลือและโปรแกรม</h2>
+  <p class="sec-lead">คุณไม่ได้ทำธุรกิจเพียงลำพัง</p>
+  <div class="feats">
+    <div class="feat"><b>ศูนย์ช่วยเหลือ</b><span>SOP รายวัน เช็กลิสต์ตั้งค่าร้านใหม่ และคู่มือทุกเมนู</span></div>
+    <div class="feat"><b>แชตฝ่ายบริการลูกค้า</b><span>ติดต่อทีม NEXBILL ได้โดยตรงจากแอป ส่งรูปและวิดีโอได้</span></div>
+    <div class="feat"><b>การเริ่มต้นแบบมีผู้แนะนำ</b><span>แผนการตั้งค่าทีละขั้นสำหรับร้านใหม่</span></div>
+    <div class="feat"><b>โปรแกรมแนะนำเพื่อน</b><span>ชวนร้านอื่นมาใช้ NEXBILL และรับค่าคอมมิชชัน</span></div>
+    <div class="feat"><b>สินค้าแนะนำ</b><span>อุปกรณ์สำหรับร้านเช่า (จอย อุปกรณ์เสริม อุปกรณ์ควบคุม) คัดสรรโดยทีม NEXBILL</span></div>
+    <div class="feat"><b>ฮาร์ดแวร์พร้อมใช้</b><span>ปลั๊กอัจฉริยะและอุปกรณ์ควบคุมซื้อพร้อมการสมัครสมาชิกได้</span></div>
+  </div>
+</div></section>
+
+<section id="th-mulai"><div class="wrap">
+  <div class="kicker">เริ่มต้นใน 3 ขั้นตอน</div>
+  <div class="steps" style="margin-top:12px">
+    <div class="step"><h3>สมัครและทดลองใช้ฟรี</h3><p>สร้างบัญชีที่ dashboard.nexbill.id — ไม่ต้องติดตั้ง ใช้ผ่านเบราว์เซอร์ได้เลย</p></div>
+    <div class="step"><h3>ใส่เครื่องและราคา</h3><p>ทำตามเช็กลิสต์การตั้งค่า: เพิ่มเครื่อง PS แพ็กเกจเวลา และสินค้าแคชเชียร์</p></div>
+    <div class="step"><h3>เริ่มการเช่าครั้งแรก</h3><p>กดเริ่มที่เครื่อง — ตัวจับเวลาเดิน และรายงานจะเติมเองตั้งแต่วันแรก</p></div>
+  </div>
+  <a class="cta solid" href="https://dashboard.nexbill.id/daftar">ทดลองใช้ NEXBILL ฟรี</a>
+</div></section>
+</main>
+<footer><div class="wrap">
+  <div class="note">ฟีเจอร์ที่ใช้ได้อาจแตกต่างกันตามแพ็กเกจสมาชิก <span class="tag addon">Add-on</span> มีค่าใช้จ่ายเพิ่ม <span class="tag opt">ไม่บังคับ</span> เปิดใช้แยกตามร้าน <span class="tag soon">เร็ว ๆ นี้</span> อยู่ระหว่างพัฒนา การควบคุม Android TV ต้องมี PC ที่ร้านซึ่งรัน NexbillAgent</div>
+  <p style="margin-top:16px">© NEXBILL · แคตตาล็อกฟีเจอร์ · dashboard.nexbill.id</p>
+</div></footer>
+</article>
+
+<!-- ============================================================ FILIPINO -->
+<article data-lang="fil" hidden>
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">NEXBILL · KATALOGO NG MGA FEATURE</div>
+    <h1>Lahat ng kailangan ng negosyong paupahan ng PlayStation, sa iisang app.</h1>
+    <p class="lead">Mula sa timer ng renta, online booking, kahera at F&amp;B, TV na kusang bumubukas, hanggang sa mga ulat pinansyal — walang notebook, walang manu-manong kuwenta, walang alalang may nawawalang pera.</p>
+    <div class="chips"><span class="chip">Gumagana sa phone, tablet at PC</span><span class="chip">Bantayan kahit saan</span><span class="chip">Maraming sangay</span><span class="chip">6 na wika</span><span class="chip">Awtomatikong accounting</span></div>
+    <a class="cta" href="https://dashboard.nexbill.id/daftar">Subukan nang Libre</a><a class="cta alt" href="#fil-mulai">Paano Magsimula</a>
+  </div>
+</header>
+<nav class="toolbar" aria-label="Nilalaman"><div class="wrap">
+  <a href="#fil-1">Renta</a><a href="#fil-2">Booking</a><a href="#fil-3">Kahera &amp; F&amp;B</a><a href="#fil-4">Auto TV</a><a href="#fil-5">Anti-Fraud</a><a href="#fil-6">Miyembro</a><a href="#fil-7">Chat &amp; WA</a><a href="#fil-8">PPOB</a><a href="#fil-9">Stock</a><a href="#fil-10">Accounting</a><a href="#fil-11">Gastos</a><a href="#fil-12">Maintenance</a><a href="#fil-13">Home Rental</a><a href="#fil-14">Marketplace</a><a href="#fil-15">Ulat &amp; AI</a><a href="#fil-16">Team &amp; Sangay</a><a href="#fil-17">Seguridad</a><a href="#fil-18">Suporta</a>
+</div></nav>
+<main>
+<section><div class="wrap">
+  <div class="kicker">Bagay para sa</div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="box"><h3>Maliit at home-based na PS rental</h3><p>Magsimula sa ilang unit. Maayos agad ang timer, kahera at arawang ulat kahit hindi bihasa sa computer.</p></div>
+    <div class="box"><h3>Gaming lounge at café</h3><p>PS rental, pagkain at inumin, online booking, miyembro at promo screen sa TV — lahat sa iisang bill.</p></div>
+    <div class="box"><h3>May-ari ng maraming sangay</h3><p>Bantayan ang benta, cash at performance ng kahera sa bawat sangay mula sa phone, real-time, nang hindi pumupunta sa outlet.</p></div>
+  </div>
+</div></section>
+
+<section id="fil-1"><div class="wrap">
+  <h2 class="sec"><span class="num">1</span>PS Rental at Billing</h2>
+  <p class="sec-lead">Kusang tumatakbo ang timer, ang sistema ang nagkukuwenta ng bill. Wala nang nakakalusot na oras o maling singil.</p>
+  <div class="feats">
+    <div class="feat"><b>Start, pause, resume, extend, stop</b><span>Kontrolin ang session ng bawat unit sa isang click — humihinto ang oras kapag naka-pause.</span></div>
+    <div class="feat"><b>Lipat-unit at palit-customer</b><span>Puwedeng lumipat ng TV/console ang customer sa gitna ng laro nang hindi nawawala ang nagamit na oras.</span></div>
+    <div class="feat"><b>Mga package ng oras</b><span>Gumawa ng preset na 1 oras, 3 oras, night package at iba pa — pipili na lang ang kahera.</span></div>
+    <div class="feat"><b>Accessory bawat session</b><span>Dagdag na controller at iba pa, per oras o isang bayad, puwedeng idagdag/tanggalin anumang oras.</span></div>
+    <div class="feat"><b>Flexible na setting ng presyo</b><span>Pag-round ng bill, service charge at buwis ayon sa patakaran ng outlet mo.</span></div>
+    <div class="feat"><b>Live Billing Board</b><span>Screen ng status ng lahat ng unit: bakante, ginagamit, natitirang oras — kita agad.</span></div>
+    <div class="feat"><b>Pamahalaan ang unit at console</b><span>Data ng bawat unit, uri ng TV at status ng serbisyo — hindi mauupahan ang unit na inaayos.</span></div>
+    <div class="feat"><b>Owner Dashboard</b><span>Buod ng benta at performance ng outlet ngayong araw, pagkabukas pa lang.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-2"><div class="wrap">
+  <h2 class="sec"><span class="num">2</span>Online Booking at Reserbasyon</h2>
+  <p class="sec-lead">Ang customer mismo ang nagbu-book sa phone, 24 oras. Hindi nagkakasalubong ang iskedyul.</p>
+  <div class="feats">
+    <div class="feat"><b>Sariling online booking page ng outlet</b><span>Nakikita ng customer ang bakanteng unit, pumipili ng oras at nagbu-book nang mag-isa.</span></div>
+    <div class="feat"><b>Deposito (paunang bayad)</b><span>Mababawasan ang nagbu-book pero hindi sumisipot.</span></div>
+    <div class="feat"><b>Anti-banggaan at pagitan ng booking</b><span>Tinatanggihan ng sistema ang nagsasapaw na iskedyul at naglalaan ng oras ng paglilinis sa pagitan ng session.</span></div>
+    <div class="feat"><b>Booking QR at pag-check ng code</b><span>Ipinapakita ng customer ang QR pagdating, naka-check-in agad sa loob ng ilang segundo.</span></div>
+    <div class="feat"><b>Kumpirmahin, i-reschedule, ilipat ang unit, kanselahin</b><span>Maayos na naitatala ang lahat ng pagbabago, kasama ang pag-mark at pag-unmark ng no-show.</span></div>
+    <div class="feat"><b>Kusang binibitawan kapag hindi dumating</b><span>Ang na-book pero bakanteng unit ay kusang ibinabalik sa listahan ng paupahan.</span></div>
+    <div class="feat"><b>Promo banner sa booking page</b><span>Ipakita ang promo at impormasyon ng outlet sa mga nagbu-book.</span></div>
+    <div class="feat"><b>Notipikasyon sa WhatsApp</b><span>Kusang ipinapadala sa customer ang kumpirmasyon at paalala ng booking.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-3"><div class="wrap">
+  <h2 class="sec"><span class="num">3</span>Kahera (POS), F&amp;B at Kusina</h2>
+  <p class="sec-lead">PS rental, pagkain at inumin sa iisang bill. Diretso sa screen ng kusina ang order.</p>
+  <div class="feats">
+    <div class="feat"><b>Kumpletong kahera</b><span>Gumawa ng order, bill at magbayad sa iba't ibang paraan — kasama ang partial/split na bayad.</span></div>
+    <div class="feat"><b>Cash, QR at digital na bayad</b><span>Mga opsyon ng bayad na nakasanayan na ng customer ngayon.</span></div>
+    <div class="feat"><b>Produkto at kategorya</b><span>Mag-import ng daan-daang produkto nang sabay mula sa Excel gamit ang nakahandang template.</span></div>
+    <div class="feat"><b>Mga recipe ng F&amp;B</b><span>Bawat menu na nabenta ay kusang nagbabawas ng stock ng sangkap nito.</span></div>
+    <div class="feat"><b>Voucher</b><span>Gumawa ng voucher code; sinusuri ng sistema kung valid ito kapag ginamit.</span></div>
+    <div class="feat"><b>Digital at naka-print na resibo</b><span>Ipadala ang resibo sa link, o i-print sa printer ng kahera (58 mm at iba pa).</span></div>
+    <div class="feat"><b>Kitchen Display</b><span>Pila ng order sa kusina na may status: pumasok, niluluto, handa — kasama ang pagkansela ng item.</span></div>
+    <div class="feat"><b>Kontroladong refund at void</b><span>Bawat order o item, may pag-apruba ng supervisor at kailangang may dahilan.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-4"><div class="wrap">
+  <h2 class="sec"><span class="num">4</span>Awtomatikong Kontrol ng TV at Device</h2>
+  <p class="sec-lead">Pagsimula ng session, kusang bubukas ang TV. Pagtapos, papatay ito o magpapakita ng promo ng outlet. Hindi na kailangang magpabalik-balik ang staff.</p>
+  <div class="feats">
+    <div class="feat"><b>Android TV / Google TV</b><span>Kusang bubuksan, papatayin at ililipat sa HDMI ng PlayStation sa pamamagitan ng NexbillAgent app sa PC ng kahera.</span></div>
+    <div class="feat"><b>Smart plug</b><span>Tuya / Smart Life, Sonoff eWeLink, Tasmota at HTTP device — para sa hindi-Android na TV o console.</span></div>
+    <div class="feat"><b>TV Screensaver (promo screen)</b><span>Kapag bakante ang unit, ipinapakita ng TV ang pangalan ng outlet, presyo, booking QR, orasan at status ng unit.</span></div>
+    <div class="feat"><b>Awtomatiko ayon sa session</b><span>Tapos ang session → screensaver; simula ng session → diretso sa PlayStation. Masusubok mula sa dashboard.</span></div>
+    <div class="feat"><b>PIN at night mode</b><span>I-lock ang screen gamit ang PIN, at padilimin ang display sa gabi.</span></div>
+    <div class="feat"><b>Ligtas na auto-update</b><span>Nag-a-update ang NexbillAgent sa labas ng oras ng operasyon at bumabalik sa lumang bersyon kapag pumalya.</span></div>
+    <div class="feat"><b>Pagbabantay ng device</b><span>Nakikita sa dashboard kung konektado o hindi ang bawat device.</span></div>
+    <div class="feat"><b>Kumpletong gabay sa 6 na wika</b><span>Hakbang-hakbang na setup ng PC at TV, at 28 karaniwang problema kasama ang solusyon.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-5"><div class="wrap">
+  <h2 class="sec"><span class="num">5</span>Shift, Cash at Anti-Fraud</h2>
+  <p class="sec-lead">Alam mo nang eksakto kung magkano dapat ang pera sa drawer — at kung sino ang may pananagutan.</p>
+  <div class="feats">
+    <div class="feat"><b>Pagbukas at pagsara ng shift ng kahera</b><span>Binibilang ng bawat kahera ang sarili niyang pera; kita agad ang diperensya.</span></div>
+    <div class="feat"><b>Awtomatikong pag-detect ng anomalya</b><span>Minamarkahan ang shift na may kahina-hinalang pattern at kailangang suriin ng May-ari/Manager.</span></div>
+    <div class="feat"><b>Pag-detect ng dobleng transaksyon</b><span>Minamarkahan ang transaksyong naitala nang dalawang beses bago ito maging problema.</span></div>
+    <div class="feat"><b>Maraming antas ng pag-apruba</b><span>Kailangan ng pag-apruba ng supervisor ang void, refund at paglilipat ng cash.</span></div>
+    <div class="feat"><b>Cash handover at cash transfer</b><span>Itala ang pag-abot ng pera sa may-ari/bangko at paggalaw ng pera sa pagitan ng account.</span></div>
+    <div class="feat"><b>Ulat ng shift</b><span>I-export ang buod ng bawat shift para sa archive o pagsusuri.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-6"><div class="wrap">
+  <h2 class="sec"><span class="num">6</span>Customer, Miyembro at Promo</h2>
+  <p class="sec-lead">Pabalikin nang pabalikin ang mga customer.</p>
+  <div class="feats">
+    <div class="feat"><b>Data at kasaysayan ng customer</b><span>Sino ang madalas pumunta, magkano ang ginagastos, kailan huling naglaro.</span></div>
+    <div class="feat"><b>Mga antas ng membership</b><span>Silver, Gold at iba pa — kumpleto sa benepisyo at bisa.</span></div>
+    <div class="feat"><b>Magbenta ng membership</b><span>Bumibili ang customer ng membership sa kahera, cash o QR.</span></div>
+    <div class="feat"><b>Puntos at gantimpala</b><span>Nag-iipon ng puntos ang customer at ipinapalit sa gantimpala mula sa katalogo mo.</span></div>
+    <div class="feat"><b>Promo at bundle</b><span>Promo sa matumal na oras, tipid na package at espesyal na diskwento.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-7"><div class="wrap">
+  <h2 class="sec"><span class="num">7</span>Customer Chat, WhatsApp at Instagram</h2>
+  <p class="sec-lead">Sagutin ang tanong ng customer mula sa iisang lugar — kahit abala ka.</p>
+  <div class="feats">
+    <div class="feat"><b>Pinag-isang inbox</b><span>Mensahe ng customer sa iisang inbox, sinasagot ng team mo.</span></div>
+    <div class="feat"><b>AI auto-reply <span class="tag addon">Add-on</span></b><span>Sinasagot ng AI ang karaniwang tanong; puwedeng i-on/off bawat usapan.</span></div>
+    <div class="feat"><b>Instagram DM</b><span>Pumapasok ang mensahe sa Instagram sa parehong inbox.</span></div>
+    <div class="feat"><b>Awtomatikong WhatsApp</b><span>Kusang ipinapadala ang notipikasyon ng booking, paalala at kumpirmasyon.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-8"><div class="wrap">
+  <h2 class="sec"><span class="num">8</span>PPOB — Dagdag na Kita <span class="tag opt">Opsyonal</span></h2>
+  <p class="sec-lead">Magbenta ng digital na produkto (bills payment at load) sa parehong kahera, walang hiwalay na app.</p>
+  <div class="feats">
+    <div class="feat"><b>Mga transaksyong PPOB</b><span>Itala, tapusin at kanselahin ang transaksyon ng digital na produkto.</span></div>
+    <div class="feat"><b>Itakda ang presyo at tubo</b><span>Ikaw ang magtatakda ng markup bawat produkto.</span></div>
+    <div class="feat"><b>Deposit balance</b><span>Pamahalaan ang channel ng balanse para sa transaksyong PPOB.</span></div>
+    <div class="feat"><b>Ulat ng PPOB</b><span>Buod ng benta at tubo ng PPOB.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-9"><div class="wrap">
+  <h2 class="sec"><span class="num">9</span>Stock at Pagbili</h2>
+  <p class="sec-lead">Hindi biglang nauubos ang stock, at eksakto ang kuwenta ng puhunan.</p>
+  <div class="feats">
+    <div class="feat"><b>Stock sa maraming bodega</b><span>Paghiwalayin ang stock sa bodega at display/kusina.</span></div>
+    <div class="feat"><b>Babala sa mababang stock</b><span>Malalaman bago maubos ang paninda.</span></div>
+    <div class="feat"><b>Stock opname</b><span>Bilangin ang aktuwal na stock; diretsong naitatala sa accounting ang diperensya.</span></div>
+    <div class="feat"><b>Supplier at Purchase Order</b><span>Gumawa ng PO (puwedeng kusang mapunan mula sa mababang stock), saka tanggapin ang paninda.</span></div>
+    <div class="feat"><b>Invoice at return ng binili</b><span>Itala ang utang sa supplier, bayad at pagbabalik ng paninda.</span></div>
+    <div class="feat"><b>Eksaktong cost of goods sold</b><span>Kusang kinukuwenta mula sa mga binili mo.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-10"><div class="wrap">
+  <h2 class="sec"><span class="num">10</span>Awtomatikong Accounting at Ulat Pinansyal</h2>
+  <p class="sec-lead">Bawat transaksyon ay diretsong naitatala sa accounting. Laging handa ang ulat pinansyal — walang hiwalay na accounting software.</p>
+  <div class="feats">
+    <div class="feat"><b>Kita at Lugi</b><span>Tubo o lugi ngayong buwan, masisilip hanggang sa bawat account.</span></div>
+    <div class="feat"><b>Balance Sheet at Cash Flow</b><span>Posisyon ng asset, utang, puhunan at daloy ng perang pumapasok at lumalabas.</span></div>
+    <div class="feat"><b>Receivable at Payable</b><span>Sino ang hindi pa nagbabayad, at anong bill ang kailangan mong bayaran.</span></div>
+    <div class="feat"><b>Handang chart of accounts</b><span>Inihanda para sa negosyong paupahan; puwedeng i-customize.</span></div>
+    <div class="feat"><b>Journal at pag-lock ng panahon</b><span>Iwasto ang journal, at i-lock ang mga saradong buwan para hindi mabago.</span></div>
+    <div class="feat"><b>Opening balance at import ng lumang data</b><span>Ilipat ang data mula sa dating accounting gamit ang template.</span></div>
+    <div class="feat"><b>Reconciliation</b><span>Itugma ang talaan ng sistema sa cash at bangko.</span></div>
+    <div class="feat"><b>I-export ang ulat</b><span>I-download ang ulat para sa accountant, bangko o buwis.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-11"><div class="wrap">
+  <h2 class="sec"><span class="num">11</span>Gastos, Iba pang Kita at Asset</h2>
+  <p class="sec-lead">Bawat perang lumalabas ay naitatala na may patunay at pag-apruba.</p>
+  <div class="feats">
+    <div class="feat"><b>Gastos na may pag-apruba</b><span>Kusang naaaprubahan ang mababa sa limitasyon; ang lampas ay naghihintay sa May-ari.</span></div>
+    <div class="feat"><b>Mabilis na Cash Out</b><span>Itala ang maliliit na gastos (parking, tubig) sa 3 field lang.</span></div>
+    <div class="feat"><b>Patunay at utang</b><span>Mag-attach ng litrato ng resibo; itala ang hindi pa bayad bilang utang.</span></div>
+    <div class="feat"><b>Awtomatikong paulit-ulit na gastos</b><span>Kuryente, internet, upa, sahod — may draft bawat panahon.</span></div>
+    <div class="feat"><b>Cost center</b><span>Paghiwalayin ang gastos ayon sa bahagi: renta, F&amp;B, kusina, admin.</span></div>
+    <div class="feat"><b>Iba pang kita</b><span>Itala ang kita sa labas ng renta at kahera, kasama ang bawas na QR fee.</span></div>
+    <div class="feat"><b>Fixed assets</b><span>Console, TV at kagamitan — may awtomatikong depreciation at kasaysayan ng maintenance.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-12"><div class="wrap">
+  <h2 class="sec"><span class="num">12</span>Maintenance at Doktor ng Controller</h2>
+  <p class="sec-lead">Alamin kung aling controller ang may problema bago pa magreklamo ang customer.</p>
+  <div class="feats">
+    <div class="feat"><b>Ticket ng pag-aayos</b><span>Itala ang sira, status ng pag-aayos at piyesang ginamit.</span></div>
+    <div class="feat"><b>Gamepad Tester</b><span>Subukan ang controller ng PS3, PS4 at PS5 direkta mula sa browser.</span></div>
+    <div class="feat"><b>Doktor ng Controller</b><span>Sukatin ang analog drift, balanse, diin ng button at trigger — may health score, pagsusuri ng sira at rekomendasyon sa serbisyo.</span></div>
+    <div class="feat"><b>Driver ng PS3 controller</b><span>I-download ang driver at gabay sa pag-install direkta mula sa app.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-13"><div class="wrap">
+  <h2 class="sec"><span class="num">13</span>Home Rental — Paupahang Iuuwi <span class="tag opt">Opsyonal</span></h2>
+  <p class="sec-lead">Paupahan ang PS at TV na iuuwi ng customer, nang kontrolado ang panganib.</p>
+  <div class="feats">
+    <div class="feat"><b>Produkto at package ng renta</b><span>PS3, PS4, PS5, Playbox at TV ng iba't ibang laki — nasusubaybayan bawat unit.</span></div>
+    <div class="feat"><b>Beripikasyon ng pagkakakilanlan</b><span>Mag-upload ng ID bago mailabas ang gamit.</span></div>
+    <div class="feat"><b>Risk score at blacklist</b><span>Minamarkahan ang customer na nahuli o nakasira dati; kailangan ng pag-apruba ang mapanganib na order.</span></div>
+    <div class="feat"><b>Security deposit</b><span>Hiwalay na naitatala sa kita hanggang maibalik ang gamit.</span></div>
+    <div class="feat"><b>Hatid-sundo at bayad sa delivery</b><span>Kusang kinukuwenta ang bayad sa delivery ayon sa lugar.</span></div>
+    <div class="feat"><b>Awtomatikong paalala</b><span>Iskedyul ng pickup, deadline at pagkaantala — sa WhatsApp.</span></div>
+    <div class="feat"><b>Digital na kontrata at inspeksyon gamit ang litrato <span class="tag soon">Malapit na</span></b><span>Digital na pirma at litrato ng kondisyon bago/pagkatapos ng renta.</span></div>
+    <div class="feat"><b>Claim sa sira at pagkawala <span class="tag soon">Malapit na</span></b><span>Itala ang sira at bawas sa deposito.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-14"><div class="wrap">
+  <h2 class="sec"><span class="num">14</span>Marketplace ng Outlet-sa-Outlet <span class="tag free">Libre</span></h2>
+  <p class="sec-lead">Ibenta sa ibang outlet ang hindi nagagamit na controller, console, TV o upuan — o bumili ng second-hand sa magandang presyo.</p>
+  <div class="feats">
+    <div class="feat"><b>Display na may litrato</b><span>Mag-post ng gamit na may hanggang 5 litrato; tingnan ang mga gamit ng ibang outlet.</span></div>
+    <div class="feat"><b>Tawaran at kasunduan sa app</b><span>Mag-alok, tanggapin ang alok, saka markahang tapos.</span></div>
+    <div class="feat"><b>Trust profile at rating</b><span>Tingnan ang edad ng account, natapos na transaksyon, rating at rekord ng reklamo ng kausap.</span></div>
+    <div class="feat"><b>Naka-lock na bank account at patunay</b><span>Sa nakarehistrong account lang ng nagbebenta itinuturo ang mamimili; naitatabi ang patunay ng bayad at abot.</span></div>
+    <div class="feat"><b>Daluyan ng reklamo</b><span>Mag-ulat ng problema; susuriin ng team ng NEXBILL ang patunay ng dalawang panig.</span></div>
+    <div class="feat"><b>Naitatala sa accounting</b><span>Kusang naitatala ang benta bilang kita ng nagbebenta.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-15"><div class="wrap">
+  <h2 class="sec"><span class="num">15</span>Ulat at AI</h2>
+  <p class="sec-lead">Mga desisyong batay sa data, hindi hula.</p>
+  <div class="feats">
+    <div class="feat"><b>Ulat ng benta at renta</b><span>Pinakamataong oras, pinakamabentang unit, arawang/buwanang benta.</span></div>
+    <div class="feat"><b>Ulat ng stock, gastos at customer</b><span>Lahat ng anggulo ng negosyo sa iisang menu.</span></div>
+    <div class="feat"><b>Performance ng kahera</b><span>Ikumpara ang performance ng bawat kahera.</span></div>
+    <div class="feat"><b>Kalusugang pinansyal</b><span>Simpleng indikasyon: malusog ba ang negosyo mo ngayong buwan?</span></div>
+    <div class="feat"><b>AI Business Intelligence <span class="tag addon">Add-on</span></b><span>Mga insight, rekomendasyon at AI assistant na sumasagot sa tanong tungkol sa negosyo mo.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-16"><div class="wrap">
+  <h2 class="sec"><span class="num">16</span>Team, Sangay at Setting</h2>
+  <p class="sec-lead">Isang account para sa lahat ng sangay, na may tamang access para sa bawat tao.</p>
+  <div class="feats">
+    <div class="feat"><b>Mga role at access</b><span>May-ari, Manager, Kahera at iba pa — itakda kung sino ang puwedeng gumawa ng ano.</span></div>
+    <div class="feat"><b>Maraming sangay</b><span>Lumipat ng sangay sa isang click, o tingnan ang lahat ng sangay nang sabay.</span></div>
+    <div class="feat"><b>Setting ng outlet</b><span>Profile, logo, detalye ng buwis, printer, notipikasyon at patakaran ng booking.</span></div>
+    <div class="feat"><b>I-on ang feature ayon sa kailangan</b><span>Ang dagdag na feature (Home Rental, PPOB, TV Screensaver) ay ina-activate bawat outlet.</span></div>
+    <div class="feat"><b>6 na wika</b><span>Indonesian, English, Malay, Thai, Filipino at Vietnamese.</span></div>
+    <div class="feat"><b>Madaling pag-login</b><span>Email o Google account, may beripikasyon ng email at pag-reset ng password.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-17"><div class="wrap">
+  <h2 class="sec"><span class="num">17</span>Seguridad at Pagiging Maaasahan</h2>
+  <p class="sec-lead">Ligtas ang data ng negosyo mo, at nasusubaybayan ang bawat pagbabago.</p>
+  <div class="feats">
+    <div class="feat"><b>Bakas ng aktibidad (audit log)</b><span>Sino ang nagbago ng ano, at kailan.</span></div>
+    <div class="feat"><b>Kailangang may dahilan ang pagkansela</b><span>Hindi puwede ang void, refund at pagkansela nang walang nakasulat na dahilan.</span></div>
+    <div class="feat"><b>Anti-dobleng input</b><span>Naka-lock ang save button habang nagpo-proseso; tinatanggihan ang dobleng transaksyon.</span></div>
+    <div class="feat"><b>Hiwalay na data bawat outlet</b><span>Hindi makikita ng ibang outlet ang data mo.</span></div>
+    <div class="feat"><b>Sunud-sunod na numero ng dokumento</b><span>Bawat gastos, booking at transaksyon ay may maayos at natatanging numero.</span></div>
+    <div class="feat"><b>Cloud-based</b><span>Hindi kailangan ng sariling server; online ang data at maaabot kahit saan.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-18"><div class="wrap">
+  <h2 class="sec"><span class="num">18</span>Suporta at mga Programa</h2>
+  <p class="sec-lead">Hindi ka nag-iisa sa pagpapatakbo ng negosyo.</p>
+  <div class="feats">
+    <div class="feat"><b>Help Center</b><span>Arawang SOP, checklist sa pag-setup ng bagong outlet at gabay sa bawat menu.</span></div>
+    <div class="feat"><b>Customer Service Chat</b><span>Kontakin ang team ng NEXBILL direkta mula sa app, puwedeng magpadala ng litrato at video.</span></div>
+    <div class="feat"><b>May gabay na onboarding</b><span>Hakbang-hakbang na plano ng setup para sa bagong outlet.</span></div>
+    <div class="feat"><b>Referral Program</b><span>Imbitahan ang ibang outlet na gumamit ng NEXBILL at kumita ng komisyon.</span></div>
+    <div class="feat"><b>Rekomendasyon ng Produkto</b><span>Piniling kagamitan para sa paupahan (controller, accessory, device) ng team ng NEXBILL.</span></div>
+    <div class="feat"><b>Handang hardware</b><span>Mabibili ang smart plug at control device kasabay ng subscription.</span></div>
+  </div>
+</div></section>
+
+<section id="fil-mulai"><div class="wrap">
+  <div class="kicker">Magsimula sa 3 hakbang</div>
+  <div class="steps" style="margin-top:12px">
+    <div class="step"><h3>Mag-sign up at subukan nang libre</h3><p>Gumawa ng account sa dashboard.nexbill.id — walang install, diretso sa browser.</p></div>
+    <div class="step"><h3>Ilagay ang unit at presyo</h3><p>Sundan ang setup checklist: magdagdag ng PS unit, package ng oras at produkto ng kahera.</p></div>
+    <div class="step"><h3>Simulan ang unang renta</h3><p>Pindutin ang Start sa unit — tatakbo ang timer, at kusang mapupunan ang ulat mula sa unang araw.</p></div>
+  </div>
+  <a class="cta solid" href="https://dashboard.nexbill.id/daftar">Subukan ang NEXBILL nang Libre</a>
+</div></section>
+</main>
+<footer><div class="wrap">
+  <div class="note">Maaaring mag-iba ang availability ng feature ayon sa subscription package. May dagdag na bayad ang <span class="tag addon">Add-on</span>; ina-activate bawat outlet ang <span class="tag opt">Opsyonal</span>; ginagawa pa ang <span class="tag soon">Malapit na</span>. Kailangan ng PC sa outlet na nagpapatakbo ng NexbillAgent para sa kontrol ng Android TV.</div>
+  <p style="margin-top:16px">© NEXBILL · Katalogo ng mga Feature · dashboard.nexbill.id</p>
+</div></footer>
+</article>
+
+<!-- ============================================================ TIẾNG VIỆT -->
+<article data-lang="vi" hidden>
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">NEXBILL · DANH MỤC TÍNH NĂNG</div>
+    <h1>Mọi thứ một tiệm cho thuê PlayStation cần, trong một ứng dụng.</h1>
+    <p class="lead">Từ đồng hồ tính giờ thuê, đặt chỗ trực tuyến, thu ngân &amp; đồ ăn uống, TV tự bật, cho đến báo cáo tài chính — không cần sổ ghi chép, không tính tay, không lo thất thoát tiền.</p>
+    <div class="chips"><span class="chip">Dùng trên điện thoại, máy tính bảng &amp; PC</span><span class="chip">Theo dõi từ mọi nơi</span><span class="chip">Nhiều chi nhánh</span><span class="chip">6 ngôn ngữ</span><span class="chip">Kế toán tự động</span></div>
+    <a class="cta" href="https://dashboard.nexbill.id/daftar">Dùng thử miễn phí</a><a class="cta alt" href="#vi-mulai">Cách bắt đầu</a>
+  </div>
+</header>
+<nav class="toolbar" aria-label="Mục lục"><div class="wrap">
+  <a href="#vi-1">Cho thuê</a><a href="#vi-2">Đặt chỗ</a><a href="#vi-3">Thu ngân &amp; F&amp;B</a><a href="#vi-4">TV tự động</a><a href="#vi-5">Chống gian lận</a><a href="#vi-6">Thành viên</a><a href="#vi-7">Chat &amp; WA</a><a href="#vi-8">PPOB</a><a href="#vi-9">Kho</a><a href="#vi-10">Kế toán</a><a href="#vi-11">Chi phí</a><a href="#vi-12">Bảo trì</a><a href="#vi-13">Home Rental</a><a href="#vi-14">Marketplace</a><a href="#vi-15">Báo cáo &amp; AI</a><a href="#vi-16">Nhân sự &amp; Chi nhánh</a><a href="#vi-17">Bảo mật</a><a href="#vi-18">Hỗ trợ</a>
+</div></nav>
+<main>
+<section><div class="wrap">
+  <div class="kicker">Phù hợp cho</div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="box"><h3>Tiệm PS nhỏ &amp; tại nhà</h3><p>Bắt đầu với vài máy. Đồng hồ tính giờ, thu ngân và báo cáo ngày gọn gàng ngay, không cần giỏi máy tính.</p></div>
+    <div class="box"><h3>Gaming lounge &amp; quán cà phê</h3><p>Thuê PS, đồ ăn &amp; thức uống, đặt chỗ trực tuyến, thành viên và màn hình khuyến mãi trên TV — tất cả trong một hóa đơn.</p></div>
+    <div class="box"><h3>Chủ nhiều chi nhánh</h3><p>Theo dõi doanh thu, tiền mặt và hiệu suất thu ngân từng chi nhánh trên điện thoại, theo thời gian thực, không cần đến tiệm.</p></div>
+  </div>
+</div></section>
+
+<section id="vi-1"><div class="wrap">
+  <h2 class="sec"><span class="num">1</span>Cho thuê &amp; Tính tiền PS</h2>
+  <p class="sec-lead">Đồng hồ tự chạy, hệ thống tự tính hóa đơn. Không còn sót giờ chơi hay tính sai tiền.</p>
+  <div class="feats">
+    <div class="feat"><b>Bắt đầu, tạm dừng, tiếp tục, gia hạn, kết thúc</b><span>Điều khiển phiên của từng máy chỉ với một cú nhấp — thời gian dừng khi tạm dừng.</span></div>
+    <div class="feat"><b>Chuyển máy &amp; đổi khách</b><span>Khách chuyển TV/máy chơi game giữa chừng mà không mất thời gian đã chơi.</span></div>
+    <div class="feat"><b>Gói thời gian</b><span>Tạo sẵn gói 1 giờ, 3 giờ, gói đêm… — thu ngân chỉ cần chọn.</span></div>
+    <div class="feat"><b>Phụ kiện theo phiên</b><span>Tay cầm thêm và phụ kiện khác, tính theo giờ hoặc một lần, thêm/bớt bất cứ lúc nào.</span></div>
+    <div class="feat"><b>Thiết lập giá linh hoạt</b><span>Làm tròn hóa đơn, phí dịch vụ và thuế theo chính sách tiệm của bạn.</span></div>
+    <div class="feat"><b>Live Billing Board</b><span>Màn hình trạng thái mọi máy: trống, đang chơi, thời gian còn lại — nhìn là biết.</span></div>
+    <div class="feat"><b>Quản lý máy &amp; console</b><span>Dữ liệu từng máy, loại TV và trạng thái sửa chữa — máy đang sửa không thể cho thuê.</span></div>
+    <div class="feat"><b>Bảng điều khiển chủ tiệm</b><span>Tóm tắt doanh thu và hiệu suất tiệm hôm nay ngay khi mở.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-2"><div class="wrap">
+  <h2 class="sec"><span class="num">2</span>Đặt chỗ &amp; Giữ chỗ trực tuyến</h2>
+  <p class="sec-lead">Khách tự đặt qua điện thoại 24 giờ. Lịch không bao giờ trùng.</p>
+  <div class="feats">
+    <div class="feat"><b>Trang đặt chỗ trực tuyến của tiệm</b><span>Khách xem máy trống, chọn giờ và tự đặt.</span></div>
+    <div class="feat"><b>Đặt cọc</b><span>Giảm tình trạng khách đặt rồi không đến.</span></div>
+    <div class="feat"><b>Chống trùng lịch &amp; khoảng nghỉ giữa các lượt</b><span>Hệ thống từ chối lịch chồng chéo và chừa thời gian dọn dẹp giữa các phiên.</span></div>
+    <div class="feat"><b>QR đặt chỗ &amp; kiểm tra mã</b><span>Khách đưa QR khi đến, thu ngân check-in trong vài giây.</span></div>
+    <div class="feat"><b>Xác nhận, đổi lịch, chuyển máy, hủy</b><span>Mọi thay đổi được ghi lại gọn gàng, kể cả đánh dấu và bỏ đánh dấu không đến.</span></div>
+    <div class="feat"><b>Tự giải phóng khi khách không đến</b><span>Máy đã đặt nhưng bỏ trống sẽ tự quay lại danh sách cho thuê.</span></div>
+    <div class="feat"><b>Banner khuyến mãi trên trang đặt chỗ</b><span>Hiển thị khuyến mãi và thông tin tiệm cho khách đang đặt.</span></div>
+    <div class="feat"><b>Thông báo WhatsApp</b><span>Tự động gửi xác nhận và nhắc lịch đặt chỗ cho khách.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-3"><div class="wrap">
+  <h2 class="sec"><span class="num">3</span>Thu ngân (POS), F&amp;B &amp; Bếp</h2>
+  <p class="sec-lead">Thuê PS, đồ ăn và thức uống trong một hóa đơn. Đơn hàng chuyển thẳng tới màn hình bếp.</p>
+  <div class="feats">
+    <div class="feat"><b>Thu ngân đầy đủ</b><span>Tạo đơn, hóa đơn và thanh toán nhiều cách — kể cả trả một phần/kết hợp.</span></div>
+    <div class="feat"><b>Tiền mặt, QR &amp; thanh toán số</b><span>Các lựa chọn thanh toán theo thói quen của khách hiện nay.</span></div>
+    <div class="feat"><b>Sản phẩm &amp; danh mục</b><span>Nhập hàng trăm sản phẩm cùng lúc từ Excel bằng mẫu có sẵn.</span></div>
+    <div class="feat"><b>Công thức F&amp;B</b><span>Mỗi món bán ra tự trừ tồn kho nguyên liệu.</span></div>
+    <div class="feat"><b>Voucher</b><span>Tạo mã voucher; hệ thống kiểm tra tính hợp lệ khi sử dụng.</span></div>
+    <div class="feat"><b>Hóa đơn điện tử &amp; in</b><span>Gửi hóa đơn qua đường link, hoặc in bằng máy in thu ngân (58 mm…).</span></div>
+    <div class="feat"><b>Kitchen Display</b><span>Hàng đợi đơn bếp theo trạng thái: mới, đang nấu, xong — kèm hủy món.</span></div>
+    <div class="feat"><b>Hoàn tiền &amp; hủy có kiểm soát</b><span>Theo đơn hoặc theo món, cần quản lý duyệt và bắt buộc ghi lý do.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-4"><div class="wrap">
+  <h2 class="sec"><span class="num">4</span>Điều khiển TV &amp; Thiết bị tự động</h2>
+  <p class="sec-lead">Phiên bắt đầu, TV tự bật. Phiên kết thúc, TV tắt hoặc chiếu khuyến mãi của tiệm. Nhân viên không phải đi tới đi lui.</p>
+  <div class="feats">
+    <div class="feat"><b>Android TV / Google TV</b><span>Tự bật, tắt và chuyển sang cổng HDMI của PlayStation qua ứng dụng NexbillAgent trên PC thu ngân.</span></div>
+    <div class="feat"><b>Ổ cắm thông minh</b><span>Tuya / Smart Life, Sonoff eWeLink, Tasmota và thiết bị HTTP — cho TV không phải Android hoặc máy chơi game.</span></div>
+    <div class="feat"><b>TV Screensaver (màn hình khuyến mãi)</b><span>Khi máy trống, TV hiển thị tên tiệm, giá, QR đặt chỗ, đồng hồ và trạng thái máy.</span></div>
+    <div class="feat"><b>Tự động theo phiên</b><span>Hết phiên → screensaver; bắt đầu phiên → vào thẳng PlayStation. Có thể thử từ bảng điều khiển.</span></div>
+    <div class="feat"><b>PIN &amp; chế độ ban đêm</b><span>Khóa màn hình bằng PIN, và giảm độ sáng vào ban đêm.</span></div>
+    <div class="feat"><b>Tự cập nhật an toàn</b><span>NexbillAgent tự cập nhật ngoài giờ hoạt động và quay lại phiên bản cũ nếu lỗi.</span></div>
+    <div class="feat"><b>Giám sát thiết bị</b><span>Trạng thái kết nối/mất kết nối của từng thiết bị hiển thị trên bảng điều khiển.</span></div>
+    <div class="feat"><b>Hướng dẫn đầy đủ 6 ngôn ngữ</b><span>Cài đặt PC &amp; TV từng bước, cùng 28 sự cố thường gặp và cách khắc phục.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-5"><div class="wrap">
+  <h2 class="sec"><span class="num">5</span>Ca làm, Tiền mặt &amp; Chống gian lận</h2>
+  <p class="sec-lead">Biết chính xác trong ngăn kéo phải có bao nhiêu tiền — và ai chịu trách nhiệm.</p>
+  <div class="feats">
+    <div class="feat"><b>Mở &amp; đóng ca thu ngân</b><span>Mỗi thu ngân tự đếm tiền của mình; chênh lệch hiện ra ngay.</span></div>
+    <div class="feat"><b>Tự phát hiện bất thường</b><span>Ca có dấu hiệu đáng ngờ được đánh dấu và bắt buộc Chủ/Quản lý xem xét.</span></div>
+    <div class="feat"><b>Phát hiện giao dịch trùng</b><span>Giao dịch ghi hai lần được đánh dấu trước khi thành vấn đề.</span></div>
+    <div class="feat"><b>Duyệt nhiều cấp</b><span>Hủy, hoàn tiền và chuyển tiền mặt cần quản lý phê duyệt.</span></div>
+    <div class="feat"><b>Bàn giao &amp; chuyển tiền mặt</b><span>Ghi nhận việc nộp tiền cho chủ/ngân hàng và luân chuyển tiền giữa các tài khoản.</span></div>
+    <div class="feat"><b>Báo cáo ca</b><span>Xuất tóm tắt từng ca để lưu trữ hoặc kiểm tra.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-6"><div class="wrap">
+  <h2 class="sec"><span class="num">6</span>Khách hàng, Thành viên &amp; Khuyến mãi</h2>
+  <p class="sec-lead">Khiến khách quay lại hết lần này đến lần khác.</p>
+  <div class="feats">
+    <div class="feat"><b>Dữ liệu &amp; lịch sử khách hàng</b><span>Ai hay đến, chi bao nhiêu, lần cuối chơi khi nào.</span></div>
+    <div class="feat"><b>Hạng thành viên</b><span>Silver, Gold… — kèm quyền lợi và thời hạn.</span></div>
+    <div class="feat"><b>Bán thẻ thành viên</b><span>Khách mua thẻ thành viên tại quầy, tiền mặt hoặc QR.</span></div>
+    <div class="feat"><b>Điểm &amp; quà tặng</b><span>Khách tích điểm và đổi quà từ danh mục của bạn.</span></div>
+    <div class="feat"><b>Khuyến mãi &amp; combo</b><span>Khuyến mãi giờ thấp điểm, gói tiết kiệm và giảm giá đặc biệt.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-7"><div class="wrap">
+  <h2 class="sec"><span class="num">7</span>Chat khách hàng, WhatsApp &amp; Instagram</h2>
+  <p class="sec-lead">Trả lời khách từ một nơi — kể cả khi bạn đang bận.</p>
+  <div class="feats">
+    <div class="feat"><b>Hộp thư hợp nhất</b><span>Tin nhắn khách trong một hộp thư, đội của bạn cùng trả lời.</span></div>
+    <div class="feat"><b>AI tự trả lời <span class="tag addon">Add-on</span></b><span>AI trả lời câu hỏi thường gặp; bật/tắt được cho từng cuộc trò chuyện.</span></div>
+    <div class="feat"><b>Instagram DM</b><span>Tin nhắn Instagram vào cùng hộp thư.</span></div>
+    <div class="feat"><b>WhatsApp tự động</b><span>Thông báo đặt chỗ, nhắc nhở và xác nhận tự gửi.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-8"><div class="wrap">
+  <h2 class="sec"><span class="num">8</span>PPOB — Thu nhập thêm <span class="tag opt">Tùy chọn</span></h2>
+  <p class="sec-lead">Bán sản phẩm số (thanh toán hóa đơn &amp; nạp tiền) ngay tại quầy, không cần ứng dụng riêng.</p>
+  <div class="feats">
+    <div class="feat"><b>Giao dịch PPOB</b><span>Ghi nhận, hoàn tất và hủy giao dịch sản phẩm số.</span></div>
+    <div class="feat"><b>Đặt giá bán &amp; lợi nhuận</b><span>Tự quyết định mức lời cho từng sản phẩm.</span></div>
+    <div class="feat"><b>Số dư ký quỹ</b><span>Quản lý kênh số dư cho giao dịch PPOB.</span></div>
+    <div class="feat"><b>Báo cáo PPOB</b><span>Tóm tắt doanh thu và lợi nhuận PPOB.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-9"><div class="wrap">
+  <h2 class="sec"><span class="num">9</span>Kho &amp; Mua hàng</h2>
+  <p class="sec-lead">Không hết hàng đột ngột, giá vốn được tính chính xác.</p>
+  <div class="feats">
+    <div class="feat"><b>Kho nhiều nơi</b><span>Tách tồn kho trong kho và quầy/bếp.</span></div>
+    <div class="feat"><b>Cảnh báo tồn kho thấp</b><span>Được báo trước khi hàng hết.</span></div>
+    <div class="feat"><b>Kiểm kê</b><span>Đếm tồn kho thực tế; chênh lệch được ghi thẳng vào sổ sách.</span></div>
+    <div class="feat"><b>Nhà cung cấp &amp; Đơn mua hàng</b><span>Tạo PO (có thể tự điền từ hàng sắp hết), rồi nhận hàng.</span></div>
+    <div class="feat"><b>Hóa đơn &amp; trả hàng mua</b><span>Ghi nhận công nợ nhà cung cấp, thanh toán và trả hàng.</span></div>
+    <div class="feat"><b>Giá vốn hàng bán chính xác</b><span>Tự tính từ các lần mua hàng của bạn.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-10"><div class="wrap">
+  <h2 class="sec"><span class="num">10</span>Kế toán &amp; Báo cáo tài chính tự động</h2>
+  <p class="sec-lead">Mọi giao dịch được ghi sổ ngay. Báo cáo tài chính luôn sẵn sàng — không cần phần mềm kế toán riêng.</p>
+  <div class="feats">
+    <div class="feat"><b>Lãi lỗ</b><span>Tháng này lãi hay lỗ, xem chi tiết đến từng tài khoản.</span></div>
+    <div class="feat"><b>Bảng cân đối &amp; Lưu chuyển tiền</b><span>Tình hình tài sản, nợ, vốn và dòng tiền vào-ra.</span></div>
+    <div class="feat"><b>Phải thu &amp; Phải trả</b><span>Ai chưa trả tiền, và hóa đơn nào bạn cần thanh toán.</span></div>
+    <div class="feat"><b>Hệ thống tài khoản dùng ngay</b><span>Thiết kế cho mô hình cho thuê; có thể tùy chỉnh.</span></div>
+    <div class="feat"><b>Bút toán &amp; khóa kỳ</b><span>Điều chỉnh bút toán, và khóa các tháng đã chốt để không bị sửa.</span></div>
+    <div class="feat"><b>Số dư đầu kỳ &amp; nhập dữ liệu cũ</b><span>Chuyển dữ liệu từ hệ thống kế toán trước bằng mẫu có sẵn.</span></div>
+    <div class="feat"><b>Đối chiếu</b><span>Khớp sổ sách hệ thống với tiền mặt và ngân hàng.</span></div>
+    <div class="feat"><b>Xuất báo cáo</b><span>Tải báo cáo cho kế toán, ngân hàng hoặc thuế.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-11"><div class="wrap">
+  <h2 class="sec"><span class="num">11</span>Chi phí, Thu nhập khác &amp; Tài sản</h2>
+  <p class="sec-lead">Mọi khoản chi đều được ghi nhận kèm chứng từ và phê duyệt.</p>
+  <div class="feats">
+    <div class="feat"><b>Chi phí có phê duyệt</b><span>Dưới hạn mức tự duyệt; vượt hạn mức chờ Chủ duyệt.</span></div>
+    <div class="feat"><b>Cash Out nhanh</b><span>Ghi chi phí nhỏ (gửi xe, nước uống) chỉ với 3 ô.</span></div>
+    <div class="feat"><b>Chứng từ &amp; công nợ</b><span>Đính kèm ảnh hóa đơn; ghi khoản chưa trả thành công nợ.</span></div>
+    <div class="feat"><b>Chi phí định kỳ tự động</b><span>Điện, internet, thuê mặt bằng, lương — tự tạo bản nháp mỗi kỳ.</span></div>
+    <div class="feat"><b>Trung tâm chi phí</b><span>Tách chi phí theo bộ phận: cho thuê, F&amp;B, bếp, hành chính.</span></div>
+    <div class="feat"><b>Thu nhập khác</b><span>Ghi nhận thu nhập ngoài cho thuê &amp; quầy, kể cả khấu trừ phí QR.</span></div>
+    <div class="feat"><b>Tài sản cố định</b><span>Máy chơi game, TV và thiết bị — tự tính khấu hao và lịch sử bảo trì.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-12"><div class="wrap">
+  <h2 class="sec"><span class="num">12</span>Bảo trì &amp; Bác sĩ Tay cầm</h2>
+  <p class="sec-lead">Biết tay cầm nào có vấn đề trước khi khách phàn nàn.</p>
+  <div class="feats">
+    <div class="feat"><b>Phiếu sửa chữa</b><span>Ghi nhận hư hỏng, trạng thái sửa và linh kiện đã dùng.</span></div>
+    <div class="feat"><b>Gamepad Tester</b><span>Kiểm tra tay cầm PS3, PS4 và PS5 ngay trên trình duyệt.</span></div>
+    <div class="feat"><b>Bác sĩ Tay cầm</b><span>Đo độ trôi analog, độ cân bằng, lực nhấn nút &amp; cò — cho ra điểm sức khỏe, phân tích hư hỏng và đề xuất sửa chữa.</span></div>
+    <div class="feat"><b>Driver tay cầm PS3</b><span>Tải driver &amp; hướng dẫn cài đặt ngay trong ứng dụng.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-13"><div class="wrap">
+  <h2 class="sec"><span class="num">13</span>Home Rental — Cho thuê mang về <span class="tag opt">Tùy chọn</span></h2>
+  <p class="sec-lead">Cho thuê PS và TV mang về nhà, với rủi ro được kiểm soát.</p>
+  <div class="feats">
+    <div class="feat"><b>Sản phẩm &amp; gói thuê</b><span>PS3, PS4, PS5, Playbox và TV nhiều kích cỡ — theo dõi từng máy.</span></div>
+    <div class="feat"><b>Xác minh danh tính</b><span>Tải lên giấy tờ tùy thân trước khi mang đồ ra.</span></div>
+    <div class="feat"><b>Điểm rủi ro &amp; danh sách đen</b><span>Khách từng trả trễ hoặc làm hỏng được đánh dấu; đơn rủi ro cần phê duyệt.</span></div>
+    <div class="feat"><b>Tiền đặt cọc</b><span>Ghi nhận tách khỏi doanh thu cho đến khi trả đồ.</span></div>
+    <div class="feat"><b>Giao-nhận &amp; phí vận chuyển</b><span>Phí vận chuyển tự tính theo khu vực.</span></div>
+    <div class="feat"><b>Nhắc nhở tự động</b><span>Lịch lấy đồ, hạn trả và trễ hạn — qua WhatsApp.</span></div>
+    <div class="feat"><b>Hợp đồng điện tử &amp; kiểm tra bằng ảnh <span class="tag soon">Sắp ra mắt</span></b><span>Chữ ký số và ảnh tình trạng trước/sau khi thuê.</span></div>
+    <div class="feat"><b>Yêu cầu bồi thường hư hỏng &amp; mất mát <span class="tag soon">Sắp ra mắt</span></b><span>Ghi nhận hư hỏng và khấu trừ tiền cọc.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-14"><div class="wrap">
+  <h2 class="sec"><span class="num">14</span>Marketplace giữa các tiệm <span class="tag free">Miễn phí</span></h2>
+  <p class="sec-lead">Bán tay cầm, máy chơi game, TV hay ghế không dùng đến cho tiệm khác — hoặc mua đồ cũ giá tốt.</p>
+  <div class="feats">
+    <div class="feat"><b>Gian hàng có ảnh</b><span>Đăng món hàng với tối đa 5 ảnh; xem hàng của các tiệm khác.</span></div>
+    <div class="feat"><b>Trả giá &amp; chốt đơn trong ứng dụng</b><span>Đưa ra đề nghị, chấp nhận đề nghị, rồi đánh dấu hoàn tất.</span></div>
+    <div class="feat"><b>Hồ sơ uy tín &amp; đánh giá</b><span>Xem tuổi tài khoản, số giao dịch hoàn tất, đánh giá và lịch sử khiếu nại của đối tác.</span></div>
+    <div class="feat"><b>Khóa tài khoản ngân hàng &amp; chứng từ</b><span>Người mua chỉ được hướng đến tài khoản đã đăng ký của người bán; lưu chứng từ chuyển khoản &amp; bàn giao.</span></div>
+    <div class="feat"><b>Kênh khiếu nại</b><span>Báo cáo sự cố; đội NEXBILL xem xét chứng cứ của cả hai bên.</span></div>
+    <div class="feat"><b>Ghi vào sổ sách</b><span>Doanh thu tự động ghi nhận là thu nhập của người bán.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-15"><div class="wrap">
+  <h2 class="sec"><span class="num">15</span>Báo cáo &amp; AI</h2>
+  <p class="sec-lead">Quyết định dựa trên dữ liệu, không phải phỏng đoán.</p>
+  <div class="feats">
+    <div class="feat"><b>Báo cáo doanh thu &amp; cho thuê</b><span>Giờ cao điểm, máy được thuê nhiều nhất, doanh thu ngày/tháng.</span></div>
+    <div class="feat"><b>Báo cáo kho, chi phí &amp; khách hàng</b><span>Mọi góc độ kinh doanh trong một menu.</span></div>
+    <div class="feat"><b>Hiệu suất thu ngân</b><span>So sánh hiệu suất từng thu ngân.</span></div>
+    <div class="feat"><b>Sức khỏe tài chính</b><span>Chỉ báo đơn giản: tháng này việc kinh doanh của bạn có ổn không?</span></div>
+    <div class="feat"><b>AI Business Intelligence <span class="tag addon">Add-on</span></b><span>Phân tích, đề xuất và trợ lý AI trả lời câu hỏi về việc kinh doanh của bạn.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-16"><div class="wrap">
+  <h2 class="sec"><span class="num">16</span>Nhân sự, Chi nhánh &amp; Cài đặt</h2>
+  <p class="sec-lead">Một tài khoản cho mọi chi nhánh, với quyền truy cập phù hợp cho từng người.</p>
+  <div class="feats">
+    <div class="feat"><b>Vai trò &amp; quyền truy cập</b><span>Chủ, Quản lý, Thu ngân… — quy định ai được làm gì.</span></div>
+    <div class="feat"><b>Nhiều chi nhánh</b><span>Chuyển chi nhánh chỉ với một cú nhấp, hoặc xem tất cả cùng lúc.</span></div>
+    <div class="feat"><b>Cài đặt tiệm</b><span>Hồ sơ, logo, thông tin thuế, máy in, thông báo và quy tắc đặt chỗ.</span></div>
+    <div class="feat"><b>Bật tính năng theo nhu cầu</b><span>Tính năng bổ sung (Home Rental, PPOB, TV Screensaver) được kích hoạt theo từng tiệm.</span></div>
+    <div class="feat"><b>6 ngôn ngữ</b><span>Tiếng Indonesia, Anh, Mã Lai, Thái, Philippines và Việt.</span></div>
+    <div class="feat"><b>Đăng nhập dễ dàng</b><span>Email hoặc tài khoản Google, có xác minh email và đặt lại mật khẩu.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-17"><div class="wrap">
+  <h2 class="sec"><span class="num">17</span>Bảo mật &amp; Độ tin cậy</h2>
+  <p class="sec-lead">Dữ liệu kinh doanh của bạn an toàn, và mọi thay đổi đều truy vết được.</p>
+  <div class="feats">
+    <div class="feat"><b>Nhật ký hoạt động (audit log)</b><span>Ai đã thay đổi gì, và khi nào.</span></div>
+    <div class="feat"><b>Bắt buộc lý do khi hủy</b><span>Không thể hủy, hoàn tiền hay hủy đơn mà không có lý do bằng văn bản.</span></div>
+    <div class="feat"><b>Chống nhập trùng</b><span>Nút lưu bị khóa khi đang xử lý; giao dịch trùng bị từ chối.</span></div>
+    <div class="feat"><b>Dữ liệu tách riêng từng tiệm</b><span>Tiệm khác không thể xem dữ liệu của bạn.</span></div>
+    <div class="feat"><b>Số chứng từ liên tục</b><span>Mỗi khoản chi, lượt đặt và giao dịch có số riêng, gọn gàng.</span></div>
+    <div class="feat"><b>Trên nền tảng đám mây</b><span>Không cần máy chủ riêng; dữ liệu lưu trực tuyến và truy cập được từ mọi nơi.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-18"><div class="wrap">
+  <h2 class="sec"><span class="num">18</span>Hỗ trợ &amp; Chương trình</h2>
+  <p class="sec-lead">Bạn không kinh doanh một mình.</p>
+  <div class="feats">
+    <div class="feat"><b>Trung tâm trợ giúp</b><span>SOP hằng ngày, danh sách kiểm tra khi mở tiệm mới và hướng dẫn từng menu.</span></div>
+    <div class="feat"><b>Chat chăm sóc khách hàng</b><span>Liên hệ đội NEXBILL ngay trong ứng dụng, gửi được ảnh &amp; video.</span></div>
+    <div class="feat"><b>Hướng dẫn khởi đầu</b><span>Kế hoạch thiết lập từng bước cho tiệm mới.</span></div>
+    <div class="feat"><b>Chương trình giới thiệu</b><span>Mời tiệm khác dùng NEXBILL và nhận hoa hồng.</span></div>
+    <div class="feat"><b>Sản phẩm đề xuất</b><span>Thiết bị cho tiệm thuê (tay cầm, phụ kiện, thiết bị) do đội NEXBILL tuyển chọn.</span></div>
+    <div class="feat"><b>Phần cứng sẵn dùng</b><span>Ổ cắm thông minh và thiết bị điều khiển có thể mua kèm gói đăng ký.</span></div>
+  </div>
+</div></section>
+
+<section id="vi-mulai"><div class="wrap">
+  <div class="kicker">Bắt đầu trong 3 bước</div>
+  <div class="steps" style="margin-top:12px">
+    <div class="step"><h3>Đăng ký &amp; dùng thử miễn phí</h3><p>Tạo tài khoản tại dashboard.nexbill.id — không cần cài đặt, dùng ngay trên trình duyệt.</p></div>
+    <div class="step"><h3>Nhập máy &amp; giá</h3><p>Làm theo danh sách thiết lập: thêm máy PS, gói thời gian và sản phẩm quầy.</p></div>
+    <div class="step"><h3>Bắt đầu lượt thuê đầu tiên</h3><p>Nhấn Bắt đầu trên máy — đồng hồ chạy, báo cáo tự cập nhật từ ngày đầu tiên.</p></div>
+  </div>
+  <a class="cta solid" href="https://dashboard.nexbill.id/daftar">Dùng thử NEXBILL miễn phí</a>
+</div></section>
+</main>
+<footer><div class="wrap">
+  <div class="note">Tính năng khả dụng có thể khác nhau tùy gói đăng ký. <span class="tag addon">Add-on</span> tính phí thêm; <span class="tag opt">Tùy chọn</span> kích hoạt theo từng tiệm; <span class="tag soon">Sắp ra mắt</span> đang được phát triển. Điều khiển Android TV cần một PC tại tiệm chạy NexbillAgent.</div>
+  <p style="margin-top:16px">© NEXBILL · Danh mục tính năng · dashboard.nexbill.id</p>
+</div></footer>
+</article>
+
+<script>
+(function () {
+  var LANGS = ["id", "en", "ms", "th", "fil", "vi"];
+  var PRINT_LABEL = { id: "Cetak / Simpan PDF", en: "Print / Save as PDF", ms: "Cetak / Simpan PDF", th: "พิมพ์ / บันทึกเป็น PDF", fil: "I-print / I-save bilang PDF", vi: "In / Lưu PDF" };
+  var TITLE = { id: "Katalog Fitur NEXBILL", en: "NEXBILL Feature Catalog", ms: "Katalog Ciri NEXBILL", th: "แคตตาล็อกฟีเจอร์ NEXBILL", fil: "Katalogo ng mga Feature ng NEXBILL", vi: "Danh mục tính năng NEXBILL" };
+  var articles = document.querySelectorAll("article[data-lang]");
+  function available(code) { return !!document.querySelector('article[data-lang="' + code + '"]'); }
+  function pick() {
+    var q = null;
+    try { q = new URLSearchParams(window.location.search).get("lang"); } catch (e) {}
+    if (q === "vn") q = "vi";
+    if (q && LANGS.indexOf(q) >= 0 && available(q)) return q;
+    var nav = String(navigator.language || "").toLowerCase();
+    var guess = nav.indexOf("fil") === 0 || nav.indexOf("tl") === 0 ? "fil" : nav.slice(0, 2);
+    return LANGS.indexOf(guess) >= 0 && available(guess) ? guess : "id";
+  }
+  function show(code) {
+    for (var i = 0; i < articles.length; i++) articles[i].hidden = articles[i].getAttribute("data-lang") !== code;
+    var btns = document.querySelectorAll("[data-set-lang]");
+    for (var j = 0; j < btns.length; j++) btns[j].setAttribute("aria-pressed", btns[j].getAttribute("data-set-lang") === code ? "true" : "false");
+    document.documentElement.lang = code === "fil" ? "fil" : code;
+    document.title = TITLE[code] || TITLE.id;
+    var pb = document.getElementById("printButton");
+    if (pb) pb.textContent = PRINT_LABEL[code] || PRINT_LABEL.id;
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.set("lang", code);
+      window.history.replaceState(null, "", url.toString());
+    } catch (e) {}
+  }
+  var btns = document.querySelectorAll("[data-set-lang]");
+  for (var k = 0; k < btns.length; k++) {
+    btns[k].addEventListener("click", function () { show(this.getAttribute("data-set-lang")); window.scrollTo(0, 0); });
+  }
+  show(pick());
+})();
+</script>
+</body>
+</html>

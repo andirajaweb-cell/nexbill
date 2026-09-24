@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
@@ -56,14 +57,14 @@ export default function PlatformMarketplaceDisputesPage() {
 
   const putuskan = async (id: string, resolution: string) => {
     const note = (catatan[id] ?? "").trim();
-    if (note.length < 10) return alert("Tuliskan alasan keputusan (minimal 10 karakter). Alasan ini dibaca kedua outlet.");
+    if (note.length < 10) return showAlert("Tuliskan alasan keputusan (minimal 10 karakter). Alasan ini dibaca kedua outlet.");
     const label = KEPUTUSAN.find((k) => k.key === resolution)?.label;
-    if (!confirm(`Putuskan: ${label}?${resolution === "suspended" ? "\n\nAkses Marketplace outlet terlapor akan DITANGGUHKAN dan barangnya hilang dari etalase." : ""}`)) return;
+    if (!(await showConfirm(`Putuskan: ${label}?${resolution === "suspended" ? "\n\nAkses Marketplace outlet terlapor akan DITANGGUHKAN dan barangnya hilang dari etalase." : ""}`, { tone: resolution === "dismissed" ? "default" : "danger" }))) return;
     setBusy(id);
     try {
       const res = await fetch(`/api/platform-admin/marketplace-disputes/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resolution, note }) });
       const d = await res.json();
-      if (!res.ok) return alert(d.error);
+      if (!res.ok) return showAlert(d.error);
       await load();
     } finally {
       setBusy(null);
@@ -71,11 +72,11 @@ export default function PlatformMarketplaceDisputesPage() {
   };
 
   const cabut = async (outletId: string, name: string) => {
-    const note = prompt(`Alasan mencabut penangguhan ${name}?`);
+    const note = await showPrompt(`Alasan mencabut penangguhan ${name}?`, { title: "Cabut penangguhan", required: true, multiline: true, confirmLabel: "Cabut" });
     if (!note) return;
     const res = await fetch(`/api/platform-admin/marketplace-suspensions/${outletId}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
     const d = await res.json();
-    if (!res.ok) return alert(d.error);
+    if (!res.ok) return showAlert(d.error);
     await load();
   };
 

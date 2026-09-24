@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { expenses, accounts, outlets, cashBankAccounts, recurringExpenseTemplates, staffUsers } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { postJournal } from "./journal";
 import { EXPENSE_PAYABLE_ACCOUNT_CODE } from "./coa";
 import { isPeriodLocked } from "./periods";
@@ -65,12 +66,9 @@ export interface CreateExpenseInput {
   recurringTemplateId?: string;
 }
 
-async function generateExpenseNumber(outletId: string): Promise<string> {
-  const [{ count }] = (await db
-    .select({ count: sql<number>`count(*)` })
-    .from(expenses)
-    .where(eq(expenses.outletId, outletId))) as { count: number }[];
-  return `EXP-${String(count + 1).padStart(5, "0")}`;
+/** expense_number UNIQUE secara global — lihat lib/db/nomor-urut.ts untuk bug count(*)+1 yang digantikan. */
+function generateExpenseNumber(): Promise<string> {
+  return nomorBerikutnya(expenses, expenses.expenseNumber, "EXP");
 }
 
 async function assertExpenseAccount(accountId: string) {
@@ -146,7 +144,7 @@ export async function createExpense(input: CreateExpenseInput) {
     throw new Error("Pilih akun kas/bank untuk expense yang dibayar langsung, atau centang 'Catat sebagai hutang' jika belum dibayar.");
   }
 
-  const expenseNumber = await generateExpenseNumber(input.outletId);
+  const expenseNumber = await generateExpenseNumber();
   const [expense] = await db
     .insert(expenses)
     .values({

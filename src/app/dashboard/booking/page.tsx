@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { useAuth } from "@/lib/auth/client";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-booking";
 
@@ -129,8 +129,9 @@ export default function BookingPage() {
 
   const submitTransfer = async () => {
     if (!transferFor?.unitId) return showAlert(t("booking.alertSelectDestUnit", "Pilih unit tujuan."));
-    const reason = prompt(t("booking.transferReasonPrompt", "Alasan pindah unit? (opsional)")) ?? undefined;
-    await action(transferFor.id, "transfer", { rentalUnitId: transferFor.unitId, reason });
+    const reason = await showPrompt(t("booking.transferReasonPrompt", "Alasan pindah unit? (opsional)"), { multiline: true, confirmLabel: t("booking.transferButton", "Pindahkan") });
+    if (reason === null) return; // Batal = tidak jadi pindah (dulu tetap dipindah walau prompt dibatalkan)
+    await action(transferFor.id, "transfer", { rentalUnitId: transferFor.unitId, reason: reason || undefined });
     setTransferFor(null);
   };
 
@@ -234,7 +235,12 @@ export default function BookingPage() {
               {!["completed", "cancelled", "checked_in", "no_show", "expired"].includes(b.status) && (
                 <>
                   <Button variant="ghost" className="text-xs" onClick={() => action(b.id, "no-show")}>{t("booking.noShowButton", "No-show")}</Button>
-                  <Button variant="ghost" className="text-xs text-red-400" onClick={() => { const r = prompt(t("booking.cancelBookingPrompt", "Alasan pembatalan?")) ?? undefined; action(b.id, "cancel", { reason: r }); }}>{t("booking.cancelButton", "Batal")}</Button>
+                  <Button variant="ghost" className="text-xs text-red-400" onClick={async () => {
+                      // Dulu: menekan "Cancel" di prompt bawaan browser TETAP membatalkan booking (tanpa alasan).
+                      const r = await showPrompt(t("booking.cancelBookingPrompt", "Alasan pembatalan?"), { tone: "danger", multiline: true, confirmLabel: t("booking.cancelButton", "Batal"), cancelLabel: t("booking.keepBooking", "Jangan batalkan") });
+                      if (r === null) return;
+                      action(b.id, "cancel", { reason: r || undefined });
+                    }}>{t("booking.cancelButton", "Batal")}</Button>
                 </>
               )}
               {b.status === "no_show" && isAdmin && (

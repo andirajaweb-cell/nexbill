@@ -62,6 +62,24 @@ registerDict({
   "expenses.placeholderAmountRp": { id: "Nominal (Rp)", en: "Amount (Rp)", ms: "Jumlah (Rp)", th: "จำนวนเงิน (Rp)", fil: "Halaga (Rp)", vi: "Số tiền (Rp)" },
   "expenses.placeholderNote": { id: "Catatan (opsional)", en: "Note (optional)", ms: "Catatan (pilihan)", th: "หมายเหตุ (ไม่บังคับ)", fil: "Tala (opsyonal)", vi: "Ghi chú (tùy chọn)" },
   "expenses.processing": { id: "Memproses...", en: "Processing...", ms: "Memproses...", th: "กำลังดำเนินการ...", fil: "Prinoseso...", vi: "Đang xử lý..." },
+  "expenses.saving": { id: "Menyimpan...", en: "Saving...", ms: "Menyimpan...", th: "กำลังบันทึก...", fil: "Sine-save...", vi: "Đang lưu..." },
+  "expenses.reasonPlaceholder": {
+    id: "mis. input ganda, salah nominal, salah akun",
+    en: "e.g. duplicate entry, wrong amount, wrong account",
+    ms: "cth. input berganda, jumlah salah, akaun salah",
+    th: "เช่น บันทึกซ้ำ จำนวนเงินผิด บัญชีผิด",
+    fil: "hal. dobleng input, maling halaga, maling account",
+    vi: "vd. nhập trùng, sai số tiền, sai tài khoản",
+  },
+  "expenses.alert.waitUpload": { id: "Tunggu sampai unggahan bukti selesai.", en: "Please wait until the receipt upload finishes.", ms: "Tunggu sehingga muat naik bukti selesai.", th: "กรุณารอให้อัปโหลดหลักฐานเสร็จก่อน", fil: "Hintaying matapos ang pag-upload ng resibo.", vi: "Vui lòng đợi tải chứng từ xong." },
+  "expenses.alert.duplicate": {
+    id: "Expense yang sama persis (akun, nominal, deskripsi) baru saja disimpan beberapa detik lalu. Kemungkinan tombol tertekan dua kali — cek daftar di bawah. Jika memang ingin mencatat dua kali, tunggu sebentar lalu simpan lagi.",
+    en: "An identical expense (account, amount, description) was saved a few seconds ago. The button was probably pressed twice — check the list below. If you really want two entries, wait a moment and save again.",
+    ms: "Perbelanjaan yang sama (akaun, jumlah, keterangan) baru sahaja disimpan beberapa saat lalu. Kemungkinan butang ditekan dua kali — semak senarai di bawah.",
+    th: "มีค่าใช้จ่ายเดียวกันทุกประการ (บัญชี จำนวนเงิน คำอธิบาย) เพิ่งบันทึกไปเมื่อไม่กี่วินาทีที่แล้ว อาจกดปุ่มซ้ำ — ตรวจสอบรายการด้านล่าง",
+    fil: "May kaparehong expense (account, halaga, paglalarawan) na na-save ilang segundo lang ang nakalipas. Malamang napindot nang dalawang beses ang button — tingnan ang listahan sa ibaba.",
+    vi: "Một khoản chi giống hệt (tài khoản, số tiền, mô tả) vừa được lưu vài giây trước. Có thể đã bấm nút hai lần — hãy kiểm tra danh sách bên dưới.",
+  },
   "expenses.recordCashOut": { id: "Catat Cash Out", en: "Record Cash Out", ms: "Rekod Cash Out", th: "บันทึกการเบิกเงินสด", fil: "I-record ang Cash Out", vi: "Ghi nhận chi tiền" },
 
   // --- Alerts ---

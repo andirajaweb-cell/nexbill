@@ -8,7 +8,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
-import { showAlert } from "@/lib/ui/dialog";
+import { showAlert, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-other-income";
 
@@ -71,7 +71,7 @@ export default function OtherIncomePage() {
   useEffect(() => { load(); }, [outletId, range.from, range.to]);
 
   const doVoid = async (id: string) => {
-    const reason = prompt(t("otherIncome.voidPrompt", "Alasan void entri pendapatan lain-lain ini?")) ?? "";
+    const reason = (await showPrompt(t("otherIncome.voidPrompt", "Alasan void entri pendapatan lain-lain ini?"), { tone: "danger", required: true, multiline: true, confirmLabel: "Void" })) ?? "";
     if (!reason.trim()) return;
     const res = await fetch(`/api/other-income/${id}/void`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
     const out = await res.json();

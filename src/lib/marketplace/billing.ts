@@ -1,7 +1,8 @@
 import { db } from "@/db/client";
 import { subscriptionInvoices, subscriptions, marketplaceDeals, outlets } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { UJRAH_AKTIF } from "./ujrah";
+import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 
 /**
  * Penagihan ujrah Marketplace Antar-Outlet.
@@ -35,9 +36,9 @@ export interface UjrahLineItem {
 
 const round = (n: number) => Math.round(n);
 
-async function nomorFakturBaru(): Promise<string> {
-  const [{ n }] = (await db.select({ n: sql<number>`count(*)` }).from(subscriptionInvoices)) as { n: number }[];
-  return `SUB-INV-${String(n + 1).padStart(5, "0")}`;
+/** Sama dengan generateInvoiceNumber di subscription/service.ts — keduanya berbagi deret SUB-INV. */
+function nomorFakturBaru(): Promise<string> {
+  return nomorBerikutnya(subscriptionInvoices, subscriptionInvoices.invoiceNumber, "SUB-INV");
 }
 
 function bacaBaris(json: string | null | undefined): UjrahLineItem[] {

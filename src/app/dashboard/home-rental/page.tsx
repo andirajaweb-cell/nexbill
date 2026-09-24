@@ -9,7 +9,7 @@ import { fetchJsonObject, fetchJsonArray } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-home-rental";
@@ -1440,8 +1440,16 @@ function RiskTab({ outletId, canManage, canApprove }: { outletId: string; canMan
 
   const toggleBlacklist = async (p: any) => {
     const isBlacklisted = !p.isBlacklisted;
-    const reason = isBlacklisted ? window.prompt(t("homeRental.risk.blacklistReasonPrompt", "Alasan blacklist (opsional):")) ?? undefined : undefined;
-    if (isBlacklisted && !(await showConfirm(t("homeRental.risk.confirmBlacklist", "Blacklist nomor {phone}? Nomor ini tidak akan bisa booking Home Rental lagi selama diblokir.").replace("{phone}", p.phone)))) return;
+    let reason: string | undefined;
+    if (isBlacklisted) {
+      // Satu modal (konfirmasi + alasan) menggantikan prompt bawaan browser + konfirmasi terpisah.
+      const r = await showPrompt(
+        `${t("homeRental.risk.confirmBlacklist", "Blacklist nomor {phone}? Nomor ini tidak akan bisa booking Home Rental lagi selama diblokir.").replace("{phone}", p.phone)}\n\n${t("homeRental.risk.blacklistReasonPrompt", "Alasan blacklist (opsional):")}`,
+        { tone: "danger", multiline: true, confirmLabel: "Blacklist" }
+      );
+      if (r === null) return;
+      reason = r || undefined;
+    }
     const res = await fetch(`/api/home-rental/risk/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isBlacklisted, blacklistReason: reason }) });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);

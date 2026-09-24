@@ -22,9 +22,19 @@ export interface DialogOptions {
   cancelLabel?: string;
 }
 
+export interface PromptOptions extends DialogOptions {
+  placeholder?: string;
+  defaultValue?: string;
+  /** Wajib diisi: tombol konfirmasi nonaktif selama isian masih kosong. */
+  required?: boolean;
+  /** Isian multi-baris (untuk alasan panjang). */
+  multiline?: boolean;
+}
+
 export type DialogState =
   | { kind: "alert"; message: string; options?: DialogOptions; resolve: (value: void) => void }
-  | { kind: "confirm"; message: string; options?: DialogOptions; resolve: (value: boolean) => void };
+  | { kind: "confirm"; message: string; options?: DialogOptions; resolve: (value: boolean) => void }
+  | { kind: "prompt"; message: string; options?: PromptOptions; resolve: (value: string | null) => void };
 
 type Listener = (state: DialogState | null) => void;
 
@@ -56,5 +66,20 @@ export function showConfirm(message: string, options?: DialogOptions): Promise<b
       return;
     }
     listener({ kind: "confirm", message, options, resolve });
+  });
+}
+
+/**
+ * Themed stand-in for `prompt(message)` — resolves with the typed text (trimmed), or `null` if the
+ * user cancelled (same contract as native prompt, so `if (r === null) return;` keeps working).
+ * MUST be awaited.
+ */
+export function showPrompt(message: string, options?: PromptOptions): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!listener) {
+      resolve(window.prompt(message, options?.defaultValue ?? ""));
+      return;
+    }
+    listener({ kind: "prompt", message, options, resolve });
   });
 }

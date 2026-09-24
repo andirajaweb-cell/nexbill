@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import {
   computeUjrah,
   bersihUntukPenjual,
@@ -671,7 +671,14 @@ function KesepakatanTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
     }
     let alasan: string | undefined;
     if (ke === "rejected" || ke === "cancelled") {
-      const r = prompt(ke === "rejected" ? "Alasan menolak?" : "Alasan membatalkan?");
+      const r = await showPrompt(ke === "rejected" ? `${deal.dealNumber} — alasan menolak penawaran?` : `${deal.dealNumber} — alasan membatalkan kesepakatan?`, {
+        title: ke === "rejected" ? "Tolak penawaran" : "Batalkan kesepakatan",
+        required: true,
+        multiline: true,
+        tone: "danger",
+        placeholder: "Alasan ini terbaca oleh pihak lawan. Jangan tulis nomor HP/kontak.",
+        confirmLabel: ke === "rejected" ? "Tolak" : "Batalkan",
+      });
       if (r === null) return;
       alasan = r;
     }

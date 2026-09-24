@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { showAlert } from "@/lib/ui/dialog";
 import { Loader2, Copy, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 
 const rupiah = (n: number | undefined) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
@@ -76,7 +77,7 @@ export default function PaymentPage() {
           window.open(data.paymentUrl, "_blank");
         }
       } else {
-        alert(data.error);
+        showAlert(data.error);
       }
     } catch (err) {
       console.error(err);

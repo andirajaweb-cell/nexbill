@@ -1,7 +1,8 @@
 import { db } from "@/db/client";
 import { bookings, rentalUnits, outlets, rentalSessions, promos } from "@/db/schema";
-import { eq, and, inArray, ne, sql, isNull } from "drizzle-orm";
+import { eq, and, inArray, ne, isNull } from "drizzle-orm";
 import { startRentalSession } from "./sessions";
+import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { logAudit } from "@/lib/audit/log";
 import { queueBookingNotification, bookingMessages, outletName } from "./notifications";
 
@@ -36,12 +37,9 @@ function withBuffer(start: string, end: string, bufferMinutes: number) {
   };
 }
 
-async function generateBookingCode(outletId: string): Promise<string> {
-  const [{ count }] = (await db
-    .select({ count: sql<number>`count(*)` })
-    .from(bookings)
-    .where(eq(bookings.outletId, outletId))) as { count: number }[];
-  return `BK-${String(count + 1).padStart(5, "0")}`;
+/** booking_code UNIQUE secara global — lihat lib/db/nomor-urut.ts untuk bug count(*)+1 yang digantikan. */
+function generateBookingCode(): Promise<string> {
+  return nomorBerikutnya(bookings, bookings.bookingCode, "BK");
 }
 
 /** Open-ended sessions (no plannedMinutes/promo duration) have no knowable end — cap the conflict window at a generous horizon rather than blocking forever. Mirrors the hours-param clamp in /api/public/availability-timeline. */
@@ -194,7 +192,7 @@ export async function createBooking(input: CreateBookingInput) {
   }
 
   const conflict = await hasConflict(input.outletId, input, input.scheduledStart, input.scheduledEnd, outlet.bookingBufferMinutes);
-  const bookingCode = await generateBookingCode(input.outletId);
+  const bookingCode = await generateBookingCode();
 
   if (conflict) {
     const waitlisted = await db.select().from(bookings).where(and(eq(bookings.outletId, input.outletId), eq(bookings.status, "waitlisted")));

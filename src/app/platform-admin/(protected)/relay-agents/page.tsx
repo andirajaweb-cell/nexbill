@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
+import { showAlert, showConfirm } from "@/lib/ui/dialog";
 
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 
@@ -64,10 +65,10 @@ export default function PlatformRelayAgentsPage() {
   };
 
   const remove = async (agentId: string) => {
-    if (!confirm("Hapus relay agent ini? Perangkat TV outlet yang masih memakainya harus dipindah dulu.")) return;
+    if (!(await showConfirm("Hapus relay agent ini? Perangkat TV outlet yang masih memakainya harus dipindah dulu.", { tone: "danger", confirmLabel: "Hapus" }))) return;
     const res = await fetch(`/api/platform-admin/relay-agents/${agentId}`, { method: "DELETE" });
     const data = await res.json();
-    if (!res.ok) return alert(data.error);
+    if (!res.ok) return showAlert(data.error);
     await load();
   };
 

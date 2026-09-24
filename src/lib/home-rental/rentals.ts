@@ -10,6 +10,7 @@ import {
   cashBankAccounts,
 } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
+import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { postJournal } from "@/lib/accounting/journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
 import { resolvePaymentFee, feeExpenseLine } from "@/lib/accounting/payment-fee";
@@ -51,12 +52,9 @@ async function resolveCashAccountId(outletId: string, method: string): Promise<s
   return row.accountId;
 }
 
-async function generateRentalCode(outletId: string): Promise<string> {
-  const [{ count }] = (await db
-    .select({ count: sql<number>`count(*)` })
-    .from(homeRentalRentals)
-    .where(eq(homeRentalRentals.outletId, outletId))) as { count: number }[];
-  return `HR-${String(count + 1).padStart(5, "0")}`;
+/** rental_code UNIQUE secara global — lihat lib/db/nomor-urut.ts untuk bug count(*)+1 yang digantikan. */
+function generateRentalCode(): Promise<string> {
+  return nomorBerikutnya(homeRentalRentals, homeRentalRentals.rentalCode, "HR");
 }
 
 export interface CreateHomeRentalInput {
@@ -166,7 +164,7 @@ export async function createHomeRentalBooking(input: CreateHomeRentalInput) {
 
   const discountAmount = Math.max(0, input.discountAmount ?? 0);
   const totalAmount = Math.max(0, rentalFee + deliveryFee + pickupFee - discountAmount);
-  const rentalCode = await generateRentalCode(input.outletId);
+  const rentalCode = await generateRentalCode();
   const approvalStatus = await determineApprovalStatus(input.outletId, input.phone);
 
   const [row] = await db

@@ -604,6 +604,18 @@ function DaftarPageInner() {
             Masuk di sini
           </a>
         </p>
+        {/* Catalog auto-picks the language from the browser (no ?lang=). */}
+        <p className="text-center text-xs text-neutral-600">
+          Ingin tahu semua fiturnya dulu?{" "}
+          <a
+            href="/downloads/katalog-fitur-nexbill.html"
+            target="_blank"
+            rel="noopener"
+            className="text-cyan-400 hover:underline"
+          >
+            Lihat Katalog Fitur NEXBILL
+          </a>
+        </p>
       </Card>
     </div>
   );

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
+import { showAlert } from "@/lib/ui/dialog";
 import { LANG_OPTIONS, type LangCode } from "@/lib/i18n/registry";
 import { Paperclip, Download, X, FileVideo } from "lucide-react";
 
@@ -90,7 +91,7 @@ export default function PlatformSupportPage() {
 
   const uploadAttachment = async (file: File): Promise<PendingAttachment | null> => {
     if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
-      alert(`File maksimal ${MAX_ATTACHMENT_MB}MB.`);
+      showAlert(`File maksimal ${MAX_ATTACHMENT_MB}MB.`);
       return null;
     }
     const form = new FormData();
@@ -98,7 +99,7 @@ export default function PlatformSupportPage() {
     const res = await fetch("/api/platform-admin/support/upload", { method: "POST", body: form });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(data?.error || "Gagal mengunggah file.");
+      showAlert(data?.error || "Gagal mengunggah file.");
       return null;
     }
     return { url: data.url, type: data.type, name: data.name };
@@ -150,7 +151,7 @@ export default function PlatformSupportPage() {
         body: JSON.stringify({ body: reply }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) return alert(data?.error ?? "Gagal menerjemahkan.");
+      if (!res.ok) return showAlert(data?.error ?? "Gagal menerjemahkan.");
       setReply(data.translated);
       setTranslatedInto(data.targetLang);
     } finally {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { usePollingWhenVisible } from "@/lib/api/use-polling";
-import { showAlert } from "@/lib/ui/dialog";
+import { showAlert, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-kitchen";
 import { scaledGain } from "@/lib/ui/notification-sound";
@@ -202,7 +202,11 @@ export default function KitchenDisplayPage() {
   };
 
   const cancel = async (itemId: string) => {
-    const reason = prompt(t("kitchen.cancelPromptMessage", "Alasan batal (mis. bahan habis)?"), t("kitchen.cancelPromptDefault", "Bahan habis"));
+    const reason = await showPrompt(t("kitchen.cancelPromptMessage", "Alasan batal (mis. bahan habis)?"), {
+      defaultValue: t("kitchen.cancelPromptDefault", "Bahan habis"),
+      tone: "danger",
+      required: true,
+    });
     if (reason === null) return;
     const res = await fetch(`/api/order-items/${itemId}/cancel`, {
       method: "POST",

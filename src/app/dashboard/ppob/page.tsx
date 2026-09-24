@@ -9,7 +9,7 @@ import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
-import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-ppob";
 
@@ -94,7 +94,9 @@ export default function PpobPage() {
   const cashAccount = accounts.find((a) => a.type === "cash");
 
   const doVoid = async (id: string) => {
-    const reason = prompt(t("ppob.promptVoidReason", "Alasan pembatalan transaksi PPOB ini?")) ?? "";
+    // Dulu: menekan "Cancel" di prompt bawaan browser TETAP membatalkan transaksi PPOB (alasan kosong).
+    const reason = await showPrompt(t("ppob.promptVoidReason", "Alasan pembatalan transaksi PPOB ini?"), { tone: "danger", required: true, multiline: true });
+    if (reason === null) return;
     const res = await fetch(`/api/ppob/transactions/${id}/void`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
     const out = await res.json();
     if (!res.ok) return showAlert(out.error);

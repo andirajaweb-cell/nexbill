@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { otherIncomes, cashBankAccounts } from "@/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
+import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { postJournal, voidJournal } from "./journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "./account-mapping";
 import { logAudit } from "@/lib/audit/log";
@@ -65,12 +66,9 @@ export interface CreateOtherIncomeInput {
   shiftId?: string | null;
 }
 
-async function generateIncomeNumber(outletId: string): Promise<string> {
-  const [{ count }] = (await db
-    .select({ count: sql<number>`count(*)` })
-    .from(otherIncomes)
-    .where(eq(otherIncomes.outletId, outletId))) as { count: number }[];
-  return `INC-${String(count + 1).padStart(5, "0")}`;
+/** income_number UNIQUE secara global — lihat lib/db/nomor-urut.ts untuk bug count(*)+1 yang digantikan. */
+function generateIncomeNumber(): Promise<string> {
+  return nomorBerikutnya(otherIncomes, otherIncomes.incomeNumber, "INC");
 }
 
 /** Records one Other Income entry and posts its journal (Dr Kas/Bank per channel, Cr Pendapatan Lain-lain per category) in one shot — no separate submit/approve step, money's already in hand. */
@@ -87,7 +85,7 @@ export async function createOtherIncome(input: CreateOtherIncomeInput) {
   const feeAmount = await resolvePaymentFee(input.outletId, input.paymentMethod, amount);
   const netAmount = amount - feeAmount;
 
-  const incomeNumber = await generateIncomeNumber(input.outletId);
+  const incomeNumber = await generateIncomeNumber();
   const label = input.description?.trim() || OTHER_INCOME_CATEGORY_LABEL[input.category];
 
   const [row] = await db
