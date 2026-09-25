@@ -16,41 +16,46 @@ export interface TrialBalanceRow {
 }
 
 /**
- * Excludes cancelled PAIRS — a voided entry together with the reversal voidJournal posted for it
- * (linked by reversalOfEntryId) — when BOTH fall inside [from, to].
+ * Excludes fully-cancelled reversal CHAINS from reports when every member falls inside [from, to].
  *
- * Why: a pair nets to exactly zero on every account, so dropping both never changes any balance.
- * But summing them (the old behaviour, see computeTrialBalance's note below) inflated the Debit and
- * Kredit columns of the Neraca Saldo with money that never really moved, and filled every account's
- * drill-down with struck-through rows plus their negative mirrors — so the numbers looked nothing
- * like the transactions NEXBILL actually recorded.
+ * voidJournal never deletes: it marks the entry "void" and posts a mirrored reversal linked by
+ * reversalOfEntryId. Voiding that reversal again posts a reversal of the reversal, and so on — a
+ * linear chain root → r1 → r2 → … where each member cancels the previous one. So:
+ *   - odd number of reversals (root → r1, or root → r1 → r2 → r3): the chain nets to ZERO → drop
+ *     every member;
+ *   - even number (root → r1 → r2): the cancellation itself was undone, so the chain nets to the
+ *     ROOT → drop everything except the root, which really is still on the books.
+ * Dropping a zero-sum chain never changes a balance; it only stops cancelled money from inflating
+ * the Debit/Kredit columns and filling every drill-down with struck-through rows and their negative
+ * mirrors. A chain with a member outside the range is kept whole — each half belongs to its own
+ * period there (e.g. a sale in a closed month reversed in the current one).
  *
- * A pair that straddles the range (e.g. a sale in a closed period reversed in the current one) is
- * kept: there each half legitimately belongs to its own period.
- *
- * Chains stay correct: a reversal that was itself later voided no longer counts as "the" reversal
- * of its original (the reversal must still be status posted), so re-voiding revives the original
- * instead of dropping everything.
+ * The earlier version only looked at single pairs and treated "root whose reversal was itself
+ * voided" as live but still showed the rest of the chain inconsistently; chains matter because the
+ * pre-2026-09-20 order-correction bug voided reversals (see order-journal-correction.ts).
  */
-export function excludeCancelledPairs(from?: string, to?: string) {
-  const inRange = (alias: string) =>
-    sql.join(
-      [
-        sql`true`,
-        ...(from ? [sql`${sql.raw(alias)}.entry_date >= ${from}`] : []),
-        ...(to ? [sql`${sql.raw(alias)}.entry_date <= ${to}`] : []),
-      ],
-      sql` and `
-    );
-  return sql`not (
-    (${journalEntries.status} = 'void' and exists (
-      select 1 from journal_entries rev
-      where rev.reversal_of_entry_id = ${journalEntries.id} and rev.status = 'posted' and ${inRange("rev")}
-    ))
-    or (${journalEntries.reversalOfEntryId} is not null and ${journalEntries.status} = 'posted' and exists (
-      select 1 from journal_entries orig
-      where orig.id = ${journalEntries.reversalOfEntryId} and ${inRange("orig")}
-    ))
+export function excludeCancelledPairs(outletId: string, from?: string, to?: string) {
+  const inRange = sql.join(
+    [sql`true`, ...(from ? [sql`chain.entry_date >= ${from}`] : []), ...(to ? [sql`chain.entry_date <= ${to}`] : [])],
+    sql` and `
+  );
+  return sql`${journalEntries.id} not in (
+    with recursive chain (root, id, depth, entry_date) as (
+      select e.id, e.id, 0, e.entry_date
+      from journal_entries e
+      where e.outlet_id = ${outletId}
+        and e.reversal_of_entry_id is null
+        and exists (select 1 from journal_entries x where x.reversal_of_entry_id = e.id)
+      union all
+      select chain.root, r.id, chain.depth + 1, r.entry_date
+      from chain join journal_entries r on r.reversal_of_entry_id = chain.id
+    ),
+    roots as (
+      select chain.root, max(chain.depth) as max_depth, bool_and(${inRange}) as all_in_range
+      from chain group by chain.root
+    )
+    select chain.id from chain join roots on roots.root = chain.root
+    where roots.all_in_range and (roots.max_depth % 2 = 1 or chain.depth > 0)
   )`;
 }
 
@@ -70,7 +75,7 @@ export function excludeCancelledPairs(from?: string, to?: string) {
 export async function computeTrialBalance(outletId: string, from?: string, to?: string): Promise<TrialBalanceRow[]> {
   const allAccounts = await db.select().from(accounts).where(eq(accounts.outletId, outletId));
 
-  const conditions = [eq(journalEntries.outletId, outletId), excludeCancelledPairs(from, to)];
+  const conditions = [eq(journalEntries.outletId, outletId), excludeCancelledPairs(outletId, from, to)];
   if (from) conditions.push(gte(journalEntries.entryDate, from));
   if (to) conditions.push(lte(journalEntries.entryDate, to));
 
@@ -367,7 +372,7 @@ export async function getAccountLedgerDetail(
   if (postableIds.length === 0) return [];
 
   const conditions = [eq(journalEntries.outletId, outletId), inArray(journalLines.accountId, postableIds)];
-  if (!includeCancelled) conditions.push(excludeCancelledPairs(from, to));
+  if (!includeCancelled) conditions.push(excludeCancelledPairs(outletId, from, to));
   if (from) conditions.push(gte(journalEntries.entryDate, from));
   if (to) conditions.push(lte(journalEntries.entryDate, to));
 

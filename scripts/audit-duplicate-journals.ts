@@ -258,6 +258,44 @@ async function findStaleReceivables() {
   `)) as unknown as { id: string; outlet_id: string; status: string; total: number; gap: number; paid: number; methods: string | null }[];
 }
 
+/**
+ * F. "Revived" cancellations: a chain root → r1 → r2 where r2 reversed the REVERSAL r1, so the root
+ * is effectively back on the books even though it is still labelled "void" (struck through in the
+ * UI). Caused by the pre-2026-09-20 order-correction bug that also voided reversals. For an order's
+ * sales/HPP journal that has since been reposted (another live journal of the same kind exists for
+ * the same order), the root is a stale duplicate: Kas/pendapatan counted twice. Fix = void the chain
+ * tail (r2) so the chain is odd again and nets to zero.
+ */
+async function findRevivedChains() {
+  const filter = OUTLET ? sql`AND e.outlet_id = ${OUTLET}` : sql``;
+  return (await db.execute(sql`
+    WITH RECURSIVE chain (root, id, depth) AS (
+      SELECT e.id, e.id, 0 FROM journal_entries e
+      WHERE e.reversal_of_entry_id IS NULL
+        AND EXISTS (SELECT 1 FROM journal_entries x WHERE x.reversal_of_entry_id = e.id)
+        ${filter}
+      UNION ALL
+      SELECT chain.root, r.id, chain.depth + 1 FROM chain JOIN journal_entries r ON r.reversal_of_entry_id = chain.id
+    ),
+    roots AS (SELECT root, MAX(depth) AS max_depth FROM chain GROUP BY root HAVING MAX(depth) % 2 = 0)
+    SELECT o.id AS root_id, o.outlet_id, o.source_type, o.source_id, o.reference, o.description, o.entry_date,
+           (SELECT COALESCE(SUM(jl.debit), 0)::float FROM journal_lines jl WHERE jl.journal_entry_id = o.id) AS total,
+           (SELECT c.id FROM chain c WHERE c.root = o.id ORDER BY c.depth DESC LIMIT 1) AS tail_id,
+           roots.max_depth,
+           CASE WHEN o.source_type IN ('rental', 'pos') THEN EXISTS (
+             SELECT 1 FROM journal_entries l
+             WHERE l.source_id = o.source_id AND l.id <> o.id AND l.status = 'posted'
+               AND l.reversal_of_entry_id IS NULL AND l.description NOT LIKE '[VOID]%'
+               AND (l.reference LIKE '%-COGS') = (o.reference LIKE '%-COGS')
+           ) ELSE false END AS superseded
+    FROM roots JOIN journal_entries o ON o.id = roots.root
+    ORDER BY o.entry_date
+  `)) as unknown as {
+    root_id: string; outlet_id: string; source_type: string; source_id: string | null; reference: string | null;
+    description: string; entry_date: string; total: number; tail_id: string; max_depth: number; superseded: boolean;
+  }[];
+}
+
 /** Adds the residual to the largest line on the short side — same rule as absorbRoundingResidual. */
 async function fixUnbalanced(journalId: string, debit: number, credit: number) {
   const diff = Math.round((debit - credit) * 100) / 100;
@@ -350,6 +388,24 @@ async function main() {
     console.log(`  Piutang yang memang belum dibayar (dibiarkan): ${genuine.length} order, ${rupiah(genuine.reduce((s, o) => s + o.gap, 0))}.`);
     for (const o of genuine) console.log(`    · order ${o.id.slice(0, 8)} [${o.status}] · total ${rupiah(o.total)} · dibayar ${rupiah(o.paid)} · piutang ${rupiah(o.gap)}`);
   }
+  console.log("");
+
+  // ---------- F. Pembatalan yang terhidupkan kembali
+  const revived = await findRevivedChains();
+  const fixableRevived = revived.filter((r) => r.superseded);
+  console.log(`F. JURNAL DIBATALKAN TAPI TERHITUNG LAGI: ${revived.length} jurnal (pembatalannya ikut dibatalkan oleh bug koreksi order lama).`);
+  let restored = 0;
+  for (const r of revived) {
+    console.log(
+      `  - [${r.source_type}] ${r.reference ?? r.root_id} · "${r.description}" · ${rupiah(Number(r.total))} · ${r.entry_date.slice(0, 10)}${r.superseded ? " → sudah ada jurnal pengganti, pembatalan dipulihkan" : " → TIDAK ada jurnal pengganti, dibiarkan (periksa manual)"}`
+    );
+    if (APPLY && r.superseded) {
+      await voidJournal(r.tail_id, "Memulihkan pembatalan yang terhidupkan kembali oleh bug koreksi order lama (diperbaiki 2026-09-20) — audit-duplicate-journals bagian F");
+      restored++;
+    }
+  }
+  if (APPLY) console.log(`  ${restored} pembatalan dipulihkan.`);
+  if (fixableRevived.length) console.log(`  Nilai yang terhitung dobel: ${rupiah(fixableRevived.reduce((sum, r) => sum + Number(r.total), 0))} (per jurnal, termasuk Kas & pendapatan/HPP-nya).`);
   console.log("");
 
   // ---------- C. Invoice supplier kelebihan bayar (laporan)
