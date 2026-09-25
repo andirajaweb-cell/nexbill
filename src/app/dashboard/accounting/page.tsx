@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
@@ -1077,6 +1078,12 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
       {/* Form muncul DI ATAS tabel. Kalau pemakai sedang menggulir di daftar piutang yang panjang,
           menekan "Terima Bayar" terasa seperti tidak terjadi apa-apa — formnya terbuka di luar
           layar. Karena itu setiap kali form dibuka, ia digulirkan ke pandangan. */}
+      {busy && (
+        <ProcessingOverlay
+          message={t("accounting.receivables.processing", "Memproses pembayaran piutang...")}
+          hint={t("accounting.receivables.processingHint", "Mencatat pembayaran dan jurnalnya. Jangan tutup atau muat ulang halaman ini.")}
+        />
+      )}
       {collectFor && (
         <div ref={collectFormRef}>
         <Card className="space-y-3 border-emerald-500/40">

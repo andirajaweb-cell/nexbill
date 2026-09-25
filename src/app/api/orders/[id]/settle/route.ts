@@ -31,7 +31,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     let summary = await getOrderPaymentSummary(id);
     if (!summary || summary.order.outletId !== session.outletId) return NextResponse.json({ error: "Order tidak ditemukan." }, { status: 404 });
-    if (summary.order.status === "paid") return NextResponse.json({ error: "Order sudah lunas." }, { status: 400 });
+    // Same rule as /pay: only refuse when nothing is actually left to collect.
+    if (summary.order.status === "paid" && summary.remaining <= 0.5) return NextResponse.json({ error: "Order sudah lunas." }, { status: 400 });
     if (summary.order.status === "cancelled") return NextResponse.json({ error: "Order sudah dibatalkan." }, { status: 400 });
 
     for (const p of summary.payments) {

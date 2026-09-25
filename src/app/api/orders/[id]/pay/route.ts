@@ -22,10 +22,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 401) });
   }
-  if (order.status === "paid") return NextResponse.json({ error: "Order sudah lunas." }, { status: 400 });
   if (order.status === "cancelled") return NextResponse.json({ error: "Order sudah dibatalkan." }, { status: 400 });
 
   const summary = await getOrderPaymentSummary(id);
+  // "Lunas" is decided by the money actually received, not by the status label. An order can carry
+  // status "paid" while still having a balance (e.g. marked paid by an older flow with no success
+  // payment behind it) — its Piutang then showed in the Piutang tab, but every "Terima Bayar"
+  // bounced with "Order sudah lunas" and the receivable could never be collected.
+  if (order.status === "paid" && (summary?.remaining ?? 0) <= 0.5) return NextResponse.json({ error: "Order sudah lunas." }, { status: 400 });
   const chargeAmount = amount ?? summary?.remaining ?? order.total;
 
   try {
