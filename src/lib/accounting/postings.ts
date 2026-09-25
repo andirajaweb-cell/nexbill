@@ -188,15 +188,19 @@ async function revenueAccountIdForItem(
   return getMappedAccountId(outletId, "other", "service_charge_tax", "4650", dbc);
 }
 
-/** Resolves the COGS expense account for one product category — F&B (module "fnb_cogs") or retail
- * merchandise/accessory (module "product_sale_cogs"). Returns null for categories with no COGS
- * account concept (device_rental/raw_material/other), same as the old fnbMappingKey-only gate. */
-async function cogsAccountIdForCategory(outletId: string, category: string, dbc: DbOrTx = db): Promise<string | null> {
+/** Resolves the COGS expense account for one product category — F&B (module "fnb_cogs"), retail
+ * merchandise/accessory (module "product_sale_cogs"), or 5400 "Other COGS" for everything else
+ * (raw_material, sparepart, other, and every outlet-created custom category). Those used to return
+ * null, so selling them reduced stock but never credited Persediaan — every Belanja Supplier debit
+ * for them stayed on the balance sheet forever. Only device_rental returns null: those are rental
+ * units, not goods sold out of stock. */
+export async function cogsAccountIdForCategory(outletId: string, category: string, dbc: DbOrTx = db): Promise<string | null> {
   const fnbKey = fnbMappingKey(category);
   if (fnbKey) return getMappedAccountId(outletId, "fnb_cogs", fnbKey, FNB_COGS_FALLBACK[fnbKey], dbc);
   const merchKey = merchMappingKey(category);
   if (merchKey) return getMappedAccountId(outletId, "product_sale_cogs", merchKey, MERCH_COGS_FALLBACK[merchKey], dbc);
-  return null;
+  if (category === "device_rental") return null;
+  return getMappedAccountId(outletId, "product_sale_cogs", "other", "5400", dbc);
 }
 
 /**

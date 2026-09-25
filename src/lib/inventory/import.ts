@@ -4,6 +4,7 @@ import { products } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { describeError } from "@/lib/api/error";
 import { getActiveProductCategories } from "@/lib/inventory/categories";
+import { recordOpeningStock } from "@/lib/accounting/inventory-postings";
 
 /**
  * Categories used to be a fixed 6-value enum subset hardcoded here. They're now the outlet's own
@@ -75,7 +76,7 @@ export interface ImportSummary {
 }
 
 /** Parses the uploaded workbook's first sheet and upserts products for the given outlet. Matches existing products by (outletId, sku) when sku is non-empty — updates master-data fields only (never touches stockQty on an update, to avoid silently clobbering real inventory counts from a re-uploaded file). Bad rows are skipped and reported; good rows still commit. */
-export async function importProductsFromWorkbook(outletId: string, fileBuffer: Buffer): Promise<ImportSummary> {
+export async function importProductsFromWorkbook(outletId: string, fileBuffer: Buffer, staffUserId?: string): Promise<ImportSummary> {
   const wb = XLSX.read(fileBuffer, { type: "buffer" });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error("File Excel tidak punya sheet.");
@@ -143,7 +144,14 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
   }
 
   // Pass 2: commit. One bulk insert for every new product...
-  if (toCreate.length > 0) await db.insert(products).values(toCreate);
+  // Stok Awal of every new product gets its stock movement + one opening Persediaan journal for the
+  // whole batch, in the same transaction as the insert (see recordOpeningStock).
+  if (toCreate.length > 0) {
+    await db.transaction(async (tx) => {
+      const createdRows = await tx.insert(products).values(toCreate).returning({ id: products.id, name: products.name, stockQty: products.stockQty });
+      await recordOpeningStock(outletId, createdRows, staffUserId, tx);
+    });
+  }
 
   // ...and updates chunked into small parallel batches rather than either fully sequential (slow)
   // or one giant unbounded Promise.all (risks exhausting the DB connection pool — see db/client.ts's

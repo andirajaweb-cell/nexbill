@@ -255,6 +255,7 @@ registerDict({
   "accounting.journal.source.pos": { id: "POS", en: "POS", ms: "POS", th: "POS", fil: "POS", vi: "POS" },
   "accounting.journal.source.purchaseInvoice": { id: "Purchase Invoice", en: "Purchase Invoice", ms: "Invois Belian", th: "ใบแจ้งหนี้ซื้อ", fil: "Purchase Invoice", vi: "Hóa đơn mua hàng" },
   "accounting.journal.source.purchasePayment": { id: "Purchase Payment", en: "Purchase Payment", ms: "Bayaran Belian", th: "การชำระเงินซื้อ", fil: "Purchase Payment", vi: "Thanh toán mua hàng" },
+  "accounting.journal.source.inventoryAdjustment": { id: "Penyesuaian Persediaan", en: "Inventory Adjustment", ms: "Pelarasan Inventori", th: "ปรับปรุงสินค้าคงคลัง", fil: "Inventory Adjustment", vi: "Điều chỉnh tồn kho" },
   "accounting.journal.source.purchaseReturn": { id: "Purchase Return", en: "Purchase Return", ms: "Pemulangan Belian", th: "การคืนสินค้าซื้อ", fil: "Purchase Return", vi: "Trả hàng mua" },
   "accounting.journal.source.expense": { id: "Expense", en: "Expense", ms: "Perbelanjaan", th: "ค่าใช้จ่าย", fil: "Expense", vi: "Chi phí" },
   "accounting.journal.source.refund": { id: "Refund", en: "Refund", ms: "Bayaran Balik", th: "การคืนเงิน", fil: "Refund", vi: "Hoàn tiền" },

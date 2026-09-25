@@ -589,6 +589,7 @@ const SOURCE_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }> 
   membership_fee: { key: "accounting.journal.source.membershipFee", fallback: "Iuran Membership" },
   cash_deposit: { key: "accounting.journal.source.cashDeposit", fallback: "Setoran Kas" },
   cash_transfer: { key: "accounting.journal.source.cashTransfer", fallback: "Pindah Kas" },
+  inventory_adjustment: { key: "accounting.journal.source.inventoryAdjustment", fallback: "Penyesuaian Persediaan" },
 };
 
 const emptyJournalLine = () => ({ accountId: "", debit: "", credit: "", description: "" });

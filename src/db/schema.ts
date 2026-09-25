@@ -885,7 +885,7 @@ export const journalEntries = pgTable(
         "rental", "pos", "purchase_invoice", "purchase_payment", "purchase_return",
         "expense", "refund", "asset_purchase", "asset_disposal", "depreciation",
         "receivable_payment", "manual", "opening_balance", "ppob", "other_income",
-        "home_rental", "membership_fee", "cash_deposit", "cash_transfer",
+        "home_rental", "membership_fee", "cash_deposit", "cash_transfer", "inventory_adjustment",
       ],
     }).notNull(),
     sourceId: text("source_id"),

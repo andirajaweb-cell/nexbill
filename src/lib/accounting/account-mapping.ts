@@ -128,6 +128,17 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "addon", transactionKey: "vr", accountCode: "4353", label: "Add-on — VR (opsional, tidak dipakai default)" },
   { module: "addon", transactionKey: "member", accountCode: "4530", label: "Add-on — Member" },
   { module: "product", transactionKey: "inventory", accountCode: "1161", label: "Inventory F&B" },
+  // HPP for any product category outside food/drink/coffee/snack/dessert/merchandise/accessory
+  // (raw_material, sparepart, other, and every outlet-created custom category) — see
+  // cogsAccountIdForCategory in postings.ts. Before this, such sales reduced stock but posted no
+  // COGS at all, so Persediaan kept every purchase forever and gross profit was overstated.
+  { module: "product_sale_cogs", transactionKey: "other", accountCode: "5400", label: "HPP Produk Lainnya (kategori non-standar)" },
+  // Stock count / manual adjustment differences, valued at harga modal — see
+  // lib/accounting/inventory-postings.ts.
+  { module: "product", transactionKey: "opname_difference", accountCode: "5310", label: "Selisih Stock Opname" },
+  { module: "product", transactionKey: "damaged", accountCode: "5320", label: "Barang Rusak / Waste" },
+  { module: "product", transactionKey: "adjustment", accountCode: "5340", label: "Penyesuaian Stok Manual" },
+  { module: "product", transactionKey: "opening_stock", accountCode: "3400", label: "Stok Awal Produk (Opening Balance Equity)" },
   // Revenue accounts below now receive ONLY the admin fee/margin (feeAdmin) — see
   // buildPpobCollectionLines in lib/ppob/engine.ts. The provider's own cut (providerFee) is no
   // longer grossed into these as revenue-then-expensed; it's part of "principal", routed through

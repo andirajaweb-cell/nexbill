@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     if (!file || !(file instanceof File)) return NextResponse.json({ error: "File Excel wajib diupload." }, { status: 400 });
 
     const arrayBuffer = await file.arrayBuffer();
-    const summary = await importProductsFromWorkbook(session.outletId, Buffer.from(arrayBuffer));
+    const summary = await importProductsFromWorkbook(session.outletId, Buffer.from(arrayBuffer), session.sub);
     return NextResponse.json(summary);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { stockOpnames, stockOpnameItems, products, stockMovements } from "@/db/schema";
 import { eq, sql, inArray } from "drizzle-orm";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
+import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-postings";
 
 // PARALLEL_CHUNK_SIZE used to live here, bounding how many stock updates ran per Promise.all
 // batch. completeStockOpname now applies them sequentially inside a single transaction instead —
@@ -92,6 +93,23 @@ export async function completeStockOpname(stockOpnameId: string) {
         .set({ stockQty: sql`${products.stockQty} + ${item.differenceQty}` })
         .where(eq(products.id, item.productId));
     }
+
+    // Book the counted difference (valued at harga modal) against Persediaan in the same
+    // transaction — before this, an opname changed stock but Persediaan in the Neraca never moved,
+    // and missing stock never showed up as a loss in Laba Rugi. A closed accounting period makes
+    // postJournal throw, which rolls the whole opname back instead of applying it half-booked.
+    await postInventoryAdjustmentJournal(
+      {
+        outletId: opname.outletId,
+        reason: "opname",
+        lines: changed.map((item) => ({ productId: item.productId, qtyDelta: item.differenceQty })),
+        reference: `OPN-${opname.id.slice(0, 8)}`,
+        description: `Selisih stock opname ${new Date(opname.opnameDate).toLocaleDateString("id-ID")}`,
+        sourceId: opname.id,
+        staffUserId: opname.staffUserId ?? undefined,
+      },
+      tx
+    );
 
     const [row] = await tx.update(stockOpnames).set({ status: "completed" }).where(eq(stockOpnames.id, stockOpnameId)).returning();
     return row;

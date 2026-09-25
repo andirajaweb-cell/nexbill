@@ -946,8 +946,8 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   // `submitting` disables the button for the duration of the request, and a themed showAlert
   // confirms the save so the user isn't left guessing whether their first click registered.
   const [submitting, setSubmitting] = useState(false);
-  const [viewing, setViewing] = useState<{ invoice: any; lines: any[]; isLegacy: boolean } | null>(null);
-  const [editing, setEditing] = useState<{ invoiceId: string; invoiceNumber: string; cart: { productId: string; qty: number; unitCost: number }[]; reason: string } | null>(null);
+  const [viewing, setViewing] = useState<{ invoice: any; lines: any[]; isLegacy: boolean; additionalCost: number | null } | null>(null);
+  const [editing, setEditing] = useState<{ invoiceId: string; invoiceNumber: string; cart: { productId: string; qty: number; unitCost: number }[]; additionalCost: number; reason: string } | null>(null);
   const [editItemForm, setEditItemForm] = useState({ productId: "", qty: 1, unitCost: 0 });
   const [busyInvoiceId, setBusyInvoiceId] = useState<string | null>(null);
 
@@ -977,7 +977,11 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const grandTotal = itemsSubtotal + transportCost + parkingCost + otherCost;
 
   const addToCart = () => {
-    if (!itemForm.productId || !itemForm.qty || itemForm.unitCost <= 0) return;
+    // Used to return silently here, so a purchase entered without a price (or without a product)
+    // just "didn't add" with no explanation — say why instead.
+    if (!itemForm.productId) return showAlert(t("inventory.supplierPurchase.chooseProductAlert", "Pilih produk dulu."));
+    if (!itemForm.qty || itemForm.qty <= 0) return showAlert(t("inventory.supplierPurchase.qtyAlert", "Qty harus lebih dari 0."));
+    if (itemForm.unitCost <= 0) return showAlert(t("inventory.supplierPurchase.unitCostAlert", "Isi harga beli per unit — harga ini yang menjadi dasar HPP produk."));
     setCart((prev) => [...prev, { ...itemForm }]);
     setItemForm({ productId: "", qty: 1, unitCost: 0 });
   };
@@ -1016,17 +1020,17 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   };
 
   const openView = async (invoiceId: string) => {
-    const data = await fetchJsonObject<{ invoice: any; lines: any[]; isLegacy: boolean }>(`/api/purchase-invoices/${invoiceId}`);
+    const data = await fetchJsonObject<{ invoice: any; lines: any[]; isLegacy: boolean; additionalCost: number | null }>(`/api/purchase-invoices/${invoiceId}`);
     if (data) setViewing(data);
   };
 
   const openEdit = async (invoiceId: string, invoiceNumber: string) => {
-    const data = await fetchJsonObject<{ invoice: any; lines: any[]; isLegacy: boolean }>(`/api/purchase-invoices/${invoiceId}`);
+    const data = await fetchJsonObject<{ invoice: any; lines: any[]; isLegacy: boolean; additionalCost: number | null }>(`/api/purchase-invoices/${invoiceId}`);
     if (!data) return;
     if (data.isLegacy) {
       return showAlert(t("inventory.supplierPurchase.legacyNoEdit", "Invoice ini dibuat sebelum fitur edit tersedia, jadi rinciannya tidak bisa dipastikan ulang — hanya bisa dilihat atau dibatalkan."));
     }
-    setEditing({ invoiceId, invoiceNumber, cart: data.lines.map((l: any) => ({ productId: l.productId, qty: l.qty, unitCost: l.unitCost })), reason: "" });
+    setEditing({ invoiceId, invoiceNumber, cart: data.lines.map((l: any) => ({ productId: l.productId, qty: l.qty, unitCost: l.unitCost })), additionalCost: data.additionalCost ?? 0, reason: "" });
   };
 
   const addEditItem = () => {
@@ -1044,11 +1048,13 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
     if (editing.cart.length === 0) return showAlert(t("inventory.supplierPurchase.needItemAlert", "Tambah minimal 1 item belanja."));
     setBusyInvoiceId(editing.invoiceId);
     try {
-      const lines = editing.cart.map((c) => ({ productId: c.productId, qty: c.qty, unitCost: c.unitCost, landedUnitCost: c.unitCost }));
+      // Unit prices + ongkos only — the server prorates the ongkos into each line's landed cost
+      // (HPP). Sending landedUnitCost = unitCost here used to drop the invoice's ongkos on every edit.
+      const lines = editing.cart.map((c) => ({ productId: c.productId, qty: c.qty, unitCost: c.unitCost }));
       const res = await fetch(`/api/purchase-invoices/${editing.invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines, reason: editing.reason || undefined }),
+        body: JSON.stringify({ lines, additionalCost: editing.additionalCost, reason: editing.reason || undefined }),
       });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
@@ -1201,11 +1207,21 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
             <button className="text-neutral-500" onClick={() => setViewing(null)}>{t("accounting.common.cancel", "Batal")}</button>
           </div>
           {viewing.isLegacy && <div className="text-amber-400">{t("inventory.supplierPurchase.legacyHint", "Invoice lama — rincian item direkonstruksi dari catatan stok, bukan data invoice asli.")}</div>}
+          {viewing.isLegacy && viewing.lines.some((l) => l.unitCost == null) && (
+            <div className="text-neutral-400">{t("inventory.supplierPurchase.legacyCostHint", "Invoice ini dibuat sebelum harga per item disimpan, jadi harga per item tidak bisa ditampilkan. Total belanja tetap benar, dan HPP produk sudah diperbarui saat belanja ini dicatat.")}</div>
+          )}
+          {!viewing.isLegacy && (viewing.additionalCost ?? 0) > 0 && (
+            <div className="flex justify-between text-neutral-400"><span>{t("inventory.supplierPurchase.costsLabel", "Ongkos (transport+parkir+lain-lain)")}</span><span>{rupiah(viewing.additionalCost ?? 0)} ({t("inventory.supplierPurchase.includedInCost", "sudah termasuk di HPP")})</span></div>
+          )}
           <div className="space-y-1">
             {viewing.lines.map((l, i) => (
               <div key={i} className="flex justify-between">
                 <span>{products.find((p) => p.id === l.productId)?.name ?? l.productId} x{l.qty}</span>
-                <span>{rupiah(l.unitCost)} → {t("inventory.supplierPurchase.landedCostShort", "HPP")} {rupiah(l.landedUnitCost)}</span>
+                <span>
+                  {l.unitCost == null
+                    ? <span className="text-neutral-500">{t("inventory.supplierPurchase.costNotRecorded", "harga tidak tercatat")}</span>
+                    : <>{rupiah(l.unitCost)} → {t("inventory.supplierPurchase.landedCostShort", "HPP")} {rupiah(l.landedUnitCost)}</>}
+                </span>
               </div>
             ))}
           </div>
@@ -1242,6 +1258,15 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
               </div>
             ))}
             {editing.cart.length === 0 && <div className="text-neutral-500">{t("inventory.supplierPurchase.editEmptyCart", "Belum ada item.")}</div>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 items-center">
+            <label className="text-neutral-400">{t("inventory.supplierPurchase.costsLabel", "Ongkos (transport+parkir+lain-lain)")}</label>
+            <input type="number" min={0} className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2" value={editing.additionalCost || ""} placeholder="0" onChange={(e) => setEditing({ ...editing, additionalCost: Math.max(0, Number(e.target.value) || 0) })} />
+          </div>
+          <div className="flex justify-between font-semibold">
+            <span>{t("inventory.supplierPurchase.totalLabel", "Total Belanja")}</span>
+            <span>{rupiah(editing.cart.reduce((s, c) => s + c.qty * c.unitCost, 0) + editing.additionalCost)}</span>
           </div>
 
           <input

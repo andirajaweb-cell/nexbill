@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 import { receiveStockForItem } from "@/lib/inventory/stock";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
+import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-postings";
 
 export async function GET() {
   try {
@@ -64,15 +65,36 @@ export async function POST(req: NextRequest) {
     const delta =
       type === "purchase_in" ? Math.abs(qty) : type === "sale_out" || type === "waste" ? -Math.abs(qty) : Number(qty);
 
-    const [movement] = await db
-      .insert(stockMovements)
-      .values({ productId, type, qty: delta, note, staffUserId })
-      .returning();
+    // Movement, stock change, and its Persediaan journal commit together. The journal used to be
+    // missing entirely, so a Kurangi Unit for broken stock lowered the count but never booked the
+    // loss, and Persediaan in the Neraca drifted away from the real stock value.
+    const movement = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(stockMovements)
+        .values({ productId, type, qty: delta, note, staffUserId })
+        .returning();
 
-    await db
-      .update(products)
-      .set({ stockQty: sql`${products.stockQty} + ${delta}` })
-      .where(eq(products.id, productId));
+      await tx
+        .update(products)
+        .set({ stockQty: sql`${products.stockQty} + ${delta}` })
+        .where(eq(products.id, productId));
+
+      if (type === "adjustment" || type === "waste") {
+        await postInventoryAdjustmentJournal(
+          {
+            outletId: session.outletId,
+            reason: type === "waste" ? "damaged" : "adjustment",
+            lines: [{ productId, qtyDelta: delta }],
+            reference: `ADJ-${row.id.slice(0, 8)}`,
+            description: `${type === "waste" ? "Barang rusak/waste" : "Penyesuaian stok"} — ${product.name} (${delta > 0 ? "+" : ""}${delta})${note ? `: ${note}` : ""}`,
+            sourceId: row.id,
+            staffUserId: session.sub,
+          },
+          tx
+        );
+      }
+      return row;
+    });
 
     await autoFillLowStockPurchaseOrders(session.outletId);
 

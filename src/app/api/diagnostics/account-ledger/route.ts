@@ -37,6 +37,7 @@ const SOURCE_LABEL: Record<string, string> = {
   purchase_invoice: "Faktur pembelian supplier",
   purchase_payment: "Pembayaran ke supplier",
   purchase_return: "Retur pembelian",
+  inventory_adjustment: "Penyesuaian persediaan (opname/stok awal/rusak)",
   expense: "Pengeluaran/biaya",
   refund: "Refund",
   asset_purchase: "Pembelian aset",

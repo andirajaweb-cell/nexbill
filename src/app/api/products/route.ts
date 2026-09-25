@@ -4,6 +4,7 @@ import { products } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { recordOpeningStock } from "@/lib/accounting/inventory-postings";
 
 export async function GET() {
   try {
@@ -25,7 +26,12 @@ export async function POST(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
     const body = await req.json();
     const { outletId: _ignoredOutlet, ...rest } = body;
-    const [row] = await db.insert(products).values({ ...rest, outletId: session.outletId }).returning();
+    // Product + its Stok Awal movement + opening Persediaan journal commit together.
+    const row = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(products).values({ ...rest, outletId: session.outletId }).returning();
+      await recordOpeningStock(session.outletId, [created], session.sub, tx);
+      return created;
+    });
     return NextResponse.json(row);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

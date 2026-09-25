@@ -240,6 +240,27 @@ export interface RecordSupplierPurchaseInput {
 }
 
 /**
+ * Prorates incidental costs (transport/parking/other) across purchase lines by each line's share of
+ * the items subtotal (even split if the subtotal is 0), giving each line its landed unit cost — the
+ * value that blends into products.costPrice (HPP). Shared by recordSupplierPurchase and the invoice
+ * Edit flow (editPurchaseInvoiceLines) so a corrected invoice keeps its ongkos exactly the way the
+ * original purchase allocated it.
+ */
+export function prorateLandedCosts<T extends { qty: number; unitCost: number }>(items: T[], additionalCostsTotal: number) {
+  const extra = Math.max(0, additionalCostsTotal);
+  const itemsSubtotal = items.reduce((s, i) => s + i.qty * i.unitCost, 0);
+  const lineBreakdown = items.map((item) => {
+    const lineSubtotal = item.qty * item.unitCost;
+    const share = itemsSubtotal > 0 ? lineSubtotal / itemsSubtotal : 1 / items.length;
+    const allocatedExtra = extra * share;
+    const landedLineCost = lineSubtotal + allocatedExtra;
+    const landedUnitCost = landedLineCost / item.qty;
+    return { ...item, lineSubtotal, allocatedExtra, landedLineCost, landedUnitCost };
+  });
+  return { itemsSubtotal, additionalCostsTotal: extra, grandTotal: itemsSubtotal + extra, lineBreakdown };
+}
+
+/**
  * Quick supplier purchase for finished/resale F&B products (bottled drinks,
  * packaged snacks — items with no recipe/BOM, bought ready-to-sell rather than
  * as ingredients). Unlike the formal PO → receive flow, this is a single-step
@@ -257,20 +278,8 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
     if (item.unitCost < 0) throw new Error("Harga beli tidak boleh negatif.");
   }
 
-  const itemsSubtotal = input.items.reduce((s, i) => s + i.qty * i.unitCost, 0);
   const additionalCostsTotal = Math.max(0, (input.transportCost ?? 0) + (input.parkingCost ?? 0) + (input.otherCost ?? 0));
-  const grandTotal = itemsSubtotal + additionalCostsTotal;
-
-  // Prorate the incidental costs across items by their share of the items
-  // subtotal (falls back to an even split if the subtotal is somehow 0).
-  const lineBreakdown = input.items.map((item) => {
-    const lineSubtotal = item.qty * item.unitCost;
-    const share = itemsSubtotal > 0 ? lineSubtotal / itemsSubtotal : 1 / input.items.length;
-    const allocatedExtra = additionalCostsTotal * share;
-    const landedLineCost = lineSubtotal + allocatedExtra;
-    const landedUnitCost = landedLineCost / item.qty;
-    return { ...item, lineSubtotal, allocatedExtra, landedLineCost, landedUnitCost };
-  });
+  const { itemsSubtotal, grandTotal, lineBreakdown } = prorateLandedCosts(input.items, additionalCostsTotal);
 
   const invoiceNumber = input.invoiceNumber ?? `BLJ-${Date.now().toString(36).toUpperCase()}`;
 

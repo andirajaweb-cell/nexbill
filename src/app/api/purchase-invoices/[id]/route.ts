@@ -15,8 +15,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!hasPermission(session.role as StaffRole, "manage_supplier_purchase_history")) {
       return NextResponse.json({ error: "Role kamu tidak punya izin melihat riwayat belanja supplier." }, { status: 403 });
     }
-    const { lines, isLegacy } = await reconstructInvoiceLines(id);
-    return NextResponse.json({ invoice: row, lines, isLegacy });
+    const { lines, isLegacy, additionalCost } = await reconstructInvoiceLines(id);
+    return NextResponse.json({ invoice: row, lines, isLegacy, additionalCost });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });
   }
@@ -36,7 +36,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Minimal 1 item." }, { status: 400 });
     }
     const reason = typeof body.reason === "string" && body.reason.trim() ? body.reason.trim() : "Koreksi manual";
-    const result = await editPurchaseInvoiceLines(id, body.lines, reason, session.sub);
+    const additionalCost = body.additionalCost == null ? undefined : Number(body.additionalCost);
+    const result = await editPurchaseInvoiceLines(id, body.lines, additionalCost, reason, session.sub);
     return NextResponse.json(result);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });

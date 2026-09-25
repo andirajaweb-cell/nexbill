@@ -13,15 +13,22 @@ import {
 } from "@/db/schema";
 import { voidJournal } from "@/lib/accounting/journal";
 import { postPurchaseInvoiceJournal } from "@/lib/accounting/postings";
-import { payPurchaseInvoice } from "@/lib/inventory/purchasing";
+import { payPurchaseInvoice, prorateLandedCosts } from "@/lib/inventory/purchasing";
 import { recomputeCostPriceExcludingRef } from "@/lib/inventory/cost-replay";
 import { logAudit } from "@/lib/audit/log";
 
 export interface ReconstructedInvoiceLine {
   productId: string;
   qty: number;
-  unitCost: number;
-  landedUnitCost: number;
+  /** null = never recorded (legacy invoice) — NOT the same as Rp0; the UI must show it as unknown. */
+  unitCost: number | null;
+  landedUnitCost: number | null;
+}
+
+/** The ongkos (transport/parkir/lain-lain) baked into an invoice's landed costs: Σ qty × (landed − unit). */
+export function additionalCostOf(lines: { qty: number; unitCost: number; landedUnitCost: number }[]): number {
+  const extra = lines.reduce((s, l) => s + l.qty * (l.landedUnitCost - l.unitCost), 0);
+  return Math.max(0, Math.round(extra * 100) / 100);
 }
 
 /**
@@ -30,16 +37,23 @@ export interface ReconstructedInvoiceLine {
  * legacy invoice that predates that table, falls back to reverse-engineering from stockMovements
  * rows sharing this invoice's id as refOrderId (type purchase_in) — qty and landedUnitCost are
  * recoverable that way, but the original pre-proration unitCost is not, so it's approximated as
- * equal to landedUnitCost. `isLegacy` tells the caller (UI + the edit route) to degrade Edit to
- * "not available for this invoice, only View/Delete" since we can't reconstruct exactly what the
- * user originally typed for legacy rows.
+ * equal to landedUnitCost. Invoices from before stockMovements.unitCost existed (added 2026-09-12)
+ * have no per-line cost at all — those come back as null, never 0: the purchase DID blend its real
+ * cost into products.costPrice at the time, only the per-line breakdown was never stored, so
+ * showing "Rp0 → HPP Rp0" misreported it as a free purchase. `isLegacy` tells the caller (UI + the
+ * edit route) to degrade Edit to "not available for this invoice, only View/Delete" since we can't
+ * reconstruct exactly what the user originally typed for legacy rows.
  */
-export async function reconstructInvoiceLines(purchaseInvoiceId: string, dbc: DbOrTx = db): Promise<{ lines: ReconstructedInvoiceLine[]; isLegacy: boolean }> {
+export async function reconstructInvoiceLines(
+  purchaseInvoiceId: string,
+  dbc: DbOrTx = db
+): Promise<{ lines: ReconstructedInvoiceLine[]; isLegacy: boolean; additionalCost: number | null }> {
   const canonical = await dbc.select().from(purchaseInvoiceItems).where(eq(purchaseInvoiceItems.purchaseInvoiceId, purchaseInvoiceId));
   if (canonical.length > 0) {
     return {
       lines: canonical.map((r) => ({ productId: r.productId, qty: r.qty, unitCost: r.unitCost, landedUnitCost: r.landedUnitCost })),
       isLegacy: false,
+      additionalCost: additionalCostOf(canonical),
     };
   }
 
@@ -49,8 +63,9 @@ export async function reconstructInvoiceLines(purchaseInvoiceId: string, dbc: Db
     .where(and(eq(stockMovements.refOrderId, purchaseInvoiceId), eq(stockMovements.type, "purchase_in")));
 
   return {
-    lines: movements.map((m) => ({ productId: m.productId, qty: m.qty, unitCost: m.unitCost ?? 0, landedUnitCost: m.unitCost ?? 0 })),
+    lines: movements.map((m) => ({ productId: m.productId, qty: m.qty, unitCost: m.unitCost ?? null, landedUnitCost: m.unitCost ?? null })),
     isLegacy: true,
+    additionalCost: null,
   };
 }
 
@@ -226,9 +241,26 @@ export async function voidPurchaseInvoice(purchaseInvoiceId: string, reason: str
  * Blocked for legacy invoices with no purchaseInvoiceItems rows (reconstructInvoiceLines
  * `isLegacy: true`) — we can't be sure we're reversing exactly what was originally entered, so
  * those only get View/Delete, never Edit; the route layer enforces this before calling here.
+ *
+ * Landed costs are recomputed HERE from unitCost + the invoice's ongkos (prorateLandedCosts), never
+ * taken from the caller. The edit form used to send landedUnitCost = unitCost, which silently
+ * dropped the original transport/parkir/lain-lain from the invoice total, Persediaan, and every
+ * item's HPP the moment anyone corrected a single qty. `additionalCost` undefined = keep the ongkos
+ * the invoice already had.
  */
-export async function editPurchaseInvoiceLines(purchaseInvoiceId: string, newLines: InvoiceLineInput[], reason: string, staffUserId: string | undefined) {
-  if (!newLines.length) throw new Error("Invoice harus punya minimal 1 item.");
+export async function editPurchaseInvoiceLines(
+  purchaseInvoiceId: string,
+  inputLines: { productId: string; qty: number; unitCost: number }[],
+  additionalCost: number | undefined,
+  reason: string,
+  staffUserId: string | undefined
+) {
+  if (!inputLines.length) throw new Error("Invoice harus punya minimal 1 item.");
+  for (const l of inputLines) {
+    if (!l.productId || !(Number(l.qty) > 0)) throw new Error("Qty item harus lebih dari 0.");
+    if (!(Number(l.unitCost) >= 0)) throw new Error("Harga beli tidak boleh negatif.");
+  }
+  if (additionalCost !== undefined && !(Number(additionalCost) >= 0)) throw new Error("Ongkos tidak boleh negatif.");
 
   const { invoice, journalId, amount, priorPayment } = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${purchaseInvoiceId}))`);
@@ -236,10 +268,15 @@ export async function editPurchaseInvoiceLines(purchaseInvoiceId: string, newLin
     const [before] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
     if (!before) throw new Error("Invoice tidak ditemukan.");
 
-    const { isLegacy } = await reconstructInvoiceLines(purchaseInvoiceId, tx);
+    const { isLegacy, additionalCost: originalAdditionalCost } = await reconstructInvoiceLines(purchaseInvoiceId, tx);
     if (isLegacy) {
       throw new Error("Invoice ini dibuat sebelum fitur koreksi tersedia dan tidak bisa diedit langsung — hanya bisa dilihat atau dibatalkan.");
     }
+    const { lineBreakdown } = prorateLandedCosts(
+      inputLines.map((l) => ({ productId: l.productId, qty: Number(l.qty), unitCost: Number(l.unitCost) })),
+      additionalCost !== undefined ? Number(additionalCost) : (originalAdditionalCost ?? 0)
+    );
+    const newLines: InvoiceLineInput[] = lineBreakdown.map((l) => ({ productId: l.productId, qty: l.qty, unitCost: l.unitCost, landedUnitCost: l.landedUnitCost }));
 
     // Capture what was already paid BEFORE reversing — reverseInvoiceEffects voids the payment
     // journal(s) but (deliberately) leaves the purchasePayments rows themselves untouched as

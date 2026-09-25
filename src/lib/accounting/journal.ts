@@ -23,7 +23,8 @@ export type JournalSourceType =
   | "home_rental"
   | "membership_fee"
   | "cash_deposit"
-  | "cash_transfer";
+  | "cash_transfer"
+  | "inventory_adjustment";
 
 export interface JournalLineInput {
   /** Either accountCode (COA code, resolved automatically) or a raw accountId. */
