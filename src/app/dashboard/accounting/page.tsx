@@ -1524,12 +1524,14 @@ function AccountLedgerModal({
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [lines, setLines] = useState<AccountLedgerLine[] | null>(null);
+  // Default hides cancelled pairs (a voided entry + its reversal) — same rows the Neraca Saldo
+  // excludes, so this list adds up to the balance shown. Tick to audit what was cancelled.
+  const [showCancelled, setShowCancelled] = useState(false);
 
   useEffect(() => {
-    const qs = new URLSearchParams({ outletId, accountId, ...(from ? { from } : {}), ...(to ? { to } : {}) });
-    setLines(null);
+    const qs = new URLSearchParams({ outletId, accountId, ...(from ? { from } : {}), ...(to ? { to } : {}), ...(showCancelled ? { includeCancelled: "1" } : {}) });
     fetchJsonObject<{ lines: AccountLedgerLine[] }>(`/api/accounting/profit-loss/account-detail?${qs}`).then((r) => setLines(r?.lines ?? []));
-  }, [outletId, accountId, from, to]);
+  }, [outletId, accountId, from, to, showCancelled]);
 
   const total = lines?.reduce((s, l) => s + l.amount, 0) ?? 0;
 
@@ -1550,6 +1552,10 @@ function AccountLedgerModal({
           <span>{totalLabel}</span>
           <span>{rupiah(balance)}</span>
         </div>
+        <label className="flex items-center gap-2 text-xs text-neutral-500 mb-2 cursor-pointer select-none">
+          <input type="checkbox" checked={showCancelled} onChange={(e) => { setLines(null); setShowCancelled(e.target.checked); }} />
+          {t("accounting.ledger.showCancelled", "Tampilkan transaksi yang dibatalkan beserta jurnal pembaliknya (untuk audit — tidak mengubah saldo)")}
+        </label>
 
         {/*
          * Ringkasan "bertambah / berkurang / sisa" dalam satu baris.

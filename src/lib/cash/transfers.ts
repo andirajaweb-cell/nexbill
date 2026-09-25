@@ -1,7 +1,7 @@
 import { db } from "@/db/client";
 import { cashTransfers, cashBankAccounts, staffUsers, approvalRequests } from "@/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
-import { postJournal, voidJournal } from "@/lib/accounting/journal";
+import { postJournal, voidJournal, lockEntity } from "@/lib/accounting/journal";
 import { logAudit } from "@/lib/audit/log";
 import type { StaffRole } from "@/lib/auth/permissions";
 
@@ -76,7 +76,10 @@ export async function requestCashTransfer(input: RequestCashTransferInput) {
 
 /** Called from approveRequest() once an Owner/Manager approves the pending approvalRequests row — actually posts the journal (Dr destination pool / Cr source pool, both stay on the balance sheet as assets) and flips the cashTransfers row to "posted". */
 export async function executeCashTransfer(transferId: string, reviewerId: string) {
-  const [transfer] = await db.select().from(cashTransfers).where(eq(cashTransfers.id, transferId)).limit(1);
+  // Lock-then-recheck: a double-clicked Setujui used to post the same transfer's journal twice.
+  const { transfer, updated } = await db.transaction(async (tx) => {
+  await lockEntity(tx, `cash_transfer:${transferId}`);
+  const [transfer] = await tx.select().from(cashTransfers).where(eq(cashTransfers.id, transferId)).limit(1);
   if (!transfer) throw new Error("Permintaan pindah kas tidak ditemukan.");
   if (transfer.status !== "pending_approval") throw new Error("Permintaan pindah kas ini sudah diproses.");
 
@@ -95,13 +98,15 @@ export async function executeCashTransfer(transferId: string, reviewerId: string
       { accountId: destination.accountId, debit: transfer.amount, credit: 0, description: label },
       { accountId: source.accountId, debit: 0, credit: transfer.amount, description: label },
     ],
-  });
+  }, tx);
 
-  const [updated] = await db
+  const [updated] = await tx
     .update(cashTransfers)
     .set({ status: "posted", journalEntryId: journalId })
     .where(eq(cashTransfers.id, transferId))
     .returning();
+  return { transfer, updated };
+  });
 
   await logAudit({ outletId: transfer.outletId, staffUserId: reviewerId, action: "approve_cash_transfer", entityType: "cash_transfer", entityId: transferId, after: updated });
   return updated;

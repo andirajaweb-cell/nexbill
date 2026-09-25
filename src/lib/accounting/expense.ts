@@ -1,8 +1,8 @@
-import { db } from "@/db/client";
+import { db, type DbOrTx } from "@/db/client";
 import { expenses, accounts, outlets, cashBankAccounts, recurringExpenseTemplates, staffUsers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nomorBerikutnya } from "@/lib/db/nomor-urut";
-import { postJournal } from "./journal";
+import { postJournal, voidJournal, lockEntity } from "./journal";
 import { EXPENSE_PAYABLE_ACCOUNT_CODE } from "./coa";
 import { isPeriodLocked } from "./periods";
 import { logAudit } from "@/lib/audit/log";
@@ -186,10 +186,15 @@ export async function createExpense(input: CreateExpenseInput) {
   return expense;
 }
 
-/** The actual posting step, shared by the auto-approve (under threshold) and manual approve paths. */
-async function postAndAdvance(expenseId: string, actorId?: string) {
-  const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
+/**
+ * The actual posting step, shared by the auto-approve (under threshold) and manual approve paths.
+ * Runs inside the caller's transaction, AFTER the expense is locked — see withLockedExpense below.
+ */
+async function postAndAdvance(tx: DbOrTx, expenseId: string, actorId?: string) {
+  const [expense] = await tx.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
   if (!expense) throw new Error("Expense tidak ditemukan.");
+  // Belt and braces on top of the lock: an expense that already has its journal never gets a second.
+  if (expense.journalEntryId) return expense.status === "paid" ? ("paid" as const) : ("approved" as const);
   const total = round(expense.amount + (expense.taxAmount ?? 0));
 
   /*
@@ -210,7 +215,7 @@ async function postAndAdvance(expenseId: string, actorId?: string) {
    * mundur ke hari ini — buku yang sudah dikunci tidak boleh disisipi entri baru.
    */
   const expenseDate = expense.expenseDate ?? new Date().toISOString();
-  const entryDate = (await isPeriodLocked(expense.outletId, expenseDate)) ? new Date().toISOString() : expenseDate;
+  const entryDate = (await isPeriodLocked(expense.outletId, expenseDate, tx)) ? new Date().toISOString() : expenseDate;
 
   if (expense.recordAsPayable) {
     const journalId = await postJournal({
@@ -225,8 +230,8 @@ async function postAndAdvance(expenseId: string, actorId?: string) {
         { accountId: expense.accountId, debit: total, credit: 0, description: expense.category },
         { accountCode: EXPENSE_PAYABLE_ACCOUNT_CODE, debit: 0, credit: total, description: "Hutang expense" },
       ],
-    });
-    await db
+    }, tx);
+    await tx
       .update(expenses)
       .set({ status: "approved", journalEntryId: journalId, approvedBy: actorId, approvedAt: new Date().toISOString() })
       .where(eq(expenses.id, expenseId));
@@ -247,9 +252,9 @@ async function postAndAdvance(expenseId: string, actorId?: string) {
       { accountId: expense.accountId, debit: total, credit: 0, description: expense.category },
       { accountId: cashBankGlAccountId, debit: 0, credit: total, description: `Pembayaran (${expense.paymentMethod ?? "cash"})` },
     ],
-  });
+  }, tx);
   const now = new Date().toISOString();
-  await db
+  await tx
     .update(expenses)
     .set({ status: "paid", journalEntryId: journalId, approvedBy: actorId, approvedAt: now, paidBy: actorId, paidAt: now })
     .where(eq(expenses.id, expenseId));
@@ -257,39 +262,58 @@ async function postAndAdvance(expenseId: string, actorId?: string) {
 }
 
 /** Submit a draft (or resubmit a rejected) expense — auto-approves+posts under the outlet's threshold, otherwise queues for approval. */
+/**
+ * Runs `fn` in one transaction holding a lock on this expense, with the expense re-read AFTER the
+ * lock. Every state change that can post or reverse a journal goes through here.
+ *
+ * BUG YANG DIPERBAIKI DI SINI (2026-09-25): status dulu dicek SEBELUM posting tanpa kunci apa pun.
+ * Klik ganda (atau klik ulang karena koneksi lambat) pada Submit/Approve membuat setiap request
+ * sama-sama melihat status "draft"/"pending_approval", lalu MASING-MASING memposting jurnal.
+ * Terbukti di produksi: expense Listrik EXP-00161 Rp1.005.000 punya 5 jurnal identik, sehingga
+ * akun Listrik di Neraca Saldo tercatat Rp5.025.000.
+ */
+async function withLockedExpense<T>(expenseId: string, fn: (tx: DbOrTx, expense: typeof expenses.$inferSelect) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await lockEntity(tx, `expense:${expenseId}`);
+    const [expense] = await tx.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
+    if (!expense) throw new Error("Expense tidak ditemukan.");
+    return fn(tx, expense);
+  });
+}
+
+/** Submit a draft (or resubmit a rejected) expense — auto-approves+posts under the outlet's threshold, otherwise queues for approval. */
 export async function submitExpense(expenseId: string, staffUserId?: string) {
-  const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
-  if (!expense) throw new Error("Expense tidak ditemukan.");
-  if (!["draft", "rejected"].includes(expense.status)) throw new Error(`Expense berstatus "${expense.status}" tidak bisa disubmit.`);
+  const result = await withLockedExpense(expenseId, async (tx, expense) => {
+    if (!["draft", "rejected"].includes(expense.status)) throw new Error(`Expense berstatus "${expense.status}" tidak bisa disubmit.`);
 
-  const [outlet] = await db.select().from(outlets).where(eq(outlets.id, expense.outletId)).limit(1);
-  const threshold = outlet?.expenseApprovalThreshold ?? 500000;
-  const total = expense.amount + (expense.taxAmount ?? 0);
+    const [outlet] = await tx.select().from(outlets).where(eq(outlets.id, expense.outletId)).limit(1);
+    const threshold = outlet?.expenseApprovalThreshold ?? 500000;
+    const total = expense.amount + (expense.taxAmount ?? 0);
 
-  if (total > threshold) {
-    await db
-      .update(expenses)
-      .set({ status: "pending_approval", submittedAt: new Date().toISOString(), rejectedBy: null, rejectedAt: null, rejectReason: null })
-      .where(eq(expenses.id, expenseId));
-    await logAudit({ outletId: expense.outletId, staffUserId, action: "submit_expense", entityType: "expense", entityId: expenseId, after: { status: "pending_approval", total } });
-    return { status: "pending_approval" as const };
-  }
+    if (total > threshold) {
+      await tx
+        .update(expenses)
+        .set({ status: "pending_approval", submittedAt: new Date().toISOString(), rejectedBy: null, rejectedAt: null, rejectReason: null })
+        .where(eq(expenses.id, expenseId));
+      return { outletId: expense.outletId, status: "pending_approval" as const, total, action: "submit_expense" };
+    }
 
-  await db.update(expenses).set({ submittedAt: new Date().toISOString() }).where(eq(expenses.id, expenseId));
-  const status = await postAndAdvance(expenseId, staffUserId);
-  await logAudit({ outletId: expense.outletId, staffUserId, action: "auto_approve_expense", entityType: "expense", entityId: expenseId, after: { status, total } });
-  return { status };
+    await tx.update(expenses).set({ submittedAt: new Date().toISOString() }).where(eq(expenses.id, expenseId));
+    const status = await postAndAdvance(tx, expenseId, staffUserId);
+    return { outletId: expense.outletId, status, total, action: "auto_approve_expense" };
+  });
+  await logAudit({ outletId: result.outletId, staffUserId, action: result.action, entityType: "expense", entityId: expenseId, after: { status: result.status, total: result.total } });
+  return { status: result.status };
 }
 
 export async function approveExpense(expenseId: string, approverId: string, role: StaffRole) {
   if (!hasPermission(role, "approve_expenses")) throw new Error("Role kamu tidak punya izin menyetujui expense.");
-  const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
-  if (!expense) throw new Error("Expense tidak ditemukan.");
-  if (expense.status !== "pending_approval") throw new Error(`Expense berstatus "${expense.status}" tidak sedang menunggu approval.`);
-  await assertCanReviewExpense(expense, role);
-
-  const status = await postAndAdvance(expenseId, approverId);
-  await logAudit({ outletId: expense.outletId, staffUserId: approverId, action: "approve_expense", entityType: "expense", entityId: expenseId, after: { status } });
+  const { outletId, status } = await withLockedExpense(expenseId, async (tx, expense) => {
+    if (expense.status !== "pending_approval") throw new Error(`Expense berstatus "${expense.status}" tidak sedang menunggu approval.`);
+    await assertCanReviewExpense(expense, role);
+    return { outletId: expense.outletId, status: await postAndAdvance(tx, expenseId, approverId) };
+  });
+  await logAudit({ outletId, staffUserId: approverId, action: "approve_expense", entityType: "expense", entityId: expenseId, after: { status } });
   return { status };
 }
 
@@ -310,32 +334,38 @@ export async function rejectExpense(expenseId: string, approverId: string, role:
 
 /** Settle an expense that was recorded as payable (hutang) — Dr Accounts Payable / Cr Kas-Bank. */
 export async function payExpense(expenseId: string, staffUserId: string, method: "cash" | "bank" | "transfer" | "qris", cashBankAccountId: string) {
-  const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
-  if (!expense) throw new Error("Expense tidak ditemukan.");
-  if (expense.status !== "approved") throw new Error(`Expense berstatus "${expense.status}" tidak bisa dibayar (harus "approved" dulu).`);
-  if (!expense.recordAsPayable) throw new Error("Expense ini bukan hutang — sudah lunas sejak approval.");
-
-  const total = round(expense.amount + (expense.taxAmount ?? 0));
   const cashBankGlAccountId = await getCashBankGlAccountId(cashBankAccountId);
 
-  const journalId = await postJournal({
-    outletId: expense.outletId,
-    reference: `${expense.expenseNumber}-PAY`,
-    description: `Pelunasan hutang — ${expense.description || expense.category}`,
-    sourceType: "expense",
-    sourceId: expense.id,
-    staffUserId,
-    lines: [
-      { accountCode: EXPENSE_PAYABLE_ACCOUNT_CODE, debit: total, credit: 0, description: "Pelunasan hutang expense" },
-      { accountId: cashBankGlAccountId, debit: 0, credit: total, description: `Pembayaran (${method})` },
-    ],
-  });
+  const { expense, updated, total } = await withLockedExpense(expenseId, async (tx, expense) => {
+    if (expense.status !== "approved" || expense.paymentJournalEntryId) {
+      throw new Error(`Expense berstatus "${expense.status}" tidak bisa dibayar (harus "approved" dulu).`);
+    }
+    if (!expense.recordAsPayable) throw new Error("Expense ini bukan hutang — sudah lunas sejak approval.");
 
-  const [updated] = await db
-    .update(expenses)
-    .set({ status: "paid", paymentJournalEntryId: journalId, paidBy: staffUserId, paidAt: new Date().toISOString(), paymentMethod: method, cashBankAccountId })
-    .where(eq(expenses.id, expenseId))
-    .returning();
+    const total = round(expense.amount + (expense.taxAmount ?? 0));
+    const journalId = await postJournal(
+      {
+        outletId: expense.outletId,
+        reference: `${expense.expenseNumber}-PAY`,
+        description: `Pelunasan hutang — ${expense.description || expense.category}`,
+        sourceType: "expense",
+        sourceId: expense.id,
+        staffUserId,
+        lines: [
+          { accountCode: EXPENSE_PAYABLE_ACCOUNT_CODE, debit: total, credit: 0, description: "Pelunasan hutang expense" },
+          { accountId: cashBankGlAccountId, debit: 0, credit: total, description: `Pembayaran (${method})` },
+        ],
+      },
+      tx
+    );
+
+    const [updated] = await tx
+      .update(expenses)
+      .set({ status: "paid", paymentJournalEntryId: journalId, paidBy: staffUserId, paidAt: new Date().toISOString(), paymentMethod: method, cashBankAccountId })
+      .where(eq(expenses.id, expenseId))
+      .returning();
+    return { expense, updated, total };
+  });
 
   await logAudit({ outletId: expense.outletId, staffUserId, action: "pay_expense", entityType: "expense", entityId: expenseId, after: { method, total } });
   return updated;
@@ -343,16 +373,18 @@ export async function payExpense(expenseId: string, staffUserId: string, method:
 
 /** Cancel a not-yet-posted expense (draft/pending_approval) — nothing to reverse since no journal exists yet. */
 export async function cancelExpense(expenseId: string, staffUserId: string, reason: string) {
-  const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
-  if (!expense) throw new Error("Expense tidak ditemukan.");
-  if (!["draft", "pending_approval"].includes(expense.status)) {
-    throw new Error(`Expense berstatus "${expense.status}" sudah terposting ke jurnal — gunakan Void, bukan Cancel.`);
-  }
-  const [updated] = await db
-    .update(expenses)
-    .set({ status: "cancelled", cancelReason: reason })
-    .where(eq(expenses.id, expenseId))
-    .returning();
+  // Locked too: a Cancel racing an Approve must not leave a "cancelled" expense with a live journal.
+  const { expense, updated } = await withLockedExpense(expenseId, async (tx, expense) => {
+    if (!["draft", "pending_approval"].includes(expense.status)) {
+      throw new Error(`Expense berstatus "${expense.status}" sudah terposting ke jurnal — gunakan Void, bukan Cancel.`);
+    }
+    const [updated] = await tx
+      .update(expenses)
+      .set({ status: "cancelled", cancelReason: reason })
+      .where(eq(expenses.id, expenseId))
+      .returning();
+    return { expense, updated };
+  });
   await logAudit({ outletId: expense.outletId, staffUserId, action: "cancel_expense", entityType: "expense", entityId: expenseId, after: { reason } });
   return updated;
 }
@@ -360,19 +392,19 @@ export async function cancelExpense(expenseId: string, staffUserId: string, reas
 /** Reverse an already-posted (approved/paid) expense — posts the exact opposite journal(s), never deletes/mutates history. */
 export async function voidExpense(expenseId: string, staffUserId: string, role: StaffRole, reason: string) {
   if (!hasPermission(role, "void_expense")) throw new Error("Role kamu tidak punya izin void expense.");
-  const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
-  if (!expense) throw new Error("Expense tidak ditemukan.");
-  if (!["approved", "paid"].includes(expense.status)) throw new Error(`Expense berstatus "${expense.status}" tidak ada jurnal untuk di-void.`);
+  const { expense, updated } = await withLockedExpense(expenseId, async (tx, expense) => {
+    if (!["approved", "paid"].includes(expense.status)) throw new Error(`Expense berstatus "${expense.status}" tidak ada jurnal untuk di-void.`);
 
-  const { voidJournal } = await import("./journal");
-  if (expense.journalEntryId) await voidJournal(expense.journalEntryId, reason);
-  if (expense.paymentJournalEntryId) await voidJournal(expense.paymentJournalEntryId, reason);
+    if (expense.journalEntryId) await voidJournal(expense.journalEntryId, reason, tx);
+    if (expense.paymentJournalEntryId) await voidJournal(expense.paymentJournalEntryId, reason, tx);
 
-  const [updated] = await db
-    .update(expenses)
-    .set({ status: "cancelled", voidedBy: staffUserId, voidedAt: new Date().toISOString(), voidReason: reason })
-    .where(eq(expenses.id, expenseId))
-    .returning();
+    const [updated] = await tx
+      .update(expenses)
+      .set({ status: "cancelled", voidedBy: staffUserId, voidedAt: new Date().toISOString(), voidReason: reason })
+      .where(eq(expenses.id, expenseId))
+      .returning();
+    return { expense, updated };
+  });
 
   await logAudit({ outletId: expense.outletId, staffUserId, action: "void_expense", entityType: "expense", entityId: expenseId, after: { reason } });
   return updated;

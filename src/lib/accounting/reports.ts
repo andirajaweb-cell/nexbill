@@ -16,6 +16,45 @@ export interface TrialBalanceRow {
 }
 
 /**
+ * Excludes cancelled PAIRS — a voided entry together with the reversal voidJournal posted for it
+ * (linked by reversalOfEntryId) — when BOTH fall inside [from, to].
+ *
+ * Why: a pair nets to exactly zero on every account, so dropping both never changes any balance.
+ * But summing them (the old behaviour, see computeTrialBalance's note below) inflated the Debit and
+ * Kredit columns of the Neraca Saldo with money that never really moved, and filled every account's
+ * drill-down with struck-through rows plus their negative mirrors — so the numbers looked nothing
+ * like the transactions NEXBILL actually recorded.
+ *
+ * A pair that straddles the range (e.g. a sale in a closed period reversed in the current one) is
+ * kept: there each half legitimately belongs to its own period.
+ *
+ * Chains stay correct: a reversal that was itself later voided no longer counts as "the" reversal
+ * of its original (the reversal must still be status posted), so re-voiding revives the original
+ * instead of dropping everything.
+ */
+export function excludeCancelledPairs(from?: string, to?: string) {
+  const inRange = (alias: string) =>
+    sql.join(
+      [
+        sql`true`,
+        ...(from ? [sql`${sql.raw(alias)}.entry_date >= ${from}`] : []),
+        ...(to ? [sql`${sql.raw(alias)}.entry_date <= ${to}`] : []),
+      ],
+      sql` and `
+    );
+  return sql`not (
+    (${journalEntries.status} = 'void' and exists (
+      select 1 from journal_entries rev
+      where rev.reversal_of_entry_id = ${journalEntries.id} and rev.status = 'posted' and ${inRange("rev")}
+    ))
+    or (${journalEntries.reversalOfEntryId} is not null and ${journalEntries.status} = 'posted' and exists (
+      select 1 from journal_entries orig
+      where orig.id = ${journalEntries.reversalOfEntryId} and ${inRange("orig")}
+    ))
+  )`;
+}
+
+/**
  * Sum journal lines per account within [from, to] (inclusive, ISO date strings).
  *
  * IMPORTANT: this intentionally includes entries with status "void", not just
@@ -31,7 +70,7 @@ export interface TrialBalanceRow {
 export async function computeTrialBalance(outletId: string, from?: string, to?: string): Promise<TrialBalanceRow[]> {
   const allAccounts = await db.select().from(accounts).where(eq(accounts.outletId, outletId));
 
-  const conditions = [eq(journalEntries.outletId, outletId)];
+  const conditions = [eq(journalEntries.outletId, outletId), excludeCancelledPairs(from, to)];
   if (from) conditions.push(gte(journalEntries.entryDate, from));
   if (to) conditions.push(lte(journalEntries.entryDate, to));
 
@@ -294,7 +333,14 @@ export interface AccountLedgerDetailLine {
  * correctRentalCharge/deleteOrderItem) an owner auditing the books most needs to see. The UI is
  * expected to visually de-emphasize/label voided entries rather than this function hiding them.
  */
-export async function getAccountLedgerDetail(outletId: string, accountId: string, from?: string, to?: string): Promise<AccountLedgerDetailLine[]> {
+export async function getAccountLedgerDetail(
+  outletId: string,
+  accountId: string,
+  from?: string,
+  to?: string,
+  /** true = also list voided entries and their reversals (audit view). Default hides cancelled pairs, same as the Neraca Saldo. */
+  includeCancelled = false
+): Promise<AccountLedgerDetailLine[]> {
   const allAccounts = await db.select().from(accounts).where(eq(accounts.outletId, outletId));
   const byId = new Map(allAccounts.map((a) => [a.id, a]));
   const target = byId.get(accountId);
@@ -321,6 +367,7 @@ export async function getAccountLedgerDetail(outletId: string, accountId: string
   if (postableIds.length === 0) return [];
 
   const conditions = [eq(journalEntries.outletId, outletId), inArray(journalLines.accountId, postableIds)];
+  if (!includeCancelled) conditions.push(excludeCancelledPairs(from, to));
   if (from) conditions.push(gte(journalEntries.entryDate, from));
   if (to) conditions.push(lte(journalEntries.entryDate, to));
 

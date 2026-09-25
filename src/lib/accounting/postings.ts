@@ -567,9 +567,20 @@ export async function postDepositJournal(paymentId: string): Promise<string | un
  */
 export async function postReceivableSettlement(receivableId: string, payment: typeof payments.$inferSelect) {
   return db.transaction(async (tx) => {
+    // Lock the receivable, then refuse to settle the SAME payment twice (webhook retry, duplicate
+    // success callback). Without this each call posted another Dr Kas / Cr Piutang and added the
+    // payment to paidAmount again.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"receivable:" + receivableId}))`);
     const [receivable] = await tx.select().from(receivables).where(eq(receivables.id, receivableId)).limit(1);
     if (!receivable) throw new Error("Piutang tidak ditemukan.");
     if (receivable.status === "paid" || receivable.status === "written_off") return; // nothing left to settle
+    const settlementRef = `AR-${receivable.id.slice(0, 8)}-${payment.id.slice(0, 8)}`;
+    const [alreadySettled] = await tx
+      .select({ id: journalEntries.id })
+      .from(journalEntries)
+      .where(and(eq(journalEntries.sourceId, receivable.id), eq(journalEntries.reference, settlementRef), eq(journalEntries.status, "posted")))
+      .limit(1);
+    if (alreadySettled) return alreadySettled.id;
 
     let staffUserId: string | undefined;
     if (receivable.orderId) {
@@ -593,7 +604,7 @@ export async function postReceivableSettlement(receivableId: string, payment: ty
     const journalId = await postJournal(
       {
         outletId: receivable.outletId,
-        reference: `AR-${receivable.id.slice(0, 8)}-${payment.id.slice(0, 8)}`,
+        reference: settlementRef,
         description: `Pelunasan piutang${receivable.orderId ? ` order ${receivable.orderId.slice(0, 8)}` : ""}`,
         sourceType: "receivable_payment",
         sourceId: receivable.id,
@@ -645,8 +656,8 @@ export async function postPurchaseInvoiceJournal(purchaseInvoiceId: string) {
 }
 
 /** Atomic (Task #61): the journal and the payment's journalEntryId stamp are one transaction. */
-export async function postPurchasePaymentJournal(purchasePaymentId: string) {
-  return db.transaction(async (tx) => {
+export async function postPurchasePaymentJournal(purchasePaymentId: string, dbc: DbOrTx = db) {
+  const run = async (tx: DbOrTx) => {
     const [payment] = await tx.select().from(purchasePayments).where(eq(purchasePayments.id, purchasePaymentId)).limit(1);
     if (!payment) throw new Error("Purchase payment tidak ditemukan.");
     const [invoice] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, payment.purchaseInvoiceId)).limit(1);
@@ -672,7 +683,9 @@ export async function postPurchasePaymentJournal(purchasePaymentId: string) {
 
     await tx.update(purchasePayments).set({ journalEntryId: journalId }).where(eq(purchasePayments.id, purchasePaymentId));
     return journalId;
-  });
+  };
+  if (dbc === db) return db.transaction((tx) => run(tx));
+  return run(dbc);
 }
 
 /** Atomic (Task #61): the journal and the return's journalEntryId stamp are one transaction. */

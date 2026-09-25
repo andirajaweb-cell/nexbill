@@ -1,7 +1,7 @@
 import { db } from "@/db/client";
 import { fixedAssets, assetDepreciationEntries, assetMaintenanceLogs, assetMaintenancePartsUsed, cashBankAccounts, rentalUnits, products, stockMovements } from "@/db/schema";
 import { eq, and, ne, sql } from "drizzle-orm";
-import { postJournal, JournalLineInput } from "./journal";
+import { postJournal, JournalLineInput, lockEntity } from "./journal";
 import { EXPENSE_PAYABLE_ACCOUNT_CODE } from "./coa";
 import { getMappedAccountId } from "./account-mapping";
 import { logAudit } from "@/lib/audit/log";
@@ -127,11 +127,16 @@ export async function createFixedAsset(input: CreateFixedAssetInput) {
 
 /** Runs one depreciation period for one asset — straight-line, capped so accumulated depreciation never exceeds (cost - salvage). Idempotent: throws if this period was already run. */
 export async function runDepreciation(fixedAssetId: string, period: string, staffUserId?: string) {
-  const [asset] = await db.select().from(fixedAssets).where(eq(fixedAssets.id, fixedAssetId)).limit(1);
+  // One transaction holding a lock on this asset, with the "already run for this period?" check made
+  // AFTER the lock: two clicks on Jalankan Penyusutan (or the bulk run overlapping a single run)
+  // used to both pass the check and post the same period's depreciation twice.
+  const result = await db.transaction(async (tx) => {
+  await lockEntity(tx, `fixed_asset:${fixedAssetId}`);
+  const [asset] = await tx.select().from(fixedAssets).where(eq(fixedAssets.id, fixedAssetId)).limit(1);
   if (!asset) throw new Error("Aset tidak ditemukan.");
   if (asset.status === "disposed") throw new Error("Aset sudah dilepas (disposed) — tidak bisa didepresiasi lagi.");
 
-  const [existing] = await db
+  const [existing] = await tx
     .select()
     .from(assetDepreciationEntries)
     .where(and(eq(assetDepreciationEntries.fixedAssetId, fixedAssetId), eq(assetDepreciationEntries.period, period)))
@@ -156,12 +161,14 @@ export async function runDepreciation(fixedAssetId: string, period: string, staf
       { accountId: await deprExpenseAccountId(asset.outletId, asset.category), debit: amount, credit: 0, description: asset.name },
       { accountId: await accumDeprAccountId(asset.outletId, asset.category), debit: 0, credit: amount, description: "Akumulasi penyusutan" },
     ],
-  });
+  }, tx);
 
-  await db.insert(assetDepreciationEntries).values({ fixedAssetId, period, amount, journalEntryId: journalId });
-  await db.update(fixedAssets).set({ accumulatedDepreciation: asset.accumulatedDepreciation + amount }).where(eq(fixedAssets.id, fixedAssetId));
-  await logAudit({ outletId: asset.outletId, staffUserId, action: "run_depreciation", entityType: "fixed_asset", entityId: fixedAssetId, after: { period, amount } });
-  return { journalId, amount };
+  await tx.insert(assetDepreciationEntries).values({ fixedAssetId, period, amount, journalEntryId: journalId });
+  await tx.update(fixedAssets).set({ accumulatedDepreciation: asset.accumulatedDepreciation + amount }).where(eq(fixedAssets.id, fixedAssetId));
+  return { journalId, amount, outletId: asset.outletId };
+  });
+  await logAudit({ outletId: result.outletId, staffUserId, action: "run_depreciation", entityType: "fixed_asset", entityId: fixedAssetId, after: { period, amount: result.amount } });
+  return { journalId: result.journalId, amount: result.amount };
 }
 
 /** Runs depreciation for every active asset in the outlet for one period — skips (records the error, doesn't abort) assets already run or fully depreciated. */
@@ -187,7 +194,10 @@ export async function runDepreciationForAllAssets(outletId: string, period: stri
  * regardless of sale price vs book value.
  */
 export async function disposeAsset(fixedAssetId: string, disposalAmount: number, reason: string, staffUserId: string, cashBankAccountId?: string) {
-  const [asset] = await db.select().from(fixedAssets).where(eq(fixedAssets.id, fixedAssetId)).limit(1);
+  // Same lock-then-recheck as runDepreciation: a double-clicked Lepas Aset used to post the disposal twice.
+  const { asset, updated, gainLoss } = await db.transaction(async (tx) => {
+  await lockEntity(tx, `fixed_asset:${fixedAssetId}`);
+  const [asset] = await tx.select().from(fixedAssets).where(eq(fixedAssets.id, fixedAssetId)).limit(1);
   if (!asset) throw new Error("Aset tidak ditemukan.");
   if (asset.status === "disposed") throw new Error("Aset sudah dilepas sebelumnya.");
   if (disposalAmount > 0 && !cashBankAccountId) throw new Error("Pilih akun kas/bank untuk menerima hasil pelepasan aset.");
@@ -217,13 +227,15 @@ export async function disposeAsset(fixedAssetId: string, disposalAmount: number,
     sourceId: asset.id,
     staffUserId,
     lines,
-  });
+  }, tx);
 
-  const [updated] = await db
+  const [updated] = await tx
     .update(fixedAssets)
     .set({ status: "disposed", disposalDate: new Date().toISOString(), disposalAmount, disposalReason: reason, disposalJournalEntryId: journalId })
     .where(eq(fixedAssets.id, fixedAssetId))
     .returning();
+  return { asset, updated, gainLoss };
+  });
 
   await logAudit({ outletId: asset.outletId, staffUserId, action: "dispose_asset", entityType: "fixed_asset", entityId: fixedAssetId, after: { disposalAmount, reason, gainLoss } });
   return updated;

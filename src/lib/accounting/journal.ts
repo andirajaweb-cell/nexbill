@@ -1,6 +1,6 @@
 import { db, type DbOrTx } from "@/db/client";
 import { journalEntries, journalLines } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getAccountIdByCode, assertPostableAccountIds } from "./coa";
 import { isPeriodLocked, periodLabel } from "./periods";
 
@@ -43,6 +43,8 @@ export interface PostJournalInput {
   sourceType: JournalSourceType;
   sourceId?: string;
   staffUserId?: string;
+  /** Only voidJournal sets this: the entry this one reverses. */
+  reversalOfEntryId?: string;
   lines: JournalLineInput[];
 }
 
@@ -66,6 +68,37 @@ export function computeJournalBalance(lines: { debit?: number; credit?: number }
   const totalDebit = round(lines.reduce((s, l) => s + round(l.debit ?? 0), 0));
   const totalCredit = round(lines.reduce((s, l) => s + round(l.credit ?? 0), 0));
   return { totalDebit, totalCredit, balanced: Math.abs(totalDebit - totalCredit) <= 1 };
+}
+
+/**
+ * Serializes concurrent work on ONE entity (an expense, a transfer, a journal being voided...) for
+ * the rest of the caller's transaction: a second caller for the same key blocks here until the
+ * first commits, then re-reads the entity and sees it already processed. This is the guard that
+ * stops a double-clicked Approve/Bayar/Void from posting the same journal twice — a status check
+ * done BEFORE the transaction can't do that, because both clicks read "not yet posted" before
+ * either commits. Released automatically at commit/rollback. Must be called inside a transaction.
+ */
+export async function lockEntity(tx: DbOrTx, key: string) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+}
+
+/**
+ * Pure: moves a sub-rupiah rounding residual (|debit − credit| ≤ 1, as allowed by
+ * computeJournalBalance) onto the largest line of the short side, so the lines that get STORED
+ * balance exactly. Without this, each journal could carry up to Rp1 of imbalance and those
+ * residuals accumulated into a Neraca Saldo that never tied out ("TIDAK BALANCE" by a few rupiah).
+ */
+export function absorbRoundingResidual<T extends { debit: number; credit: number }>(lines: T[]): T[] {
+  const { totalDebit, totalCredit } = computeJournalBalance(lines);
+  const diff = round(totalDebit - totalCredit);
+  if (diff === 0) return lines;
+  const side: "debit" | "credit" = diff > 0 ? "credit" : "debit";
+  let target = -1;
+  lines.forEach((l, i) => {
+    if (l[side] > 0 && (target === -1 || l[side] > lines[target][side])) target = i;
+  });
+  if (target === -1) return lines;
+  return lines.map((l, i) => (i === target ? { ...l, [side]: round(l[side] + Math.abs(diff)) } : l));
 }
 
 /**
@@ -128,6 +161,7 @@ export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Pr
       `Journal tidak balance: total debit ${totalDebit} != total kredit ${totalCredit} (${input.description})`
     );
   }
+  const balancedLines = absorbRoundingResidual(resolvedLines);
 
   const write = async (exec: DbOrTx) => {
     const [entry] = await exec
@@ -140,6 +174,7 @@ export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Pr
         sourceType: input.sourceType,
         sourceId: input.sourceId,
         staffUserId: input.staffUserId,
+        reversalOfEntryId: input.reversalOfEntryId,
         status: "posted",
       })
       .returning();
@@ -148,7 +183,7 @@ export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Pr
     // the app (every POS sale, rental checkout, expense/purchase payment, and historical import
     // row all route through here), so the sequential per-line await here was the same N+1 pattern
     // already fixed in coa.ts/account-mapping.ts, just on a much busier path.
-    const rows = resolvedLines
+    const rows = balancedLines
       .filter((line) => line.debit !== 0 || line.credit !== 0) // skip zero-amount lines
       .map((line, order) => ({
         journalEntryId: entry.id,
@@ -200,12 +235,16 @@ export function resolveReversalEntryDate(
  * revenue with no reversing entry to explain it).
  */
 export async function voidJournal(journalEntryId: string, reason: string, dbc: DbOrTx = db) {
-  const [entry] = await dbc.select().from(journalEntries).where(eq(journalEntries.id, journalEntryId)).limit(1);
-  if (!entry || entry.status === "void") return;
-
-  const lines = await dbc.select().from(journalLines).where(eq(journalLines.journalEntryId, journalEntryId));
-
   const run = async (tx: DbOrTx) => {
+    // Lock + re-read INSIDE the transaction. The status check used to happen before it, so two
+    // concurrent voids of the same journal (double-clicked Batalkan, a retry) both saw "posted"
+    // and both posted a reversal — reversing the entry twice and leaving the ledger wrong the
+    // other way. Now the second caller waits, then sees "void" and does nothing.
+    await lockEntity(tx, `journal:${journalEntryId}`);
+    const [entry] = await tx.select().from(journalEntries).where(eq(journalEntries.id, journalEntryId)).limit(1);
+    if (!entry || entry.status === "void") return;
+    const lines = await tx.select().from(journalLines).where(eq(journalLines.journalEntryId, journalEntryId));
+
     /*
      * Pembalik memakai entryDate JURNAL ASLINYA, bukan tanggal hari ini.
      *
@@ -245,6 +284,7 @@ export async function voidJournal(journalEntryId: string, reason: string, dbc: D
         sourceType: entry.sourceType as JournalSourceType,
         sourceId: entry.sourceId ?? undefined,
         staffUserId: entry.staffUserId ?? undefined,
+        reversalOfEntryId: entry.id,
         lines: lines.map((l) => ({ accountId: l.accountId, debit: l.credit, credit: l.debit, description: l.description ?? undefined })),
       },
       tx

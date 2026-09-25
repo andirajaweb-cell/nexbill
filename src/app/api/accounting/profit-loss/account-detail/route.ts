@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
     const from = req.nextUrl.searchParams.get("from") ?? undefined;
     const to = req.nextUrl.searchParams.get("to") ?? undefined;
 
-    const lines = await getAccountLedgerDetail(session.outletId, accountId, from, to);
+    const includeCancelled = req.nextUrl.searchParams.get("includeCancelled") === "1";
+    const lines = await getAccountLedgerDetail(session.outletId, accountId, from, to, includeCancelled);
     return NextResponse.json({ lines });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });

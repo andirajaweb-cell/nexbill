@@ -12,6 +12,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { postPurchaseInvoiceJournal, postPurchasePaymentJournal, postPurchaseReturnJournal } from "@/lib/accounting/postings";
 import { getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
+import { lockEntity } from "@/lib/accounting/journal";
 import { receiveStockForItem } from "@/lib/inventory/stock";
 
 export interface CreatePurchaseOrderInput {
@@ -154,24 +155,41 @@ export async function receivePurchaseOrder(
   return result;
 }
 
+/**
+ * Pay (part of) a supplier invoice. Payment row, its journal, and the invoice's paidAmount commit
+ * together under a lock on the invoice, with the remaining balance re-read after the lock.
+ *
+ * Before this, a double-clicked Bayar created two payments and two Dr Hutang / Cr Kas journals for
+ * one bill (and the second write of paidAmount was computed from a stale read), and nothing stopped
+ * paying more than the invoice was worth — Hutang Supplier went negative in the Neraca.
+ */
 export async function payPurchaseInvoice(purchaseInvoiceId: string, amount: number, method: string, cashBankAccountId: string, staffUserId?: string) {
-  const [invoice] = await db.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
-  if (!invoice) throw new Error("Invoice tidak ditemukan.");
+  if (!(amount > 0)) throw new Error("Nominal pembayaran harus lebih dari 0.");
+  return db.transaction(async (tx) => {
+    await lockEntity(tx, `purchase_invoice:${purchaseInvoiceId}`);
+    const [invoice] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
+    if (!invoice) throw new Error("Invoice tidak ditemukan.");
+    if (invoice.status === "cancelled") throw new Error("Invoice ini sudah dibatalkan.");
+    const remaining = Math.round((invoice.amount - invoice.paidAmount) * 100) / 100;
+    if (amount - remaining > 1) {
+      throw new Error(`Pembayaran melebihi sisa hutang invoice ini (sisa Rp${Math.max(0, remaining).toLocaleString("id-ID")}).`);
+    }
 
-  const [payment] = await db
-    .insert(purchasePayments)
-    .values({ purchaseInvoiceId, amount, method, cashBankAccountId, staffUserId })
-    .returning();
+    const [payment] = await tx
+      .insert(purchasePayments)
+      .values({ purchaseInvoiceId, amount, method, cashBankAccountId, staffUserId })
+      .returning();
 
-  const journalEntryId = await postPurchasePaymentJournal(payment.id);
+    const journalEntryId = await postPurchasePaymentJournal(payment.id, tx);
 
-  const newPaidAmount = invoice.paidAmount + amount;
-  await db
-    .update(purchaseInvoices)
-    .set({ paidAmount: newPaidAmount, status: newPaidAmount >= invoice.amount ? "paid" : "partial" })
-    .where(eq(purchaseInvoices.id, purchaseInvoiceId));
+    const newPaidAmount = invoice.paidAmount + amount;
+    await tx
+      .update(purchaseInvoices)
+      .set({ paidAmount: newPaidAmount, status: newPaidAmount >= invoice.amount - 1 ? "paid" : "partial" })
+      .where(eq(purchaseInvoices.id, purchaseInvoiceId));
 
-  return { ...payment, journalEntryId };
+    return { ...payment, journalEntryId };
+  });
 }
 
 export async function createPurchaseReturn(input: {

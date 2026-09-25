@@ -161,3 +161,25 @@ describe("pembalikan lintas hari tidak lagi menghasilkan angka negatif", () => {
     expect(arusKas.totalOut).toBe(2_500);
   });
 });
+
+describe("absorbRoundingResidual", () => {
+  it("moves a sub-rupiah residual onto the largest short-side line so the journal balances exactly", async () => {
+    const { absorbRoundingResidual, computeJournalBalance } = await import("./journal");
+    const lines = [
+      { debit: 1000.4, credit: 0 },
+      { debit: 0, credit: 600 },
+      { debit: 0, credit: 400 },
+    ];
+    const fixed = absorbRoundingResidual(lines);
+    const { totalDebit, totalCredit } = computeJournalBalance(fixed);
+    expect(totalDebit).toBe(totalCredit);
+    expect(fixed[1].credit).toBe(600.4); // largest credit line absorbed it
+    expect(fixed[2].credit).toBe(400);
+  });
+
+  it("leaves an already-balanced journal untouched", async () => {
+    const { absorbRoundingResidual } = await import("./journal");
+    const lines = [{ debit: 500, credit: 0 }, { debit: 0, credit: 500 }];
+    expect(absorbRoundingResidual(lines)).toBe(lines);
+  });
+});

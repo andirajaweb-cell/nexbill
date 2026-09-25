@@ -1,7 +1,7 @@
 import { db, type DbOrTx } from "@/db/client";
 import { ppobTransactions, cashBankAccounts, journalEntries, journalLines } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { postJournal, voidJournal, JournalLineInput } from "@/lib/accounting/journal";
+import { postJournal, voidJournal, JournalLineInput, lockEntity } from "@/lib/accounting/journal";
 import { computeTrialBalance } from "@/lib/accounting/reports";
 import { getMappedAccountId } from "@/lib/accounting/account-mapping";
 import { isPeriodLocked } from "@/lib/accounting/periods";
@@ -329,6 +329,11 @@ export async function postPpobSettlementJournal(ppobTxId: string, staffUserId?: 
   const entryDate = (await isPeriodLocked(row.outletId, txDate)) ? new Date().toISOString() : txDate;
 
   return db.transaction(async (tx) => {
+    // Re-check under a lock: two concurrent settles (double click, retry) both passed the
+    // "settled?" check above and each posted a settlement journal.
+    await lockEntity(tx, `ppob:${ppobTxId}`);
+    const [fresh] = await tx.select().from(ppobTransactions).where(eq(ppobTransactions.id, ppobTxId)).limit(1);
+    if (!fresh || fresh.settlementStatus === "settled") return fresh?.settlementJournalEntryId ?? null;
     const lines = await buildPpobSettlementLines(row.outletId, label, row.principal, funding, tx);
     const journalId = await postJournal(
       { outletId: row.outletId, entryDate, description: `Settlement ${label} ke provider`, sourceType: "ppob", sourceId: row.id, staffUserId, lines },
@@ -349,8 +354,11 @@ export async function voidPpobTransaction(id: string, reason: string, staffUserI
   if (row.status === "reversed") throw new Error("Transaksi ini sudah dibatalkan/reversed sebelumnya.");
 
   await db.transaction(async (tx) => {
-    if (row.settlementJournalEntryId) await voidJournal(row.settlementJournalEntryId, reason, tx);
-    if (row.journalEntryId) await voidJournal(row.journalEntryId, reason, tx);
+    await lockEntity(tx, `ppob:${id}`);
+    const [fresh] = await tx.select().from(ppobTransactions).where(eq(ppobTransactions.id, id)).limit(1);
+    if (!fresh || fresh.status === "reversed") return;
+    if (fresh.settlementJournalEntryId) await voidJournal(fresh.settlementJournalEntryId, reason, tx);
+    if (fresh.journalEntryId) await voidJournal(fresh.journalEntryId, reason, tx);
     await tx
       .update(ppobTransactions)
       .set({ status: "reversed", reversedReason: reason, reversedAt: new Date().toISOString() })
@@ -413,8 +421,14 @@ export async function editPpobTransaction(id: string, input: EditPpobInput, staf
   const label = `PPOB ${product}${serviceRef ? " - " + serviceRef : ""}`;
 
   const updated = await db.transaction(async (tx) => {
-    if (row.settlementJournalEntryId) await voidJournal(row.settlementJournalEntryId, "Dikoreksi (edit transaksi PPOB oleh Owner)", tx);
-    if (row.journalEntryId) await voidJournal(row.journalEntryId, "Dikoreksi (edit transaksi PPOB oleh Owner)", tx);
+    // Lock + void whatever journals are CURRENT after the lock. With the ids read before the
+    // transaction, two overlapping edits each voided the same old pair and each posted a new one,
+    // leaving two live collection + settlement journals for one PPOB sale.
+    await lockEntity(tx, `ppob:${id}`);
+    const [fresh] = await tx.select().from(ppobTransactions).where(eq(ppobTransactions.id, id)).limit(1);
+    if (!fresh || fresh.status === "reversed") throw new Error("Transaksi yang sudah dibatalkan tidak bisa diedit — buat transaksi baru kalau perlu koreksi.");
+    if (fresh.settlementJournalEntryId) await voidJournal(fresh.settlementJournalEntryId, "Dikoreksi (edit transaksi PPOB oleh Owner)", tx);
+    if (fresh.journalEntryId) await voidJournal(fresh.journalEntryId, "Dikoreksi (edit transaksi PPOB oleh Owner)", tx);
 
     const collectionLines = await buildPpobCollectionLines(row.outletId, category, label, principal, feeAdmin, uangMasuk, receiving, tx);
     let journalId: string | null = null;

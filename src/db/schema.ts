@@ -893,9 +893,13 @@ export const journalEntries = pgTable(
     staffUserId: text("staff_user_id").references(() => staffUsers.id),
     voidedAt: text("voided_at"),
     voidReason: text("void_reason"),
+    // Set on the offsetting entry voidJournal posts: points at the entry it reverses. Lets reports
+    // drop a voided entry AND its reversal as a pair when both fall in the period being viewed,
+    // instead of summing two cancelled movements into the Debit/Kredit columns (migrasi 0015).
+    reversalOfEntryId: text("reversal_of_entry_id"),
     ...timestamps,
   },
-  (t) => [index("journal_entries_outlet_date_idx").on(t.outletId, t.entryDate)]
+  (t) => [index("journal_entries_outlet_date_idx").on(t.outletId, t.entryDate), index("journal_entries_reversal_of_idx").on(t.reversalOfEntryId)]
 );
 
 export const journalLines = pgTable(
