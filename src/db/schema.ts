@@ -2666,3 +2666,68 @@ export const platformAnnouncements = pgTable("platform_announcements", {
   createdBy: text("created_by").references(() => platformAdmins.id),
   ...timestamps,
 });
+/** ---------------- LEADS & CRM (PLATFORM-ADMIN) ---------------- */
+
+/*
+ * Prospek calon pelanggan NEXBILL (pemilik rental PS, warnet, dll) — dicari lewat Google Places API
+ * di /platform-admin/leads atau ditambah manual, lalu ditindaklanjuti lewat pipeline CRM. Data
+ * internal NEXBILL, bukan milik outlet mana pun: RLS dikunci tanpa policy (lihat migrasi 0014).
+ *
+ * placeId unik supaya pencarian ulang di area yang sama tidak menduplikasi prospek; lead manual
+ * placeId-nya null (Postgres mengizinkan banyak NULL di unique index).
+ */
+export const platformLeads = pgTable(
+  "platform_leads",
+  {
+    id: id(),
+    placeId: text("place_id"),
+    source: text("source", { enum: ["google_maps", "manual"] }).notNull().default("manual"),
+    searchQuery: text("search_query"),
+    name: text("name").notNull(),
+    category: text("category"),
+    address: text("address"),
+    city: text("city"),
+    phone: text("phone"),
+    waNumber: text("wa_number"),
+    website: text("website"),
+    mapsUrl: text("maps_url"),
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    rating: doublePrecision("rating"),
+    reviewCount: integer("review_count"),
+    businessStatus: text("business_status"),
+    contactName: text("contact_name"),
+    status: text("status", { enum: ["baru", "dihubungi", "follow_up", "demo", "trial", "closing", "tidak_tertarik"] })
+      .notNull()
+      .default("baru"),
+    // Tanggal (YYYY-MM-DD) tindak lanjut berikutnya — dipakai filter "Jatuh Tempo".
+    nextFollowUpDate: text("next_follow_up_date"),
+    lastContactedAt: text("last_contacted_at"),
+    notes: text("notes"),
+    // Diisi saat prospek sudah jadi pelanggan — menautkan ke outlet NEXBILL-nya.
+    convertedOutletId: text("converted_outlet_id").references(() => outlets.id),
+    createdBy: text("created_by").references(() => platformAdmins.id),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("platform_leads_place_id_idx").on(t.placeId),
+    index("platform_leads_status_idx").on(t.status),
+    index("platform_leads_follow_up_idx").on(t.nextFollowUpDate),
+  ]
+);
+
+export const platformLeadActivities = pgTable(
+  "platform_lead_activities",
+  {
+    id: id(),
+    leadId: text("lead_id")
+      .notNull()
+      .references(() => platformLeads.id, { onDelete: "cascade" }),
+    type: text("type", { enum: ["catatan", "whatsapp", "telepon", "kunjungan", "demo", "email", "status"] }).notNull(),
+    content: text("content").notNull(),
+    createdBy: text("created_by").references(() => platformAdmins.id),
+    createdByName: text("created_by_name"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("platform_lead_activities_lead_idx").on(t.leadId)]
+);

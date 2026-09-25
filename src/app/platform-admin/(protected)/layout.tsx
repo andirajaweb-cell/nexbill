@@ -6,6 +6,7 @@ import { PlatformAdminTopBar } from "@/components/platform-admin/PlatformAdminTo
 const NAV = [
   { href: "/platform-admin", label: "Ringkasan" },
   { href: "/platform-admin/outlets", label: "Outlet / Merchant" },
+  { href: "/platform-admin/leads", label: "Leads & CRM" },
   { href: "/platform-admin/announcements", label: "Pengumuman" },
   { href: "/platform-admin/subscriptions", label: "Penjualan Langganan" },
   { href: "/platform-admin/cogs", label: "COGS Aplikasi" },
