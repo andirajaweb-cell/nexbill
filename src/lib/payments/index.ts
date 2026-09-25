@@ -8,6 +8,7 @@ import { payments, orders, receivables } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { postSalesJournal, postReceivableSettlement, postDepositJournal } from "@/lib/accounting/postings";
 import { applyLoyaltyAndSpending } from "@/lib/membership/loyalty";
+import { resyncIfReceivableStale } from "@/lib/accounting/reconciliation-resync";
 
 // Partial, not Record<PaymentMethod, PaymentGateway>: several PaymentMethod keys (the outlet-
 // facing ipaymu_qris/va_*/dana/shopeepay/alfamart/indomaret channels — see the comment below)
@@ -199,6 +200,14 @@ export async function settleOrderAfterPayment(orderId: string, paymentId: string
       }
     }
     if (fullyPaid) {
+      // Fully collected now — Piutang for this order must be zero. If it isn't (the total changed
+      // after the receivable was booked, or this re-evaluation came without a payment id), rebuild
+      // the order's journals from its current state. See resyncIfReceivableStale.
+      try {
+        await resyncIfReceivableStale(orderId);
+      } catch (err) {
+        console.error(`Gagal menyelaraskan piutang untuk order ${orderId}:`, err);
+      }
       try {
         await applyLoyaltyAndSpending(orderId);
       } catch (err) {

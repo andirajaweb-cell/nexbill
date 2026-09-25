@@ -8,6 +8,7 @@ import { deductStockForItem } from "@/lib/inventory/stock";
 import { resolveKitchenStatus } from "@/lib/kitchen/routing";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { roundBillTotal } from "@/lib/pos/rounding";
 
 export async function GET(req: NextRequest) {
   try {
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
     const taxableBase = Math.max(0, subtotal - totalDiscount);
     const tax = applyTax ? Math.round((taxableBase * (outlet?.taxPercent ?? 0)) / 100) : 0;
     const serviceCharge = applyServiceCharge ? Math.round((taxableBase * (outlet?.serviceChargePercent ?? 0)) / 100) : 0;
-    const total = Math.max(0, taxableBase + tax + serviceCharge);
+    const { total, adjustment: roundingAdjustment } = roundBillTotal(taxableBase + tax + serviceCharge, outlet?.billTotalRoundingUnit, outlet?.billTotalRoundingMode);
 
     const [order] = await db
       .insert(orders)
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
         applyTax,
         applyServiceCharge,
         total,
+        roundingAdjustment,
         voucherId,
         source,
         staffUserId,

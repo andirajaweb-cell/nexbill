@@ -128,6 +128,8 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "addon", transactionKey: "vr", accountCode: "4353", label: "Add-on — VR (opsional, tidak dipakai default)" },
   { module: "addon", transactionKey: "member", accountCode: "4530", label: "Add-on — Member" },
   { module: "product", transactionKey: "inventory", accountCode: "1161", label: "Inventory F&B" },
+  // Pembulatan Total Tagihan — selisih antara total tagihan yang dibulatkan dan total aslinya.
+  { module: "other", transactionKey: "bill_rounding", accountCode: "4650", label: "Selisih Pembulatan Tagihan" },
   // HPP for any product category outside food/drink/coffee/snack/dessert/merchandise/accessory
   // (raw_material, sparepart, other, and every outlet-created custom category) — see
   // cogsAccountIdForCategory in postings.ts. Before this, such sales reduced stock but posted no

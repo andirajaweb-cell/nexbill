@@ -4,6 +4,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { deductStockForItem } from "@/lib/inventory/stock";
 import { validateVoucher, consumeVoucher } from "@/lib/pos/vouchers";
 import { resolveKitchenStatus } from "@/lib/kitchen/routing";
+import { roundBillTotal } from "@/lib/pos/rounding";
 
 export interface BillItemInput {
   productId?: string | null;
@@ -68,9 +69,9 @@ export async function recomputeBillTotals(orderId: string) {
   const taxableBase = Math.max(0, subtotal - order.discount);
   const tax = order.applyTax ? Math.round((taxableBase * (outlet?.taxPercent ?? 0)) / 100) : 0;
   const serviceCharge = order.applyServiceCharge ? Math.round((taxableBase * (outlet?.serviceChargePercent ?? 0)) / 100) : 0;
-  const total = Math.max(0, taxableBase + tax + serviceCharge);
+  const { total, adjustment: roundingAdjustment } = roundBillTotal(taxableBase + tax + serviceCharge, outlet?.billTotalRoundingUnit, outlet?.billTotalRoundingMode);
 
-  const [updated] = await db.update(orders).set({ subtotal, tax, serviceCharge, total }).where(eq(orders.id, orderId)).returning();
+  const [updated] = await db.update(orders).set({ subtotal, tax, serviceCharge, total, roundingAdjustment }).where(eq(orders.id, orderId)).returning();
   return updated;
 }
 

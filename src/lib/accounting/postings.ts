@@ -346,6 +346,15 @@ export async function postSalesJournal(orderId: string) {
       revenueByAccount[otherAccountId] = (revenueByAccount[otherAccountId] ?? 0) + otherRevenue;
     }
 
+    // Pembulatan Total Tagihan (lib/pos/rounding.ts): order.total already includes it, so without
+    // this line the journal's revenue side would differ from the cash side by exactly that amount.
+    // Rounded up → extra revenue (credit); rounded down → contra revenue (debit, see below).
+    const roundingAdjustment = round(order.roundingAdjustment ?? 0);
+    const roundingAccountId = roundingAdjustment !== 0 ? await getMappedAccountId(order.outletId, "other", "bill_rounding", "4650", tx) : null;
+    if (roundingAccountId && roundingAdjustment > 0) {
+      revenueByAccount[roundingAccountId] = (revenueByAccount[roundingAccountId] ?? 0) + roundingAdjustment;
+    }
+
     // "cashLines" mixes two kinds of debit lines that both represent money already in
     // hand for this order: ordinary Kas/Bank lines for ordinary payments, and — for a payment
     // that was collected earlier as a rental "bayar di muka" deposit (kind === "deposit") — a
@@ -408,6 +417,7 @@ export async function postSalesJournal(orderId: string) {
       ...(shortfall > 0 ? [{ accountCode: "1141", debit: shortfall, credit: 0, description: "Piutang usaha (belum lunas)" }] : []),
       ...(totalFee > 0 ? [{ accountCode: "6540", debit: round(totalFee), credit: 0, description: "Biaya payment gateway" }] : []),
       ...(order.discount > 0 ? [{ accountCode: "4910", debit: round(order.discount), credit: 0, description: "Diskon penjualan" }] : []),
+      ...(roundingAccountId && roundingAdjustment < 0 ? [{ accountId: roundingAccountId, debit: -roundingAdjustment, credit: 0, description: "Selisih pembulatan tagihan" }] : []),
       ...Object.entries(revenueByAccount).map(([accountId, amount]) => ({
         accountId,
         debit: 0,

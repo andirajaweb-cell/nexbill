@@ -338,6 +338,21 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
            * kepercayaan pada setelan yang lain.
            */}
           <Field label={t("settings.field.billingRoundingMinutes", "Pembulatan Billing (menit)")}><input type="number" min={0} step={1} className={inputCls} disabled={!canManage} value={form.billingRoundingMinutes ?? 1} onChange={(e) => setForm({ ...form, billingRoundingMinutes: Math.max(0, Math.floor(Number(e.target.value)) || 0) })} /></Field>
+          <Field label={t("settings.field.billTotalRoundingUnit", "Pembulatan Total Tagihan")}>
+            <select className={inputCls} disabled={!canManage} value={form.billTotalRoundingUnit ?? 0} onChange={(e) => setForm({ ...form, billTotalRoundingUnit: Number(e.target.value) })}>
+              <option value={0}>{t("settings.field.billTotalRoundingOff", "Tidak dibulatkan")}</option>
+              <option value={100}>Rp100</option>
+              <option value={500}>Rp500</option>
+              <option value={1000}>Rp1.000</option>
+            </select>
+          </Field>
+          <Field label={t("settings.field.billTotalRoundingMode", "Arah Pembulatan")}>
+            <select className={inputCls} disabled={!canManage || !form.billTotalRoundingUnit} value={form.billTotalRoundingMode ?? "nearest"} onChange={(e) => setForm({ ...form, billTotalRoundingMode: e.target.value })}>
+              <option value="nearest">{t("settings.field.billTotalRoundingNearest", "Ke terdekat")}</option>
+              <option value="down">{t("settings.field.billTotalRoundingDown", "Ke bawah (untung pelanggan)")}</option>
+              <option value="up">{t("settings.field.billTotalRoundingUp", "Ke atas")}</option>
+            </select>
+          </Field>
           <Field label={t("settings.field.expenseApprovalThreshold", "Batas Approval Expense (Rp)")}><input type="number" className={inputCls} disabled={!canManage} value={form.expenseApprovalThreshold ?? 0} onChange={(e) => setForm({ ...form, expenseApprovalThreshold: Number(e.target.value) })} /></Field>
           <Field label={t("settings.field.accessoryBillingMode", "Kebijakan Tarif Aksesoris")}>
             <select className={inputCls} disabled={!canManage} value={form.accessoryBillingMode ?? "per_hour"} onChange={(e) => setForm({ ...form, accessoryBillingMode: e.target.value })}>
@@ -350,6 +365,12 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
           {t(
             "settings.field.billingRoundingMinutesDesc",
             "Pembulatan Billing berlaku HANYA untuk sesi Terbuka (tanpa batas waktu) — sesi berdurasi tetap dan paket promo selalu ditagih sesuai kesepakatan awal, tanpa pembulatan. Isi 1 agar pelanggan membayar persis menit yang dipakai (mis. 181 menit ditagih 181 menit). Isi 15 bila outlet ingin membulatkan ke atas tiap seperempat jam (181 menit jadi 195 menit)."
+          )}
+        </p>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "settings.field.billTotalRoundingDesc",
+            "Pembulatan Total Tagihan membulatkan total akhir setiap tagihan (rental maupun kasir) ke satuan uang yang dipilih, mis. Rp15.083 menjadi Rp15.000 bila \"Rp500 · Ke terdekat\". Selisihnya tercetak di struk sebagai \"Pembulatan\" dan dicatat otomatis di jurnal (akun Selisih Pembulatan Tagihan), jadi tidak ada lagi sisa receh yang tercatat sebagai piutang. Berlaku untuk tagihan yang dihitung setelah setelan disimpan."
           )}
         </p>
         <p className="text-xs text-neutral-500">

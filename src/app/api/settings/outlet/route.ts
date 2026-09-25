@@ -11,7 +11,7 @@ import { SEA_COUNTRY_TO_LANG } from "@/lib/data/sea-banks";
 /** Curated fields the Settings UI (Business/Tax/Printer/Notification tabs) is allowed to edit on the outlet row. */
 const EDITABLE_FIELDS = [
   "name", "address", "phone", "logoUrl", "wifiSsid", "wifiPassword",
-  "billingRoundingMinutes", "accessoryBillingMode", "serviceChargePercent", "taxPercent", "expenseApprovalThreshold",
+  "billingRoundingMinutes", "billTotalRoundingUnit", "billTotalRoundingMode", "accessoryBillingMode", "serviceChargePercent", "taxPercent", "expenseApprovalThreshold",
   "printerName", "printerPaperWidthMm", "receiptFooterText",
   "notifyLowStock", "notifyPendingApproval", "notifyShiftVariance", "notifyBookingReminder", "notifyMaintenanceDue",
   "defaultMaintenanceThresholdHours",

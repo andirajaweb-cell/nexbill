@@ -68,3 +68,46 @@ export async function resyncOrderJournal(orderId: string, staffUserId: string | 
 
   return { orderId, reposted, repostError, orderStatus: outcome.orderStatus };
 }
+
+/**
+ * What this order still has sitting in Piutang Usaha (1141) according to its LIVE journals: the
+ * 1141 debit on its sales journal minus every 1141 credit from settlements of its receivable.
+ * Voided entries and their reversals are left out (they cancel each other). Zero for an order the
+ * books consider fully collected.
+ */
+export async function orderReceivableGap(orderId: string): Promise<number> {
+  const [row] = (await db.execute(sql`
+    SELECT COALESCE(SUM(jl.debit - jl.credit), 0)::float AS gap
+    FROM journal_lines jl
+    JOIN journal_entries je ON je.id = jl.journal_entry_id
+    JOIN accounts a ON a.id = jl.account_id
+    WHERE a.code = '1141'
+      AND je.status = 'posted'
+      AND je.reversal_of_entry_id IS NULL
+      AND (
+        (je.source_id = ${orderId} AND je.source_type IN ('rental', 'pos'))
+        OR (je.source_type = 'receivable_payment' AND je.source_id IN (SELECT r.id FROM receivables r WHERE r.order_id = ${orderId}))
+      )
+  `)) as unknown as { gap: number }[];
+  return Math.round((row?.gap ?? 0) * 100) / 100;
+}
+
+/**
+ * Called whenever an order becomes fully paid (or is re-evaluated as such): if its journals still
+ * leave a balance in Piutang Usaha, they were built against a total that has since changed, so
+ * rebuild them from the order's current state.
+ *
+ * BUG YANG DIPERBAIKI DI SINI (2026-09-25). Piutang dicatat pada pembayaran PERTAMA, memakai total
+ * order saat itu. Kalau totalnya lalu berubah — bayar di muka lalu sesi ditutup dengan total final,
+ * F&B ditambah di tengah sesi, jam tambahan, Koreksi Nominal — pelunasan berikutnya hanya
+ * mengurangi piutang sebesar pembayarannya, bukan menyesuaikan pendapatan. Ditambah: penutupan sesi
+ * dan "Tandai Lunas" menilai ulang order tanpa id pembayaran, sehingga pelunasannya dilewati sama
+ * sekali. Hasilnya order berstatus lunas (cash/QRIS sudah diterima) tapi Piutang Pelanggan di
+ * Neraca Saldo tidak pernah kembali ke nol.
+ */
+export async function resyncIfReceivableStale(orderId: string, staffUserId?: string): Promise<boolean> {
+  const gap = await orderReceivableGap(orderId);
+  if (Math.abs(gap) <= 0.5) return false;
+  await resyncOrderJournal(orderId, staffUserId);
+  return true;
+}

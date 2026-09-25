@@ -36,6 +36,7 @@ import "dotenv/config";
 import { db } from "../src/db/client";
 import { sql } from "drizzle-orm";
 import { voidJournal } from "../src/lib/accounting/journal";
+import { resyncOrderJournal } from "../src/lib/accounting/reconciliation-resync";
 
 const APPLY = process.argv.includes("--apply");
 const OUTLET = process.argv.find((a) => a.startsWith("--outlet="))?.slice("--outlet=".length);
@@ -225,6 +226,38 @@ async function planReversalLinks() {
   return { links, unmatched };
 }
 
+/**
+ * E. Orders whose journals still leave a balance in Piutang Usaha (1141) although the order is fully
+ * paid (or cancelled). Cause: the receivable was booked at the FIRST payment against the total at
+ * that moment, then the total changed and/or the final settlement was skipped (see
+ * resyncIfReceivableStale). Fix = the app's own "Sinkronkan Ulang Jurnal" (resyncOrderJournal),
+ * which rebuilds the order's journals from its current total and payments.
+ * Orders that are genuinely still unpaid are listed separately and left alone.
+ */
+async function findStaleReceivables() {
+  const filter = OUTLET ? sql`AND o.outlet_id = ${OUTLET}` : sql``;
+  return (await db.execute(sql`
+    WITH gap AS (
+      SELECT o.id AS order_id,
+             COALESCE(SUM(jl.debit - jl.credit), 0)::float AS gap
+      FROM orders o
+      JOIN journal_entries je ON je.status = 'posted' AND je.reversal_of_entry_id IS NULL AND (
+             (je.source_id = o.id AND je.source_type IN ('rental', 'pos'))
+          OR (je.source_type = 'receivable_payment' AND je.source_id IN (SELECT r.id FROM receivables r WHERE r.order_id = o.id)))
+      JOIN journal_lines jl ON jl.journal_entry_id = je.id
+      JOIN accounts a ON a.id = jl.account_id AND a.code = '1141'
+      WHERE 1 = 1 ${filter}
+      GROUP BY o.id
+      HAVING ABS(COALESCE(SUM(jl.debit - jl.credit), 0)) > 0.5
+    )
+    SELECT o.id, o.outlet_id, o.status, o.total::float AS total, g.gap,
+           (SELECT COALESCE(SUM(p.amount), 0)::float FROM payments p WHERE p.order_id = o.id AND p.status = 'success') AS paid,
+           (SELECT string_agg(DISTINCT p.method, '+') FROM payments p WHERE p.order_id = o.id AND p.status = 'success') AS methods
+    FROM gap g JOIN orders o ON o.id = g.order_id
+    ORDER BY o.created_at
+  `)) as unknown as { id: string; outlet_id: string; status: string; total: number; gap: number; paid: number; methods: string | null }[];
+}
+
 /** Adds the residual to the largest line on the short side — same rule as absorbRoundingResidual. */
 async function fixUnbalanced(journalId: string, debit: number, credit: number) {
   const diff = Math.round((debit - credit) * 100) / 100;
@@ -294,6 +327,28 @@ async function main() {
       await db.execute(sql`UPDATE journal_entries SET reversal_of_entry_id = ${l.originalId} WHERE id = ${l.reversalId} AND reversal_of_entry_id IS NULL`);
     }
     console.log(`  ${links.length} tautan disimpan.`);
+  }
+  console.log("");
+
+  // ---------- E. Piutang yang seharusnya sudah nol
+  const stale = await findStaleReceivables();
+  const fixable = stale.filter((o) => o.status === "cancelled" || o.paid >= o.total - 0.5);
+  const genuine = stale.filter((o) => !fixable.includes(o));
+  const fixableGap = fixable.reduce((s, o) => s + o.gap, 0);
+  console.log(`E. PIUTANG PADA ORDER YANG SUDAH LUNAS/BATAL: ${fixable.length} order, total sisa piutang ${rupiah(fixableGap)}.`);
+  let resynced = 0;
+  for (const o of fixable) {
+    console.log(`  - order ${o.id.slice(0, 8)} [${o.status}] · total ${rupiah(o.total)} · dibayar ${rupiah(o.paid)} (${o.methods ?? "-"}) · sisa piutang di jurnal ${rupiah(o.gap)}`);
+    if (APPLY) {
+      const r = await resyncOrderJournal(o.id, undefined);
+      if (r.repostError) console.log(`    ⚠ jurnal dibalik tapi gagal diposting ulang: ${r.repostError} — tekan "Sinkronkan Ulang Jurnal" di Rekonsiliasi`);
+      else resynced++;
+    }
+  }
+  if (APPLY) console.log(`  ${resynced} order disinkronkan ulang (jurnal lama dibalik, jurnal baru sesuai total & pembayaran terkini).`);
+  if (genuine.length) {
+    console.log(`  Piutang yang memang belum dibayar (dibiarkan): ${genuine.length} order, ${rupiah(genuine.reduce((s, o) => s + o.gap, 0))}.`);
+    for (const o of genuine) console.log(`    · order ${o.id.slice(0, 8)} [${o.status}] · total ${rupiah(o.total)} · dibayar ${rupiah(o.paid)} · piutang ${rupiah(o.gap)}`);
   }
   console.log("");
 

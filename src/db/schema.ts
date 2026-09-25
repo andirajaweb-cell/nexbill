@@ -27,6 +27,11 @@ export const outlets = pgTable("outlets", {
   // NOTE: changing this default only affects NEWLY created outlets; existing rows keep whatever
   // value they already hold and must be changed in Pengaturan (or by a one-off UPDATE).
   billingRoundingMinutes: integer("billing_rounding_minutes").notNull().default(1),
+  // Settings > Pajak & Billing > "Pembulatan Total Tagihan" (2026-09-25) — rounds every bill total
+  // to a real cash denomination so per-minute rental rates stop leaving Rp83-style leftovers as
+  // Piutang. 0 = off (default, so existing outlets see no change). See lib/pos/rounding.ts.
+  billTotalRoundingUnit: integer("bill_total_rounding_unit").notNull().default(0),
+  billTotalRoundingMode: text("bill_total_rounding_mode", { enum: ["nearest", "down", "up"] }).notNull().default("nearest"),
   // Settings > Pajak & Billing > "Kebijakan Tarif Aksesoris" — added 2026-09-14. Governs how
   // sessionAccessories.ratePerHour is actually charged at billing time (see
   // lib/rental/accessories.ts's estimateAccessoryCharge/finalizeAccessoryCharges, and the matching
@@ -611,6 +616,9 @@ export const orders = pgTable(
     discount: doublePrecision("discount").notNull().default(0),
     tax: doublePrecision("tax").notNull().default(0),
     total: doublePrecision("total").notNull().default(0),
+    // total − (subtotal − discount + tax + serviceCharge): the Pembulatan Total Tagihan applied to
+    // this bill (negative = rounded down). Journaled to Selisih Pembulatan by postSalesJournal.
+    roundingAdjustment: doublePrecision("rounding_adjustment").notNull().default(0),
     serviceCharge: doublePrecision("service_charge").notNull().default(0),
     applyTax: boolean("apply_tax").notNull().default(false),
     applyServiceCharge: boolean("apply_service_charge").notNull().default(false),

@@ -52,6 +52,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
         {order.discount > 0 && <div className="flex justify-between"><span>Diskon</span><span>-{rupiah(order.discount)}</span></div>}
         {order.serviceCharge > 0 && <div className="flex justify-between"><span>Service Charge</span><span>{rupiah(order.serviceCharge)}</span></div>}
         {order.tax > 0 && <div className="flex justify-between"><span>Pajak</span><span>{rupiah(order.tax)}</span></div>}
+        {(order.roundingAdjustment ?? 0) !== 0 && <div className="flex justify-between"><span>Pembulatan</span><span>{order.roundingAdjustment > 0 ? "" : "-"}{rupiah(Math.abs(order.roundingAdjustment))}</span></div>}
         <div className="flex justify-between font-bold border-t border-dashed border-black mt-1 pt-1"><span>TOTAL</span><span>{rupiah(order.total)}</span></div>
         {successPayment && (
           <>
