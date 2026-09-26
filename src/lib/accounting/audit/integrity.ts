@@ -2,10 +2,13 @@ import { db } from "@/db/client";
 import { and, eq, inArray, isNull, notLike, sql } from "drizzle-orm";
 import {
   accounts,
+  assetPurchasePayments,
+  assetPurchases,
   cashBankAccounts,
   cashDeposits,
   cashTransfers,
   expenses,
+  fixedAssets,
   homeRentalRentals,
   journalEntries,
   journalLines,
@@ -387,6 +390,10 @@ export async function auditCashPostings(outletId: string, accountCode?: string):
   const cdMap = await mapById(idsOf("cash_deposit"), (ids) => db.select().from(cashDeposits).where(inArray(cashDeposits.id, ids)));
   const ctMap = await mapById(idsOf("cash_transfer"), (ids) => db.select().from(cashTransfers).where(inArray(cashTransfers.id, ids)));
   const hrMap = await mapById(idsOf("home_rental"), (ids) => db.select().from(homeRentalRentals).where(inArray(homeRentalRentals.id, ids)));
+  const apMap = await mapById(idsOf("asset_purchase"), (ids) => db.select().from(assetPurchases).where(inArray(assetPurchases.id, ids)));
+  const appMap = await mapById(idsOf("asset_purchase_payment"), (ids) => db.select().from(assetPurchasePayments).where(inArray(assetPurchasePayments.id, ids)));
+  // Assets registered one by one before Pembelian Aset existed carry sourceId = fixed_assets.id; disposals always do.
+  const faMap = await mapById([...idsOf("asset_purchase"), ...idsOf("asset_disposal")], (ids) => db.select().from(fixedAssets).where(inArray(fixedAssets.id, ids)));
 
   const arPay8 = new Set(list.filter((e) => e.sourceType === "receivable_payment" && e.reference?.startsWith("AR-")).map((e) => e.reference!.split("-")[2]));
 
@@ -452,6 +459,31 @@ export async function auditCashPostings(outletId: string, accountCode?: string):
     if (st === "membership_fee") return linked(mbMap, "Pembayaran membership");
     if (st === "cash_deposit") return linked(cdMap, "Setoran kas");
     if (st === "cash_transfer") return linked(ctMap, "Pindah kas");
+    if (st === "asset_purchase") {
+      const p = apMap.get(e.sourceId);
+      if (p) {
+        if (p.status === "cancelled") return { kind: "orphan", reason: "Pembelian aset sudah dibatalkan tapi jurnalnya masih berlaku" };
+        if (p.journalEntryId && p.journalEntryId !== e.entryId) return { kind: "orphan", reason: "Bukan jurnal yang ditautkan di pembelian aset (duplikat)" };
+        return { kind: "valid" };
+      }
+      const fa = faMap.get(e.sourceId);
+      if (!fa) return { kind: "orphan", reason: "Aset/pembelian aset sumbernya sudah tidak ada" };
+      if (fa.journalEntryId && fa.journalEntryId !== e.entryId) return { kind: "orphan", reason: "Bukan jurnal perolehan yang ditautkan di aset (duplikat)" };
+      return { kind: "valid" };
+    }
+    if (st === "asset_purchase_payment") {
+      const x = appMap.get(e.sourceId);
+      if (!x) return { kind: "orphan", reason: "Pembayaran utang aset sumbernya sudah tidak ada" };
+      if (x.status !== "posted") return { kind: "orphan", reason: "Pembayaran utang aset sudah dibatalkan tapi jurnalnya masih berlaku" };
+      if (x.journalEntryId && x.journalEntryId !== e.entryId) return { kind: "orphan", reason: "Bukan jurnal yang ditautkan di pembayaran utang aset (duplikat)" };
+      return { kind: "valid" };
+    }
+    if (st === "asset_disposal") {
+      const fa = faMap.get(e.sourceId);
+      if (!fa) return { kind: "orphan", reason: "Aset sumbernya sudah tidak ada" };
+      if (fa.disposalJournalEntryId && fa.disposalJournalEntryId !== e.entryId) return { kind: "orphan", reason: "Bukan jurnal pelepasan yang ditautkan di aset (duplikat)" };
+      return { kind: "valid" };
+    }
     if (st === "home_rental") return hrMap.has(e.sourceId) ? { kind: "valid" } : { kind: "orphan", reason: "Data Home Rental sumbernya sudah tidak ada" };
     return { kind: "check", reason: `Jenis sumber "${st}" tidak dicek otomatis` };
   };

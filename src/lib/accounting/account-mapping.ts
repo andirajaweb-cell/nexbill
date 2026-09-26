@@ -172,6 +172,9 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "asset", transactionKey: "furniture", accountCode: "1241", label: "Asset — Furniture" },
   { module: "asset", transactionKey: "vehicle", accountCode: "1245", label: "Asset — Vehicle" },
   { module: "asset", transactionKey: "other", accountCode: "1244", label: "Asset — Lainnya" },
+  // Utang dari Pembelian Aset yang belum/baru sebagian dibayar (lib/accounting/asset-purchase.ts).
+  // Bisa dipindah ke 2220 Equipment Financing bila pembeliannya lewat leasing/cicilan panjang.
+  { module: "other", transactionKey: "asset_purchase_payable", accountCode: "2163", label: "Utang Pembelian Aset" },
   { module: "asset_accum_depr", transactionKey: "playstation", accountCode: "1291", label: "Akumulasi Penyusutan — PS" },
   { module: "asset_accum_depr", transactionKey: "tv", accountCode: "1292", label: "Akumulasi Penyusutan — TV" },
   { module: "asset_accum_depr", transactionKey: "controller", accountCode: "1293", label: "Akumulasi Penyusutan — Equipment (Controller)" },

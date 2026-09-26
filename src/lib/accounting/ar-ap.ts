@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
-import { receivables, customers, purchaseInvoices, suppliers, expenses, orders } from "@/db/schema";
-import { eq, and, ne, inArray } from "drizzle-orm";
+import { receivables, customers, purchaseInvoices, suppliers, expenses, orders, assetPurchases } from "@/db/schema";
+import { eq, and, ne, inArray, notInArray } from "drizzle-orm";
 import { previewPaymentDestinationAccount } from "./account-mapping";
 
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -113,7 +113,7 @@ export async function computeAccountsReceivable(outletId: string) {
 }
 
 export interface PayableRow {
-  type: "purchase_invoice" | "expense";
+  type: "purchase_invoice" | "expense" | "asset_purchase";
   id: string;
   payee: string;
   amount: number;
@@ -132,6 +132,9 @@ export interface PayableRow {
  * Lain-lain). Settling either kind still goes through their own existing
  * pay endpoints (/api/purchase-invoices/[id]/pay, /api/expenses/[id]/pay) —
  * this is a read-only consolidated view + aging, not a new payment path.
+ *
+ * Also includes unpaid Pembelian Aset (asset_purchases, lib/accounting/asset-purchase.ts), paid
+ * through /api/asset-purchases/[id]/pay.
  */
 export async function computeAccountsPayable(outletId: string): Promise<{
   totalOutstanding: number;
@@ -140,10 +143,11 @@ export async function computeAccountsPayable(outletId: string): Promise<{
   byPayee: { payee: string; outstanding: number; count: number }[];
   agingBuckets: Record<AgingBucket, number>;
 }> {
-  const [invoices, supplierRows, payableExpenses] = await Promise.all([
+  const [invoices, supplierRows, payableExpenses, assetPurchaseRows] = await Promise.all([
     db.select().from(purchaseInvoices).where(and(eq(purchaseInvoices.outletId, outletId), ne(purchaseInvoices.status, "paid"))),
     db.select().from(suppliers).where(eq(suppliers.outletId, outletId)),
     db.select().from(expenses).where(and(eq(expenses.outletId, outletId), eq(expenses.recordAsPayable, true), eq(expenses.status, "approved"))),
+    db.select().from(assetPurchases).where(and(eq(assetPurchases.outletId, outletId), notInArray(assetPurchases.status, ["paid", "cancelled"]))),
   ]);
   const supplierName = new Map(supplierRows.map((s) => [s.id, s.name]));
 
@@ -180,6 +184,24 @@ export async function computeAccountsPayable(outletId: string): Promise<{
       dueDate: e.dueDate,
       reference: e.expenseNumber,
       createdAt: e.createdAt,
+      agingBucket: bucket,
+      daysOverdue,
+    });
+  }
+
+  for (const p of assetPurchaseRows) {
+    const outstanding = round(p.total - p.paidAmount);
+    if (outstanding <= 0) continue;
+    const { bucket, daysOverdue } = agingBucketFor(p.dueDate, p.purchaseDate);
+    agingBuckets[bucket] += outstanding;
+    detail.push({
+      type: "asset_purchase",
+      id: p.id,
+      payee: (p.supplierId && supplierName.get(p.supplierId)) || "Pembelian Aset",
+      amount: outstanding,
+      dueDate: p.dueDate,
+      reference: p.invoiceNumber ? `${p.purchaseNumber} · ${p.invoiceNumber}` : p.purchaseNumber,
+      createdAt: p.createdAt,
       agingBucket: bucket,
       daysOverdue,
     });

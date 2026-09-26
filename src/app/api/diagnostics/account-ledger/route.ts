@@ -4,6 +4,7 @@ import { accounts, journalEntries, journalLines } from "@/db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { excludeCancelledPairs } from "@/lib/accounting/reports";
 
 /**
  * READ-ONLY. Memecah perputaran satu akun COA menurut ASAL transaksinya.
@@ -41,6 +42,7 @@ const SOURCE_LABEL: Record<string, string> = {
   expense: "Pengeluaran/biaya",
   refund: "Refund",
   asset_purchase: "Pembelian aset",
+  asset_purchase_payment: "Pembayaran utang pembelian aset",
   asset_disposal: "Pelepasan aset",
   depreciation: "Penyusutan aset",
   receivable_payment: "Pelunasan piutang pelanggan",
@@ -86,7 +88,13 @@ export async function GET(req: NextRequest) {
       return new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - 7 * 3600_000).toISOString();
     };
 
-    const conds = [eq(journalEntries.outletId, session.outletId), eq(journalLines.accountId, akun.id)];
+    // Cancelled pairs (voided entry + its reversal, both in range) left out — same rule as the
+    // Neraca Saldo and Arus Kas, so this breakdown ties to them instead of showing phantom turnover.
+    const conds = [
+      eq(journalEntries.outletId, session.outletId),
+      eq(journalLines.accountId, akun.id),
+      excludeCancelledPairs(session.outletId, dari ? wibStart(dari) : undefined, sampai ? wibEnd(sampai) : undefined),
+    ];
     if (dari) conds.push(gte(journalEntries.entryDate, wibStart(dari)));
     if (sampai) conds.push(lte(journalEntries.entryDate, wibEnd(sampai)));
 

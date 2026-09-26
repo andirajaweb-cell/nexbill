@@ -264,6 +264,7 @@ registerDict({
   "accounting.journal.source.purchaseReturn": { id: "Purchase Return", en: "Purchase Return", ms: "Pemulangan Belian", th: "การคืนสินค้าซื้อ", fil: "Purchase Return", vi: "Trả hàng mua" },
   "accounting.journal.source.expense": { id: "Expense", en: "Expense", ms: "Perbelanjaan", th: "ค่าใช้จ่าย", fil: "Expense", vi: "Chi phí" },
   "accounting.journal.source.refund": { id: "Refund", en: "Refund", ms: "Bayaran Balik", th: "การคืนเงิน", fil: "Refund", vi: "Hoàn tiền" },
+  "accounting.journal.source.assetPurchasePayment": { id: "Bayar Utang Aset", en: "Asset Debt Payment", ms: "Bayar Hutang Aset", th: "ชำระหนี้สินทรัพย์", fil: "Bayad sa Utang ng Asset", vi: "Trả nợ tài sản" },
   "accounting.journal.source.assetPurchase": { id: "Pembelian Aset", en: "Asset Purchase", ms: "Belian Aset", th: "การซื้อสินทรัพย์", fil: "Pagbili ng Asset", vi: "Mua tài sản" },
   "accounting.journal.source.assetDisposal": { id: "Pelepasan Aset", en: "Asset Disposal", ms: "Pelupusan Aset", th: "การจำหน่ายสินทรัพย์", fil: "Pagtatapon ng Asset", vi: "Thanh lý tài sản" },
   "accounting.journal.source.depreciation": { id: "Penyusutan", en: "Depreciation", ms: "Susut Nilai", th: "ค่าเสื่อมราคา", fil: "Depreciation", vi: "Khấu hao" },
@@ -356,9 +357,10 @@ registerDict({
   // --- PayablesTab ---
   "accounting.payables.typeSupplierDebt": { id: "Hutang Supplier", en: "Supplier Debt", ms: "Hutang Pembekal", th: "หนี้ซัพพลายเออร์", fil: "Utang sa Supplier", vi: "Nợ nhà cung cấp" },
   "accounting.payables.typeExpenseDebt": { id: "Expense (Hutang Lain-lain)", en: "Expense (Other Payables)", ms: "Perbelanjaan (Hutang Lain-lain)", th: "ค่าใช้จ่าย (เจ้าหนี้อื่นๆ)", fil: "Expense (Ibang Utang)", vi: "Chi phí (Khoản phải trả khác)" },
+  "accounting.payables.typeAssetPurchaseDebt": { id: "Hutang Pembelian Aset", en: "Asset Purchase Debt", ms: "Hutang Belian Aset", th: "หนี้ซื้อสินทรัพย์", fil: "Utang sa Pagbili ng Asset", vi: "Nợ mua tài sản" },
   "accounting.payables.explainer": {
-    id: "Gabungan hutang supplier (purchase invoice) dan expense yang dicatat sebagai hutang — pembayaran tetap lewat mekanisme masing-masing yang sudah ada, tampilan ini hanya konsolidasi + aging supaya tidak perlu buka dua tempat terpisah.",
-    en: "A combined view of supplier debt (purchase invoices) and expenses recorded as payables — payment still goes through each item's existing mechanism, this view is just a consolidation + aging so you don't need to open two separate places.",
+    id: "Gabungan hutang supplier (purchase invoice), hutang pembelian aset, dan expense yang dicatat sebagai hutang — pembayaran tetap lewat mekanisme masing-masing yang sudah ada, tampilan ini hanya konsolidasi + aging supaya tidak perlu buka dua tempat terpisah.",
+    en: "A combined view of supplier debt (purchase invoices), asset purchase debt and expenses recorded as payables — payment still goes through each item's existing mechanism, this view is just a consolidation + aging so you don't need to open two separate places.",
     ms: "Gabungan hutang pembekal (invois belian) dan perbelanjaan yang dicatat sebagai hutang — pembayaran tetap melalui mekanisme masing-masing yang sedia ada, paparan ini hanya penggabungan + aging supaya tidak perlu buka dua tempat berasingan.",
     th: "รวมหนี้ซัพพลายเออร์ (ใบแจ้งหนี้ซื้อ) และค่าใช้จ่ายที่บันทึกเป็นเจ้าหนี้ — การชำระเงินยังคงผ่านกลไกของแต่ละรายการตามเดิม หน้านี้เป็นเพียงการรวมข้อมูล + อายุหนี้ เพื่อไม่ต้องเปิดสองที่แยกกัน",
     fil: "Pinagsamang tanaw ng utang sa supplier (purchase invoice) at gastos na itinala bilang utang — dumadaan pa rin ang bayad sa umiiral na mekanismo ng bawat isa, ang view na ito ay konsolidasyon + aging lang para hindi na kailangang buksan ang dalawang magkahiwalay na lugar.",

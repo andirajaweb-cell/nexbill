@@ -13,11 +13,13 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import "@/lib/i18n/dict-assets";
 import "@/lib/i18n/dict-coa";
+import { AssetPurchaseTab } from "./AssetPurchaseTab";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 
 const TAB_DEFS = [
   { value: "Daftar Aset", labelKey: "assets.tabList", fallback: "Daftar Aset" },
+  { value: "Pembelian Aset", labelKey: "assets.tabPurchase", fallback: "Pembelian Aset" },
   { value: "Penyusutan", labelKey: "assets.tabDepreciation", fallback: "Penyusutan" },
 ] as const;
 type Tab = (typeof TAB_DEFS)[number]["value"];
@@ -69,7 +71,9 @@ export default function AssetsPage() {
       </div>
 
       {!outletId ? null : tab === "Daftar Aset" ? (
-        <AssetListTab outletId={outletId} role={role} />
+        <AssetListTab outletId={outletId} role={role} onOpenPurchase={() => setTab("Pembelian Aset")} />
+      ) : tab === "Pembelian Aset" ? (
+        <AssetPurchaseTab role={role} />
       ) : (
         <DepreciationTab outletId={outletId} role={role} />
       )}
@@ -77,7 +81,7 @@ export default function AssetsPage() {
   );
 }
 
-function AssetListTab({ outletId, role }: { outletId: string; role: StaffRole }) {
+function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; role: StaffRole; onOpenPurchase: () => void }) {
   const { t } = useDashboardLang();
   const [bundle, setBundle] = useState<any>({ assets: [], rentalUnits: [], suppliers: [], cashBankAccounts: [], maintenanceLogs: [] });
   const [showForm, setShowForm] = useState(false);
@@ -137,12 +141,18 @@ function AssetListTab({ outletId, role }: { outletId: string; role: StaffRole })
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm text-neutral-500">{t("assets.registeredCount", "{n} aset terdaftar").replace("{n}", String(bundle.assets.length))}</div>
-        {canManage && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t("assets.closeForm", "Tutup Form") : t("assets.newAssetButton", "+ Aset Baru")}</Button>}
+        {canManage && (
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onOpenPurchase}>{t("assets.purchase.new", "+ Pembelian Aset")}</Button>
+            <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t("assets.closeForm", "Tutup Form") : t("assets.newAssetButton", "+ Aset Baru")}</Button>
+          </div>
+        )}
       </div>
 
       {showForm && (
         <Card className="space-y-3">
           <h2 className="font-medium">{t("assets.formTitle", "Form Aset Baru")}</h2>
+          <p className="text-xs text-neutral-500">{t("assets.formPurchaseHint", "Satu aset, dicatat sebagai Pembelian Aset 1 baris. Untuk beberapa unit sekaligus, ongkos kirim/pasang, uang muka, atau aset saldo awal, gunakan tab Pembelian Aset.")}</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" placeholder={t("assets.placeholderName", "Nama aset (mis. PS5 Unit 5)")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
@@ -245,7 +255,11 @@ function AssetListTab({ outletId, role }: { outletId: string; role: StaffRole })
               const bookValue = a.acquisitionCost - a.accumulatedDepreciation;
               return (
                 <tr key={a.id} className="border-b border-neutral-900 align-top">
-                  <td className="py-2 text-xs font-medium">{a.name}</td>
+                  <td className="py-2 text-xs font-medium">
+                    {a.name}
+                    {a.purchaseId && a.notes && <div className="text-[11px] font-normal text-neutral-500">{a.notes}</div>}
+                    {a.status === "disposed" && a.disposalReason && <div className="text-[11px] font-normal text-neutral-500">{a.disposalReason}</div>}
+                  </td>
                   <td className="text-xs">{categoryLabel(t, a.category)}</td>
                   <td className="text-xs">{rupiah(a.acquisitionCost)}</td>
                   <td className="text-xs">{rupiah(a.accumulatedDepreciation)}</td>

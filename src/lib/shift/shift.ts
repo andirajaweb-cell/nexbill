@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
-import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions, cashDeposits, cashTransfers } from "@/db/schema";
-import { eq, and, inArray, desc, isNotNull } from "drizzle-orm";
+import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions, cashDeposits, cashTransfers, assetPurchases, assetPurchasePayments } from "@/db/schema";
+import { eq, and, inArray, desc, isNotNull, ne } from "drizzle-orm";
 import { selectShiftPayments } from "./drawer";
 import { logAudit } from "@/lib/audit/log";
 import { computeTrialBalance } from "@/lib/accounting/reports";
@@ -180,6 +180,32 @@ async function computePpobCashEffect(shiftId: string): Promise<{ ppobCashIn: num
  * lands in (kas_besar could itself be cash or bank). Voided deposits (status "void") are excluded,
  * same as void/reversed rows everywhere else in this file.
  */
+/**
+ * Cash taken out of this shift's drawer for Pembelian Aset (lib/accounting/asset-purchase.ts):
+ *  - the amount paid at purchase time (full payment or DP) of purchases stamped with this shift,
+ *    = purchase.paidAmount minus the later instalments recorded against it;
+ *  - instalments on an asset payable stamped with this shift.
+ * Only when the money came from a cash-type pool; a cancelled purchase / voided instalment put the
+ * cash back through its reversal journal, so neither counts.
+ */
+async function computeAssetPurchaseCashOut(shiftId: string, cashAccountIds: Set<string>): Promise<number> {
+  const purchases = await db.select().from(assetPurchases).where(and(eq(assetPurchases.shiftId, shiftId), ne(assetPurchases.status, "cancelled")));
+  const cashPurchases = purchases.filter((p) => p.cashBankAccountId && cashAccountIds.has(p.cashBankAccountId) && p.paymentMethod !== "opening_balance");
+  let total = 0;
+  if (cashPurchases.length) {
+    const later = await db
+      .select()
+      .from(assetPurchasePayments)
+      .where(and(inArray(assetPurchasePayments.assetPurchaseId, cashPurchases.map((p) => p.id)), eq(assetPurchasePayments.status, "posted")));
+    for (const p of cashPurchases) {
+      total += p.paidAmount - later.filter((x) => x.assetPurchaseId === p.id).reduce((s, x) => s + x.amount, 0);
+    }
+  }
+  const instalments = await db.select().from(assetPurchasePayments).where(and(eq(assetPurchasePayments.shiftId, shiftId), eq(assetPurchasePayments.status, "posted")));
+  total += instalments.filter((x) => cashAccountIds.has(x.cashBankAccountId)).reduce((s, x) => s + x.amount, 0);
+  return total;
+}
+
 async function computeCashDropTotal(shiftId: string): Promise<number> {
   const shiftDeposits = await db.select().from(cashDeposits).where(and(eq(cashDeposits.shiftId, shiftId), eq(cashDeposits.status, "posted")));
   if (!shiftDeposits.length) return 0;
@@ -390,8 +416,10 @@ export async function closeShift(
   const shiftExpenses = await db.select().from(expenses).where(and(eq(expenses.shiftId, shiftId), eq(expenses.status, "paid")));
   const cashExpenseAccounts = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.type, "cash"));
   const cashAccountIds = new Set(cashExpenseAccounts.map((a) => a.id));
+  const assetPurchaseCashOut = await computeAssetPurchaseCashOut(shiftId, cashAccountIds);
   const cashOut =
     shiftExpenses.filter((e) => e.cashBankAccountId && cashAccountIds.has(e.cashBankAccountId)).reduce((s, e) => s + e.amount + (e.taxAmount ?? 0), 0) +
+    assetPurchaseCashOut +
     homeRentalDepositCashOut +
     ppobCashOut +
     cashDropTotal +

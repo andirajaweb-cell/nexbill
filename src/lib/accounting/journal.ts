@@ -13,6 +13,7 @@ export type JournalSourceType =
   | "expense"
   | "refund"
   | "asset_purchase"
+  | "asset_purchase_payment"
   | "asset_disposal"
   | "depreciation"
   | "receivable_payment"

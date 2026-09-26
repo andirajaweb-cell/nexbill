@@ -589,6 +589,7 @@ const SOURCE_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }> 
   expense: { key: "accounting.journal.source.expense", fallback: "Expense" },
   refund: { key: "accounting.journal.source.refund", fallback: "Refund" },
   asset_purchase: { key: "accounting.journal.source.assetPurchase", fallback: "Pembelian Aset" },
+  asset_purchase_payment: { key: "accounting.journal.source.assetPurchasePayment", fallback: "Bayar Utang Aset" },
   asset_disposal: { key: "accounting.journal.source.assetDisposal", fallback: "Pelepasan Aset" },
   depreciation: { key: "accounting.journal.source.depreciation", fallback: "Penyusutan" },
   receivable_payment: { key: "accounting.journal.source.receivablePayment", fallback: "Pelunasan Piutang" },
@@ -1222,9 +1223,14 @@ function PayablesTab({ outletId }: { outletId: string }) {
     if (!payFor.cashBankAccountId) return showAlert(t("accounting.payables.alertChooseCashBank", "Pilih akun kas/bank."));
     setBusy(true);
     try {
-      const url = payFor.type === "purchase_invoice" ? `/api/purchase-invoices/${payFor.id}/pay` : `/api/expenses/${payFor.id}/pay`;
-      const body =
+      const url =
         payFor.type === "purchase_invoice"
+          ? `/api/purchase-invoices/${payFor.id}/pay`
+          : payFor.type === "asset_purchase"
+            ? `/api/asset-purchases/${payFor.id}/pay`
+            : `/api/expenses/${payFor.id}/pay`;
+      const body =
+        payFor.type === "purchase_invoice" || payFor.type === "asset_purchase"
           ? { amount: payFor.amount, method: payFor.method, cashBankAccountId: payFor.cashBankAccountId, staffUserId: user?.id }
           : { method: payFor.method, cashBankAccountId: payFor.cashBankAccountId };
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -1241,11 +1247,12 @@ function PayablesTab({ outletId }: { outletId: string }) {
   const typeLabelKeys: Record<string, { key: string; fallback: string }> = {
     purchase_invoice: { key: "accounting.payables.typeSupplierDebt", fallback: "Hutang Supplier" },
     expense: { key: "accounting.payables.typeExpenseDebt", fallback: "Expense (Hutang Lain-lain)" },
+    asset_purchase: { key: "accounting.payables.typeAssetPurchaseDebt", fallback: "Hutang Pembelian Aset" },
   };
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-neutral-500">{t("accounting.payables.explainer", "Gabungan hutang supplier (purchase invoice) dan expense yang dicatat sebagai hutang — pembayaran tetap lewat mekanisme masing-masing yang sudah ada, tampilan ini hanya konsolidasi + aging supaya tidak perlu buka dua tempat terpisah.")}</p>
+      <p className="text-xs text-neutral-500">{t("accounting.payables.explainer", "Gabungan hutang supplier (purchase invoice), hutang pembelian aset, dan expense yang dicatat sebagai hutang — pembayaran tetap lewat mekanisme masing-masing yang sudah ada, tampilan ini hanya konsolidasi + aging supaya tidak perlu buka dua tempat terpisah.")}</p>
       <Card className="text-center py-4">
         <div className="text-2xl font-bold text-amber-400">{rupiah(data.totalOutstanding)}</div>
         <div className="text-xs text-neutral-500">{t("accounting.payables.totalOutstanding", "Total Hutang Outstanding ({count} tagihan)").replace("{count}", String(data.count))}</div>
@@ -1256,7 +1263,7 @@ function PayablesTab({ outletId }: { outletId: string }) {
         <Card className="space-y-2 border-emerald-500/40">
           <h2 className="font-medium">{t("accounting.payables.payFormHeading", "Bayar Hutang")}</h2>
           <div className="grid grid-cols-3 gap-2">
-            {payFor.type === "purchase_invoice" && (
+            {(payFor.type === "purchase_invoice" || payFor.type === "asset_purchase") && (
               <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={payFor.amount} onChange={(e) => setPayFor({ ...payFor, amount: Number(e.target.value) })} />
             )}
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={payFor.method} onChange={(e) => setPayFor({ ...payFor, method: e.target.value })}>

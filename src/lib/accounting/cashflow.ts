@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { accounts, cashBankAccounts, journalEntries, journalLines } from "@/db/schema";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { outletDateYmd } from "@/lib/time/outlet-time";
+import { excludeCancelledPairs } from "./reports";
 
 export interface CashFlowResult {
   from?: string;
@@ -44,11 +45,12 @@ export interface CashFlowResult {
  *  - Setoran kas, pembelian aset, dan setiap sumber jurnal lain ikut terhitung otomatis. Versi lama
  *    hanya tahu tiga sumber (payments, expenses, purchasePayments) sehingga membutakan sisanya.
  *
- * Sama seperti computeTrialBalance, entri berstatus "void" SENGAJA ikut dijumlahkan: voidJournal()
- * tidak pernah menghapus entri asli, melainkan memposting entri pembalik terpisah lalu menandai
- * yang asli sebagai "void". Kalau yang berstatus "void" dibuang, entri aslinya hilang dari total
- * sementara pembaliknya tetap terhitung — hasilnya justru timpang. Keduanya harus dijumlahkan agar
- * saling meniadakan dengan bersih.
+ * Sama seperti computeTrialBalance: pasangan jurnal batal + pembaliknya yang KEDUANYA berada di
+ * periode ini dikeluarkan (excludeCancelledPairs). Keduanya saling meniadakan, jadi kas bersih tidak
+ * berubah — tapi dulu keduanya ikut dijumlahkan, sehingga satu expense Listrik yang pernah tercatat
+ * ganda lalu dibatalkan muncul sebagai "Kas Masuk dari Listrik Rp4.020.000" DAN "Kas Keluar ke
+ * Listrik Rp5.025.000", dan Kas Masuk/Kas Keluar sama-sama menggelembung oleh transaksi yang tidak
+ * pernah terjadi. Pasangan yang melintasi batas periode tetap dihitung di periodenya masing-masing.
  */
 /** Satu baris jurnal sebagaimana dibutuhkan agregator di bawah — sengaja tidak memakai tipe Drizzle supaya bisa diuji tanpa database. */
 export interface CashFlowLine {
@@ -213,7 +215,7 @@ export async function computeCashFlow(outletId: string, from?: string, to?: stri
    * perbedaan sekecil apa pun di sini akan langsung muncul sebagai selisih yang tidak bisa
    * dijelaskan antara Arus Kas dan Neraca Saldo — persis bug yang membuat fungsi ini ditulis ulang.
    */
-  const entryConditions = [eq(journalEntries.outletId, outletId)];
+  const entryConditions = [eq(journalEntries.outletId, outletId), excludeCancelledPairs(outletId, from, to)];
   if (from) entryConditions.push(gte(journalEntries.entryDate, from));
   if (to) entryConditions.push(lte(journalEntries.entryDate, to));
 

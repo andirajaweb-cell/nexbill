@@ -63,7 +63,13 @@ export interface CreateFixedAssetInput {
   cashBankAccountId?: string;
 }
 
-/** Registers the asset and posts its acquisition journal — Dr 1500 Peralatan / Cr Kas-Bank (paid now) or Cr Hutang (recorded as payable). */
+/**
+ * Registers the asset and posts its acquisition journal — Dr 1500 Peralatan / Cr Kas-Bank (paid now) or Cr Hutang (recorded as payable).
+ *
+ * @deprecated No longer called by the app: every new asset goes through createAssetPurchase
+ * (lib/accounting/asset-purchase.ts), which validates outlet ownership of the supplier/kas/unit and
+ * gives a payable a document that Accounting → Utang can pay. Kept for scripts/history only.
+ */
 export async function createFixedAsset(input: CreateFixedAssetInput) {
   if (input.acquisitionCost <= 0) throw new Error("Harga perolehan harus lebih dari 0.");
   if (input.usefulLifeMonths <= 0) throw new Error("Umur ekonomis (bulan) harus lebih dari 0.");

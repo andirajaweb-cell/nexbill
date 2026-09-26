@@ -38,6 +38,7 @@ const KEY_TYPE: Record<string, "asset" | "liability" | "equity" | "revenue" | "e
   "ppob:payable": "liability",
   "ppob:provider_fee": "expense", // legacy, kept for old journals
   "home_rental:deposit": "liability",
+  "other:asset_purchase_payable": "liability",
 };
 const TYPE_LABEL: Record<string, string> = { asset: "aset", liability: "liabilitas", equity: "ekuitas", revenue: "pendapatan", expense: "beban" };
 

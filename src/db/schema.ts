@@ -910,7 +910,7 @@ export const journalEntries = pgTable(
     sourceType: text("source_type", {
       enum: [
         "rental", "pos", "purchase_invoice", "purchase_payment", "purchase_return",
-        "expense", "refund", "asset_purchase", "asset_disposal", "depreciation",
+        "expense", "refund", "asset_purchase", "asset_purchase_payment", "asset_disposal", "depreciation",
         "receivable_payment", "manual", "opening_balance", "ppob", "other_income",
         "home_rental", "membership_fee", "cash_deposit", "cash_transfer", "inventory_adjustment",
       ],
@@ -1368,8 +1368,81 @@ export const fixedAssets = pgTable("fixed_assets", {
   disposalReason: text("disposal_reason"),
   disposalJournalEntryId: text("disposal_journal_entry_id"),
   staffUserId: text("staff_user_id").references(() => staffUsers.id),
+  // Set when the asset came from a Pembelian Aset document (lib/accounting/asset-purchase.ts) —
+  // null for assets registered one by one through the old single-asset form.
+  purchaseId: text("purchase_id"),
   ...timestamps,
 });
+
+/**
+ * Pembelian Aset — one purchase document for fixed assets (migration 0020). Each unit bought
+ * becomes its own fixedAssets row (fixedAssets.purchaseId), so the Daftar Aset and Penyusutan tabs
+ * pick it up with no extra wiring. See lib/accounting/asset-purchase.ts.
+ */
+export const assetPurchases = pgTable(
+  "asset_purchases",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    purchaseNumber: text("purchase_number").notNull(),
+    supplierId: text("supplier_id").references(() => suppliers.id),
+    invoiceNumber: text("invoice_number"),
+    purchaseDate: text("purchase_date").notNull().$defaultFn(nowIso),
+    dueDate: text("due_date"),
+    subtotal: doublePrecision("subtotal").notNull().default(0),
+    /** Ongkos kirim/pemasangan — capitalised into each asset's acquisition cost, never expensed. */
+    additionalCost: doublePrecision("additional_cost").notNull().default(0),
+    total: doublePrecision("total").notNull().default(0),
+    paidAmount: doublePrecision("paid_amount").notNull().default(0),
+    status: text("status", { enum: ["unpaid", "partial", "paid", "cancelled"] }).notNull().default("unpaid"),
+    paymentMethod: text("payment_method"),
+    cashBankAccountId: text("cash_bank_account_id").references(() => cashBankAccounts.id),
+    journalEntryId: text("journal_entry_id"),
+    shiftId: text("shift_id"),
+    notes: text("notes"),
+    cancelReason: text("cancel_reason"),
+    cancelledAt: text("cancelled_at"),
+    staffUserId: text("staff_user_id").references(() => staffUsers.id),
+    ...timestamps,
+  },
+  (t) => [index("asset_purchases_outlet_status_idx").on(t.outletId, t.status)]
+);
+
+export const assetPurchaseItems = pgTable(
+  "asset_purchase_items",
+  {
+    id: id(),
+    assetPurchaseId: text("asset_purchase_id").notNull().references(() => assetPurchases.id),
+    name: text("name").notNull(),
+    category: text("category", { enum: ["playstation", "tv", "controller", "furniture", "vehicle", "other"] }).notNull(),
+    qty: integer("qty").notNull(),
+    unitCost: doublePrecision("unit_cost").notNull(),
+    /** unitCost + this line's prorated share of additionalCost — the acquisition cost of each asset. */
+    landedUnitCost: doublePrecision("landed_unit_cost").notNull(),
+    usefulLifeMonths: integer("useful_life_months").notNull(),
+    salvageValue: doublePrecision("salvage_value").notNull().default(0),
+    rentalUnitId: text("rental_unit_id").references(() => rentalUnits.id),
+    ...timestamps,
+  },
+  (t) => [index("asset_purchase_items_purchase_idx").on(t.assetPurchaseId)]
+);
+
+export const assetPurchasePayments = pgTable(
+  "asset_purchase_payments",
+  {
+    id: id(),
+    assetPurchaseId: text("asset_purchase_id").notNull().references(() => assetPurchases.id),
+    amount: doublePrecision("amount").notNull(),
+    method: text("method").notNull(),
+    cashBankAccountId: text("cash_bank_account_id").notNull().references(() => cashBankAccounts.id),
+    paidAt: text("paid_at").notNull().$defaultFn(nowIso),
+    journalEntryId: text("journal_entry_id"),
+    shiftId: text("shift_id"),
+    status: text("status", { enum: ["posted", "voided"] }).notNull().default("posted"),
+    staffUserId: text("staff_user_id").references(() => staffUsers.id),
+  },
+  (t) => [index("asset_purchase_payments_purchase_idx").on(t.assetPurchaseId)]
+);
 
 export const assetDepreciationEntries = pgTable("asset_depreciation_entries", {
   id: id(),
