@@ -152,7 +152,7 @@ export async function postJournal(input: PostJournalInput, dbc: DbOrTx = db): Pr
 
   // Guards lines that resolved via a raw accountId (e.g. cash/bank GL lookups)
   // rather than accountCode — getAccountIdByCode already checked the latter.
-  await assertPostableAccountIds(resolvedLines.map((l) => l.accountId), dbc);
+  await assertPostableAccountIds(resolvedLines.map((l) => l.accountId), dbc, input.outletId);
 
   const { totalDebit, totalCredit, balanced } = computeJournalBalance(resolvedLines);
 

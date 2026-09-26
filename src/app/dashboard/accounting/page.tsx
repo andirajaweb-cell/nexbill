@@ -11,6 +11,8 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PeriodBar, PeriodPreset, resolvePeriodPreset, describePeriod } from "@/components/reports/PeriodPicker";
+import { AuditTab } from "./AuditTab";
+import { CalkTab } from "./CalkTab";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
@@ -28,7 +30,7 @@ const inputClsSm = "w-full rounded-lg bg-neutral-800 border border-neutral-700 p
 function Field({ label, children }: { label: string; children: any }) {
   return <label className="space-y-1 block"><div className="text-xs text-neutral-500">{label}</div>{children}</label>;
 }
-const TABS = ["Chart of Accounts", "Account Mapping", "Jurnal", "Neraca Saldo", "Piutang (AR)", "Hutang (AP)", "Laba Rugi", "Rekonsiliasi", "Neraca", "Arus Kas", "Tutup Periode", "Migrasi Data"] as const;
+const TABS = ["Chart of Accounts", "Account Mapping", "Jurnal", "Neraca Saldo", "Piutang (AR)", "Hutang (AP)", "Laba Rugi", "Rekonsiliasi", "Neraca", "Arus Kas", "CALK (SAK EMKM)", "Audit", "Tutup Periode", "Migrasi Data"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
@@ -42,6 +44,8 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Rekonsiliasi": { key: "accounting.tab.reconciliation", fallback: "Rekonsiliasi" },
   "Neraca": { key: "accounting.tab.balanceSheet", fallback: "Neraca" },
   "Arus Kas": { key: "accounting.tab.cashFlow", fallback: "Arus Kas" },
+  "CALK (SAK EMKM)": { key: "accounting.tab.calk", fallback: "CALK (SAK EMKM)" },
+  "Audit": { key: "accounting.tab.audit", fallback: "Audit" },
   "Tutup Periode": { key: "accounting.tab.periodLock", fallback: "Tutup Periode" },
   "Migrasi Data": { key: "accounting.tab.migration", fallback: "Migrasi Data" },
 };
@@ -100,6 +104,10 @@ export default function AccountingPage() {
         <BalanceSheetTab outletId={outletId} />
       ) : tab === "Arus Kas" ? (
         <CashFlowTab outletId={outletId} />
+      ) : tab === "CALK (SAK EMKM)" ? (
+        <CalkTab />
+      ) : tab === "Audit" ? (
+        <AuditTab />
       ) : tab === "Tutup Periode" ? (
         <PeriodLockTab />
       ) : (

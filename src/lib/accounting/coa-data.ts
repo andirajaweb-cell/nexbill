@@ -130,6 +130,9 @@ export const DEFAULT_COA: CoaDef[] = [
   { code: "2141", name: "Output VAT / PPN", type: "liability", parentCode: "2140" },
   { code: "2142", name: "Withholding Tax", type: "liability", parentCode: "2140" },
   { code: "2143", name: "Other Tax Payable", type: "liability", parentCode: "2140" },
+  // SAK EMKM: beban pajak penghasilan harus tampil di Laba Rugi — utang PPh Final UMKM (PP 55/2022)
+  // yang belum disetor ditampung di sini sampai dibayar.
+  { code: "2144", name: "Utang PPh Final UMKM", type: "liability", parentCode: "2140" },
   { code: "2150", name: "Payroll Liabilities", type: "liability", parentCode: "2100", isPostingAllowed: false },
   { code: "2151", name: "Salary Payable", type: "liability", parentCode: "2150" },
   { code: "2152", name: "Employee Advances", type: "liability", parentCode: "2150" },
@@ -333,6 +336,9 @@ export const DEFAULT_COA: CoaDef[] = [
   { code: "8300", name: "Loss on Asset Disposal", type: "expense", parentCode: "8000" },
   { code: "8400", name: "Foreign Exchange Loss", type: "expense", parentCode: "8000" },
   { code: "8900", name: "Other Expense", type: "expense", parentCode: "8000" },
+  // SAK EMKM mensyaratkan pos "beban pajak" di Laporan Laba Rugi. Dipakai untuk PPh Final UMKM
+  // (0,5% dari peredaran bruto) atau PPh badan — lihat CALK di tab Accounting.
+  { code: "8500", name: "Beban Pajak Penghasilan", type: "expense", parentCode: "8000" },
 
   // ---------------- 9. TAX & CLEARING ----------------
   { code: "9000", name: "TAX & CLEARING", type: "liability", isPostingAllowed: false },

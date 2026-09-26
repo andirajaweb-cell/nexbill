@@ -192,8 +192,9 @@ export async function postPpobTransaction(input: CreatePpobInput) {
 
   const [funding] = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.id, input.fundingCashBankAccountId)).limit(1);
   const [receiving] = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.id, input.receivingCashBankAccountId)).limit(1);
-  if (!funding) throw new Error("Akun settlement/sumber modal tidak ditemukan.");
-  if (!receiving) throw new Error("Akun penerima uang masuk tidak ditemukan.");
+  // Both accounts must belong to THIS outlet — never let one outlet's PPOB sale move another outlet's Kas.
+  if (!funding || funding.outletId !== input.outletId) throw new Error("Akun settlement/sumber modal tidak ditemukan.");
+  if (!receiving || receiving.outletId !== input.outletId) throw new Error("Akun penerima uang masuk tidak ditemukan.");
 
   const label = `PPOB ${input.product}${input.serviceRef ? " - " + input.serviceRef : ""}`;
 

@@ -282,12 +282,25 @@ export async function getAccountIdByCode(outletId: string, code: string, dbc: Db
   return row.id;
 }
 
-/** Bulk header-posting guard used by postJournal for lines that resolve via a raw accountId (bypassing getAccountIdByCode's own check above). Accepts the same optional `dbc` (tx-or-db) as getAccountIdByCode. */
-export async function assertPostableAccountIds(accountIds: string[], dbc: DbOrTx = db) {
+/**
+ * Bulk guard used by postJournal for every line: the account must exist, be postable (not a
+ * Header), and — when `outletId` is given — belong to THAT outlet.
+ *
+ * Isolasi akuntansi antar-outlet (2026-09-26): several flows take a cashBankAccountId from the
+ * request body (expense, supplier payment, asset disposal, cash drop/transfer, PPOB) and turn it
+ * into a GL account without checking its outlet, so one outlet's journal could debit/credit another
+ * outlet's Kas. This single choke point refuses any journal whose lines leave its own outlet — no
+ * posting path can mix two outlets' books, whatever the caller passed in.
+ */
+export async function assertPostableAccountIds(accountIds: string[], dbc: DbOrTx = db, outletId?: string) {
   const uniqueIds = [...new Set(accountIds)];
   if (uniqueIds.length === 0) return;
   const rows = await dbc.select().from(accounts).where(inArray(accounts.id, uniqueIds));
+  if (rows.length !== uniqueIds.length) throw new Error("Ada akun pada jurnal yang tidak ditemukan.");
   for (const row of rows) {
+    if (outletId && row.outletId !== outletId) {
+      throw new Error(`Akun "${row.name}" (${row.code}) bukan milik outlet ini — jurnal ditolak supaya pembukuan antar-outlet tidak tercampur.`);
+    }
     if (!row.isPostingAllowed) throw new Error(`Akun "${row.name}" (${row.code}) adalah akun Header — tidak bisa menerima jurnal langsung.`);
   }
 }

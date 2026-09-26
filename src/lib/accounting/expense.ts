@@ -71,9 +71,10 @@ function generateExpenseNumber(): Promise<string> {
   return nomorBerikutnya(expenses, expenses.expenseNumber, "EXP");
 }
 
-async function assertExpenseAccount(accountId: string) {
+async function assertExpenseAccount(accountId: string, outletId?: string) {
   const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
-  if (!account) throw new Error("Akun COA untuk expense tidak ditemukan.");
+  // Same 404-style message whether missing or another outlet's — keeps outlets' books isolated.
+  if (!account || (outletId && account.outletId !== outletId)) throw new Error("Akun COA untuk expense tidak ditemukan.");
   if (account.type !== "expense") throw new Error(`Akun "${account.name}" bukan akun beban (type=${account.type}) — pilih akun COA bertipe expense.`);
   /*
    * Akun Header (mis. 5300 INVENTORY ADJUSTMENT) hanya pengelompok di laporan — jurnal harus masuk
@@ -124,7 +125,7 @@ export const nullIfBlank = (v: string | null | undefined): string | undefined =>
 
 export async function createExpense(input: CreateExpenseInput) {
   if (input.amount <= 0) throw new Error("Nominal expense harus lebih dari 0.");
-  await assertExpenseAccount(input.accountId);
+  await assertExpenseAccount(input.accountId, input.outletId);
 
   // Dinormalkan SEBELUM pemeriksaan di bawah — tanpa ini, cashBankAccountId berisi "" lolos dari
   // pemeriksaan `!input.cashBankAccountId`... justru tidak, "" memang falsy. Tapi ketiga kolom lain
@@ -142,6 +143,10 @@ export async function createExpense(input: CreateExpenseInput) {
 
   if (!input.recordAsPayable && !input.cashBankAccountId) {
     throw new Error("Pilih akun kas/bank untuk expense yang dibayar langsung, atau centang 'Catat sebagai hutang' jika belum dibayar.");
+  }
+  if (input.cashBankAccountId) {
+    const [cb] = await db.select({ outletId: cashBankAccounts.outletId }).from(cashBankAccounts).where(eq(cashBankAccounts.id, input.cashBankAccountId)).limit(1);
+    if (!cb || cb.outletId !== input.outletId) throw new Error("Akun kas/bank tidak ditemukan.");
   }
 
   const expenseNumber = await generateExpenseNumber();
