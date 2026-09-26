@@ -4,9 +4,9 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
-import { useApi } from "@/lib/api/use-api";
 import { usePollingWhenVisible } from "@/lib/api/use-polling";
-import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
+import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
+import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
 import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
@@ -78,7 +78,10 @@ export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState("cash");
-  const [methods, setMethods] = useState(PAYMENT_METHOD_OPTIONS); // starts with the static 8 as a safe default, replaced once the outlet's live catalog loads
+  // The outlet's active methods from /dashboard/payments (with their QRIS/rekening instructions) —
+  // see usePaymentMethods. Never a hardcoded list.
+  const { methods, find: findMethod } = usePaymentMethods();
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [discount, setDiscount] = useState(0);
   const [voucherCode, setVoucherCode] = useState("");
   const [voucherDiscount, setVoucherDiscount] = useState(0);
@@ -137,15 +140,6 @@ export default function PosPage() {
 
   usePollingWhenVisible(loadOpenOrders, 5000);
 
-  const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
-  useEffect(() => {
-    if (!outlet) return;
-    // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
-    fetchJsonArray(`/api/payment-methods?outletId=${outlet.id}`).then((rows) => {
-      const active = rows.filter((m: any) => m.isActive);
-      if (active.length > 0) setMethods(active.map((m: any) => ({ value: m.key, label: m.label })));
-    });
-  }, [outlet]);
 
   const addToCart = (p: Product) => {
     setCart((prev) => {
@@ -236,10 +230,31 @@ export default function PosPage() {
       if (!res.ok) return showAlert(payment.error);
       if (method === "cash") {
         await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
+      } else {
+        // Non-cash (QRIS/transfer/e-wallet): show where the customer pays + "Tandai Diterima",
+        // same panel as a fresh checkout — the payment stays pending until the cashier confirms.
+        setCheckoutResult({ order: { id: orderId }, payment });
       }
       loadOpenOrders();
     } finally {
       setPayingOrderId(null);
+    }
+  };
+
+  /** Marks a pending non-cash payment as received once the money has actually arrived. */
+  const confirmPendingPayment = async (paymentId: string) => {
+    if (confirmingPayment) return;
+    setConfirmingPayment(true);
+    try {
+      const res = await fetch(`/api/payments/${paymentId}/confirm-cash`, { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return showAlert(err?.error ?? t("pos.confirmFailed", "Gagal menandai pembayaran diterima."));
+      }
+      setCheckoutResult(null);
+      loadOpenOrders();
+    } finally {
+      setConfirmingPayment(false);
     }
   };
 
@@ -450,6 +465,7 @@ export default function PosPage() {
             ))}
           </select>
         </div>
+        <PaymentInstructions method={findMethod(method)} amount={estimatedTotal} />
 
         <Button className="w-full" onClick={checkout} disabled={cart.length === 0 || checkoutBusy}>
           {checkoutBusy ? t("pos.payBusy", "Memproses...") : t("pos.payButton", "Bayar {amount}").replace("{amount}", rupiah(estimatedTotal))}
@@ -458,7 +474,14 @@ export default function PosPage() {
         {checkoutResult && (
           <div className="text-xs text-neutral-400 border-t border-neutral-800 pt-3 space-y-1">
             <div>{t("pos.orderCreated", "Order #{id} dibuat.").replace("{id}", checkoutResult.order.id.slice(0, 8))}</div>
-            {checkoutResult.payment.qrString && <div>{t("pos.qrisReady", "QRIS siap discan pelanggan (lihat halaman Pembayaran).")}</div>}
+            {checkoutResult.payment.method !== "cash" && checkoutResult.payment.status === "pending" && (
+              <div className="space-y-2 pt-1">
+                <PaymentInstructions method={findMethod(checkoutResult.payment.method)} amount={checkoutResult.payment.amount} />
+                <Button className="w-full" disabled={confirmingPayment} onClick={() => confirmPendingPayment(checkoutResult.payment.id)}>
+                  {confirmingPayment ? t("pos.payBusy", "Memproses...") : t("pos.markReceived", "Tandai Diterima")}
+                </Button>
+              </div>
+            )}
             {checkoutResult.payment.method === "cash" && (
               <Button
                 variant="secondary"

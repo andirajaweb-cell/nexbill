@@ -19,7 +19,14 @@ type Method = {
   isActive: boolean;
   sortOrder: number;
   feePercent: number;
+  qrisImageUrl?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountHolder?: string | null;
+  customerNote?: string | null;
 };
+
+const EMPTY_INSTRUCTIONS = { qrisImageUrl: "", bankName: "", bankAccountNumber: "", bankAccountHolder: "", customerNote: "" };
 
 // Module-level map — can't call useDashboardLang() here since hooks require a component. Each
 // component that needs a kind's descriptive label resolves it via kindLabel(kind, t) below.
@@ -71,16 +78,42 @@ function MethodsPanel({ outletId, methods, canManage, onChanged }: { outletId: s
   const [isActive, setIsActive] = useState(true);
   const [feePercent, setFeePercent] = useState("0");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [instr, setInstr] = useState(EMPTY_INSTRUCTIONS);
+  const [uploading, setUploading] = useState(false);
 
-  const startEdit = (m: Method) => { setEditingId(m.id); setLabel(m.label); setKind(m.kind); setIsActive(m.isActive); setFeePercent(String(m.feePercent ?? 0)); };
-  const resetForm = () => { setEditingId(null); setLabel(""); setKind("info_only"); setIsActive(true); setFeePercent("0"); };
+  const startEdit = (m: Method) => {
+    setEditingId(m.id); setLabel(m.label); setKind(m.kind); setIsActive(m.isActive); setFeePercent(String(m.feePercent ?? 0));
+    setInstr({
+      qrisImageUrl: m.qrisImageUrl ?? "",
+      bankName: m.bankName ?? "",
+      bankAccountNumber: m.bankAccountNumber ?? "",
+      bankAccountHolder: m.bankAccountHolder ?? "",
+      customerNote: m.customerNote ?? "",
+    });
+  };
+  const resetForm = () => { setEditingId(null); setLabel(""); setKind("info_only"); setIsActive(true); setFeePercent("0"); setInstr(EMPTY_INSTRUCTIONS); };
+
+  const uploadQris = async (file: File | null) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/payment-methods/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.error);
+      setInstr((i) => ({ ...i, qrisImageUrl: data.url }));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const save = async () => {
     if (!label.trim()) return showAlert(t("payments.alertNameRequired", "Isi nama metode pembayaran."));
     const res = await fetch("/api/payment-methods", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editingId, outletId, label, kind, isActive, feePercent: Number(feePercent) || 0 }),
+      body: JSON.stringify({ id: editingId, outletId, label, kind, isActive, feePercent: Number(feePercent) || 0, ...instr }),
     });
     const out = await res.json();
     if (!res.ok) return showAlert(out.error);
@@ -105,6 +138,7 @@ function MethodsPanel({ outletId, methods, canManage, onChanged }: { outletId: s
             <th>{t("payments.table.key", "Key")}</th>
             <th>{t("payments.table.kind", "Jenis")}</th>
             <th>{t("payments.table.fee", "Biaya (%)")}</th>
+            <th>{t("payments.table.instructions", "Arahan")}</th>
             <th>{t("payments.table.status", "Status")}</th>
             {canManage && <th></th>}
           </tr>
@@ -116,6 +150,15 @@ function MethodsPanel({ outletId, methods, canManage, onChanged }: { outletId: s
               <td className="text-xs text-neutral-500 font-mono">{m.key}</td>
               <td className="text-xs text-neutral-400">{kindLabel(m.kind, t)}</td>
               <td className="text-xs text-neutral-400">{m.feePercent > 0 ? `${m.feePercent}%` : "—"}</td>
+              <td className="text-xs text-neutral-400">
+                {m.kind === "cash" ? "—" : (
+                  <div className="flex items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {m.qrisImageUrl && <img src={m.qrisImageUrl} alt="QRIS" className="h-8 w-8 rounded bg-white object-contain" />}
+                    <span>{[m.bankName, m.bankAccountNumber].filter(Boolean).join(" · ") || (m.qrisImageUrl ? "QRIS" : "—")}</span>
+                  </div>
+                )}
+              </td>
               <td>
                 <Badge status={m.isActive ? "on" : "off"}>{m.isActive ? t("payments.active", "Aktif") : t("payments.inactive", "Nonaktif")}</Badge>
               </td>
@@ -128,7 +171,7 @@ function MethodsPanel({ outletId, methods, canManage, onChanged }: { outletId: s
             </tr>
           ))}
           {methods.length === 0 && (
-            <tr><td colSpan={canManage ? 6 : 5} className="py-4 text-center text-neutral-500 text-xs">{t("payments.loading", "Memuat metode pembayaran…")}</td></tr>
+            <tr><td colSpan={canManage ? 7 : 6} className="py-4 text-center text-neutral-500 text-xs">{t("payments.loading", "Memuat metode pembayaran…")}</td></tr>
           )}
         </tbody>
       </table>
@@ -172,8 +215,31 @@ function MethodsPanel({ outletId, methods, canManage, onChanged }: { outletId: s
             />
             {t("payments.active", "Aktif")}
           </label>
+          {kind !== "cash" && (
+            <div className="sm:col-span-5 space-y-2 rounded-lg border border-neutral-800 p-2">
+              <div className="text-xs font-medium text-neutral-300">{t("payments.form.instructionsHeading", "Arahan untuk pelanggan (opsional)")}</div>
+              <p className="text-[11px] text-neutral-500">{t("payments.form.instructionsHelp", "Ditampilkan ke kasir & pelanggan saat metode ini dipilih di Rental, Kasir, Home Rental, dan Membership. Isi QRIS statis milik outlet dan/atau rekening bank outlet — uang pelanggan masuk langsung ke outlet.")}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {instr.qrisImageUrl && <img src={instr.qrisImageUrl} alt="QRIS" className="h-20 w-20 rounded bg-white object-contain p-1" />}
+                <label className="cursor-pointer rounded-lg border border-neutral-700 px-2 py-1.5 text-xs text-neutral-300 hover:bg-white/5">
+                  {uploading ? t("payments.uploading", "Mengunggah…") : t("payments.form.qrisUpload", "Upload gambar QRIS")}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { uploadQris(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                </label>
+                {instr.qrisImageUrl && (
+                  <button type="button" className="text-xs text-red-400" onClick={() => setInstr({ ...instr, qrisImageUrl: "" })}>{t("payments.form.qrisRemove", "Hapus gambar")}</button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("payments.form.bankName", "Nama bank (mis. BCA)")} value={instr.bankName} onChange={(e) => setInstr({ ...instr, bankName: e.target.value })} />
+                <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs font-mono" placeholder={t("payments.form.accountNumber", "Nomor rekening")} value={instr.bankAccountNumber} onChange={(e) => setInstr({ ...instr, bankAccountNumber: e.target.value })} />
+                <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("payments.form.accountHolder", "Atas nama")} value={instr.bankAccountHolder} onChange={(e) => setInstr({ ...instr, bankAccountHolder: e.target.value })} />
+              </div>
+              <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("payments.form.customerNote", "Catatan untuk pelanggan (mis. kirim bukti transfer ke kasir)")} value={instr.customerNote} onChange={(e) => setInstr({ ...instr, customerNote: e.target.value })} />
+            </div>
+          )}
           <div className="flex gap-1 sm:col-span-5">
-            <Button className="text-xs" onClick={save}>{editingId ? t("payments.save", "Simpan") : t("payments.addMethod", "Tambah Metode")}</Button>
+            <Button className="text-xs" onClick={save} disabled={uploading}>{editingId ? t("payments.save", "Simpan") : t("payments.addMethod", "Tambah Metode")}</Button>
             {editingId && <Button variant="ghost" className="text-xs" onClick={resetForm}>{t("payments.cancel", "Batal")}</Button>}
           </div>
         </div>

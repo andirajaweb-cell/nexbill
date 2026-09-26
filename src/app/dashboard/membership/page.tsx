@@ -12,6 +12,8 @@ import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-membership";
 import { isPaidTier, summarizeTierBenefits, isMembershipActive, sisaHariKeanggotaan } from "@/lib/membership/tier-benefits";
+import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
+import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const TABS = ["Customer", "Membership Tier", "Reward", "Voucher"] as const;
@@ -91,7 +93,9 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
   const [expanded, setExpanded] = useState({ orders: false, rentals: false, loyalty: false });
   const [tiers, setTiers] = useState<any[]>([]);
   const [membershipPayments, setMembershipPayments] = useState<any[]>([]);
-  const [sellForm, setSellForm] = useState<{ membershipTierId: string; paymentMethod: "cash" | "qris" }>({ membershipTierId: "", paymentMethod: "cash" });
+  const [sellForm, setSellForm] = useState<{ membershipTierId: string; paymentMethod: string }>({ membershipTierId: "", paymentMethod: "cash" });
+  // Active methods from /dashboard/payments incl. QRIS/rekening instructions — see usePaymentMethods.
+  const { methods: paymentMethodOptions, find: findMethod, labelOf: methodLabel } = usePaymentMethods();
   const [sellBusy, setSellBusy] = useState(false);
   const tr = (map: Record<string, string>, prefix: string, key: string) => t(`membership.${prefix}.${key}`, map[key] ?? key);
 
@@ -251,14 +255,17 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
                         <TierBenefitList tier={tierTerpilih} className="mt-1.5" />
                       </div>
                     )}
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-1.5 text-xs">
-                        <input type="radio" checked={sellForm.paymentMethod === "cash"} onChange={() => setSellForm({ ...sellForm, paymentMethod: "cash" })} /> {t("membership.cashLabel", "Cash")}
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs">
-                        <input type="radio" checked={sellForm.paymentMethod === "qris"} onChange={() => setSellForm({ ...sellForm, paymentMethod: "qris" })} /> QRIS
-                      </label>
-                    </div>
+                    <label className="block space-y-1">
+                      <div className="text-[11px] text-neutral-400">{t("membership.paymentMethodLabel", "Metode Pembayaran")}</div>
+                      <select
+                        className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2.5 py-1.5 text-xs"
+                        value={sellForm.paymentMethod}
+                        onChange={(e) => setSellForm({ ...sellForm, paymentMethod: e.target.value })}
+                      >
+                        {paymentMethodOptions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                      </select>
+                    </label>
+                    <PaymentInstructions method={findMethod(sellForm.paymentMethod)} amount={tierTerpilih?.feeAmount} compact />
                     <Button className="text-xs w-full" disabled={sellBusy || !sellForm.membershipTierId} onClick={sellMembershipAction}>
                       {sellBusy ? t("membership.processing", "Memproses...") : t("membership.payActivateBtn", "Bayar & Aktifkan")}
                     </Button>
@@ -270,7 +277,7 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
                     {membershipPayments.slice(0, 5).map((mp: any) => (
                       <div key={mp.id} className="text-xs flex items-center justify-between gap-2">
                         <span className={mp.status === "void" ? "text-neutral-600 line-through" : "text-neutral-300"}>
-                          {mp.paymentNumber} · {mp.paymentMethod === "cash" ? t("membership.cashLabel", "Cash") : "QRIS"}
+                          {mp.paymentNumber} · {methodLabel(mp.paymentMethod)}
                         </span>
                         <span className={mp.status === "void" ? "text-neutral-600 line-through" : "text-emerald-400"}>{rupiah(mp.amount)}</span>
                       </div>

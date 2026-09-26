@@ -7,7 +7,7 @@ import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
-import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
+import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
 import { showAlert, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-other-income";
@@ -42,18 +42,14 @@ export default function OtherIncomePage() {
   const [fromDate, setFromDate] = useState(toDateInput(new Date(new Date().setDate(new Date().getDate() - 6))));
   const [toDate, setToDate] = useState(toDateInput(new Date()));
   const [data, setData] = useState<{ rows: any[]; totalPosted: number } | null>(null);
-  const [methods, setMethods] = useState(PAYMENT_METHOD_OPTIONS); // static 8 as a safe default, replaced once the outlet's live catalog loads
+  // Active methods from /dashboard/payments — see usePaymentMethods (no hardcoded fallback list).
+  const { methods } = usePaymentMethods();
   const methodLabel = useMemo(() => Object.fromEntries(methods.map((m) => [m.value, m.label])), [methods]);
 
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
     if (!outlet) return;
     setOutletId(outlet.id);
-    // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
-    fetchJsonArray(`/api/payment-methods?outletId=${outlet.id}`).then((rows) => {
-      const active = rows.filter((m: any) => m.isActive);
-      if (active.length > 0) setMethods(active.map((m: any) => ({ value: m.key, label: m.label })));
-    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outlet]);
 

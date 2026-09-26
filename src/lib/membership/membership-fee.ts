@@ -7,6 +7,7 @@ import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "@/lib/
 import { logAudit } from "@/lib/audit/log";
 import { resolvePaymentFee, feeExpenseLine } from "@/lib/accounting/payment-fee";
 import { computeMembershipExpiry } from "./tier-benefits";
+import { getActivePaymentMethods } from "@/lib/payments/methods";
 
 /**
  * Paid membership signups/renewals — "Jual Keanggotaan" on the Membership & CRM page. A customer
@@ -18,8 +19,19 @@ import { computeMembershipExpiry } from "./tier-benefits";
  * Deliberately only cash and QRIS (per the feature request) — both are "settle immediately, no
  * external gateway confirmation needed" channels, unlike e.g. a VA that has to wait for a webhook.
  */
-export const MEMBERSHIP_PAYMENT_METHODS = ["cash", "qris"] as const;
-export type MembershipPaymentMethod = (typeof MEMBERSHIP_PAYMENT_METHODS)[number];
+/**
+ * Any ACTIVE method from the outlet's own Pembayaran catalog (cash, QRIS, transfer, e-wallet, custom
+ * channels). This used to be hardcoded to ["cash", "qris"], so a member paying by bank transfer
+ * could not be recorded at all. Each key resolves to its cash/bank GL account through Account
+ * Mapping (getCashBankAccountIdForPaymentMethod), exactly like POS/Rental payments.
+ */
+export type MembershipPaymentMethod = string;
+
+async function assertActivePaymentMethod(outletId: string, method: string) {
+  const methods = await getActivePaymentMethods(outletId);
+  const found = methods.find((m) => m.key === method);
+  if (!found || !found.isActive) throw new Error("Metode pembayaran tidak tersedia. Pilih metode yang aktif di halaman Pembayaran.");
+}
 
 const round = (n: number) => Math.round(n);
 
@@ -39,9 +51,7 @@ export interface SellMembershipInput {
 
 /** Charges a customer the tier's configured feeAmount and immediately assigns them to it. The amount is always the tier's current feeAmount at the moment of sale — not caller-suppliable — so this can never under/over-charge relative to what's configured. */
 export async function sellMembership(input: SellMembershipInput) {
-  if (!MEMBERSHIP_PAYMENT_METHODS.includes(input.paymentMethod)) {
-    throw new Error("Metode pembayaran keanggotaan hanya bisa Cash atau QRIS.");
-  }
+  await assertActivePaymentMethod(input.outletId, input.paymentMethod);
 
   const [tier] = await db.select().from(membershipTiers).where(eq(membershipTiers.id, input.membershipTierId)).limit(1);
   if (!tier || tier.outletId !== input.outletId) throw new Error("Membership tier tidak ditemukan.");

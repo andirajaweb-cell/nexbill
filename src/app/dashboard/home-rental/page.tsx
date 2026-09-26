@@ -10,7 +10,8 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
-import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
+import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
+import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-home-rental";
 
@@ -790,7 +791,8 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
   const [returnForm, setReturnForm] = useState<any>({ lateFee: 0, lateFeePaymentMethod: "cash", checklistOk: false, rating: 0, ratingNote: "", damageFee: 0, damageNote: "", damageFeePaymentMethod: "cash" });
   const [returnItems, setReturnItems] = useState<any[]>([]);
   const [detailFor, setDetailFor] = useState<any>(null);
-  const [methods, setMethods] = useState(PAYMENT_METHOD_OPTIONS); // starts with the static 8 as a safe default, replaced once the outlet's live catalog loads
+  // Active methods from /dashboard/payments incl. QRIS/rekening instructions — see usePaymentMethods.
+  const { methods, find: findMethod, labelOf: methodLabel } = usePaymentMethods();
 
   const load = () => {
     fetchJsonArray(`/api/home-rental/rentals?outletId=${outletId}`).then(setRentals);
@@ -799,13 +801,6 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
   };
   useEffect(() => {
     load();
-    // Owner-editable payment methods (Pengaturan/Pembayaran) — same source POS and Rental use,
-    // so checkout/deposit/late-fee at Home Rental always match what's actually configured for
-    // this outlet instead of a hardcoded static list.
-    fetchJsonArray(`/api/payment-methods?outletId=${outletId}`).then((rows) => {
-      const active = rows.filter((m: any) => m.isActive);
-      if (active.length > 0) setMethods(active.map((m: any) => ({ value: m.key, label: m.label })));
-    });
   }, [outletId]);
 
   const uploadDoc = async (field: string, file: File | null) => {
@@ -1046,11 +1041,19 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
               <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={checkoutForm.paymentMethod} onChange={(e) => setCheckoutForm({ ...checkoutForm, paymentMethod: e.target.value })}>
                 {methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select></label>
+            <PaymentInstructions
+              method={findMethod(checkoutForm.paymentMethod)}
+              amount={checkoutForm.depositPaymentMethod === checkoutForm.paymentMethod ? checkoutFor.totalAmount + (checkoutFor.depositAmount ?? 0) : checkoutFor.totalAmount}
+              compact
+            />
             {checkoutFor.depositAmount > 0 && (
               <label className="space-y-1 block"><div className="text-xs text-neutral-500">{t("homeRental.checkout.depositPaymentMethodLabel", "Metode Pembayaran Deposit")}</div>
                 <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={checkoutForm.depositPaymentMethod} onChange={(e) => setCheckoutForm({ ...checkoutForm, depositPaymentMethod: e.target.value })}>
                   {methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select></label>
+            )}
+            {checkoutFor.depositAmount > 0 && checkoutForm.depositPaymentMethod !== checkoutForm.paymentMethod && (
+              <PaymentInstructions method={findMethod(checkoutForm.depositPaymentMethod)} amount={checkoutFor.depositAmount} compact />
             )}
             <div className="flex gap-2">
               <Button onClick={submitCheckout}>{t("homeRental.checkout.confirmButton", "Konfirmasi Checkout")}</Button>
@@ -1072,7 +1075,10 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
                   {methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select></label>
             )}
-            {returnFor.depositAmount > 0 && <p className="text-xs text-neutral-500">{t("homeRental.return.depositWillBeReleased", "Deposit {amount} akan dilepas penuh ke pelanggan via {method}.").replace("{amount}", rupiah(returnFor.depositAmount)).replace("{method}", returnFor.depositPaymentMethod ?? "cash")}</p>}
+            {returnForm.lateFee > 0 && (
+              <PaymentInstructions method={findMethod(returnForm.lateFeePaymentMethod)} amount={returnForm.lateFee} compact />
+            )}
+            {returnFor.depositAmount > 0 && <p className="text-xs text-neutral-500">{t("homeRental.return.depositWillBeReleased", "Deposit {amount} akan dilepas penuh ke pelanggan via {method}.").replace("{amount}", rupiah(returnFor.depositAmount)).replace("{method}", methodLabel(returnFor.depositPaymentMethod ?? "cash"))}</p>}
 
             <div className="border-t border-neutral-800 pt-2 space-y-1.5">
               <div className="text-xs font-medium text-neutral-400">{t("homeRental.return.checklistHeading", "Checklist Perlengkapan")}</div>
@@ -1114,6 +1120,7 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
                           <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={returnForm.damageFeePaymentMethod} onChange={(e) => setReturnForm({ ...returnForm, damageFeePaymentMethod: e.target.value })}>
                             {methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                           </select></label>
+                        <PaymentInstructions method={findMethod(returnForm.damageFeePaymentMethod)} amount={returnForm.damageFee - returnFor.depositAmount} compact />
                       </>
                     ) : (
                       <p className="text-xs text-neutral-500">{t("homeRental.return.damageDeductedFromDepositNote", "Dipotong dari deposit {deposit} — sisa deposit {remaining} tetap dilepas ke pelanggan.").replace("{deposit}", rupiah(returnFor.depositAmount)).replace("{remaining}", rupiah(returnFor.depositAmount - returnForm.damageFee))}</p>
@@ -1123,6 +1130,9 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
                       <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={returnForm.damageFeePaymentMethod} onChange={(e) => setReturnForm({ ...returnForm, damageFeePaymentMethod: e.target.value })}>
                         {methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                       </select></label>
+                  )}
+                  {returnFor.depositAmount <= 0 && returnForm.damageFee > 0 && (
+                    <PaymentInstructions method={findMethod(returnForm.damageFeePaymentMethod)} amount={returnForm.damageFee} compact />
                   )}
                 </>
               )}

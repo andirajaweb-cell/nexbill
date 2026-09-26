@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sellMembership, listMembershipPayments, MEMBERSHIP_PAYMENT_METHODS } from "@/lib/membership/membership-fee";
+import { sellMembership, listMembershipPayments } from "@/lib/membership/membership-fee";
 import { getCurrentShift } from "@/lib/shift/shift";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** "Jual Keanggotaan" — charges the customer the tier's configured fee (Cash/QRIS only) and assigns them to it immediately. */
+/** "Jual Keanggotaan" — charges the customer the tier's configured fee (any active method from the outlet's Pembayaran catalog) and assigns them to it immediately. */
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     if (!body.customerId) return NextResponse.json({ error: "Pilih customer." }, { status: 400 });
     if (!body.membershipTierId) return NextResponse.json({ error: "Pilih tier keanggotaan." }, { status: 400 });
-    if (!MEMBERSHIP_PAYMENT_METHODS.includes(body.paymentMethod)) {
-      return NextResponse.json({ error: "Metode pembayaran keanggotaan hanya bisa Cash atau QRIS." }, { status: 400 });
+    if (typeof body.paymentMethod !== "string" || !body.paymentMethod) {
+      return NextResponse.json({ error: "Pilih metode pembayaran." }, { status: 400 });
     }
 
     // Auto-attach the cashier's currently-open shift (if any), same as Other Income — so cash

@@ -1125,6 +1125,15 @@ export const paymentMethods = pgTable("payment_methods", {
   feePercent: doublePrecision("fee_percent").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
+  // Arahan untuk pelanggan (migrasi 0017): where the customer actually sends the money when the
+  // cashier picks this method — the outlet's OWN static QRIS image and/or bank account. Shown at
+  // checkout in Rental, Kasir, Home Rental and Membership (components/payments/PaymentInstructions).
+  // All optional; a method with none of them simply shows no instructions.
+  qrisImageUrl: text("qris_image_url"),
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  bankAccountHolder: text("bank_account_holder"),
+  customerNote: text("customer_note"),
   ...timestamps,
 });
 

@@ -9,7 +9,8 @@ import { Power, Play, Square, Pause, PlayCircle, Clock, UtensilsCrossed, Plus, M
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { useAuth } from "@/lib/auth/client";
-import { PAYMENT_METHOD_OPTIONS } from "@/lib/payments/labels";
+import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
+import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
 // From ./charge, not ./pricing or ./accessories — both of those import @/db/client, which would
 // drag the postgres driver into this client bundle and break the production build. charge.ts holds
 // the pure arithmetic precisely so this page can share it instead of keeping its own copy; the
@@ -309,7 +310,8 @@ export default function RentalPage() {
   const { t, lang } = useDashboardLang();
   const staffUserId = user?.id ?? null;
   const [outletId, setOutletId] = useState<string | null>(null);
-  const [methods, setMethods] = useState(PAYMENT_METHOD_OPTIONS); // static 8 as a safe default, replaced once the outlet's live catalog loads
+  // Active methods from /dashboard/payments incl. QRIS/rekening instructions — see usePaymentMethods.
+  const { methods, find: findMethod, labelOf: methodLabel } = usePaymentMethods();
   const [units, setUnits] = useState<RentalUnit[]>([]);
   const [sessions, setSessions] = useState<RentalSession[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -356,8 +358,8 @@ export default function RentalPage() {
   // StartSessionInput.prepay in lib/rental/sessions.ts). Only cash/qris are offered here.
   const [collectPrepay, setCollectPrepay] = useState(false);
   const [prepayAmount, setPrepayAmount] = useState(0);
-  const [prepayMethod, setPrepayMethod] = useState<"cash" | "qris">("cash");
-  const [pendingPrepay, setPendingPrepay] = useState<{ paymentId: string; qrImageUrl: string | null; amount: number } | null>(null);
+  const [prepayMethod, setPrepayMethod] = useState<string>("cash");
+  const [pendingPrepay, setPendingPrepay] = useState<{ paymentId: string; qrImageUrl: string | null; amount: number; method: string } | null>(null);
   // Optional link to an existing customer record so a session can get member-rate pricing
   // (see computeEffectiveHourlyRate) and route its revenue to the Member account in
   // accounting (see isMemberCustomer in postings.ts) — a walk-in with no record is still
@@ -464,11 +466,6 @@ export default function RentalPage() {
       setOutletId(o.id);
       setAccessoryBillingMode(o.accessoryBillingMode ?? "per_hour");
       setBillingRoundingMinutes(o.billingRoundingMinutes ?? 1);
-      // Owner-editable payment methods (add/edit/delete from the Pembayaran page) — falls back to the static 8 above if this fails.
-      fetchJsonArray(`/api/payment-methods?outletId=${o.id}`).then((rows) => {
-        const active = rows.filter((m: any) => m.isActive);
-        if (active.length > 0) setMethods(active.map((m: any) => ({ value: m.key, label: m.label })));
-      });
       // Rental packages from the Promo page — API returns all outlets' rows, filter to this one.
       fetchJsonArray<Promo>("/api/promos").then((rows) => {
         setPromos(rows.filter((p) => p.outletId === o.id));
@@ -657,12 +654,12 @@ export default function RentalPage() {
         await showAlert(
           t("rental.dpReceivedToast", "DP {amount} ({method}) diterima.")
             .replace("{amount}", rupiah(prepayAmount))
-            .replace("{method}", prepayMethod.toUpperCase())
+            .replace("{method}", methodLabel(prepayMethod))
         );
       } else {
         // qris (or any async gateway) — show the QR right away so the cashier can hand it to
         // the customer, same "Tandai Diterima" pattern as end-of-session checkout.
-        setPendingPrepay({ paymentId: data.prepayment.id, qrImageUrl: data.prepayment.qrImageUrl ?? null, amount: prepayAmount });
+        setPendingPrepay({ paymentId: data.prepayment.id, qrImageUrl: data.prepayment.qrImageUrl ?? null, amount: prepayAmount, method: prepayMethod });
       }
     }
     // Session itself always starts fine even if the TV/console failed to turn on (unit not linked
@@ -1215,7 +1212,7 @@ export default function RentalPage() {
               <div className="rounded-lg bg-white/5 px-3 py-2 text-xs space-y-1 mb-3">
                 <div className="text-neutral-500 mb-1">{t("rental.paymentsReceivedSplit", "Pembayaran diterima (split):")}</div>
                 {bill.payments.filter((p) => p.status === "success").map((p) => (
-                  <div key={p.id} className="flex justify-between"><span className="uppercase">{p.method}</span><span>{rupiah(p.amount)}</span></div>
+                  <div key={p.id} className="flex justify-between"><span>{methodLabel(p.method)}</span><span>{rupiah(p.amount)}</span></div>
                 ))}
                 <div className="flex justify-between font-semibold pt-1 border-t border-white/10 text-amber-400">
                   <span>{t("rental.remainingBalance", "Sisa Tagihan")}</span><span>{rupiah(bill.balanceDue)}</span>
@@ -1229,12 +1226,16 @@ export default function RentalPage() {
                 {bill.payments.filter((p) => p.status === "pending").map((p) => (
                   <div key={p.id} className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="uppercase">{p.method} — {rupiah(p.amount)}</span>
+                      <span>{methodLabel(p.method)} — {rupiah(p.amount)}</span>
                       <Button variant="ghost" className="text-[11px] py-0.5" onClick={() => confirmPendingPayment(p.id)}>
                         {t("rental.markReceived", "Tandai Diterima")}
                       </Button>
                     </div>
-                    {p.qrImageUrl && <img src={p.qrImageUrl} alt={t("rental.qrPaymentAlt", "QR pembayaran")} className="w-28 h-28 rounded-lg border border-white/10" />}
+                    {p.qrImageUrl ? (
+                      <img src={p.qrImageUrl} alt={t("rental.qrPaymentAlt", "QR pembayaran")} className="w-28 h-28 rounded-lg border border-white/10" />
+                    ) : (
+                      <PaymentInstructions method={findMethod(p.method)} amount={p.amount} compact />
+                    )}
                   </div>
                 ))}
               </div>
@@ -1273,6 +1274,9 @@ export default function RentalPage() {
               <Button onClick={payFinishedOrder} disabled={payBusy}>{payBusy ? t("rental.payButtonBusy", "Memproses...") : t("rental.payButtonAmount", "Bayar {amount}").replace("{amount}", rupiah(payAmount))}</Button>
               <Button variant="ghost" onClick={() => updateFinishedBillEntry(bill.order.id, null)}>{t("rental.closePayLater", "Tutup (bayar nanti di POS)")}</Button>
             </div>
+            <div className="mt-2">
+              <PaymentInstructions method={findMethod(payMethod)} amount={payAmount} />
+            </div>
             {payAmount < bill.balanceDue && (
               <div className="text-[11px] text-amber-400 mt-1">
                 {t("rental.splitPaymentNote", "Split payment: sisa {amount} bisa dibayar dengan metode lain setelah ini.").replace("{amount}", rupiah(bill.balanceDue - payAmount))}
@@ -1284,13 +1288,17 @@ export default function RentalPage() {
 
       {pendingPrepay && (
         <Card className="border-amber-400/40">
-          <h2 className="gm-heading font-semibold mb-2 text-amber-300">{t("rental.awaitingPrepayHeading", "Menunggu Pembayaran DP — QRIS")}</h2>
+          <h2 className="gm-heading font-semibold mb-2 text-amber-300">{t("rental.awaitingPrepayHeadingMethod", "Menunggu Pembayaran DP — {method}").replace("{method}", methodLabel(pendingPrepay.method))}</h2>
           <div className="flex items-center gap-4">
             {pendingPrepay.qrImageUrl && (
               <img src={pendingPrepay.qrImageUrl} alt={t("rental.qrPrepayAlt", "QR pembayaran DP")} className="w-28 h-28 rounded-lg border border-white/10" />
             )}
             <div className="space-y-2">
-              <div className="text-sm">{t("rental.prepayScanNote", "DP {amount} — minta pelanggan scan QR di atas.").replace("{amount}", rupiah(pendingPrepay.amount))}</div>
+              {pendingPrepay.qrImageUrl ? (
+                <div className="text-sm">{t("rental.prepayScanNote", "DP {amount} — minta pelanggan scan QR di atas.").replace("{amount}", rupiah(pendingPrepay.amount))}</div>
+              ) : (
+                <PaymentInstructions method={findMethod(pendingPrepay.method)} amount={pendingPrepay.amount} compact />
+              )}
               <div className="flex gap-2">
                 <Button className="text-xs" onClick={confirmPendingPrepay}>{t("rental.markReceived", "Tandai Diterima")}</Button>
                 <Button variant="ghost" className="text-xs" onClick={() => setPendingPrepay(null)}>{t("rental.closeCheckBillLater", "Tutup (cek nanti di bill)")}</Button>
@@ -1793,24 +1801,12 @@ export default function RentalPage() {
                         value={prepayAmount || ""}
                         onChange={(e) => setPrepayAmount(Number(e.target.value))}
                       />
-                      <div className="flex rounded-lg border border-white/10 overflow-hidden text-xs">
-                        <button
-                          type="button"
-                          className={`px-3 py-1.5 ${prepayMethod === "cash" ? "bg-cyan-500/20 text-cyan-300" : "text-neutral-400 hover:bg-white/5"}`}
-                          onClick={() => setPrepayMethod("cash")}
-                        >
-                          {t("rental.cash", "Cash")}
-                        </button>
-                        <button
-                          type="button"
-                          className={`px-3 py-1.5 border-l border-white/10 ${prepayMethod === "qris" ? "bg-cyan-500/20 text-cyan-300" : "text-neutral-400 hover:bg-white/5"}`}
-                          onClick={() => setPrepayMethod("qris")}
-                        >
-                          QRIS
-                        </button>
-                      </div>
+                      <select className="flex-1 rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-xs" value={prepayMethod} onChange={(e) => setPrepayMethod(e.target.value)}>
+                        {methods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                      </select>
                     </div>
                   )}
+                  {collectPrepay && <PaymentInstructions method={findMethod(prepayMethod)} amount={prepayAmount} compact />}
                   {collectPrepay && suggestedPrepay > 0 && prepayAmount !== suggestedPrepay && (
                     <p className="text-[10px] text-neutral-500">{t("rental.prepayEstimateNote", "Estimasi dari paket/durasi: {amount}").replace("{amount}", rupiah(suggestedPrepay))}</p>
                   )}

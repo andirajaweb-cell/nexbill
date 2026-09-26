@@ -15,6 +15,22 @@ function toFeePercent(v: unknown): number {
   return Math.min(n, 100);
 }
 
+/** Customer-facing payment instructions (Arahan untuk pelanggan) — trimmed, length-capped, blank → null. The QRIS image must be an https URL (uploaded via /api/payment-methods/upload). */
+function toInstructions(body: Record<string, unknown>) {
+  const text = (v: unknown, max: number) => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s ? s.slice(0, max) : null;
+  };
+  const qris = text(body.qrisImageUrl, 1000);
+  return {
+    qrisImageUrl: qris && qris.toLowerCase().startsWith("https://") ? qris : null,
+    bankName: text(body.bankName, 80),
+    bankAccountNumber: text(body.bankAccountNumber, 40),
+    bankAccountHolder: text(body.bankAccountHolder, 120),
+    customerNote: text(body.customerNote, 300),
+  };
+}
+
 export async function GET(_req: NextRequest) {
   try {
     const session = await getSession();
@@ -61,6 +77,7 @@ export async function POST(req: NextRequest) {
           isActive: nextActive,
           feePercent,
           sortOrder: Number.isFinite(body.sortOrder) ? Number(body.sortOrder) : existing.sortOrder,
+          ...toInstructions(body),
           updatedAt: new Date().toISOString(),
         })
         .where(eq(paymentMethods.id, body.id))
@@ -95,6 +112,7 @@ export async function POST(req: NextRequest) {
         isActive: body.isActive ?? true,
         feePercent,
         sortOrder: maxOrder + 1,
+        ...toInstructions(body),
       })
       .returning();
     return NextResponse.json(created);
