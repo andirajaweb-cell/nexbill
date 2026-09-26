@@ -9,6 +9,8 @@ import { resolveKitchenStatus } from "@/lib/kitchen/routing";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 import { roundBillTotal } from "@/lib/pos/rounding";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
+import { guardManualDiscount, logManualDiscount } from "@/lib/pos/discount-guard";
 
 export async function GET(req: NextRequest) {
   try {
@@ -53,12 +55,13 @@ export async function POST(req: NextRequest) {
       applyServiceCharge = false,
       source = "pos",
       staffUserId,
-      shiftId,
     } = await req.json();
     // outletId always comes from the session, never the request body — this used to trust
     // whatever outletId the client sent, letting a logged-in staffer at one outlet create
     // orders (and consume vouchers, deduct stock) against any other tenant's data.
     const outletId = session.outletId;
+    // Never the client's value — the drawer shift of whoever is ringing this up.
+    const shiftId = await resolveDrawerShiftId(outletId, session.sub);
 
     const lineItems = (items as IncomingItem[]).map((i) => ({ ...i, lineTotal: i.qty * i.unitPrice }));
 
@@ -86,6 +89,7 @@ export async function POST(req: NextRequest) {
     // Standalone order — walk-in POS sale with no active rental session (or
     // a session whose bill somehow isn't open, e.g. already paid/cancelled).
     const subtotal = lineItems.reduce((sum, i) => sum + i.lineTotal, 0);
+    await guardManualDiscount({ outletId, staffUserId: session.sub, role: session.role, manualDiscount: discount, subtotal });
 
     let voucherId: string | undefined;
     let voucherDiscount = 0;
@@ -151,6 +155,7 @@ export async function POST(req: NextRequest) {
 
     if (voucherId) await consumeVoucher(voucherId);
 
+    await logManualDiscount({ outletId, staffUserId: session.sub, manualDiscount: discount, subtotal, orderId: order.id });
     return NextResponse.json(order);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

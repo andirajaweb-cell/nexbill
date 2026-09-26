@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
+import { confirmPaymentReceived } from "@/lib/payments/confirm-client";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
@@ -1040,7 +1041,12 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
         );
       }
 
-      if (collectFor.method === "cash") {
+      if (collectFor.method !== "cash") {
+        // Non-cash: confirm with the QRIS/transfer reference (required server-side). Previously a
+        // non-cash collection was created and then never confirmed — the receivable stayed open.
+        const ok = await confirmPaymentReceived(payment.id, collectFor.method, { amountLabel: rupiah(collectFor.amount) });
+        if (!ok) return;
+      } else {
         const confirmRes = await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
         if (!confirmRes.ok) {
           const confirmErr = await confirmRes.json().catch(() => ({}));

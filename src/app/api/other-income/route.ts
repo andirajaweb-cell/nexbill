@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOtherIncome, listOtherIncomes } from "@/lib/accounting/other-income";
-import { getCurrentShift } from "@/lib/shift/shift";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,7 +44,8 @@ export async function POST(req: NextRequest) {
 
     // Auto-attach the cashier's currently-open shift (if any) so cash received this way folds
     // into that shift's cash-count reconciliation instead of silently going unaccounted for.
-    const currentShift = await getCurrentShift(session.outletId, session.sub);
+    const drawerShiftId = await resolveDrawerShiftId(session.outletId, session.sub);
+    const currentShift = drawerShiftId ? { id: drawerShiftId } : null;
 
     const result = await createOtherIncome({
       outletId: session.outletId,

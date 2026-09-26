@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sellMembership, listMembershipPayments } from "@/lib/membership/membership-fee";
-import { getCurrentShift } from "@/lib/shift/shift";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 /** Lists membership fee payments for this outlet (optionally filtered to one customer — see the Riwayat Pembayaran panel on Membership > Customer detail). */
 export async function GET(req: NextRequest) {
@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
 
     // Auto-attach the cashier's currently-open shift (if any), same as Other Income — so cash
     // collected this way folds into that shift's cash-count reconciliation.
-    const currentShift = await getCurrentShift(session.outletId, session.sub);
+    const drawerShiftId = await resolveDrawerShiftId(session.outletId, session.sub);
+    const currentShift = drawerShiftId ? { id: drawerShiftId } : null;
 
     const result = await sellMembership({
       outletId: session.outletId,

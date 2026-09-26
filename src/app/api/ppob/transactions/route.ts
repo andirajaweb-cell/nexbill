@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { postPpobTransaction } from "@/lib/ppob/engine";
 import { computePpobList } from "@/lib/ppob/reports";
-import { getCurrentShift } from "@/lib/shift/shift";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 export async function GET(req: NextRequest) {
   try {
@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
     // /api/other-income and /api/membership-payments) rather than trusted from the client — the
     // page never actually sent one, which meant every PPOB transaction's shiftId silently stayed
     // null and shift close could never account for the cash tarik-tunai/top-up moved through it.
-    const currentShift = await getCurrentShift(session.outletId, session.sub);
+    const drawerShiftId = await resolveDrawerShiftId(session.outletId, session.sub);
+    const currentShift = drawerShiftId ? { id: drawerShiftId } : null;
     const result = await postPpobTransaction({
       outletId: session.outletId,
       category: body.category,

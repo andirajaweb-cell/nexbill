@@ -5,7 +5,7 @@ import { ipaymuCrossBorderGateway, ipaymuHostedGateway } from "./adapters/ipaymu
 import { manualGateway } from "./adapters/manual";
 import { db, type DbOrTx } from "@/db/client";
 import { payments, orders, receivables } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, ne } from "drizzle-orm";
 import { postSalesJournal, postReceivableSettlement, postDepositJournal } from "@/lib/accounting/postings";
 import { applyLoyaltyAndSpending } from "@/lib/membership/loyalty";
 import { resyncIfReceivableStale } from "@/lib/accounting/reconciliation-resync";
@@ -124,6 +124,7 @@ export async function initiatePayment(req: PaymentRequest) {
         feeAmount: result.feeAmount ?? 0,
         rawResponse: JSON.stringify(result.rawResponse ?? {}),
         expiresAt: result.expiresAt,
+        shiftId: req.shiftId ?? null,
       })
       .returning();
 
@@ -264,6 +265,7 @@ export async function recordDeposit(req: PaymentRequest) {
       feeAmount: result.feeAmount ?? 0,
       rawResponse: JSON.stringify(result.rawResponse ?? {}),
       expiresAt: result.expiresAt,
+      shiftId: req.shiftId ?? null,
     })
     .returning();
   return row;
@@ -277,15 +279,17 @@ export async function recordDeposit(req: PaymentRequest) {
  * requested architecture — "Customer Deposit dicatat sebagai Liability sampai digunakan" — means
  * that cash must appear on the books now, not silently wait until the session eventually stops.
  */
-export async function confirmDeposit(paymentId: string) {
+export async function confirmDeposit(paymentId: string, confirmation?: PaymentConfirmation) {
   const [existing] = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
   if (!existing) return null;
   if (existing.status === "success") return existing;
+  // Conditional on still not being "success": two concurrent confirms can't both win.
   const [updated] = await db
     .update(payments)
-    .set({ status: "success", paidAt: new Date().toISOString() })
-    .where(eq(payments.id, paymentId))
+    .set({ status: "success", paidAt: new Date().toISOString(), ...confirmationPatch(existing, confirmation) })
+    .where(and(eq(payments.id, paymentId), ne(payments.status, "success")))
     .returning();
+  if (!updated) return existing;
   if (updated) {
     try {
       await postDepositJournal(updated.id);
@@ -305,16 +309,36 @@ export async function confirmDeposit(paymentId: string) {
  * confirmed via confirmDeposit(), but an async gateway (QRIS DP) could route its success webhook
  * through this generic path instead, so it needs to branch the same way defensively.
  */
-export async function markPaymentSuccess(paymentId: string) {
+/** Who manually confirmed a payment ("Tandai Diterima") — see payments.confirmedBy/confirmationRef. */
+export interface PaymentConfirmation {
+  staffUserId?: string | null;
+  reference?: string | null;
+  /** Drawer shift of the confirmer — used only when the payment has no shift yet. */
+  shiftId?: string | null;
+}
+
+function confirmationPatch(existing: typeof payments.$inferSelect, c?: PaymentConfirmation) {
+  if (!c) return {};
+  return {
+    confirmedBy: c.staffUserId ?? null,
+    confirmationRef: c.reference?.trim() ? c.reference.trim().slice(0, 80) : null,
+    ...(existing.shiftId ? {} : { shiftId: c.shiftId ?? null }),
+  };
+}
+
+export async function markPaymentSuccess(paymentId: string, confirmation?: PaymentConfirmation) {
   const [existing] = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
   if (!existing) return null;
   if (existing.status === "success") return existing;
 
+  // Conditional on still not being "success": a double-clicked "Tandai Diterima" (or a webhook
+  // racing a manual confirm) can't settle the same payment twice.
   const [payment] = await db
     .update(payments)
-    .set({ status: "success", paidAt: new Date().toISOString() })
-    .where(eq(payments.id, paymentId))
+    .set({ status: "success", paidAt: new Date().toISOString(), ...confirmationPatch(existing, confirmation) })
+    .where(and(eq(payments.id, paymentId), ne(payments.status, "success")))
     .returning();
+  if (!payment) return existing;
 
   if (payment) {
     if (payment.kind === "deposit") {

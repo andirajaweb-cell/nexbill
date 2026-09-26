@@ -65,6 +65,8 @@ export interface PaymentRequest {
    * hardcoded placeholder. Optional because some call sites (e.g. platform-billing's
    * ipaymu-crossborder, which isn't outlet-scoped) never set it. */
   outletId?: string;
+  /** The drawer shift taking this payment (resolveDrawerShiftId), stamped on payments.shiftId. */
+  shiftId?: string | null;
 }
 
 export interface PaymentResult {

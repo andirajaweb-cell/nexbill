@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions, cashDeposits, cashTransfers } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc, isNotNull } from "drizzle-orm";
+import { selectShiftPayments } from "./drawer";
 import { logAudit } from "@/lib/audit/log";
 import { computeTrialBalance } from "@/lib/accounting/reports";
 import { getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
@@ -15,14 +16,64 @@ async function getOutletCashDenominations(outletId: string): Promise<readonly nu
   return getCashDenominations(currencyForCountry(outlet?.outletCountry).code);
 }
 
-export async function openShift(outletId: string, staffUserId: string, openingCash: number) {
+/**
+ * What the drawer SHOULD contain when the next shift opens: the cash the last closed shift at this
+ * outlet deliberately left in it (closingFloat). Null when unknown (no previous shift recorded one).
+ */
+export async function getExpectedOpeningCash(outletId: string): Promise<{ amount: number; fromShiftId: string; closedAt: string | null } | null> {
+  const [last] = await db
+    .select({ id: shifts.id, closingFloat: shifts.closingFloat, closedAt: shifts.closedAt })
+    .from(shifts)
+    .where(and(eq(shifts.outletId, outletId), eq(shifts.status, "closed"), isNotNull(shifts.closingFloat)))
+    .orderBy(desc(shifts.closedAt))
+    .limit(1);
+  return last && last.closingFloat != null ? { amount: last.closingFloat, fromShiftId: last.id, closedAt: last.closedAt } : null;
+}
+
+/**
+ * Opens a shift.
+ *
+ * Kontrol anti-fraud (2026-09-26):
+ *  - Satu laci, satu shift: unless the outlet explicitly runs several drawers
+ *    (outlets.allowMultipleOpenShifts), a second shift can't be opened while another is open —
+ *    otherwise two cashiers share one drawer and a shortage can't be attributed to anyone.
+ *    Hand-over = the previous cashier closes, the next one opens.
+ *  - Modal awal dicocokkan: the counted opening cash is compared with what the previous shift left
+ *    in the drawer (closingFloat). A difference needs a reason (openingNote) and is flagged at close
+ *    (opening_mismatch) — declaring a lower opening than what is really in the drawer was a way to
+ *    take the difference home with zero variance.
+ */
+export async function openShift(outletId: string, staffUserId: string, openingCash: number, openingNote?: string | null) {
+  if (!(openingCash >= 0)) throw new Error("Modal awal tidak valid.");
   const [existing] = await db
     .select()
     .from(shifts)
     .where(and(eq(shifts.outletId, outletId), eq(shifts.staffUserId, staffUserId), eq(shifts.status, "open")));
   if (existing) throw new Error("Kamu masih punya shift yang belum ditutup.");
 
-  const [shift] = await db.insert(shifts).values({ outletId, staffUserId, openingCash }).returning();
+  const [outlet] = await db.select({ allowMultipleOpenShifts: outlets.allowMultipleOpenShifts }).from(outlets).where(eq(outlets.id, outletId)).limit(1);
+  if (!outlet?.allowMultipleOpenShifts) {
+    const [otherOpen] = await db.select({ id: shifts.id }).from(shifts).where(and(eq(shifts.outletId, outletId), eq(shifts.status, "open"))).limit(1);
+    if (otherOpen) {
+      throw new Error(
+        "Masih ada shift lain yang terbuka di outlet ini. Satu laci hanya boleh dipegang satu kasir — minta kasir sebelumnya menutup shift-nya dulu (serah terima), atau Supervisor/Manager/Owner menutupnya dari Riwayat Shift. Outlet dengan beberapa laci bisa mengizinkannya di Pengaturan > Preferensi."
+      );
+    }
+  }
+
+  const expected = await getExpectedOpeningCash(outletId);
+  const note = openingNote?.trim() || null;
+  if (expected && Math.abs(openingCash - expected.amount) >= 1 && !note) {
+    throw new Error(
+      `Modal awal (${openingCash.toLocaleString("id-ID")}) berbeda dengan uang yang ditinggal di laci oleh shift sebelumnya (${expected.amount.toLocaleString("id-ID")}). Hitung ulang, atau tulis alasannya.`
+    );
+  }
+
+  const [shift] = await db
+    .insert(shifts)
+    .values({ outletId, staffUserId, openingCash, expectedOpeningCash: expected?.amount ?? null, openingNote: note })
+    .returning();
+  await logAudit({ outletId, staffUserId, action: "open_shift", entityType: "shift", entityId: shift.id, after: { openingCash, expectedOpeningCash: expected?.amount ?? null, openingNote: note } });
   return shift;
 }
 
@@ -50,11 +101,7 @@ export interface BalanceCheckInput {
 export async function getRequiredBalanceChannels(shiftId: string): Promise<{ channelKey: string; label: string }[]> {
   const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
   if (!shift) return [];
-  const shiftOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.shiftId, shiftId));
-  const orderIds = shiftOrders.map((o) => o.id);
-  const shiftPayments = orderIds.length
-    ? await db.select().from(payments).where(and(inArray(payments.orderId, orderIds), eq(payments.status, "success")))
-    : [];
+  const shiftPayments = await selectShiftPayments(shiftId, [eq(payments.status, "success")]);
   // Other Income received via a balance-tracked channel (GoPay/DANA/BukuPay/Fastpay) also has
   // to show up here — otherwise a cashier could receive it off a channel that never gets
   // checked this shift, closing the exact blind spot the balance-check verification exists for.
@@ -193,11 +240,7 @@ export interface IncomeByMethodRow {
  * never persisted as their own columns.
  */
 export async function computeIncomeByMethod(shiftId: string): Promise<IncomeByMethodRow[]> {
-  const shiftOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.shiftId, shiftId));
-  const orderIds = shiftOrders.map((o) => o.id);
-  const allPayments = orderIds.length
-    ? await db.select().from(payments).where(and(inArray(payments.orderId, orderIds), eq(payments.status, "success")))
-    : [];
+  const allPayments = await selectShiftPayments(shiftId, [eq(payments.status, "success")]);
   const shiftOtherIncomes = await db.select().from(otherIncomes).where(and(eq(otherIncomes.shiftId, shiftId), eq(otherIncomes.status, "posted")));
   const shiftMembershipPayments = await db.select().from(membershipPayments).where(and(eq(membershipPayments.shiftId, shiftId), eq(membershipPayments.status, "posted")));
   const shiftHomeRentals = await db.select().from(homeRentalRentals).where(eq(homeRentalRentals.shiftId, shiftId));
@@ -245,11 +288,22 @@ export async function computeIncomeByMethod(shiftId: string): Promise<IncomeByMe
  */
 export async function closeShift(
   shiftId: string,
-  input: { cashCounts: CashCountInput[]; balanceChecks: BalanceCheckInput[]; notes?: string }
+  input: {
+    cashCounts: CashCountInput[];
+    balanceChecks: BalanceCheckInput[];
+    notes?: string;
+    /** Cash deliberately left in the drawer for the next shift. Defaults to the full count. */
+    closingFloat?: number | null;
+    /** Who is closing — when it isn't the shift's own cashier, closeNote is required (route enforces the role). */
+    closedBy?: string | null;
+    closeNote?: string | null;
+  }
 ) {
   const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
   if (!shift) throw new Error("Shift tidak ditemukan.");
   if (shift.status === "closed") throw new Error("Shift sudah ditutup.");
+  const closedByOther = !!input.closedBy && input.closedBy !== shift.staffUserId;
+  if (closedByOther && !input.closeNote?.trim()) throw new Error("Menutup shift milik kasir lain wajib disertai alasan.");
 
   // --- Validate & normalize the denomination count ---
   const cashDenominations = await getOutletCashDenominations(shift.outletId);
@@ -267,12 +321,11 @@ export async function closeShift(
 
   const closedAt = new Date().toISOString();
 
-  const shiftOrders = await db.select().from(orders).where(eq(orders.shiftId, shiftId));
-  const orderIds = shiftOrders.map((o) => o.id);
+  const shiftOrders = await db.select({ id: orders.id }).from(orders).where(eq(orders.shiftId, shiftId));
 
-  const cashPayments = orderIds.length
-    ? await db.select().from(payments).where(and(inArray(payments.orderId, orderIds), eq(payments.method, "cash"), eq(payments.status, "success")))
-    : [];
+  // Cash taken BY this shift's drawer (payments.shiftId), not cash on orders merely opened in it —
+  // see selectShiftPayments / resolveDrawerShiftId.
+  const cashPayments = await selectShiftPayments(shiftId, [eq(payments.method, "cash"), eq(payments.status, "success")]);
   // Cash received as Other Income (e.g. selling scrap gear, vendor commission paid in cash) sits
   // in the same physical drawer as order payments, so it has to count toward expected cash too —
   // otherwise every cash "other income" entry would show up as an unexplained overage at close.
@@ -311,6 +364,13 @@ export async function closeShift(
   const { ppobCashIn, ppobCashOut } = await computePpobCashEffect(shiftId);
   const cashDropTotal = await computeCashDropTotal(shiftId);
   const { cashTransferIn, cashTransferOut } = await computeCashTransferEffect(shiftId);
+  // Cash handed back from THIS drawer for a payment another shift took. (A refund inside the same
+  // shift needs nothing here: the refunded payment already drops out of cashIn.)
+  const refundedHere = await db
+    .select()
+    .from(payments)
+    .where(and(eq(payments.refundedShiftId, shiftId), eq(payments.method, "cash"), eq(payments.status, "refunded")));
+  const cashRefundOut = refundedHere.filter((p) => p.shiftId !== shiftId).reduce((s, p) => s + p.amount, 0);
 
   const cashIn =
     cashPayments.reduce((s, p) => s + p.amount, 0) +
@@ -335,10 +395,17 @@ export async function closeShift(
     homeRentalDepositCashOut +
     ppobCashOut +
     cashDropTotal +
-    cashTransferOut;
+    cashTransferOut +
+    cashRefundOut;
 
   const expectedCash = shift.openingCash + cashIn - cashOut;
   const variance = actualCash - expectedCash;
+
+  const closingFloat = input.closingFloat == null ? actualCash : Number(input.closingFloat);
+  if (!(closingFloat >= 0) || closingFloat > actualCash + 0.5) {
+    throw new Error("Uang yang ditinggal di laci tidak boleh negatif atau melebihi hasil hitungan kas.");
+  }
+  const cashExpenseTotal = shiftExpenses.filter((e) => e.cashBankAccountId && cashAccountIds.has(e.cashBankAccountId)).reduce((s, e) => s + e.amount + (e.taxAmount ?? 0), 0);
 
   // --- Non-cash channel balance checks ---
   const requiredChannels = await getRequiredBalanceChannels(shiftId);
@@ -387,6 +454,10 @@ export async function closeShift(
     closedAt,
     cashVariance: variance,
     nonCashVarianceTotal,
+    openingCash: shift.openingCash,
+    expectedOpeningCash: shift.expectedOpeningCash,
+    closedByOther,
+    cashExpenseTotal,
   });
 
   // --- Persist everything ---
@@ -408,6 +479,9 @@ export async function closeShift(
       nonCashVarianceTotal,
       notes: input.notes ?? shift.notes,
       riskFlags: JSON.stringify(risk.flags),
+      closingFloat,
+      closedBy: input.closedBy ?? shift.staffUserId,
+      closeNote: input.closeNote?.trim() || null,
     })
     .where(eq(shifts.id, shiftId))
     .returning();
@@ -418,7 +492,7 @@ export async function closeShift(
     action: "close_shift",
     entityType: "shift",
     entityId: shiftId,
-    after: { expectedCash, actualCash, variance, cashRows, balanceCheckRows, nonCashVarianceTotal, riskFlags: risk.flags },
+    after: { expectedCash, actualCash, variance, cashRows, balanceCheckRows, nonCashVarianceTotal, riskFlags: risk.flags, closingFloat, closedBy: input.closedBy ?? shift.staffUserId, closeNote: input.closeNote ?? null },
   });
 
   if (risk.flags.length > 0) {
@@ -636,6 +710,12 @@ export async function updateShiftDetail(
 export async function deleteShift(shiftId: string): Promise<{ deletedId: string }> {
   const [shift] = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
   if (!shift) throw new Error("Shift tidak ditemukan.");
+  // A CLOSED shift is the audit record of a cash count (denominations, variance, risk flags) — it
+  // can be corrected (Edit, audit-logged) but no longer erased. Only a stuck/orphaned OPEN shift
+  // can still be removed, which is what this action exists for.
+  if (shift.status === "closed") {
+    throw new Error("Shift yang sudah ditutup tidak bisa dihapus — riwayat hitung kas adalah jejak audit. Gunakan Edit untuk mengoreksi angkanya.");
+  }
 
   await db.delete(shiftCashCounts).where(eq(shiftCashCounts.shiftId, shiftId));
   await db.delete(shiftBalanceChecks).where(eq(shiftBalanceChecks.shiftId, shiftId));

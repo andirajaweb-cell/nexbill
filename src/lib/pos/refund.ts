@@ -5,6 +5,7 @@ import { voidJournal } from "@/lib/accounting/journal";
 import { restockForItem } from "@/lib/inventory/stock";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { logAudit } from "@/lib/audit/log";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 /**
  * Full refund of a paid or partially-paid bill: reverses every posted journal
@@ -45,7 +46,13 @@ export async function executeRefundOrder(orderId: string, reason: string, staffU
     }
 
     const successPayments = await tx.select().from(payments).where(and(eq(payments.orderId, orderId), eq(payments.status, "success")));
-    await tx.update(payments).set({ status: "refunded" }).where(eq(payments.orderId, orderId));
+    // Only payments that actually succeeded are refunded (pending/failed rows used to be flipped too),
+    // and each records the drawer shift handing the money back — see payments.refundedShiftId.
+    const refundedShiftId = await resolveDrawerShiftId(order.outletId, staffUserId, tx);
+    await tx
+      .update(payments)
+      .set({ status: "refunded", refundedShiftId })
+      .where(and(eq(payments.orderId, orderId), eq(payments.status, "success")));
 
     await tx.update(orders).set({ status: "cancelled" }).where(eq(orders.id, orderId));
 

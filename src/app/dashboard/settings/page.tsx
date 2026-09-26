@@ -708,7 +708,31 @@ function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: 
           <Field label={t("settings.preferences.fraudVoidCountLabel", "Ambang Jumlah Void/Refund per Shift")}>
             <input type="number" min={1} className={inputCls} disabled={!canManage} value={form.fraudVoidCountThreshold ?? 3} onChange={(e) => setForm({ ...form, fraudVoidCountThreshold: Math.max(1, Number(e.target.value) || 1) })} />
           </Field>
+          <Field label={t("settings.preferences.maxManualDiscountLabel", "Batas Diskon Manual Kasir (%)")}>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className={inputCls}
+              disabled={!canManage}
+              placeholder={t("settings.preferences.maxManualDiscountPlaceholder", "Kosong = tanpa batas")}
+              value={form.maxManualDiscountPercent ?? ""}
+              onChange={(e) => setForm({ ...form, maxManualDiscountPercent: e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
+            />
+          </Field>
+          <Field label={t("settings.preferences.multiDrawerLabel", "Beberapa Laci Kasir")}>
+            <label className="flex items-center gap-2 text-xs text-neutral-300 py-2">
+              <input type="checkbox" disabled={!canManage} checked={!!form.allowMultipleOpenShifts} onChange={(e) => setForm({ ...form, allowMultipleOpenShifts: e.target.checked })} />
+              {t("settings.preferences.multiDrawerCheckbox", "Izinkan beberapa shift terbuka bersamaan")}
+            </label>
+          </Field>
         </div>
+        <p className="text-xs text-neutral-500">
+          {t(
+            "settings.preferences.shiftControlsDesc",
+            "Batas Diskon Manual: kasir (tanpa izin approval) tidak bisa memberi diskon ketik-manual di atas persentase ini — Supervisor/Manager/Owner tetap bisa. Semua diskon manual dicatat dan dihitung di pengecekan anti-fraud shift. Beberapa Laci: biarkan tidak dicentang kalau outlet hanya punya satu laci — satu shift terbuka per outlet supaya selisih kas selalu jelas milik siapa."
+          )}
+        </p>
       </Card>
 
       {canManage && <Button onClick={save} disabled={saving}>{saving ? t("settings.common.saving", "Menyimpan...") : t("settings.preferences.saveButton", "Simpan Preferensi")}</Button>}

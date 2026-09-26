@@ -59,10 +59,10 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
-    const { openingCash } = await req.json();
+    const { openingCash, openingNote } = await req.json();
     // outletId & staffUserId always come from the session — never trust a client-supplied
     // value here, this is a real shift-open write.
-    return NextResponse.json(await openShift(session.outletId, session.sub, openingCash));
+    return NextResponse.json(await openShift(session.outletId, session.sub, Number(openingCash), openingNote));
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });
   }

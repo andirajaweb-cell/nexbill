@@ -6,6 +6,7 @@ import { createExpense, submitExpense } from "@/lib/accounting/expense";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 /**
  * Lists expenses plus the lookup data the Expense Management UI needs
@@ -87,7 +88,10 @@ export async function POST(req: NextRequest) {
     // outletId always comes from the session — never trust body.outletId (this used to prefer
     // the client-supplied value when present, letting a logged-in staffer at one outlet post
     // expenses, journal entries, and inventory deductions against another tenant).
-    const expense = await createExpense({ ...body, staffUserId: session.sub, outletId: session.outletId });
+    // shiftId resolved server-side: a cash expense paid out of the drawer must reduce THAT shift's
+    // expected cash (it was never stamped before, so cash expenses were invisible at close).
+    const shiftId = await resolveDrawerShiftId(session.outletId, session.sub);
+    const expense = await createExpense({ ...body, shiftId, staffUserId: session.sub, outletId: session.outletId });
     const result = await submitExpense(expense.id, session.sub);
 
     const [final] = await db.select().from(expenses).where(eq(expenses.id, expense.id)).limit(1);

@@ -10,11 +10,11 @@ import {
   cashBankAccounts,
 } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { postJournal } from "@/lib/accounting/journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
 import { resolvePaymentFee, feeExpenseLine } from "@/lib/accounting/payment-fee";
-import { getCurrentShift } from "@/lib/shift/shift";
 import { logAudit } from "@/lib/audit/log";
 import { isFeatureEnabled } from "./feature-flags";
 import { assertNotBlacklisted, determineApprovalStatus, recomputeCustomerRisk } from "./risk";
@@ -295,7 +295,8 @@ export async function checkoutHomeRentalRental(rentalId: string, input: Checkout
   const totalAmount = netRevenue + feesTotal;
   const now = new Date().toISOString();
 
-  const shift = input.staffUserId ? await getCurrentShift(rental.outletId, input.staffUserId) : null;
+  const shiftIdResolved = await resolveDrawerShiftId(rental.outletId, input.staffUserId);
+  const shift = shiftIdResolved ? { id: shiftIdResolved } : null;
 
   // --- Revenue journal: Dr Cash/Bank (net of channel fee), Cr Home Rental Revenue (+ Delivery/Pickup Fee if any), Dr Biaya Payment Gateway if any ---
   // Fee is computed inline (not persisted on homeRentalRentals — that table already has 4
@@ -409,7 +410,8 @@ export async function returnHomeRentalRental(rentalId: string, input: ReturnInpu
   const rating = input.rating as number;
 
   const now = new Date().toISOString();
-  const returnShift = input.staffUserId ? await getCurrentShift(rental.outletId, input.staffUserId) : null;
+  const returnShiftIdResolved = await resolveDrawerShiftId(rental.outletId, input.staffUserId);
+  const returnShift = returnShiftIdResolved ? { id: returnShiftIdResolved } : null;
   const links = await db.select().from(homeRentalRentalAssets).where(eq(homeRentalRentalAssets.rentalId, rental.id));
   const assetIds = links.map((l) => l.assetId);
   if (assetIds.length) {

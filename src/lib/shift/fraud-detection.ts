@@ -24,6 +24,12 @@ const SENSITIVE_ACTIONS = [
   "delete_ppob_transaction",
   "void_other_income",
   "void_expense",
+  // Added 2026-09-26: changing what a customer owes AFTER the fact is as sensitive as voiding —
+  // koreksi nominal/pembayaran, hapus item, and manual discounts at the till.
+  "correct_payment",
+  "correct_rental_charge",
+  "delete_order_item",
+  "manual_discount",
 ] as const;
 
 export interface ShiftRiskFlag {
@@ -54,6 +60,13 @@ export async function computeShiftRiskFlags(params: {
   closedAt: string;
   cashVariance: number;
   nonCashVarianceTotal: number;
+  /** Hand-over check: counted opening vs what the previous shift left (null = unknown). */
+  openingCash?: number;
+  expectedOpeningCash?: number | null;
+  /** The shift was closed by someone other than its own cashier. */
+  closedByOther?: boolean;
+  /** Cash paid out of this drawer as expenses (Cash Out / Expense tunai). */
+  cashExpenseTotal?: number;
 }): Promise<ShiftRiskResult> {
   const [outlet] = await db
     .select({ fraudVarianceThreshold: outlets.fraudVarianceThreshold, fraudVoidCountThreshold: outlets.fraudVoidCountThreshold })
@@ -83,6 +96,30 @@ export async function computeShiftRiskFlags(params: {
     });
   }
 
+  if (params.expectedOpeningCash != null && params.openingCash != null) {
+    const diff = round(params.openingCash - params.expectedOpeningCash);
+    if (Math.abs(diff) >= 1) {
+      flags.push({
+        code: "opening_mismatch",
+        label: `Modal awal ${diff < 0 ? "lebih kecil" : "lebih besar"} Rp${Math.abs(diff).toLocaleString("id-ID")} dari uang yang ditinggal shift sebelumnya.`,
+        severity: Math.abs(diff) >= varianceThreshold ? "high" : "warn",
+      });
+    }
+  }
+
+  if (params.closedByOther) {
+    flags.push({ code: "closed_by_other", label: "Shift ditutup oleh orang lain, bukan kasir pemilik shift.", severity: "warn" });
+  }
+
+  const cashExpenseTotal = round(params.cashExpenseTotal ?? 0);
+  if (cashExpenseTotal >= varianceThreshold * 2) {
+    flags.push({
+      code: "high_cash_expense",
+      label: `Pengeluaran tunai dari laci Rp${cashExpenseTotal.toLocaleString("id-ID")} dalam satu shift — periksa nota/bukti expense-nya.`,
+      severity: cashExpenseTotal >= varianceThreshold * 6 ? "high" : "warn",
+    });
+  }
+
   const sensitiveLogs = await db
     .select({ action: auditLogs.action })
     .from(auditLogs)
@@ -99,7 +136,7 @@ export async function computeShiftRiskFlags(params: {
   if (sensitiveActionCount >= voidThreshold) {
     flags.push({
       code: "frequent_void_refund",
-      label: `${sensitiveActionCount}x aksi void/refund/hapus dalam satu shift — melebihi ambang batas ${voidThreshold}x.`,
+      label: `${sensitiveActionCount}x aksi void/refund/hapus/koreksi/diskon manual dalam satu shift — melebihi ambang batas ${voidThreshold}x.`,
       severity: sensitiveActionCount >= voidThreshold * 2 ? "high" : "warn",
     });
   }

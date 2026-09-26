@@ -298,6 +298,7 @@ export async function startRentalSession(input: StartSessionInput) {
       rentalSessionId: session.id,
     });
     prepayment = await recordDeposit({
+      shiftId: input.shiftId ?? null,
       orderId: bill.id,
       amount: input.prepay.amount,
       method: input.prepay.method as any,

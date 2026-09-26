@@ -5,6 +5,7 @@ import { rentalSessions } from "@/db/schema";
 import { startRentalSession } from "@/lib/rental/sessions";
 import { getSession } from "@/lib/auth/session";
 import { describeError, errorStatus } from "@/lib/api/error";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 export async function GET() {
   try {
@@ -27,7 +28,9 @@ export async function POST(req: NextRequest) {
     // rental unit itself, so pin expectedOutletId to the caller's session and let it 404 the
     // unit if that unit doesn't actually belong to them (prevents starting a session against
     // another tenant's rental unit).
-    const { session: started, rate, bill, prepayment } = await startRentalSession({ ...body, expectedOutletId: session.outletId });
+    // shiftId is resolved here, never taken from the body — see resolveDrawerShiftId.
+    const shiftId = await resolveDrawerShiftId(session.outletId, session.sub);
+    const { session: started, rate, bill, prepayment } = await startRentalSession({ ...body, shiftId, staffUserId: body.staffUserId ?? session.sub, expectedOutletId: session.outletId });
     return NextResponse.json({ ...started, rateBreakdown: rate, bill, prepayment });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });

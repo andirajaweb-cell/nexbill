@@ -101,6 +101,17 @@ export default function ShiftPage() {
   const [notes, setNotes] = useState("");
   const [closing, setClosing] = useState(false);
   const [closeResult, setCloseResult] = useState<any>(null);
+  // Hand-over: cash deliberately left in the drawer for the next shift ("" = everything counted).
+  const [closingFloat, setClosingFloat] = useState<string>("");
+  // Supervisor/Manager/Owner closing SOMEONE ELSE's still-open shift (from Riwayat Shift) — the
+  // same blind count form, plus a mandatory reason (server-enforced, flagged closed_by_other).
+  const [supervisedShift, setSupervisedShift] = useState<{ id: string; staffUserId: string; staffName: string | null; openedAt: string; openingCash: number } | null>(null);
+  const [closeNote, setCloseNote] = useState("");
+  const closingShift = supervisedShift ?? currentShift;
+  // Open-shift form: previous shift's hand-over + other open shifts (single-drawer rule).
+  const [openingInfo, setOpeningInfo] = useState<{ expectedOpeningCash: number | null; allowMultipleOpenShifts: boolean; otherOpenShifts: { id: string; staffName: string | null; openedAt: string }[] } | null>(null);
+  const [openingNote, setOpeningNote] = useState("");
+  const [openingNeedsNote, setOpeningNeedsNote] = useState(false);
 
   // Deposit-balance channel management (rename PPOB provider saldo / add-delete other
   // deposit-balance channels) — kept in sync with COA via /api/deposit-balance-channels.
@@ -114,7 +125,7 @@ export default function ShiftPage() {
   useEffect(() => { loadDepositChannels(); }, []);
 
   const refreshRequiredChannels = () => {
-    if (currentShift) fetchJsonArray<RequiredChannel>(`/api/shifts/${currentShift.id}/required-channels`).then(setRequiredChannels);
+    if (closingShift) fetchJsonArray<RequiredChannel>(`/api/shifts/${closingShift.id}/required-channels`).then(setRequiredChannels);
   };
 
   const startEditChannel = (c: DepositChannel) => { setEditingChannelId(c.id); setEditingLabel(c.label); };
@@ -194,14 +205,15 @@ export default function ShiftPage() {
   }, [outletId, staffUserId]);
 
   useEffect(() => {
-    if (!currentShift) {
+    if (!closingShift) {
       setRequiredChannels([]);
       setActualByChannel({});
       setQtyByDenom({});
+      fetchJsonObject("/api/shifts/opening-info").then(setOpeningInfo);
       return;
     }
-    fetchJsonArray<RequiredChannel>(`/api/shifts/${currentShift.id}/required-channels`).then(setRequiredChannels);
-  }, [currentShift]);
+    fetchJsonArray<RequiredChannel>(`/api/shifts/${closingShift.id}/required-channels`).then(setRequiredChannels);
+  }, [closingShift]);
 
   const totalCounted = useMemo(
     () => cashDenominations.reduce((s, d) => s + d * (qtyByDenom[d] || 0), 0),
@@ -212,10 +224,16 @@ export default function ShiftPage() {
     const res = await fetch("/api/shifts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ outletId, staffUserId, openingCash }),
+      body: JSON.stringify({ openingCash, openingNote: openingNote || undefined }),
     });
     const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
+    if (!res.ok) {
+      // Counted opening cash ≠ what the previous shift left: ask for a recount or a reason.
+      if (typeof data.error === "string" && data.error.includes("berbeda dengan uang yang ditinggal")) setOpeningNeedsNote(true);
+      return showAlert(data.error);
+    }
+    setOpeningNote("");
+    setOpeningNeedsNote(false);
     setCurrentShift(data);
   };
 
@@ -330,24 +348,32 @@ export default function ShiftPage() {
     }
     if (!await showConfirm(t("shift.confirmCloseShift", "Pastikan hitungan fisik sudah final sebelum submit — setelah ini tidak bisa diubah. Lanjutkan tutup shift?"))) return;
 
+    if (supervisedShift && !closeNote.trim()) {
+      return showAlert(t("shift.closeNoteRequired", "Tulis alasan menutup shift milik kasir lain."));
+    }
     setClosing(true);
     try {
-      const res = await fetch(`/api/shifts/${currentShift.id}/close`, {
+      const res = await fetch(`/api/shifts/${closingShift.id}/close`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cashCounts: cashDenominations.map((d) => ({ denomination: d, qty: qtyByDenom[d] || 0 })),
           balanceChecks: requiredChannels.map((c) => ({ channelKey: c.channelKey, actualBalance: actualByChannel[c.channelKey] || 0 })),
           notes: notes || undefined,
+          closingFloat: closingFloat === "" ? null : Number(closingFloat),
+          closeNote: supervisedShift ? closeNote : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
       setCloseResult(data);
-      setCurrentShift(null);
+      if (supervisedShift) setSupervisedShift(null);
+      else setCurrentShift(null);
       setQtyByDenom({});
       setActualByChannel({});
       setNotes("");
+      setClosingFloat("");
+      setCloseNote("");
       if (outletId) fetchJsonArray(`/api/shifts?outletId=${outletId}`).then(setHistory);
     } finally {
       setClosing(false);
@@ -454,13 +480,34 @@ export default function ShiftPage() {
         </Card>
       )}
 
-      {currentShift ? (
-        <Card className="border-emerald-500/30 space-y-4">
+      {closingShift ? (
+        <Card className={`${supervisedShift ? "border-amber-500/40" : "border-emerald-500/30"} space-y-4`}>
           <div className="flex items-center justify-between">
-            <h2 className="font-medium">{t("shift.activeShiftTitle", "Shift Aktif")}</h2>
-            <Badge status="occupied">{t("shift.runningSince", "Berjalan sejak {time}").replace("{time}", new Date(currentShift.openedAt).toLocaleTimeString("id-ID"))}</Badge>
+            <h2 className="font-medium">
+              {supervisedShift
+                ? t("shift.closingOthersTitle", "Menutup Shift {name}").replace("{name}", supervisedShift.staffName ?? "-")
+                : t("shift.activeShiftTitle", "Shift Aktif")}
+            </h2>
+            <Badge status="occupied">{t("shift.runningSince", "Berjalan sejak {time}").replace("{time}", new Date(closingShift.openedAt).toLocaleTimeString("id-ID"))}</Badge>
           </div>
-          <div className="text-sm">{t("shift.openingCashLabel", "Modal awal:")} {rupiah(currentShift.openingCash)}</div>
+          {supervisedShift && (
+            <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+              <div className="text-xs text-amber-300">
+                {t("shift.closingOthersHint", "Kamu menutup shift milik kasir lain. Hitung uang di laci secara fisik; penutupan ini dicatat atas namamu dan ditandai untuk ditinjau.")}
+              </div>
+              <textarea
+                className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+                rows={2}
+                value={closeNote}
+                onChange={(e) => setCloseNote(e.target.value)}
+                placeholder={t("shift.closeNotePlaceholder", "Alasan (wajib), mis. kasir pulang tanpa menutup shift")}
+              />
+              <button type="button" className="text-xs text-neutral-400 hover:underline" onClick={() => { setSupervisedShift(null); setCloseNote(""); }}>
+                {t("shift.cancelSupervisedClose", "Batal menutup shift ini")}
+              </button>
+            </div>
+          )}
+          <div className="text-sm">{t("shift.openingCashLabel", "Modal awal:")} {rupiah(closingShift.openingCash)}</div>
 
           <div>
             <h3 className="text-sm font-medium mb-2">{t("shift.cashCountTitle", "Hitung Fisik Kas (Per Pecahan)")}</h3>
@@ -520,6 +567,21 @@ export default function ShiftPage() {
             </div>
           )}
 
+          <div className="rounded-lg border border-neutral-800 p-3 space-y-1">
+            <label className="text-xs font-medium text-neutral-300">{t("shift.closingFloatLabel", "Uang yang ditinggal di laci untuk shift berikutnya")}</label>
+            <input
+              type="number"
+              min={0}
+              className="w-48 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+              value={closingFloat}
+              onChange={(e) => setClosingFloat(e.target.value)}
+              placeholder={rupiah(totalCounted)}
+            />
+            <p className="text-[11px] text-neutral-500">
+              {t("shift.closingFloatHint", "Sisanya diserahkan ke owner/brankas. Kosongkan kalau semua uang tetap di laci. Kasir berikutnya harus membuka shift dengan jumlah ini — kalau berbeda, sistem meminta alasan dan menandainya.")}
+            </p>
+          </div>
+
           <div>
             <label className="text-xs text-neutral-500">{t("shift.notesLabel", "Catatan (opsional)")}</label>
             <textarea
@@ -538,11 +600,34 @@ export default function ShiftPage() {
       ) : (
         <Card>
           <h2 className="font-medium mb-3">{t("shift.openNewShiftTitle", "Buka Shift Baru")}</h2>
+          {openingInfo && !openingInfo.allowMultipleOpenShifts && openingInfo.otherOpenShifts.length > 0 && (
+            <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
+              {t("shift.otherShiftOpenWarning", "Shift {names} masih terbuka. Satu laci hanya untuk satu kasir — minta kasir itu menutup shift-nya dulu (serah terima), atau Supervisor/Manager/Owner menutupnya dari Riwayat Shift di bawah.").replace(
+                "{names}",
+                openingInfo.otherOpenShifts.map((o) => o.staffName ?? "-").join(", ")
+              )}
+            </div>
+          )}
+          <p className="text-xs text-neutral-500 mb-2">
+            {t("shift.openingCountHint", "Hitung dulu uang yang ada di laci sekarang, lalu isi hasil hitunganmu sebagai modal awal.")}
+          </p>
           <div className="flex gap-2 items-center flex-wrap">
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("shift.openingCashPlaceholder", "Modal awal kas")}
               value={openingCash || ""} onChange={(e) => setOpeningCash(Number(e.target.value))} />
             <Button onClick={openShift}>{t("shift.openShiftBtn", "Buka Shift")}</Button>
           </div>
+          {openingNeedsNote && (
+            <div className="mt-2 space-y-1">
+              <label className="text-xs text-amber-300">{t("shift.openingNoteLabel", "Hitungan berbeda dengan uang yang ditinggal shift sebelumnya — hitung ulang, atau tulis alasannya:")}</label>
+              <textarea
+                className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+                rows={2}
+                value={openingNote}
+                onChange={(e) => setOpeningNote(e.target.value)}
+                placeholder={t("shift.openingNotePlaceholder", "mis. owner mengambil Rp100.000 untuk belanja sebelum shift dibuka")}
+              />
+            </div>
+          )}
           {suggestedOpeningCash != null && suggestedOpeningCashLabel && (
             <p className="text-xs text-neutral-500 mt-2">
               {t("shift.openingCashHint", "Modal Awal harus sesuai uang kas fisik yang sudah ada di laci — kalau kas ini dilacak sistem (Kas Toko/Kas Besar/Kas Kecil, dll di Pengaturan), gunakan angka itu, bukan perkiraan.")}
@@ -691,7 +776,16 @@ export default function ShiftPage() {
                         {editingShiftId === s.id ? t("shift.editClose", "Tutup") : t("shift.edit", "Edit")}
                       </button>
                     )}
-                    {canManageShiftHistory && (
+                    {canReviewShifts && s.status === "open" && s.staffUserId !== staffUserId && !closingShift && (
+                      <button
+                        onClick={() => { setCloseResult(null); setSupervisedShift(s); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                        className="text-xs text-amber-400 hover:underline ml-2"
+                        title={t("shift.closeOthersTooltip", "Tutup shift kasir ini (hitung fisik laci, wajib alasan)")}
+                      >
+                        {t("shift.closeOthersBtn", "Tutup Shift")}
+                      </button>
+                    )}
+                    {canManageShiftHistory && s.status !== "closed" && (
                       <button
                         onClick={() => deleteShiftAction(s)}
                         disabled={deletingShiftId === s.id}

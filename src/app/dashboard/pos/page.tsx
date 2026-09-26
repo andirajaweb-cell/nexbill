@@ -7,6 +7,7 @@ import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
 import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
+import { confirmPaymentReceived } from "@/lib/payments/confirm-client";
 import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
@@ -242,15 +243,13 @@ export default function PosPage() {
   };
 
   /** Marks a pending non-cash payment as received once the money has actually arrived. */
-  const confirmPendingPayment = async (paymentId: string) => {
+  const confirmPendingPayment = async (paymentId: string, paymentMethod: string, amount: number) => {
     if (confirmingPayment) return;
     setConfirmingPayment(true);
     try {
-      const res = await fetch(`/api/payments/${paymentId}/confirm-cash`, { method: "POST" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        return showAlert(err?.error ?? t("pos.confirmFailed", "Gagal menandai pembayaran diterima."));
-      }
+      // Non-cash asks for the QRIS/transfer reference first — see confirmPaymentReceived.
+      const ok = await confirmPaymentReceived(paymentId, paymentMethod, { methodLabel: findMethod(paymentMethod)?.label, amountLabel: rupiah(amount) });
+      if (!ok) return;
       setCheckoutResult(null);
       loadOpenOrders();
     } finally {
@@ -477,7 +476,7 @@ export default function PosPage() {
             {checkoutResult.payment.method !== "cash" && checkoutResult.payment.status === "pending" && (
               <div className="space-y-2 pt-1">
                 <PaymentInstructions method={findMethod(checkoutResult.payment.method)} amount={checkoutResult.payment.amount} />
-                <Button className="w-full" disabled={confirmingPayment} onClick={() => confirmPendingPayment(checkoutResult.payment.id)}>
+                <Button className="w-full" disabled={confirmingPayment} onClick={() => confirmPendingPayment(checkoutResult.payment.id, checkoutResult.payment.method, checkoutResult.payment.amount)}>
                   {confirmingPayment ? t("pos.payBusy", "Memproses...") : t("pos.markReceived", "Tandai Diterima")}
                 </Button>
               </div>

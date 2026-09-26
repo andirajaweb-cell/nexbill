@@ -5,6 +5,8 @@ import { orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireOwnedOrder } from "@/lib/pos/order-guard";
 import { describeError, errorStatus } from "@/lib/api/error";
+import { getSession } from "@/lib/auth/session";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 /**
  * Initiates one payment against an order. Supports split/partial payment: pass
@@ -33,12 +35,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const chargeAmount = amount ?? summary?.remaining ?? order.total;
 
   try {
+    const session = await getSession();
     const payment = await initiatePayment({
       orderId: id,
       amount: chargeAmount,
       method,
       customerPhone,
       description: `Pembayaran order ${id}`,
+      // Server-resolved — the drawer that actually takes this money (see resolveDrawerShiftId).
+      shiftId: await resolveDrawerShiftId(order.outletId, session?.sub),
     });
     await db.update(orders).set({ status: "awaiting_payment" }).where(eq(orders.id, id));
     return NextResponse.json(payment);

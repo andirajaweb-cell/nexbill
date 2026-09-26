@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getOrderPaymentSummary, initiatePayment, markPaymentSuccess, settleOrderAfterPayment } from "@/lib/payments";
 import { describeError } from "@/lib/api/error";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 /**
  * Manually settles an order stuck as "Menunggu Bayar"/"Sebagian" from the Transactions page —
@@ -41,13 +42,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     summary = await getOrderPaymentSummary(id);
     if (summary && summary.remaining > 0.5) {
+      const shiftId = await resolveDrawerShiftId(session.outletId, session.sub);
       const payment = await initiatePayment({
         orderId: id,
         amount: summary.remaining,
         method,
         description: `Pelunasan manual oleh Superuser — order ${id}`,
+        shiftId,
       });
-      await markPaymentSuccess(payment.id);
+      await markPaymentSuccess(payment.id, { staffUserId: session.sub, reference: body?.reference ?? null, shiftId });
     }
 
     // Covers the case where paidTotal already matched (or now matches) order.total but

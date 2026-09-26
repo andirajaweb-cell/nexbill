@@ -27,7 +27,7 @@ const EDITABLE_FIELDS = [
   "accountingStartMonth", "accountingStartDay", "accountingPeriodType",
   "decimalStyle", "decimalPlaces", "dateFormat",
   // Anti-fraud shift-review thresholds — see lib/shift/fraud-detection.ts.
-  "fraudVarianceThreshold", "fraudVoidCountThreshold",
+  "fraudVarianceThreshold", "fraudVoidCountThreshold", "maxManualDiscountPercent", "allowMultipleOpenShifts",
   // Settings > Integrasi Tuya Cloud API — the outlet's own Tuya IoT Platform Cloud Project
   // credentials (see outlets.tuyaAccessId's doc comment in schema.ts). Deliberately NOT including
   // "tuyaUseSharedPlatformAccount" here — that legacy shared-account exception flag is

@@ -101,6 +101,13 @@ export const outlets = pgTable("outlets", {
   // "shift_close_review") rather than blocking the cashier from closing out — see closeShift().
   fraudVarianceThreshold: doublePrecision("fraud_variance_threshold").notNull().default(50000),
   fraudVoidCountThreshold: integer("fraud_void_count_threshold").notNull().default(3),
+  // Shift controls (migrasi 0018, lihat lib/shift/shift.ts):
+  // - maxManualDiscountPercent: cap on a manual POS discount for roles WITHOUT approve_requests
+  //   (kasir). Null = no cap. Above the cap the server refuses and asks for a supervisor.
+  // - allowMultipleOpenShifts: false (default) = one open shift per outlet — one drawer, one
+  //   accountable cashier; hand-over means close then open. True for outlets with several drawers.
+  maxManualDiscountPercent: doublePrecision("max_manual_discount_percent"),
+  allowMultipleOpenShifts: boolean("allow_multiple_open_shifts").notNull().default(false),
   // Predictive-maintenance default (see lib/rental/maintenance.ts) — a rental unit is flagged
   // "due for service" once its cumulative play-hours since last service pass this many hours.
   // Per-unit override lives on rentalUnits.maintenanceThresholdHours (null = use this default).
@@ -739,9 +746,21 @@ export const payments = pgTable(
     // a second Kas line for cash that was already recorded — that would double-count it in the GL.
     kind: text("kind", { enum: ["sale", "deposit"] }).notNull().default("sale"),
     depositJournalEntryId: text("deposit_journal_entry_id"),
+    // The shift of the cashier who TOOK this payment (migrasi 0018) — what closeShift counts, so
+    // cash lands in the drawer/shift that actually received it (a rental bill opened in one shift
+    // and paid in the next counts for the next). Null on rows from before 0018: closeShift falls
+    // back to orders.shiftId for those.
+    shiftId: text("shift_id"),
+    // Manual confirmation of a non-cash payment ("Tandai Diterima"): who confirmed it and the
+    // QRIS/transfer reference they checked — the audit trail against "paid cash, recorded as QRIS".
+    confirmedBy: text("confirmed_by"),
+    confirmationRef: text("confirmation_ref"),
+    // The drawer shift that handed the money BACK on a refund. A cash refund made in a later shift
+    // is cash out of THAT drawer (closeShift counts it), not of the shift that took the payment.
+    refundedShiftId: text("refunded_shift_id"),
     ...timestamps,
   },
-  (t) => [index("payments_order_idx").on(t.orderId)]
+  (t) => [index("payments_order_idx").on(t.orderId), index("payments_shift_idx").on(t.shiftId)]
 );
 
 /** ---------------- CHAT ---------------- */
@@ -1793,6 +1812,18 @@ export const shifts = pgTable("shifts", {
   // lib/shift/fraud-detection.ts) — snapshotted once at close time so the shift's history view
   // never has to recompute (and can't silently change) why it was flagged. Null/empty = clean close.
   riskFlags: text("risk_flags"),
+  // Hand-over controls (migrasi 0018):
+  // closingFloat — cash deliberately LEFT in the drawer for the next shift (the rest goes to the
+  //   owner/safe). The next shift's opening cash is checked against it.
+  // expectedOpeningCash / openingNote — what the previous shift left, and the cashier's reason when
+  //   their counted opening cash differs (flagged at close as opening_mismatch).
+  // closedBy / closeNote — who actually closed the shift (a supervisor closing someone else's shift
+  //   must give a reason; flagged as closed_by_other).
+  closingFloat: doublePrecision("closing_float"),
+  expectedOpeningCash: doublePrecision("expected_opening_cash"),
+  openingNote: text("opening_note"),
+  closedBy: text("closed_by"),
+  closeNote: text("close_note"),
 });
 
 export const shiftCashCounts = pgTable("shift_cash_counts", {

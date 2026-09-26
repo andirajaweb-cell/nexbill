@@ -11,6 +11,7 @@ import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { useAuth } from "@/lib/auth/client";
 import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
 import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
+import { confirmPaymentReceived } from "@/lib/payments/confirm-client";
 // From ./charge, not ./pricing or ./accessories — both of those import @/db/client, which would
 // drag the postgres driver into this client bundle and break the production build. charge.ts holds
 // the pure arithmetic precisely so this page can share it instead of keeping its own copy; the
@@ -687,7 +688,12 @@ export default function RentalPage() {
     // confirm-deposit, not confirm-cash — a DP mustn't trigger settlement
     // (journal posting / "paid" status) against the session's still-estimated
     // total. See confirmDeposit() in lib/payments/index.ts.
-    await fetch(`/api/payments/${pendingPrepay.paymentId}/confirm-deposit`, { method: "POST" });
+    const ok = await confirmPaymentReceived(pendingPrepay.paymentId, pendingPrepay.method, {
+      kind: "deposit",
+      methodLabel: methodLabel(pendingPrepay.method),
+      amountLabel: rupiah(pendingPrepay.amount),
+    });
+    if (!ok) return;
     setPendingPrepay(null);
     load();
   };
@@ -983,7 +989,10 @@ export default function RentalPage() {
       // Every payment starts "pending" regardless of method (see cash/manual/fastpay adapters) —
       // only flip it to "success" here ourselves for the staff-confirmed methods; gateway-backed
       // methods wait for their webhook (or the manual "Tandai Diterima" override below, e.g. mock mode).
-      if (!ASYNC_GATEWAY_METHODS.has(payMethod)) {
+      // Only CASH is confirmed on the spot. QRIS/transfer/e-wallet used to be auto-marked received
+      // too, with nothing checked — now they wait in "Menunggu konfirmasi" (with the outlet's
+      // QRIS/rekening shown) until the kasir confirms with the payment reference.
+      if (payMethod === "cash" && !ASYNC_GATEWAY_METHODS.has(payMethod)) {
         await fetch(`/api/payments/${payment.id}/confirm-cash`, { method: "POST" });
       }
 
@@ -1004,10 +1013,11 @@ export default function RentalPage() {
    * landed yet, or mock mode with no gateway configured) — lets the kasir confirm it was actually
    * received without leaving this panel. Reuses the same confirm-cash endpoint the cash flow
    * uses; despite the name it just flips any payment id to "success", no method check server-side. */
-  const confirmPendingPayment = async (paymentId: string) => {
+  const confirmPendingPayment = async (paymentId: string, paymentMethod: string, amount: number) => {
     const orderId = activeFinishedBill?.order.id;
     if (!orderId) return;
-    await fetch(`/api/payments/${paymentId}/confirm-cash`, { method: "POST" });
+    const ok = await confirmPaymentReceived(paymentId, paymentMethod, { methodLabel: methodLabel(paymentMethod), amountLabel: rupiah(amount) });
+    if (!ok) return;
     const refreshed = await fetchJsonObject<BillBreakdown>(`/api/orders/${orderId}/bill`);
     if (!refreshed || refreshed.balanceDue <= 0.5) {
       updateFinishedBillEntry(orderId, null);
@@ -1227,7 +1237,7 @@ export default function RentalPage() {
                   <div key={p.id} className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span>{methodLabel(p.method)} — {rupiah(p.amount)}</span>
-                      <Button variant="ghost" className="text-[11px] py-0.5" onClick={() => confirmPendingPayment(p.id)}>
+                      <Button variant="ghost" className="text-[11px] py-0.5" onClick={() => confirmPendingPayment(p.id, p.method, p.amount)}>
                         {t("rental.markReceived", "Tandai Diterima")}
                       </Button>
                     </div>
