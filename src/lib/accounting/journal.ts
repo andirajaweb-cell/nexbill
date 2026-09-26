@@ -14,6 +14,7 @@ export type JournalSourceType =
   | "refund"
   | "asset_purchase"
   | "asset_purchase_payment"
+  | "historical_import"
   | "asset_disposal"
   | "depreciation"
   | "receivable_payment"

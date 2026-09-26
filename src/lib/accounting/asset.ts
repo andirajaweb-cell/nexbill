@@ -7,6 +7,7 @@ import { getMappedAccountId } from "./account-mapping";
 import { logAudit } from "@/lib/audit/log";
 import { createExpense, submitExpense } from "./expense";
 import { describeError } from "@/lib/api/error";
+import { onStockIn, onStockOut } from "@/lib/inventory/costing";
 
 /**
  * Fixed Asset register + straight-line depreciation engine. Mirrors the
@@ -458,9 +459,11 @@ export async function addMaintenancePart(input: { maintenanceLogId: string; prod
 
   const [asset] = await db.select({ outletId: fixedAssets.outletId, name: fixedAssets.name }).from(fixedAssets).where(eq(fixedAssets.id, log.fixedAssetId)).limit(1);
 
+  // FIFO outlets: the part is valued at the oldest layer(s) it consumes; rata-rata: harga modal.
+  const fifo = await onStockOut(db, { productId: input.productId, qty: input.qty });
   const [partUsed] = await db
     .insert(assetMaintenancePartsUsed)
-    .values({ maintenanceLogId: input.maintenanceLogId, productId: input.productId, qty: input.qty, unitCost: product.costPrice ?? 0, staffUserId: input.staffUserId })
+    .values({ maintenanceLogId: input.maintenanceLogId, productId: input.productId, qty: input.qty, unitCost: fifo ? fifo.unitCost : product.costPrice ?? 0, staffUserId: input.staffUserId })
     .returning();
 
   await db.insert(stockMovements).values({
@@ -492,6 +495,7 @@ export async function removeMaintenancePart(partUsedId: string, staffUserId?: st
   if (!partUsed) throw new Error("Data pemakaian sparepart tidak ditemukan.");
 
   await db.delete(assetMaintenancePartsUsed).where(eq(assetMaintenancePartsUsed.id, partUsedId));
+  await onStockIn(db, { productId: partUsed.productId, qty: partUsed.qty, unitCost: partUsed.unitCost, source: "restock", refId: partUsed.maintenanceLogId });
   await db.insert(stockMovements).values({
     productId: partUsed.productId,
     type: "adjustment",

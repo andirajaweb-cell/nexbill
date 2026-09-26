@@ -17,6 +17,7 @@ import { prorateLandedCosts } from "@/lib/inventory/purchasing";
 import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 import { outletDateYmd } from "@/lib/time/outlet-time";
 import { logAudit } from "@/lib/audit/log";
+import { assertSupplierUsable } from "@/lib/inventory/suppliers";
 
 /**
  * Pembelian Aset Tetap — satu dokumen pembelian yang bisa berisi beberapa baris barang.
@@ -183,10 +184,7 @@ export async function createAssetPurchase(input: CreateAssetPurchaseInput) {
     await lockEntity(tx, `asset_purchase_seq:${input.outletId}`);
 
     // Outlet isolation for every referenced row.
-    if (input.supplierId) {
-      const [s] = await tx.select({ outletId: suppliers.outletId }).from(suppliers).where(eq(suppliers.id, input.supplierId)).limit(1);
-      if (!s || s.outletId !== input.outletId) throw new Error("Supplier tidak ditemukan di outlet ini.");
-    }
+    await assertSupplierUsable(input.outletId, input.supplierId, tx);
     const unitIds = items.map((i) => i.rentalUnitId).filter((v): v is string => Boolean(v));
     if (new Set(unitIds).size !== unitIds.length) throw new Error("Satu unit PS tidak bisa ditautkan ke dua aset.");
     if (unitIds.length) {

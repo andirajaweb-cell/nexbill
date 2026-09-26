@@ -176,7 +176,10 @@ export async function seedChartOfAccounts(outletId: string) {
     const kasAccount = existingByCode.get("1112");
     const bankAccount = existingByCode.get("1121");
     if (kasAccount) {
-      await db.insert(cashBankAccounts).values({ outletId, name: "Kas Utama", type: "cash", accountId: kasAccount.id, isDefault: true });
+      // Named after its GL account (1112 Kas Kasir — the drawer that cash payments land in). It used
+      // to be seeded as "Kas Utama", which owners read as a separate main-cash pool; existing
+      // outlets keep whatever name they have (renameable in Pembayaran).
+      await db.insert(cashBankAccounts).values({ outletId, name: "Kas Kasir", type: "cash", accountId: kasAccount.id, isDefault: true });
     }
     if (bankAccount) {
       await db.insert(cashBankAccounts).values({ outletId, name: "Rekening Bank Utama", type: "bank", accountId: bankAccount.id });

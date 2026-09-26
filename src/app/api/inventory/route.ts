@@ -7,6 +7,7 @@ import { describeError } from "@/lib/api/error";
 import { receiveStockForItem } from "@/lib/inventory/stock";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
 import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-postings";
+import { onStockIn, onStockOut } from "@/lib/inventory/costing";
 
 export async function GET() {
   try {
@@ -69,9 +70,14 @@ export async function POST(req: NextRequest) {
     // missing entirely, so a Kurangi Unit for broken stock lowered the count but never booked the
     // loss, and Persediaan in the Neraca drifted away from the real stock value.
     const movement = await db.transaction(async (tx) => {
+      // Adjustment/waste move FIFO layers inside postInventoryAdjustmentJournal below; the other
+      // (journal-less) manual types must keep them in step here.
+      let fifoUnitCost: number | null = null;
+      if (type === "sale_out") fifoUnitCost = (await onStockOut(tx, { productId, qty: Math.abs(delta) }))?.unitCost ?? null;
+      if (type === "purchase_in") await onStockIn(tx, { productId, qty: Math.abs(delta), source: "adjustment" });
       const [row] = await tx
         .insert(stockMovements)
-        .values({ productId, type, qty: delta, note, staffUserId })
+        .values({ productId, type, qty: delta, note, staffUserId, unitCost: fifoUnitCost })
         .returning();
 
       await tx

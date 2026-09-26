@@ -9,8 +9,10 @@ import {
   stockOpnameItems,
   recipes,
   recipeIngredients,
+  inventoryCostLayers,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
+import { getCostMethod } from "@/lib/inventory/costing";
 import { requireOwnedRow } from "@/lib/auth/scope";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError, errorStatus } from "@/lib/api/error";
@@ -38,11 +40,23 @@ async function findProductReferences(productId: string): Promise<string[]> {
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    await requireOwnedRow(products, id, "Produk tidak ditemukan.");
+    const { row: current } = await requireOwnedRow<typeof products.$inferSelect>(products, id, "Produk tidak ditemukan.");
     const body = await req.json();
     // outletId is intentionally never accepted from the body — a product can't be reassigned
     // to a different outlet through this route.
     delete body.outletId;
+    // FIFO: harga modal is derived from the remaining cost layers. Typing a different number here
+    // would be overwritten by the next stock movement and would never reach HPP — refuse instead
+    // of silently ignoring it. (A product with no stock/layers can still get a starting price.)
+    if (body.costPrice !== undefined && Math.abs(Number(body.costPrice) - (current.costPrice ?? 0)) > 0.005 && (await getCostMethod(current.outletId)) === "fifo") {
+      const [layer] = await db.select({ id: inventoryCostLayers.id }).from(inventoryCostLayers).where(and(eq(inventoryCostLayers.productId, id), gt(inventoryCostLayers.qtyRemaining, 0))).limit(1);
+      if (layer) {
+        return NextResponse.json(
+          { error: "Outlet memakai metode FIFO: harga modal produk yang masih punya stok dihitung dari harga belanja per lapisan dan tidak bisa diubah manual. Koreksi lewat Belanja Supplier (edit faktur) atau Stock Opname." },
+          { status: 400 }
+        );
+      }
+    }
     const [row] = await db.update(products).set(body).where(eq(products.id, id)).returning();
     return NextResponse.json(row);
   } catch (err: unknown) {
@@ -91,6 +105,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         { status: 409 }
       );
     }
+    await db.delete(inventoryCostLayers).where(eq(inventoryCostLayers.productId, id));
     await db.delete(products).where(eq(products.id, id));
     return NextResponse.json({ ok: true, deleted: true });
   } catch (err: unknown) {

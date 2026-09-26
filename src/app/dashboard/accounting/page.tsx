@@ -13,6 +13,11 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { PeriodBar, PeriodPreset, resolvePeriodPreset, describePeriod } from "@/components/reports/PeriodPicker";
 import { AuditTab } from "./AuditTab";
 import { CalkTab } from "./CalkTab";
+import { TabGuide, WorkflowGuide } from "./TabGuide";
+import { HistoricalImportSection } from "./HistoricalImport";
+import { ProfitLossSteps } from "./ProfitLossSteps";
+import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
+import { BookOpen } from "lucide-react";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
@@ -53,6 +58,7 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
 export default function AccountingPage() {
   const [outletId, setOutletId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("Neraca Saldo");
+  const [showWorkflow, setShowWorkflow] = useState(false);
   const { user } = useAuth();
   const { t } = useDashboardLang();
   const role = (user?.role ?? "cashier") as any;
@@ -67,10 +73,26 @@ export default function AccountingPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("accounting.header.title", "Accounting")}</h1>
-        <p className="text-sm text-neutral-500">{t("accounting.header.subtitle", "Setiap transaksi rental & POS otomatis membuat jurnal debit/kredit di sini.")}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("accounting.header.title", "Accounting")}</h1>
+          <p className="text-sm text-neutral-500">{t("accounting.header.subtitle", "Setiap transaksi rental & POS otomatis membuat jurnal debit/kredit di sini.")}</p>
+        </div>
+        <Button variant="secondary" className="text-xs flex items-center gap-1.5 print:hidden" onClick={() => setShowWorkflow((s) => !s)}>
+          <BookOpen size={14} /> {showWorkflow ? t("accounting.guide.hideWorkflow", "Tutup Panduan Alur Kerja") : t("accounting.guide.showWorkflow", "Panduan Alur Kerja")}
+        </Button>
       </div>
+
+      {showWorkflow && (
+        <WorkflowGuide
+          onClose={() => setShowWorkflow(false)}
+          shortcuts={(["Neraca Saldo", "Audit", "Laba Rugi", "Tutup Periode"] as Tab[]).filter((tb) => visibleTabs.includes(tb))}
+          onOpenTab={(tb) => {
+            setTab(tb as Tab);
+            setShowWorkflow(false);
+          }}
+        />
+      )}
 
       <div className="flex gap-1 border-b border-neutral-800 overflow-x-auto">
         {visibleTabs.map((tb) => (
@@ -83,6 +105,8 @@ export default function AccountingPage() {
           </button>
         ))}
       </div>
+
+      {outletId && <TabGuide key={tab} tab={tab} label={t(TAB_LABEL_KEYS[tab].key, TAB_LABEL_KEYS[tab].fallback)} />}
 
       {!outletId ? null : tab === "Chart of Accounts" ? (
         <ChartOfAccountsTab outletId={outletId} />
@@ -590,6 +614,7 @@ const SOURCE_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }> 
   refund: { key: "accounting.journal.source.refund", fallback: "Refund" },
   asset_purchase: { key: "accounting.journal.source.assetPurchase", fallback: "Pembelian Aset" },
   asset_purchase_payment: { key: "accounting.journal.source.assetPurchasePayment", fallback: "Bayar Utang Aset" },
+  historical_import: { key: "accounting.journal.source.historicalImport", fallback: "Impor Historis" },
   asset_disposal: { key: "accounting.journal.source.assetDisposal", fallback: "Pelepasan Aset" },
   depreciation: { key: "accounting.journal.source.depreciation", fallback: "Penyusutan" },
   receivable_payment: { key: "accounting.journal.source.receivablePayment", fallback: "Pelunasan Piutang" },
@@ -1083,7 +1108,7 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-neutral-500">{t("accounting.receivables.explainer", "Piutang tercipta otomatis saat order/rental dibayar sebagian — sisa tagihan dibukukan ke akun 1100 Piutang Usaha. Terima pelunasan langsung dari sini lewat mekanisme pembayaran yang sama, tidak perlu input ulang.")}</p>
+      <p className="text-xs text-neutral-500">{t("accounting.receivables.explainer", "Piutang tercipta otomatis saat order/rental dibayar sebagian — sisa tagihan dibukukan ke akun 1141 Piutang Pelanggan. Terima pelunasan langsung dari sini lewat mekanisme pembayaran yang sama, tidak perlu input ulang.")}</p>
       <Card className="text-center py-4">
         <div className="text-2xl font-bold text-amber-400">{rupiah(data.totalOutstanding)}</div>
         <div className="text-xs text-neutral-500">{t("accounting.receivables.totalOutstanding", "Total Piutang Outstanding ({count} tagihan)").replace("{count}", String(data.count))}</div>
@@ -1275,7 +1300,7 @@ function PayablesTab({ outletId }: { outletId: string }) {
               value={payFor.cashBankAccountId}
               onChange={(v) => setPayFor({ ...payFor, cashBankAccountId: v })}
               placeholder={t("accounting.payables.cashBankAccountOption", "Akun Kas/Bank")}
-              options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+              options={cashBankAccounts.map((c: any) => ({ value: c.id, label: cashBankOptionLabel(t, c) }))}
             />
           </div>
           <div className="flex gap-2">
@@ -1424,6 +1449,8 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
               <tr><td className="py-1 text-amber-400">{t("accounting.pl.discount", "Discount")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2 text-amber-400">-{rupiah(c.data.totalDiscount)}</td>)}</tr>
               <tr className="font-semibold"><td className="py-2">{t("accounting.pl.totalRevenueNet", "Total Pendapatan (Net)")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2 text-emerald-400">{rupiah(c.data.totalRevenue)}</td>)}</tr>
               <tr className="font-semibold"><td className="py-2">{t("accounting.pl.grossProfit", "Laba Kotor")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.grossProfit)}</td>)}</tr>
+              <tr className="font-semibold"><td className="py-2">{t("accounting.pl.operatingProfit", "Laba Usaha")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.operatingProfit ?? 0)}</td>)}</tr>
+              <tr className="font-semibold"><td className="py-2">{t("accounting.pl.profitBeforeTax", "Laba Sebelum Pajak")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.profitBeforeTax ?? 0)}</td>)}</tr>
               <tr className="font-semibold"><td className="py-2">{t("accounting.pl.netProfit", "Laba Bersih")}</td>{compareData.map((c, i) => <td key={i} className={`text-right px-2 ${c.data.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{rupiah(c.data.netProfit)}</td>)}</tr>
             </tfoot>
           </table>
@@ -1431,16 +1458,17 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
       )}
 
       {!compareMode && pl && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card><div className="text-xs text-neutral-500">{t("accounting.pl.totalRevenueCard", "Total Pendapatan")}</div><div className="text-xl font-bold text-emerald-400">{rupiah(pl.totalRevenue)}</div></Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card><div className="text-xs text-neutral-500">{t("accounting.pl.operatingRevenueCard", "Pendapatan Usaha (Net)")}</div><div className="text-xl font-bold text-emerald-400">{rupiah(pl.netRevenue)}</div></Card>
           <Card><div className="text-xs text-neutral-500">{t("accounting.pl.grossProfit", "Laba Kotor")}</div><div className="text-xl font-bold">{rupiah(pl.grossProfit)}</div></Card>
+          <Card><div className="text-xs text-neutral-500">{t("accounting.pl.operatingProfit", "Laba Usaha")}</div><div className="text-xl font-bold">{rupiah(pl.operatingProfit ?? 0)}</div></Card>
           <Card><div className="text-xs text-neutral-500">{t("accounting.pl.netProfit", "Laba Bersih")}</div><div className={`text-xl font-bold ${pl.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{rupiah(pl.netProfit)}</div></Card>
 
           {/* Ada penjualan barang tapi nol HPP — Laba Kotor di kartu atas karenanya sama persis
               dengan Total Pendapatan, seolah marginnya 100%. Diberi tahu terang-terangan, karena
               angka yang salah tapi terlihat normal jauh lebih berbahaya daripada angka kosong. */}
           {pl.cogsWarning && (
-            <Card className="lg:col-span-3 border-amber-500/40 bg-amber-500/5">
+            <Card className="col-span-2 lg:col-span-4 border-amber-500/40 bg-amber-500/5">
               <div className="text-sm font-semibold text-amber-300">
                 {t("accounting.pl.cogsMissingTitle", "HPP belum terhitung — Laba Kotor di atas belum mencerminkan modal barang")}
               </div>
@@ -1455,7 +1483,7 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
             </Card>
           )}
 
-          <Card className="lg:col-span-3">
+          <Card className="col-span-2 lg:col-span-4">
             <div className="text-xs text-neutral-500 mb-2">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, period.to)}</div>
 
             {pl.totalDiscount > 0 && (
@@ -1469,32 +1497,9 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
 
             <p className="text-[11px] text-neutral-600 mb-2">{t("accounting.pl.drillDownHint", "Klik baris mana pun untuk melihat transaksi/jurnal yang menyusun angka itu (audit trail).")}</p>
 
-            <h2 className="font-medium mb-2 text-sm text-neutral-400">{t("accounting.type.revenue", "Pendapatan")}</h2>
-            {(pl.revenueTree ?? pl.revenue.filter((r: any) => r.balance !== 0)).map((r: any) => (
-              <button
-                key={r.accountId}
-                type="button"
-                onClick={() => setDrillDown({ accountId: r.accountId, code: r.code, name: coaAccountName(t, r), balance: r.balance })}
-                className={`w-full flex justify-between text-sm py-1 text-left rounded hover:bg-neutral-800/60 transition-colors ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}
-                style={{ paddingLeft: (r.depth ?? 0) * 16 }}
-              >
-                <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
-                <span>{rupiah(r.balance)}</span>
-              </button>
-            ))}
-            <h2 className="font-medium mb-2 mt-4 text-sm text-neutral-400">{t("accounting.type.expense", "Beban")}</h2>
-            {(pl.expenseTree ?? pl.expense.filter((r: any) => r.balance !== 0)).map((r: any) => (
-              <button
-                key={r.accountId}
-                type="button"
-                onClick={() => setDrillDown({ accountId: r.accountId, code: r.code, name: coaAccountName(t, r), balance: r.balance })}
-                className={`w-full flex justify-between text-sm py-1 text-left rounded hover:bg-neutral-800/60 transition-colors ${!r.isPostingAllowed ? "font-semibold text-neutral-300" : ""}`}
-                style={{ paddingLeft: (r.depth ?? 0) * 16 }}
-              >
-                <span className="flex items-center gap-1.5"><span className="font-mono text-[10px] text-neutral-600">{r.code}</span>{coaAccountName(t, r)}</span>
-                <span>{rupiah(r.balance)}</span>
-              </button>
-            ))}
+            {pl.sections ? (
+              <ProfitLossSteps pl={pl} rupiah={rupiah} onRow={(r) => setDrillDown({ accountId: r.accountId, code: r.code, name: coaAccountName(t, r), balance: r.balance })} />
+            ) : null}
           </Card>
         </div>
       )}
@@ -2270,24 +2275,13 @@ function DataMigrationTab({ outletId }: { outletId: string }) {
       <Card className="border-amber-500/30">
         <h2 className="font-medium mb-1">{t("accounting.migration.recoHeading", "Rekomendasi Alur Migrasi")}</h2>
         <p className="text-xs text-neutral-500">
-          {t("accounting.migration.recoPart1", "1) Isi ")}<strong>{t("accounting.migration.recoSaldoAwalBold", "Saldo Awal")}</strong>{t("accounting.migration.recoPart2", " di bawah dengan saldo kas/bank/piutang/hutang/aset/modal per tanggal cutover (hari mulai pakai app ini) — ini cukup untuk Neraca yang benar ke depannya. 2) Kalau kamu juga mau riwayat Penjualan/Pembelian/Pendapatan Lain-lain/Pengeluaran lama tetap muncul di laporan (Laba Rugi historis, tren), pakai ")}<strong>{t("accounting.migration.recoImporBold", "Impor Data Historis")}</strong>{t("accounting.migration.recoPart3", " lewat template Excel di bawah. Data yang diimpor langsung masuk ke jurnal dengan tanggal aslinya — tidak melalui alur kasir/approval biasa, karena memang sudah terjadi di masa lalu.")}
+          {t("accounting.migration.recoPart1", "1) Isi ")}<strong>{t("accounting.migration.recoSaldoAwalBold", "Saldo Awal")}</strong>{t("accounting.migration.recoPart2", " di bawah dengan saldo kas/bank/piutang/hutang/aset/modal per tanggal cutover (hari mulai pakai app ini) — ini cukup untuk Neraca yang benar ke depannya. 2) Kalau kamu juga mau riwayat Penjualan/Pembelian/Pendapatan Lain-lain/Pengeluaran lama tetap muncul di laporan (Laba Rugi historis, tren), pakai ")}<strong>{t("accounting.migration.recoImporBold", "Impor Data Historis")}</strong>{t("accounting.migration.recoPart3", " lewat template Excel di bawah dengan mode \"Hanya riwayat Laba Rugi\" — supaya kas/bank tidak terhitung dua kali dengan Saldo Awal. Aset tetap lama dicatat lewat menu Aset → Pembelian Aset (Saldo awal), stok awal barang lewat Inventory.")}
         </p>
       </Card>
 
       <OpeningBalanceCard outletId={outletId} />
 
-      <Card>
-        <h2 className="font-medium mb-1">{t("accounting.migration.importHeading", "Impor Data Historis (Excel)")}</h2>
-        <p className="text-xs text-neutral-500 mb-3">
-          {t("accounting.migration.importDescription", "Download template, isi dari data lama (export Excel/CSV dari aplikasi sebelumnya atau catatan manual), lalu upload kembali. Penjualan/Pembelian/Pengeluaran historis masuk ke Jurnal & Laporan Keuangan saja (tidak muncul di daftar Transaksi/Purchasing/Expense Management, karena bukan order/expense sungguhan) — Pendapatan Lain-lain historis MUNCUL juga di halaman Pendapatan Lain-lain, karena pakai mesin pencatatan yang sama persis.")}
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <HistoricalImportCard outletId={outletId} category="penjualan" title={t("accounting.migration.categoryPenjualan", "Penjualan")} />
-          <HistoricalImportCard outletId={outletId} category="pembelian" title={t("accounting.migration.categoryPembelian", "Pembelian")} />
-          <HistoricalImportCard outletId={outletId} category="pendapatan_lain" title={t("accounting.migration.categoryPendapatanLain", "Pendapatan Lain-lain")} />
-          <HistoricalImportCard outletId={outletId} category="pengeluaran" title={t("accounting.migration.categoryPengeluaran", "Pengeluaran")} />
-        </div>
-      </Card>
+      <HistoricalImportSection />
     </div>
   );
 }
@@ -2430,65 +2424,3 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
   );
 }
 
-const HISTORICAL_CATEGORY_DESC_KEYS: Record<string, { key: string; fallback: string }> = {
-  penjualan: { key: "accounting.migration.descPenjualan", fallback: "Total penjualan lama (per hari/per transaksi) beserta metode pembayaran." },
-  pembelian: { key: "accounting.migration.descPembelian", fallback: "Pembelian stok/bahan baku atau operasional lama, tunai atau hutang." },
-  pendapatan_lain: { key: "accounting.migration.descPendapatanLain", fallback: "Komisi, sewa aset, penjualan barang bekas, dan pendapatan non-inti lain dari masa lalu." },
-  pengeluaran: { key: "accounting.migration.descPengeluaran", fallback: "Beban operasional lama (gaji, sewa, listrik, internet, dll), tunai atau hutang." },
-};
-
-function HistoricalImportCard({ outletId, category, title }: { outletId: string; category: string; title: string }) {
-  const { t } = useDashboardLang();
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-
-  const upload = async () => {
-    if (!file) return showAlert(t("accounting.historicalImport.alertChooseFile", "Pilih file Excel (.xlsx) dulu."));
-    setUploading(true);
-    setResult(null);
-    const fd = new FormData();
-    fd.append("outletId", outletId);
-    fd.append("category", category);
-    fd.append("file", file);
-    const res = await fetch("/api/accounting/historical-import", { method: "POST", body: fd });
-    const data = await res.json();
-    setUploading(false);
-    if (!res.ok) { showAlert(data.error); return; }
-    setResult(data);
-    setFile(null);
-  };
-
-  const errorRows = (result?.details ?? []).filter((d: any) => d.action === "error");
-
-  return (
-    <div className="rounded-lg border border-neutral-800 p-3 space-y-2">
-      <div>
-        <h3 className="text-sm font-medium">{title}</h3>
-        <p className="text-xs text-neutral-500">{HISTORICAL_CATEGORY_DESC_KEYS[category] ? t(HISTORICAL_CATEGORY_DESC_KEYS[category].key, HISTORICAL_CATEGORY_DESC_KEYS[category].fallback) : ""}</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <a href={`/api/accounting/historical-import/template?category=${category}`} className="text-xs rounded-lg bg-neutral-800 hover:bg-neutral-700 px-3 py-2 font-medium transition">{t("accounting.historicalImport.downloadTemplate", "Download Template")}</a>
-        <input
-          type="file"
-          accept=".xlsx,.xls"
-          className="text-xs text-neutral-400 file:mr-2 file:rounded-lg file:border-0 file:bg-neutral-800 file:px-3 file:py-2 file:text-xs file:text-neutral-200 file:cursor-pointer"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-        <Button onClick={upload} disabled={!file || uploading} className="text-xs">{uploading ? t("accounting.historicalImport.uploading", "Mengimpor...") : t("accounting.historicalImport.uploadButton", "Upload & Impor")}</Button>
-      </div>
-      {result && (
-        <div className="text-xs space-y-1">
-          <div className={result.errors > 0 ? "text-amber-400" : "text-emerald-400"}>
-            {t("accounting.historicalImport.resultLine", "{posted} dari {total} baris berhasil diposting").replace("{posted}", String(result.posted)).replace("{total}", String(result.totalRows))}{result.errors > 0 ? t("accounting.historicalImport.resultErrorsSuffix", ", {errors} error").replace("{errors}", String(result.errors)) : ""}.
-          </div>
-          {errorRows.length > 0 && (
-            <ul className="max-h-32 overflow-y-auto space-y-0.5 text-red-400">
-              {errorRows.map((e: any, i: number) => <li key={i}>{t("accounting.historicalImport.errorRowPrefix", "Baris {row}:").replace("{row}", String(e.row))} {e.error}</li>)}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -13,10 +13,15 @@ import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import { outletDateYmd } from "@/lib/time/outlet-time";
+import { EMPTY_EXPENSE_FILTER, expenseTotal, expenseYears, filterExpenses, isFilterActive, type ExpenseLike, type ExpenseListFilter } from "@/lib/expenses/list-filter";
+import { ExpenseFilterBar } from "./ExpenseFilterBar";
+import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
 import "@/lib/i18n/dict-expenses";
 import "@/lib/i18n/dict-coa";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
+type ExpenseListRow = ExpenseLike & { id: string; status: string };
+type NamedRow = { id: string; name: string };
 const TABS = ["Dashboard", "Daftar Expense", "Cost Center", "Recurring"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -154,6 +159,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   const [bundle, setBundle] = useState<any>({ expenses: [], accounts: [], costCenters: [], suppliers: [], rentalUnits: [], staff: [] });
   const [cashBankAccounts, setCashBankAccounts] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [listFilter, setListFilter] = useState<ExpenseListFilter>(EMPTY_EXPENSE_FILTER);
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
   // Hari ini dalam kalender WIB, bukan UTC — di atas pukul 00.00–07.00 WIB tanggal UTC masih
@@ -240,6 +246,25 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
     const s = bundle.staff.find((x: any) => x.id === id);
     return s?.name ?? "-";
   };
+  // Kolom pencarian memakai nama yang TAMPIL di tabel (akun, supplier, divisi, staf), bukan id-nya.
+  const visibleExpenses = useMemo(() => {
+    const nameOf = (list: NamedRow[], id: string | null | undefined) => (id ? list.find((x) => x.id === id)?.name ?? "-" : "-");
+    const accountsList: (NamedRow & { code: string })[] = bundle.accounts;
+    return filterExpenses(bundle.expenses as ExpenseListRow[], listFilter, {
+      accountName: (id) => {
+        const a = id ? accountsList.find((x) => x.id === id) : null;
+        return a ? `${a.code} ${coaAccountName(t, a)}` : "-";
+      },
+      supplierName: (id) => nameOf(bundle.suppliers, id),
+      costCenterName: (id) => nameOf(bundle.costCenters, id),
+      staffName: (id) => nameOf(bundle.staff, id),
+    });
+  }, [bundle, listFilter, t]);
+  const years = useMemo(() => expenseYears(bundle.expenses), [bundle.expenses]);
+  // Total biaya yang benar-benar diakui: draft/pending/rejected/cancelled belum/tidak pernah dibukukan.
+  const visibleBooked = visibleExpenses.filter((e) => e.status === "approved" || e.status === "paid");
+  const visibleBookedTotal = visibleBooked.reduce((s, e) => s + expenseTotal(e), 0);
+
   const auditTrail = (e: any) => {
     const parts = [`Diinput: ${staffName(e.staffUserId)}`];
     if (e.approvedBy) parts.push(`Approved: ${staffName(e.approvedBy)}`);
@@ -337,7 +362,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
         <Card className="space-y-2 border-amber-500/30">
           <div>
             <h2 className="font-medium text-amber-400">{t("expenses.cashOutQuick", "Cash Out Cepat")}</h2>
-            <p className="text-xs text-neutral-500">{t("expenses.cashOutDescription", "Pengeluaran kas kecil (parkir, beli air galon, dll) — langsung lunas dari {account}, tanpa isi form lengkap.").replace("{account}", defaultCashAccount?.name ?? t("expenses.defaultCashAccountName", "akun Kas"))}</p>
+            <p className="text-xs text-neutral-500">{t("expenses.cashOutDescription", "Pengeluaran kas kecil (parkir, beli air galon, dll) — langsung lunas dari {account}, tanpa isi form lengkap.").replace("{account}", defaultCashAccount ? cashBankOptionLabel(t, defaultCashAccount) : t("expenses.defaultCashAccountName", "akun Kas"))}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <SearchableSelect
@@ -354,11 +379,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
         </Card>
       )}
 
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">{t("expenses.allStatus", "Semua Status")}</option>
-          {Object.entries(STATUS_LABEL_KEY).map(([k, entry]) => <option key={k} value={k}>{t(entry.key, entry.fallback)}</option>)}
-        </select>
+      <div className="flex justify-end">
         {canManage && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t("expenses.closeForm", "Tutup Form") : t("expenses.newExpense", "+ Expense Baru")}</Button>}
       </div>
 
@@ -477,7 +498,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                 <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldSupplier", "Atau pilih supplier terdaftar")}</div>
                 <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
                   <option value="">{t("expenses.fieldSupplierNone", "— tidak ada —")}</option>
-                  {bundle.suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {bundle.suppliers.filter((s: { id: string; archivedAt?: string | null }) => !s.archivedAt || s.id === form.supplierId).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
                 <div className="text-[11px] text-neutral-500">{t("expenses.fieldSupplierHint", "Cukup isi salah satu: nama penerima ATAU supplier.")}</div>
               </label>
@@ -522,9 +543,20 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                     value={form.cashBankAccountId}
                     onChange={(v) => setForm({ ...form, cashBankAccountId: v })}
                     placeholder={t("expenses.fieldCashBankPlaceholder", "Pilih sumber dana...")}
-                    options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+                    options={cashBankAccounts.map((c: any) => ({ value: c.id, label: cashBankOptionLabel(t, c) }))}
                   />
                   <div className="text-[11px] text-neutral-500">{t("expenses.fieldCashBankHint", "Pilih laci kas atau rekening yang saldonya benar-benar berkurang. Salah pilih di sini bikin saldo kas tidak cocok dengan uang fisik.")}</div>
+                  {(() => {
+                    const src = cashBankAccounts.find((c) => c.id === form.cashBankAccountId);
+                    if (!src) return null;
+                    return (
+                      <div className="text-[11px] text-sky-300">
+                        {src.type === "cash"
+                          ? t("expenses.sourceCashNote", "Uang tunai — mengurangi saldo akun {akun} dan ikut dihitung sebagai kas keluar pada shift kasir yang sedang buka.").replace("{akun}", cashBankOptionLabel(t, src).split(" — ").pop() ?? src.name)
+                          : t("expenses.sourceBankNote", "Non-tunai — mengurangi saldo akun {akun}; tidak memengaruhi uang di laci kasir.").replace("{akun}", cashBankOptionLabel(t, src).split(" — ").pop() ?? src.name)}
+                      </div>
+                    );
+                  })()}
                 </label>
               </div>
             ) : (
@@ -624,7 +656,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
               value={payFor.cashBankAccountId}
               onChange={(v) => setPayFor({ ...payFor, cashBankAccountId: v })}
               placeholder={t("expenses.optionCashBankAccount", "Akun Kas/Bank")}
-              options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+              options={cashBankAccounts.map((c: any) => ({ value: c.id, label: cashBankOptionLabel(t, c) }))}
             />
           </div>
           <div className="flex gap-2">
@@ -634,15 +666,37 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
         </Card>
       )}
 
-      <Card>
-        <table className="w-full text-sm">
+      <Card className="space-y-3">
+        <ExpenseFilterBar
+          filter={listFilter}
+          onChange={setListFilter}
+          status={statusFilter}
+          onStatusChange={setStatusFilter}
+          statusOptions={Object.entries(STATUS_LABEL_KEY).map(([k, entry]) => ({ value: k, label: t(entry.key, entry.fallback) }))}
+          years={years}
+          todayYmd={todayYmd}
+        />
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400 border-t border-neutral-800 pt-2">
+          <span>
+            {t("expenses.filter.showing", "Menampilkan {n} dari {total} expense")
+              .replace("{n}", String(visibleExpenses.length))
+              .replace("{total}", String(bundle.expenses.length))}
+          </span>
+          <span>
+            {t("expenses.filter.bookedTotal", "Total biaya tercatat (approved + paid): {amount} · {n} transaksi")
+              .replace("{amount}", rupiah(visibleBookedTotal))
+              .replace("{n}", String(visibleBooked.length))}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[760px]">
           <thead>
             <tr className="text-left text-neutral-500 border-b border-neutral-800">
               <th className="py-2">{t("expenses.table.no", "No.")}</th><th>{t("expenses.table.date", "Tanggal")}</th><th>{t("expenses.table.account", "Akun")}</th><th>{t("expenses.placeholderDescription", "Deskripsi")}</th><th>{t("expenses.amountLabel", "Nominal")}</th><th>{t("expenses.table.status", "Status")}</th><th>{t("expenses.table.inputBy", "Diinput Oleh")}</th><th></th>
             </tr>
           </thead>
           <tbody>
-            {bundle.expenses.map((e: any) => (
+            {visibleExpenses.map((e: any) => (
               <tr key={e.id} className="border-b border-neutral-900 align-top" title={auditTrail(e)}>
                 <td className="py-2 font-mono text-xs">{e.expenseNumber}</td>
                 <td className="text-xs">{new Date(e.expenseDate).toLocaleDateString("id-ID")}</td>
@@ -706,7 +760,19 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
             ))}
           </tbody>
         </table>
-        {bundle.expenses.length === 0 && <div className="text-sm text-neutral-500 py-4 text-center">{t("expenses.emptyList", "Belum ada expense.")}</div>}
+        </div>
+        {bundle.expenses.length === 0 ? (
+          <div className="text-sm text-neutral-500 py-4 text-center">{t("expenses.emptyList", "Belum ada expense.")}</div>
+        ) : (
+          visibleExpenses.length === 0 && (
+            <div className="text-sm text-neutral-500 py-4 text-center">
+              {t("expenses.filter.noMatch", "Tidak ada expense yang cocok dengan filter.")}{" "}
+              {isFilterActive(listFilter) && (
+                <button className="underline text-neutral-300" onClick={() => setListFilter(EMPTY_EXPENSE_FILTER)}>{t("expenses.filter.reset", "Reset filter")}</button>
+              )}
+            </div>
+          )
+        )}
       </Card>
     </div>
   );

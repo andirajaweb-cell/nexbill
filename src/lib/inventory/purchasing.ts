@@ -14,6 +14,8 @@ import { postPurchaseInvoiceJournal, postPurchasePaymentJournal, postPurchaseRet
 import { getCashBankAccountIdForPaymentMethod } from "@/lib/accounting/account-mapping";
 import { lockEntity } from "@/lib/accounting/journal";
 import { receiveStockForItem } from "@/lib/inventory/stock";
+import { assertSupplierUsable } from "@/lib/inventory/suppliers";
+import { onStockOut } from "@/lib/inventory/costing";
 
 export interface CreatePurchaseOrderInput {
   outletId: string;
@@ -25,6 +27,7 @@ export interface CreatePurchaseOrderInput {
 }
 
 export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
+  await assertSupplierUsable(input.outletId, input.supplierId);
   const totalAmount = input.items.reduce((s, i) => s + i.qtyOrdered * i.unitCost, 0);
 
   const [po] = await db
@@ -201,6 +204,8 @@ export async function createPurchaseReturn(input: {
   unitCost: number;
   reason?: string;
 }) {
+  // Returns belong to past purchases, so an archived supplier is fine — but never another outlet's.
+  await assertSupplierUsable(input.outletId, input.supplierId, undefined, { allowArchived: true });
   // Return record + stock-out commit together: without this, a failure between them left goods
   // recorded as returned to the supplier while the stock was still counted as on hand.
   //
@@ -211,6 +216,8 @@ export async function createPurchaseReturn(input: {
   // changed in passing.
   const ret = await db.transaction(async (tx) => {
     const [row] = await tx.insert(purchaseReturns).values(input).returning();
+    // FIFO: returned goods leave from the invoice's own layer first.
+    await onStockOut(tx, { productId: input.productId, qty: Math.abs(input.qty), preferRefId: input.purchaseInvoiceId ?? null });
 
     await tx.insert(stockMovements).values({
       productId: input.productId,
@@ -291,6 +298,7 @@ export function prorateLandedCosts<T extends { qty: number; unitCost: number }>(
  */
 export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput) {
   if (!input.items.length) throw new Error("Belanja harus punya minimal 1 item.");
+  await assertSupplierUsable(input.outletId, input.supplierId);
   for (const item of input.items) {
     if (item.qty <= 0) throw new Error("Qty item harus lebih dari 0.");
     if (item.unitCost < 0) throw new Error("Harga beli tidak boleh negatif.");

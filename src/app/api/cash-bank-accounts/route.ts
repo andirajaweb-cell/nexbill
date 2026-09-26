@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
         isDefault: cashBankAccounts.isDefault,
         includeInShiftFloat: cashBankAccounts.includeInShiftFloat,
         code: accounts.code,
+        accountName: accounts.name,
       })
       .from(cashBankAccounts)
       .leftJoin(accounts, eq(cashBankAccounts.accountId, accounts.id))

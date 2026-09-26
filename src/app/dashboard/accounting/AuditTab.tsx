@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { CashMapCard } from "./CashMapCard";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, ShieldCheck, XCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -192,6 +193,7 @@ export function AuditTab() {
       {data && (
         <>
           {renderGroup("integritas", t("accounting.audit.integrityTitle", "Integritas Pembukuan"), t("accounting.audit.integritySub", "Setiap jurnal berasal dari transaksi nyata, tercatat sekali, dan seimbang."))}
+          <CashMapCard reloadKey={new Date(data.checkedAt).getTime()} />
           {renderGroup("kehati_hatian", t("accounting.audit.prudenceTitle", "Prinsip Kehati-hatian (SAK EMKM)"), t("accounting.audit.prudenceSub", "Aset tidak dicatat berlebih, kerugian & beban tidak ditunda, dan periode yang sudah dilaporkan dikunci."))}
         </>
       )}

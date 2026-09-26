@@ -44,6 +44,10 @@ export const outlets = pgTable("outlets", {
   serviceChargePercent: doublePrecision("service_charge_percent").notNull().default(0),
   taxPercent: doublePrecision("tax_percent").notNull().default(0),
   expenseApprovalThreshold: doublePrecision("expense_approval_threshold").notNull().default(500000),
+  // Metode penilaian persediaan (migrasi 0022): "average" = rata-rata tertimbang, "fifo" = masuk
+  // pertama keluar pertama (lapisan di inventoryCostLayers). LIFO tidak diizinkan SAK EMKM/PSAK 14.
+  inventoryCostMethod: text("inventory_cost_method", { enum: ["average", "fifo"] }).notNull().default("average"),
+  inventoryCostMethodSince: text("inventory_cost_method_since"),
   printerName: text("printer_name"),
   printerPaperWidthMm: integer("printer_paper_width_mm").notNull().default(58),
   receiptFooterText: text("receipt_footer_text"),
@@ -582,6 +586,24 @@ export const products = pgTable(
   (t) => [index("products_outlet_idx").on(t.outletId)]
 );
 
+/** FIFO cost layers (migrasi 0022) — see lib/inventory/costing.ts. Only used when outlets.inventoryCostMethod = "fifo". */
+export const inventoryCostLayers = pgTable(
+  "inventory_cost_layers",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    productId: text("product_id").notNull().references(() => products.id),
+    receivedAt: text("received_at").notNull().$defaultFn(nowIso),
+    qtyInitial: doublePrecision("qty_initial").notNull(),
+    qtyRemaining: doublePrecision("qty_remaining").notNull(),
+    unitCost: doublePrecision("unit_cost").notNull(),
+    source: text("source", { enum: ["purchase", "opening", "adjustment", "restock", "switch"] }).notNull(),
+    refId: text("ref_id"),
+    ...timestamps,
+  },
+  (t) => [index("inventory_cost_layers_product_idx").on(t.productId, t.receivedAt), index("inventory_cost_layers_ref_idx").on(t.refId)]
+);
+
 export const stockMovements = pgTable(
   "stock_movements",
   {
@@ -910,7 +932,7 @@ export const journalEntries = pgTable(
     sourceType: text("source_type", {
       enum: [
         "rental", "pos", "purchase_invoice", "purchase_payment", "purchase_return",
-        "expense", "refund", "asset_purchase", "asset_purchase_payment", "asset_disposal", "depreciation",
+        "expense", "refund", "asset_purchase", "asset_purchase_payment", "asset_disposal", "depreciation", "historical_import",
         "receivable_payment", "manual", "opening_balance", "ppob", "other_income",
         "home_rental", "membership_fee", "cash_deposit", "cash_transfer", "inventory_adjustment",
       ],
@@ -1509,6 +1531,8 @@ export const suppliers = pgTable("suppliers", {
   address: text("address"),
   paymentTermsDays: integer("payment_terms_days").notNull().default(0),
   notes: text("notes"),
+  /** Set = diarsipkan: hilang dari pilihan transaksi baru, riwayat tetap utuh (migrasi 0021). */
+  archivedAt: text("archived_at"),
   ...timestamps,
 });
 

@@ -130,7 +130,9 @@ export function flattenTrialBalanceTree(rows: TrialBalanceRow[], showZero: boole
   const byId = new Map(rows.map((r) => [r.accountId, r]));
   const childrenOf = new Map<string, TrialBalanceRow[]>();
   for (const r of rows) {
-    const key = r.parentId ?? "__root__";
+    // A row whose parent is not in this set (e.g. 4700 when only the Pendapatan lain-lain section
+    // of Laba Rugi is being rendered) becomes a root instead of silently disappearing.
+    const key = r.parentId && byId.has(r.parentId) ? r.parentId : "__root__";
     if (!childrenOf.has(key)) childrenOf.set(key, []);
     childrenOf.get(key)!.push(r);
   }
@@ -169,6 +171,56 @@ export function flattenTrialBalanceTree(rows: TrialBalanceRow[], showZero: boole
   return out;
 }
 
+/**
+ * Laba Rugi bertingkat (multi-step) mengikuti golongan Chart of Accounts, supaya setiap akun jatuh
+ * di bagian laporan yang benar:
+ *
+ *   Pendapatan usaha      4xxx kecuali 47xx (termasuk kontra 49xx diskon/retur)
+ * − HPP                   5xxx                         = LABA KOTOR
+ * − Beban operasional     6xxx (dan kode beban lain di luar 5/8)   = LABA USAHA
+ * + Pendapatan lain-lain  47xx, 7xxx
+ * − Beban lain-lain       8xxx kecuali 8500             = LABA SEBELUM PAJAK
+ * − Beban pajak penghasilan 8500                        = LABA BERSIH
+ *
+ * DIPERBAIKI (2026-09-26): Laba Kotor dulu = SEMUA pendapatan − HPP, jadi komisi vendor, bunga
+ * bank, penjualan barang bekas (47xx/7xxx) ikut menaikkan Laba Kotor dan margin kotor — padahal
+ * itu bukan hasil penjualan. Laba Bersih tidak berubah (jumlah seluruh baris tetap sama).
+ * Murni — diuji tanpa database.
+ */
+export function classifyProfitLoss<T extends { code: string; balance: number; isPostingAllowed?: boolean | null }>(revenue: T[], expense: T[]) {
+  const isOtherIncome = (code: string) => code.startsWith("47") || code.startsWith("7");
+  const sum = (rows: T[]) => rows.reduce((s, r) => s + r.balance, 0);
+  const operatingRevenueRows = revenue.filter((r) => !isOtherIncome(r.code));
+  const otherIncomeRows = revenue.filter((r) => isOtherIncome(r.code));
+  const cogsRows = expense.filter((r) => r.code.startsWith("5"));
+  const incomeTaxRows = expense.filter((r) => r.code === "8500");
+  const otherExpenseRows = expense.filter((r) => r.code.startsWith("8") && r.code !== "8500");
+  const operatingExpenseRows = expense.filter((r) => !r.code.startsWith("5") && !r.code.startsWith("8"));
+
+  const operatingRevenue = sum(operatingRevenueRows);
+  const totalCogs = sum(cogsRows);
+  const grossProfit = operatingRevenue - totalCogs;
+  const operatingExpense = sum(operatingExpenseRows);
+  const operatingProfit = grossProfit - operatingExpense;
+  const otherIncome = sum(otherIncomeRows);
+  const otherExpense = sum(otherExpenseRows);
+  const profitBeforeTax = operatingProfit + otherIncome - otherExpense;
+  const incomeTax = sum(incomeTaxRows);
+  return {
+    rows: { operatingRevenueRows, cogsRows, operatingExpenseRows, otherIncomeRows, otherExpenseRows, incomeTaxRows },
+    operatingRevenue,
+    totalCogs,
+    grossProfit,
+    operatingExpense,
+    operatingProfit,
+    otherIncome,
+    otherExpense,
+    profitBeforeTax,
+    incomeTax,
+    netProfit: profitBeforeTax - incomeTax,
+  };
+}
+
 export async function computeProfitLoss(outletId: string, from?: string, to?: string) {
   const trialBalance = await computeTrialBalance(outletId, from, to);
 
@@ -194,16 +246,27 @@ export async function computeProfitLoss(outletId: string, from?: string, to?: st
   // penjualan" line), so their `balance` (credit-normal: credit-debit) comes out negative —
   // totalRevenue above already nets them in automatically. Pull them out separately here so
   // the report can show Gross -> Discount -> Net instead of one flat net number.
+  // Contra accounts normally carry a debit (negative) balance; a credit leftover is not a discount.
   const contraRevenue = revenue.filter((r) => r.code.startsWith("49") && r.code !== "4900" && r.isPostingAllowed);
-  const totalDiscount = contraRevenue.reduce((s, r) => s + Math.abs(r.balance), 0);
-  const grossRevenue = totalRevenue + totalDiscount;
-  const netRevenue = totalRevenue;
+  const totalDiscount = contraRevenue.reduce((s, r) => s + Math.max(0, -r.balance), 0);
 
-  // COGS now spans the whole 5xxx family (5110 Food COGS, 5120 Beverage COGS, ...)
-  // instead of one lumped "5000" code — sum every account under that top-level digit.
-  const totalCogs = expense.filter((r) => r.code.startsWith("5")).reduce((s, r) => s + r.balance, 0);
-  const grossProfit = totalRevenue - totalCogs;
+  // Multi-step sections (see classifyProfitLoss). Net Sales and Laba Kotor now cover operating
+  // revenue only — other income (47xx/7xxx) is reported below Laba Usaha.
+  const steps = classifyProfitLoss(revenue, expense);
+  const netRevenue = steps.operatingRevenue;
+  const grossRevenue = netRevenue + totalDiscount;
+  const totalCogs = steps.totalCogs;
+  const grossProfit = steps.grossProfit;
   const netProfit = totalRevenue - totalExpense;
+  const tree = (rows: TrialBalanceRow[]) => flattenTrialBalanceTree(rows, false);
+  const sections = {
+    operatingRevenue: { total: steps.operatingRevenue, tree: tree(steps.rows.operatingRevenueRows) },
+    cogs: { total: steps.totalCogs, tree: tree(steps.rows.cogsRows) },
+    operatingExpense: { total: steps.operatingExpense, tree: tree(steps.rows.operatingExpenseRows) },
+    otherIncome: { total: steps.otherIncome, tree: tree(steps.rows.otherIncomeRows) },
+    otherExpense: { total: steps.otherExpense, tree: tree(steps.rows.otherExpenseRows) },
+    incomeTax: { total: steps.incomeTax, tree: tree(steps.rows.incomeTaxRows) },
+  };
 
   /*
    * Peringatan "HPP tidak terdeteksi".
@@ -256,6 +319,13 @@ export async function computeProfitLoss(outletId: string, from?: string, to?: st
     contraRevenue,
     grossProfit,
     netProfit,
+    totalCogs,
+    operatingProfit: steps.operatingProfit,
+    otherIncome: steps.otherIncome,
+    otherExpense: steps.otherExpense,
+    profitBeforeTax: steps.profitBeforeTax,
+    incomeTax: steps.incomeTax,
+    sections,
   };
 }
 

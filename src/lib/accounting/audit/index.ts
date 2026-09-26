@@ -29,6 +29,8 @@ export * from "./integrity";
 export * from "./prudence";
 export * from "./mapping";
 import { checkAccountMappings } from "./mapping";
+import { auditCashBankAccounts } from "./cash-accounts";
+export * from "./cash-accounts";
 
 /*
  * Audit Accounting (tab "Audit") — pemeriksaan mandiri pembukuan outlet dengan prinsip
@@ -45,6 +47,7 @@ export type AuditCode =
   | "stale_receivables"
   | "cash_sources"
   | "account_mapping"
+  | "cash_bank_accounts"
   | "outlet_isolation"
   | "inventory_valuation"
   | "contra_balances"
@@ -81,7 +84,7 @@ const rp = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
 const cap = <T,>(xs: T[]) => xs.slice(0, 100);
 
 export async function runAccountingAudit(outletId: string): Promise<AuditCheck[]> {
-  const [dups, unbalanced, revived, links, gaps, cash, overpaid, contra, inventory, aged, noCost, reviews, periods, tax, mapping, isolation] = await Promise.all([
+  const [dups, unbalanced, revived, links, gaps, cash, overpaid, contra, inventory, aged, noCost, reviews, periods, tax, mapping, isolation, cashBank] = await Promise.all([
     findDuplicateJournals(outletId),
     findUnbalancedJournals(outletId),
     findRevivedChains(outletId),
@@ -98,6 +101,7 @@ export async function runAccountingAudit(outletId: string): Promise<AuditCheck[]
     checkIncomeTax(outletId),
     checkAccountMappings(outletId),
     findIsolationBreaches(outletId),
+    auditCashBankAccounts(outletId),
   ]);
 
   const checks: AuditCheck[] = [];
@@ -220,6 +224,22 @@ export async function runAccountingAudit(outletId: string): Promise<AuditCheck[]
       ...mapping.unmappedPaymentMethods.map((m) => ({ label: `Metode "${m.label}" (${m.key})`, detail: "Belum dipetakan — uangnya masuk ke akun Bank umum (1121). Petakan di Account Mapping, modul payment." })),
     ],
     action: mappingProblems ? { label: "Buka Account Mapping", href: "/dashboard/accounting" } : undefined,
+  });
+
+  const cbErrors = cashBank.issues.filter((i) => i.severity === "error").length;
+  const cbWarnings = cashBank.issues.length - cbErrors;
+  checks.push({
+    code: "cash_bank_accounts",
+    group: "integritas",
+    title: "Kas & Bank ↔ Chart of Accounts",
+    why: "Setiap uang yang diterima/dikeluarkan kasir mendarat di akun COA lewat metode pembayaran (Account Mapping) atau sumber dana yang dipilih (Kas Utama, Rekening Bank, QRIS, Saldo Deposit PPOB). Kalau salah satunya menunjuk golongan akun yang keliru — QRIS ke Kas Kasir, Kas Utama ke akun bank, uang pelanggan ke saldo deposit — saldo di Neraca tidak sama dengan uang sebenarnya dan cek shift selalu selisih.",
+    status: cbErrors ? "error" : cbWarnings ? "warning" : "ok",
+    summary: cashBank.issues.length
+      ? `${cbErrors} ketidaksesuaian, ${cbWarnings} perlu diperiksa — lihat Peta Kas & Bank di bawah.`
+      : `${cashBank.map.length} akun kas/bank sesuai golongan COA-nya, semua metode pembayaran & transaksi masuk ke akun yang benar.`,
+    count: cashBank.issues.length,
+    items: cashBank.issues.map((i) => ({ label: `${i.severity === "error" ? "❌" : "⚠️"} ${i.label}`, detail: i.detail, amount: i.amount })),
+    action: cashBank.issues.length ? { label: "Buka Pembayaran (Kas/Bank)", href: "/dashboard/payments" } : undefined,
   });
 
   // ---------------- KEHATI-HATIAN

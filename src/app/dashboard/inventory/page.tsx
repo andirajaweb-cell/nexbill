@@ -6,13 +6,17 @@ import { Badge } from "@/components/ui/Badge";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
-import { useAuth, isSuperRole } from "@/lib/auth/client";
+import { useAuth } from "@/lib/auth/client";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { resolveSendToKitchen } from "@/lib/kitchen/routing";
 import "@/lib/i18n/dict-inventory";
+import { SupplierTab } from "./SupplierTab";
+import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
+import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
+import { CostMethodCard, FifoLayerList, type CostMethodInfo } from "./CostMethodCard";
 
 interface Product {
   id: string; name: string; category: string; price: number; costPrice: number;
@@ -21,7 +25,9 @@ interface Product {
   sendToKitchen: boolean | null;
 }
 
-interface SupplierOption { id: string; name: string }
+interface SupplierOption { id: string; name: string; archivedAt?: string | null }
+/** Archived suppliers stay out of pickers for new entries — but a row that already points at one keeps showing it. */
+const selectableSuppliers = <T extends { id: string; archivedAt?: string | null }>(list: T[], current?: string | null) => list.filter((s) => !s.archivedAt || s.id === current);
 
 interface UnitOption { id: string; code: string; label: string; isActive: boolean }
 
@@ -77,7 +83,7 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {!outletId ? null : tab === "Produk" ? <ProductTab outletId={outletId} /> : tab === "Resep / BOM" ? <RecipeTab outletId={outletId} /> : tab === "Supplier" ? <SupplierTab outletId={outletId} /> : tab === "Belanja Supplier" ? <SupplierPurchaseTab outletId={outletId} /> : tab === "Purchase Order" ? <PurchaseOrderTab outletId={outletId} /> : <StockOpnameTab outletId={outletId} />}
+      {!outletId ? null : tab === "Produk" ? <ProductTab outletId={outletId} /> : tab === "Resep / BOM" ? <RecipeTab outletId={outletId} /> : tab === "Supplier" ? <SupplierTab /> : tab === "Belanja Supplier" ? <SupplierPurchaseTab outletId={outletId} /> : tab === "Purchase Order" ? <PurchaseOrderTab outletId={outletId} /> : <StockOpnameTab outletId={outletId} />}
     </div>
   );
 }
@@ -115,6 +121,9 @@ function ProductTab({ outletId }: { outletId: string }) {
   // manage_inventory_purchasing is the same permission that already covers everything else on
   // this page (owner + manager get it by default — see DEFAULT_ROLE_PERMISSIONS in permissions.ts).
   const canDelete = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_inventory_purchasing");
+  // Penjaga klik ganda "Tambah" produk: ref-nya langsung terkunci pada klik pertama, dan modal
+  // loading menutupi halaman sampai server selesai (produk + stok awal + jurnal Persediaan).
+  const proses = useProsesTunggal();
   const [products, setProducts] = useState<Product[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -126,6 +135,11 @@ function ProductTab({ outletId }: { outletId: string }) {
   const [recipeProductIds, setRecipeProductIds] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Metode harga modal + lapisan FIFO (lib/inventory/costing.ts) — kolom Modal menampilkannya.
+  const [costInfo, setCostInfo] = useState<CostMethodInfo | null>(null);
+  const [layersFor, setLayersFor] = useState<string | null>(null);
+  const isFifo = costInfo?.method === "fifo";
+  const layersOf = (productId: string) => (costInfo?.layers ?? []).filter((l) => l.productId === productId);
   const [editForm, setEditForm] = useState<{ name: string; category: string; price: number; costPrice: number; unit: string; lowStockThreshold: number; preferredSupplierId: string; sendToKitchen: boolean } | null>(null);
 
   // "Penyesuaian Barang" — replaces the old costed Restock shortcut. Pure quantity tool (no
@@ -145,7 +159,10 @@ function ProductTab({ outletId }: { outletId: string }) {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<ProductSortOption>("name_asc");
 
-  const load = () => fetchJsonArray("/api/products").then(setProducts);
+  const load = () => {
+    fetchJsonObject<CostMethodInfo>("/api/inventory/cost-method").then(setCostInfo);
+    return fetchJsonArray("/api/products").then(setProducts);
+  };
   useEffect(() => {
     load();
     fetchJsonArray<UnitOption>(`/api/units?outletId=${outletId}`).then((rows) => setUnits(rows.filter((u) => u.isActive)));
@@ -178,16 +195,24 @@ function ProductTab({ outletId }: { outletId: string }) {
     });
   }, [products, search, categoryFilter, sortBy]);
 
-  const addProduct = async () => {
-    if (!form.name) return;
-    await fetch("/api/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, preferredSupplierId: form.preferredSupplierId || null, outletId: await getOutletId() }),
+  const addProduct = () =>
+    proses.jalankan("add-product", async () => {
+      if (!form.name.trim()) return showAlert(t("inventory.product.nameRequired", "Nama produk wajib diisi."));
+      try {
+        const res = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, preferredSupplierId: form.preferredSupplierId || null, outletId: await getOutletId() }),
+        });
+        const data = await res.json().catch(() => ({}));
+        // Form stays filled on failure so nothing has to be retyped.
+        if (!res.ok) return showAlert(data.error ?? t("inventory.product.addFailed", "Gagal menambah produk."));
+        setForm({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: units[0]?.code ?? "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
+        await load();
+      } catch (err) {
+        showAlert(t("inventory.product.addNetworkError", "Gagal menghubungi server: {pesan}").replace("{pesan}", err instanceof Error ? err.message : String(err)));
+      }
     });
-    setForm({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: units[0]?.code ?? "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
-    load();
-  };
 
   const deleteProduct = async (p: Product) => {
     if (!await showConfirm(t('inventory.product.confirmDeactivate', 'Nonaktifkan produk "{name}"? Riwayat order tetap tersimpan.').replace("{name}", p.name))) return;
@@ -306,6 +331,12 @@ function ProductTab({ outletId }: { outletId: string }) {
 
   return (
     <div className="space-y-6">
+      {proses.sibuk("add-product") && (
+        <ProcessingOverlay
+          message={t("inventory.product.addingOverlay", "Menyimpan produk...")}
+          hint={t("inventory.product.addingOverlayHint", "Mencatat produk, stok awal, dan jurnal persediaan. Jangan tutup atau muat ulang halaman ini.")}
+        />
+      )}
       <ImportProductsCard outletId={outletId} onImported={load} />
 
       <Card>
@@ -320,9 +351,11 @@ function ProductTab({ outletId }: { outletId: string }) {
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.product.minStockPlaceholder", "Minimum stok")} value={form.lowStockThreshold} onChange={(e) => setForm({ ...form, lowStockThreshold: Number(e.target.value) })} />
           <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.preferredSupplierId} onChange={(e) => setForm({ ...form, preferredSupplierId: e.target.value })}>
             <option value="">{t("inventory.product.preferredSupplierOption", "Supplier utama (opsional)")}</option>
-            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {selectableSuppliers(suppliers, form.preferredSupplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <Button onClick={addProduct}>{t("inventory.action.add", "Tambah")}</Button>
+          <Button onClick={addProduct} disabled={proses.sibuk("add-product")}>
+            {proses.sibuk("add-product") ? t("inventory.product.adding", "Menyimpan...") : t("inventory.action.add", "Tambah")}
+          </Button>
         </div>
         <label className="flex items-center gap-2 text-xs text-neutral-400 mt-2" title={t("inventory.product.sendToKitchenHint", "Nyalakan untuk produk yang benar-benar dibuat/diproses (masuk antrian Kitchen Display). Matikan untuk produk kemasan/siap saji (air mineral botol, snack kemasan, dll) yang tidak perlu diproses dapur meski kategorinya makanan/minuman.")}>
           <input type="checkbox" checked={form.sendToKitchen} onChange={(e) => setForm({ ...form, sendToKitchen: e.target.checked })} />
@@ -358,7 +391,7 @@ function ProductTab({ outletId }: { outletId: string }) {
           <p className="text-sm text-neutral-500 py-4 text-center">{t("inventory.product.noSearchResults", "Tidak ada produk yang cocok dengan pencarian/filter ini.")}</p>
         )}
         <table className="w-full text-sm">
-          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("inventory.product.table.name", "Produk")}</th><th>{t("inventory.product.table.category", "Kategori")}</th><th>{t("inventory.product.table.price", "Harga")}</th><th>{t("inventory.product.table.cost", "Modal")}</th><th>{t("inventory.product.table.stock", "Stok")}</th><th>{t("inventory.product.table.supplier", "Supplier Utama")}</th><th></th></tr></thead>
+          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("inventory.product.table.name", "Produk")}</th><th>{t("inventory.product.table.category", "Kategori")}</th><th>{t("inventory.product.table.price", "Harga")}</th><th>{t("inventory.product.table.cost", "Modal")}<div className="text-[10px] font-normal text-sky-400">{isFifo ? "FIFO" : t("inventory.costMethod.averageShort", "rata-rata tertimbang")}</div></th><th>{t("inventory.product.table.stock", "Stok")}</th><th>{t("inventory.product.table.supplier", "Supplier Utama")}</th><th></th></tr></thead>
           <tbody>
             {filteredProducts.map((p) => (
               <Fragment key={p.id}>
@@ -376,7 +409,14 @@ function ProductTab({ outletId }: { outletId: string }) {
                     )}
                   </td>
                   <td>{rupiah(p.price)}</td>
-                  <td className="text-neutral-500">{rupiah(p.costPrice)}</td>
+                  <td className="text-neutral-500">
+                    {rupiah(p.costPrice)}
+                    {isFifo && layersOf(p.id).length > 0 && (
+                      <button className="block text-[10px] text-sky-400 hover:underline" onClick={() => setLayersFor(layersFor === p.id ? null : p.id)}>
+                        {t("inventory.product.fifoLayers", "{n} lapisan FIFO").replace("{n}", String(layersOf(p.id).length))} · {t("inventory.product.nextOut", "keluar berikutnya {cost}").replace("{cost}", rupiah(layersOf(p.id)[0].unitCost))}
+                      </button>
+                    )}
+                  </td>
                   <td className={p.stockQty <= p.lowStockThreshold ? "text-amber-400 font-medium" : ""}>
                     {p.stockQty} {p.unit}
                     <div className="text-[10px] text-neutral-600 font-normal">{t("inventory.product.minLabel", "min")} {p.lowStockThreshold}</div>
@@ -407,6 +447,14 @@ function ProductTab({ outletId }: { outletId: string }) {
                   </td>
                 </tr>
 
+                {layersFor === p.id && (
+                  <tr className="border-b border-neutral-900 bg-sky-500/5">
+                    <td colSpan={7} className="px-2 py-2">
+                      <div className="mb-1 text-xs font-medium text-sky-300">{t("inventory.product.fifoLayersTitle", "Lapisan harga FIFO — {name}").replace("{name}", p.name)}</div>
+                      <FifoLayerList layers={layersOf(p.id)} unit={p.unit} formatMoney={rupiah} />
+                    </td>
+                  </tr>
+                )}
                 {editingId === p.id && editForm && (
                   <tr className="border-b border-neutral-900 bg-neutral-900/40">
                     <td colSpan={7} className="py-3">
@@ -414,14 +462,18 @@ function ProductTab({ outletId }: { outletId: string }) {
                         <div className="col-span-2"><label className="text-xs text-neutral-500">{t("inventory.product.editForm.name", "Nama Produk")}</label><input className={smallInputCls} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.category", "Kategori")}</label><CategorySelect categories={categories.filter((c) => c.isActive)} value={editForm.category} onChange={(v) => setEditForm({ ...editForm, category: v })} className={smallInputCls} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.sellPrice", "Harga Jual")}</label><input type="number" className={smallInputCls} value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
-                        <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.costPrice", "Harga Modal")}</label><input type="number" className={smallInputCls} value={editForm.costPrice} onChange={(e) => setEditForm({ ...editForm, costPrice: Number(e.target.value) })} /></div>
+                        <div>
+                          <label className="text-xs text-neutral-500">{t("inventory.product.editForm.costPrice", "Harga Modal")}</label>
+                          <input type="number" className={smallInputCls} value={editForm.costPrice} disabled={isFifo && layersOf(p.id).length > 0} onChange={(e) => setEditForm({ ...editForm, costPrice: Number(e.target.value) })} />
+                          {isFifo && layersOf(p.id).length > 0 && <div className="text-[10px] text-neutral-500">{t("inventory.product.fifoCostLocked", "FIFO: dihitung dari lapisan belanja")}</div>}
+                        </div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.unit", "Satuan")}</label><UnitSelect units={units} value={editForm.unit} onChange={(v) => setEditForm({ ...editForm, unit: v })} className={smallInputCls} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.minStock", "Minimum Stok")}</label><input type="number" className={smallInputCls} value={editForm.lowStockThreshold} onChange={(e) => setEditForm({ ...editForm, lowStockThreshold: Number(e.target.value) })} /></div>
                         <div>
                           <label className="text-xs text-neutral-500">{t("inventory.product.editForm.supplier", "Supplier Utama")}</label>
                           <select className={smallInputCls} value={editForm.preferredSupplierId} onChange={(e) => setEditForm({ ...editForm, preferredSupplierId: e.target.value })}>
                             <option value="">-</option>
-                            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {selectableSuppliers(suppliers, editForm.preferredSupplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>
                         </div>
                       </div>
@@ -860,59 +912,6 @@ function RecipeTab({ outletId }: { outletId: string }) {
   );
 }
 
-function SupplierTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
-  const { user } = useAuth();
-  const canDelete = isSuperRole(user?.role);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [form, setForm] = useState({ name: "", phone: "", address: "", paymentTermsDays: 0 });
-
-  const load = () => fetchJsonArray(`/api/suppliers?outletId=${outletId}`).then(setSuppliers);
-  useEffect(() => { load(); }, [outletId]);
-
-  const create = async () => {
-    if (!form.name) return;
-    await fetch("/api/suppliers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId }) });
-    setForm({ name: "", phone: "", address: "", paymentTermsDays: 0 });
-    load();
-  };
-
-  const deleteSupplier = async (s: any) => {
-    if (!await showConfirm(t('inventory.supplier.confirmDelete', 'Hapus supplier "{name}"? Hanya bisa jika tidak punya invoice/PO terkait.').replace("{name}", s.name))) return;
-    const res = await fetch(`/api/admin/suppliers/${s.id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
-    load();
-  };
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <h2 className="font-medium mb-3">{t("inventory.supplier.addTitle", "Tambah Supplier")}</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.supplier.namePlaceholder", "Nama supplier")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.supplier.phonePlaceholder", "No. HP")} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.supplier.addressPlaceholder", "Alamat")} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-          <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.supplier.termsPlaceholder", "Termin (hari)")} value={form.paymentTermsDays || ""} onChange={(e) => setForm({ ...form, paymentTermsDays: Number(e.target.value) })} />
-        </div>
-        <Button className="mt-2" onClick={create}>{t("inventory.supplier.saveButton", "Simpan Supplier")}</Button>
-      </Card>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {suppliers.map((s) => (
-          <Card key={s.id} className="space-y-1">
-            <div className="flex items-start justify-between gap-2">
-              <div className="font-medium">{s.name}</div>
-              {canDelete && <button className="text-xs text-red-400 shrink-0" onClick={() => deleteSupplier(s)}>{t("inventory.supplier.deleteButton", "Hapus")}</button>}
-            </div>
-            <div className="text-xs text-neutral-500">{s.phone}</div>
-            <div className="text-xs text-neutral-500">{s.address}</div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /** Quick supplier purchase for finished/resale F&B products (no recipe/BOM) — transport/parking/other costs get prorated into landed cost, which updates products.costPrice so HPP reflects true cost. */
 function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
@@ -976,6 +975,33 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const itemsSubtotal = cart.reduce((s, c) => s + c.qty * c.unitCost, 0);
   const grandTotal = itemsSubtotal + transportCost + parkingCost + otherCost;
 
+  // Metode harga modal outlet + pratinjau harga modal baru per produk sebelum disimpan. Rumus
+  // pratinjau sama untuk kedua metode: (stok × harga modal + qty × harga landed) ÷ (stok + qty) —
+  // pada FIFO itu adalah rata-rata lapisan tersisa; bedanya ada di HPP saat barang terjual.
+  const [costInfo, setCostInfo] = useState<CostMethodInfo | null>(null);
+  const loadCostInfo = () => {
+    fetchJsonObject<CostMethodInfo>("/api/inventory/cost-method").then(setCostInfo);
+  };
+  useEffect(loadCostInfo, []);
+  const extraCosts = transportCost + parkingCost + otherCost;
+  const costPreview = useMemo(() => {
+    const byProduct = new Map<string, { qty: number; value: number }>();
+    for (const c of cart) {
+      const share = itemsSubtotal > 0 ? (c.qty * c.unitCost) / itemsSubtotal : 1 / cart.length;
+      const cur = byProduct.get(c.productId) ?? { qty: 0, value: 0 };
+      byProduct.set(c.productId, { qty: cur.qty + c.qty, value: cur.value + c.qty * c.unitCost + extraCosts * share });
+    }
+    return [...byProduct].map(([productId, v]) => {
+      const prod = products.find((x) => x.id === productId);
+      const stock = Math.max(0, prod?.stockQty ?? 0);
+      const oldCost = prod?.costPrice ?? 0;
+      const landed = v.qty > 0 ? v.value / v.qty : 0;
+      const newCost = stock + v.qty > 0 ? (stock * oldCost + v.value) / (stock + v.qty) : landed;
+      const oldest = costInfo?.method === "fifo" ? costInfo.layers.find((l) => l.productId === productId) : undefined;
+      return { productId, name: prod?.name ?? "-", unit: prod?.unit ?? "", stock, oldCost, landed, newCost, nextOutCost: oldest ? oldest.unitCost : landed };
+    });
+  }, [cart, products, itemsSubtotal, extraCosts, costInfo]);
+
   const addToCart = () => {
     // Used to return silently here, so a purchase entered without a price (or without a product)
     // just "didn't add" with no explanation — say why instead.
@@ -1005,6 +1031,9 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
       setLastResult(data);
+      // Refresh products (new harga modal) and FIFO layers so the result card shows real numbers.
+      fetchJsonArray<Product>("/api/products").then(setProducts);
+      loadCostInfo();
       setCart([]);
       setTransportCost(0);
       setParkingCost(0);
@@ -1109,6 +1138,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
 
   return (
     <div className="space-y-4">
+      <CostMethodCard info={costInfo} onChanged={() => { loadCostInfo(); fetchJsonArray<Product>("/api/products").then(setProducts); }} />
       <Card className="space-y-3">
         <h2 className="font-medium">{t("inventory.supplierPurchase.title", "Belanja Supplier")}</h2>
         <p className="text-xs text-neutral-500">
@@ -1120,7 +1150,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
 
         <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
           <option value="">{t("inventory.option.chooseSupplier", "Pilih supplier")}</option>
-          {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {selectableSuppliers(suppliers, supplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         {suppliers.length === 0 && <div className="text-xs text-amber-400">{t("inventory.supplierPurchase.noSupplierHint", 'Belum ada supplier — tambah dulu di tab "Supplier".')}</div>}
 
@@ -1145,6 +1175,44 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
                 <button className="text-red-400" onClick={() => removeFromCart(i)}>{t("inventory.cart.removeItem", "Hapus")}</button>
               </div>
             ))}
+          </div>
+        )}
+
+        {costPreview.length > 0 && (
+          <div className="rounded-lg border border-sky-500/25 bg-sky-500/5 p-2 text-xs space-y-1 overflow-x-auto">
+            <div className="font-medium text-sky-300">
+              {t("inventory.supplierPurchase.costPreviewTitle", "Pratinjau harga modal di tab Produk ({method})").replace(
+                "{method}",
+                costInfo?.method === "fifo" ? "FIFO" : t("inventory.costMethod.averageShort", "rata-rata tertimbang")
+              )}
+            </div>
+            <table className="w-full min-w-[520px]">
+              <thead>
+                <tr className="text-left text-neutral-500">
+                  <th className="py-0.5">{t("inventory.product.table.name", "Produk")}</th>
+                  <th className="text-right">{t("inventory.supplierPurchase.previewNow", "Modal sekarang")}</th>
+                  <th className="text-right">{t("inventory.supplierPurchase.previewLanded", "Harga + ongkos")}</th>
+                  <th className="text-right">{t("inventory.supplierPurchase.previewNew", "Modal baru")}</th>
+                  {costInfo?.method === "fifo" && <th className="text-right">{t("inventory.supplierPurchase.previewNextOut", "HPP jual berikutnya")}</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {costPreview.map((r) => (
+                  <tr key={r.productId}>
+                    <td className="py-0.5">{r.name} <span className="text-neutral-500">({t("inventory.supplierPurchase.previewStock", "stok {n}").replace("{n}", String(r.stock))})</span></td>
+                    <td className="text-right text-neutral-400">{rupiah(r.oldCost)}</td>
+                    <td className="text-right">{rupiah(r.landed)}</td>
+                    <td className="text-right font-medium text-emerald-300">{rupiah(r.newCost)}</td>
+                    {costInfo?.method === "fifo" && <td className="text-right">{rupiah(r.nextOutCost)}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-neutral-500">
+              {costInfo?.method === "fifo"
+                ? t("inventory.supplierPurchase.previewFifoNote", "FIFO: stok lama terjual lebih dulu dengan harganya sendiri; harga belanja ini baru menjadi HPP setelah lapisan lama habis.")
+                : t("inventory.supplierPurchase.previewAvgNote", "Rata-rata: harga belanja ini dicampur dengan stok yang ada; semua penjualan berikutnya memakai modal baru.")}
+            </p>
           </div>
         )}
 
@@ -1193,8 +1261,8 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
           <div className="font-medium text-sm mb-1">{t("inventory.supplierPurchase.savedResult", "Belanja tersimpan — {invoiceNumber}").replace("{invoiceNumber}", lastResult.invoice.invoiceNumber)}</div>
           {lastResult.lineBreakdown.map((l: any, i: number) => (
             <div key={i} className="flex justify-between">
-              <span>{products.find((p) => p.id === l.productId)?.name} {t("inventory.supplierPurchase.newCostSuffix", "— HPP baru per unit")}</span>
-              <span>{rupiah(l.landedUnitCost)}</span>
+              <span>{products.find((p) => p.id === l.productId)?.name} — {t("inventory.supplierPurchase.landedLabel", "harga + ongkos per unit")} {rupiah(l.landedUnitCost)}</span>
+              <span>{t("inventory.supplierPurchase.nowCost", "Harga modal sekarang")}: <b>{rupiah(products.find((p) => p.id === l.productId)?.costPrice ?? 0)}</b></span>
             </div>
           ))}
         </Card>
@@ -1435,7 +1503,7 @@ function PurchaseOrderTab({ outletId }: { outletId: string }) {
         <h2 className="font-medium mb-3">{t("inventory.po.createTitle", "Buat Purchase Order")}</h2>
         <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm mb-2" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
           <option value="">{t("inventory.option.chooseSupplier", "Pilih supplier")}</option>
-          {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {selectableSuppliers(suppliers, form.supplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <SearchableSelect

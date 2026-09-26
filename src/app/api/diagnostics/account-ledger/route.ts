@@ -43,6 +43,7 @@ const SOURCE_LABEL: Record<string, string> = {
   refund: "Refund",
   asset_purchase: "Pembelian aset",
   asset_purchase_payment: "Pembayaran utang pembelian aset",
+  historical_import: "Impor data historis",
   asset_disposal: "Pelepasan aset",
   depreciation: "Penyusutan aset",
   receivable_payment: "Pelunasan piutang pelanggan",

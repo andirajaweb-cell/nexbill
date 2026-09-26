@@ -399,7 +399,9 @@ export async function auditCashPostings(outletId: string, accountCode?: string):
 
   const verdictOf = (e: Omit<CashPosting, "verdict">): CashVerdict => {
     const st = e.sourceType;
-    if (st === "manual" || st === "opening_balance") return { kind: "manual", reason: st === "manual" ? "Jurnal manual" : "Saldo awal" };
+    if (st === "manual" || st === "opening_balance" || st === "historical_import") {
+      return { kind: "manual", reason: st === "manual" ? "Jurnal manual" : st === "opening_balance" ? "Saldo awal" : "Impor data historis" };
+    }
     if (!e.sourceId) return { kind: "manual", reason: "Jurnal tanpa sumber (impor/historis)" };
 
     if (st === "rental" || st === "pos") {

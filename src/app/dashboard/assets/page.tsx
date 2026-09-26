@@ -168,7 +168,7 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("assets.placeholderUsefulLife", "Umur Ekonomis (bulan)")} value={form.usefulLifeMonths || ""} onChange={(e) => setForm({ ...form, usefulLifeMonths: e.target.value })} />
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
               <option value="">{t("assets.optionSupplier", "Supplier (opsional)")}</option>
-              {bundle.suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {bundle.suppliers.filter((s: { id: string; archivedAt?: string | null }) => !s.archivedAt || s.id === form.supplierId).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
 
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} disabled={form.recordAsPayable}>

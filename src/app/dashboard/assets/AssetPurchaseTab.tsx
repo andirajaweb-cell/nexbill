@@ -40,7 +40,7 @@ const FUNDING = [
 ] as const;
 
 type PurchaseRow = Awaited<ReturnType<typeof listAssetPurchases>>[number];
-interface Option { id: string; name: string }
+interface Option { id: string; name: string; archivedAt?: string | null }
 interface Lookups { suppliers: Option[]; rentalUnits: Option[]; cashBankAccounts: Option[] }
 
 interface ItemForm { name: string; category: string; qty: string; unitCost: string; usefulLifeMonths: string; salvageValue: string; rentalUnitId: string }
@@ -191,7 +191,7 @@ export function AssetPurchaseTab({ role, onChanged }: { role: StaffRole; onChang
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             <label className="text-xs text-neutral-400 space-y-1">
               <span>{t("assets.purchase.supplier", "Supplier (opsional)")}</span>
-              <SearchableSelect value={form.supplierId} onChange={(v) => setForm({ ...form, supplierId: v })} placeholder="—" options={lookups.suppliers.map((s) => ({ value: s.id, label: s.name }))} />
+              <SearchableSelect value={form.supplierId} onChange={(v) => setForm({ ...form, supplierId: v })} placeholder="—" options={lookups.suppliers.filter((s) => !s.archivedAt || s.id === form.supplierId).map((s) => ({ value: s.id, label: s.name }))} />
             </label>
             <label className="text-xs text-neutral-400 space-y-1">
               <span>{t("assets.purchase.invoiceNo", "No. faktur/nota supplier")}</span>

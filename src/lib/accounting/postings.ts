@@ -21,6 +21,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { postJournal, JournalLineInput } from "./journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "./account-mapping";
 import { isPeriodLocked } from "./periods";
+import { orderUnitCost } from "@/lib/inventory/costing";
 
 const round = (n: number) => Math.round(n);
 
@@ -109,7 +110,12 @@ async function getCashBankGlAccountId(cashBankAccountId: string, dbc: DbOrTx = d
   return row.accountId;
 }
 
-export async function computeItemCogs(productId: string | null, qty: number, dbc: DbOrTx = db): Promise<number> {
+/**
+ * HPP of `qty` units. With `orderId` and a FIFO outlet, uses the layer cost actually consumed when
+ * that order's stock was deducted (stock_movements.unit_cost, see lib/inventory/costing.ts) —
+ * otherwise, and always for rata-rata tertimbang, the product's current harga modal.
+ */
+export async function computeItemCogs(productId: string | null, qty: number, dbc: DbOrTx = db, orderId?: string): Promise<number> {
   if (!productId) return 0;
   const [product] = await dbc.select().from(products).where(eq(products.id, productId)).limit(1);
   if (!product) return 0;
@@ -119,13 +125,19 @@ export async function computeItemCogs(productId: string | null, qty: number, dbc
     const ingredients = await dbc.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
     let costPerYield = 0;
     for (const ing of ingredients) {
+      const fifoCost = orderId ? await orderUnitCost(dbc, orderId, ing.ingredientProductId) : null;
+      if (fifoCost != null) {
+        costPerYield += fifoCost * ing.qtyPerYield;
+        continue;
+      }
       const [ingredientProduct] = await dbc.select().from(products).where(eq(products.id, ing.ingredientProductId)).limit(1);
       costPerYield += (ingredientProduct?.costPrice ?? 0) * ing.qtyPerYield;
     }
     return (costPerYield / Math.max(1, recipe.yieldQty)) * qty;
   }
 
-  return (product.costPrice ?? 0) * qty;
+  const fifoCost = orderId ? await orderUnitCost(dbc, orderId, productId) : null;
+  return (fifoCost ?? product.costPrice ?? 0) * qty;
 }
 
 const FNB_REVENUE_FALLBACK: Record<string, string> = { food: "4210", drink: "4220", coffee: "4230", snack: "4240", dessert: "4250" };
@@ -328,7 +340,7 @@ export async function postSalesJournal(orderId: string) {
       if (item.itemType === "product") {
         const cogsAccountId = await cogsAccountIdForCategory(order.outletId, category ?? "", tx);
         if (cogsAccountId) {
-          const itemCogs = await computeItemCogs(item.productId, item.qty, tx);
+          const itemCogs = await computeItemCogs(item.productId, item.qty, tx, order.id);
           if (itemCogs > 0) {
             cogsByAccount[cogsAccountId] = (cogsByAccount[cogsAccountId] ?? 0) + itemCogs;
             cogsTotal += itemCogs;

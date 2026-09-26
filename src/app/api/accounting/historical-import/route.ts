@@ -23,8 +23,11 @@ export async function POST(req: NextRequest) {
     }
     if (!file || !(file instanceof File)) return NextResponse.json({ error: "File Excel wajib diupload." }, { status: 400 });
 
+    const mode = form.get("mode") === "saldo_awal" ? "saldo_awal" : "kas";
+    const dryRun = form.get("dryRun") === "1";
+    if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "File terlalu besar (maks 5 MB). Rekap per hari agar baris lebih sedikit." }, { status: 400 });
     const arrayBuffer = await file.arrayBuffer();
-    const summary = await importHistoricalRows(session.outletId, category as HistoricalCategory, Buffer.from(arrayBuffer), session.sub);
+    const summary = await importHistoricalRows(session.outletId, category as HistoricalCategory, Buffer.from(arrayBuffer), session.sub, { mode, dryRun });
     return NextResponse.json(summary);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

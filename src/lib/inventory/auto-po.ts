@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { products, purchaseOrders, purchaseOrderItems } from "@/db/schema";
+import { products, purchaseOrders, purchaseOrderItems, suppliers } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 
 const AUTO_PO_NOTE_MARKER = "Auto-generated: produk mencapai stok minimum";
@@ -35,7 +35,11 @@ export interface AutoFillResult {
  */
 export async function autoFillLowStockPurchaseOrders(outletId: string): Promise<AutoFillResult> {
   const allProducts = await db.select().from(products).where(and(eq(products.outletId, outletId), eq(products.isActive, true)));
-  const eligible = allProducts.filter((p) => p.stockQty <= p.lowStockThreshold && p.preferredSupplierId);
+  // Archived suppliers are skipped: an auto-PO to a supplier the outlet stopped using is noise.
+  const activeSupplierIds = new Set(
+    (await db.select({ id: suppliers.id, archivedAt: suppliers.archivedAt }).from(suppliers).where(eq(suppliers.outletId, outletId))).filter((s) => !s.archivedAt).map((s) => s.id)
+  );
+  const eligible = allProducts.filter((p) => p.stockQty <= p.lowStockThreshold && p.preferredSupplierId && activeSupplierIds.has(p.preferredSupplierId));
   if (eligible.length === 0) return { poCreated: 0, poReused: 0, itemsAdded: 0, poIds: [] };
 
   const bySupplier = new Map<string, typeof eligible>();

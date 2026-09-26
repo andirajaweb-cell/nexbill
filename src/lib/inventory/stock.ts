@@ -1,6 +1,7 @@
 import { db, type DbOrTx } from "@/db/client";
 import { products, stockMovements, recipes, recipeIngredients } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { onStockIn, onStockOut, orderUnitCost } from "./costing";
 
 /**
  * Deduct stock for a sold item — follows the recipe/BOM if the product has
@@ -18,10 +19,13 @@ export async function deductStockForItem(productId: string, qty: number, orderId
     const ingredients = await dbc.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
     for (const ing of ingredients) {
       const deductQty = Math.round(((ing.qtyPerYield * qty) / Math.max(1, recipe.yieldQty)) * 100) / 100;
+      // FIFO outlets: consume the oldest cost layers and remember what these units cost (HPP).
+      const fifo = await onStockOut(dbc, { productId: ing.ingredientProductId, qty: Math.abs(deductQty) });
       await dbc.insert(stockMovements).values({
         productId: ing.ingredientProductId,
         type: "sale_out",
         qty: -Math.abs(deductQty),
+        unitCost: fifo ? fifo.unitCost : null,
         note: `Bahan baku untuk resep (order ${orderId.slice(0, 8)})`,
         refOrderId: orderId,
         staffUserId,
@@ -34,7 +38,8 @@ export async function deductStockForItem(productId: string, qty: number, orderId
     return;
   }
 
-  await dbc.insert(stockMovements).values({ productId, type: "sale_out", qty: -Math.abs(qty), refOrderId: orderId, staffUserId });
+  const fifo = await onStockOut(dbc, { productId, qty: Math.abs(qty) });
+  await dbc.insert(stockMovements).values({ productId, type: "sale_out", qty: -Math.abs(qty), unitCost: fifo ? fifo.unitCost : null, refOrderId: orderId, staffUserId });
   await dbc
     .update(products)
     .set({ stockQty: sql`${products.stockQty} - ${qty}` })
@@ -71,6 +76,8 @@ export async function receiveStockForItem(
     .update(products)
     .set({ stockQty: sql`${products.stockQty} + ${qty}`, costPrice: Math.round(newCostPrice * 100) / 100 })
     .where(eq(products.id, productId));
+  // FIFO outlets: this receipt becomes its own cost layer (costPrice is then re-derived from layers).
+  await onStockIn(dbc, { productId, qty, unitCost: landedUnitCost, source: "purchase", refId, stockBefore: product.stockQty });
 
   return { newCostPrice };
 }
@@ -84,6 +91,8 @@ export async function restockForItem(productId: string, qty: number, orderId: st
     const ingredients = await dbc.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
     for (const ing of ingredients) {
       const restoreQty = Math.round(((ing.qtyPerYield * qty) / Math.max(1, recipe.yieldQty)) * 100) / 100;
+      // FIFO: returned units go back at the cost they left with on this order.
+      await onStockIn(dbc, { productId: ing.ingredientProductId, qty: restoreQty, unitCost: await orderUnitCost(dbc, orderId, ing.ingredientProductId), source: "restock", refId: orderId });
       await dbc.insert(stockMovements).values({
         productId: ing.ingredientProductId,
         type: "adjustment",
@@ -99,6 +108,7 @@ export async function restockForItem(productId: string, qty: number, orderId: st
     return;
   }
 
+  await onStockIn(dbc, { productId, qty, unitCost: await orderUnitCost(dbc, orderId, productId), source: "restock", refId: orderId });
   await dbc.insert(stockMovements).values({ productId, type: "adjustment", qty, note: `${note} (order ${orderId.slice(0, 8)})`, refOrderId: orderId });
   await dbc
     .update(products)

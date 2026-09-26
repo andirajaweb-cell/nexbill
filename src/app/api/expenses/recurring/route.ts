@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { nullIfBlank } from "@/lib/accounting/expense";
+import { assertSupplierUsable } from "@/lib/inventory/suppliers";
 
 export async function GET(_req: NextRequest) {
   try {
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Role kamu tidak punya izin membuat recurring expense." }, { status: 403 });
     }
     const body = await req.json();
+    await assertSupplierUsable(session.outletId, nullIfBlank(body.supplierId));
     const { name, accountId, category, amount, nextDueDate } = body;
     if (!name || !accountId || !category || !amount || !nextDueDate) {
       return NextResponse.json({ error: "name, accountId, category, amount, nextDueDate wajib diisi." }, { status: 400 });

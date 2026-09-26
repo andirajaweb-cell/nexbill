@@ -1,5 +1,7 @@
 import { db, type DbOrTx } from "@/db/client";
-import { stockMovements } from "@/db/schema";
+import { products, stockMovements } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { onStockIn, onStockOut } from "@/lib/inventory/costing";
 import { getMappedAccountId } from "./account-mapping";
 import { postJournal } from "./journal";
 import { computeItemCogs } from "./postings";
@@ -57,10 +59,29 @@ export async function postInventoryAdjustmentJournal(
   },
   dbc: DbOrTx = db
 ): Promise<string | null> {
+  // Callers apply the stock change BEFORE calling this. On a FIFO outlet this is also where the
+  // cost layers follow that change: a decrease consumes the oldest layers (and is valued at exactly
+  // their cost), an increase becomes a new layer at harga modal. Rata-rata outlets: onStock* return
+  // null and every line is valued at harga modal as before.
   const valued = [];
   for (const l of input.lines) {
     if (!l.qtyDelta) continue;
-    valued.push({ qtyDelta: l.qtyDelta, unitCost: await computeItemCogs(l.productId, 1, dbc) });
+    let unitCost: number | null = null;
+    if (l.qtyDelta < 0) {
+      const out = await onStockOut(dbc, { productId: l.productId, qty: Math.abs(l.qtyDelta) });
+      if (out) unitCost = out.unitCost;
+    } else {
+      const [p] = await dbc.select({ stockQty: products.stockQty }).from(products).where(eq(products.id, l.productId)).limit(1);
+      const into = await onStockIn(dbc, {
+        productId: l.productId,
+        qty: l.qtyDelta,
+        source: input.reason === "opening" ? "opening" : "adjustment",
+        refId: input.sourceId ?? null,
+        stockBefore: (p?.stockQty ?? l.qtyDelta) - l.qtyDelta,
+      });
+      if (into) unitCost = into.unitCost;
+    }
+    valued.push({ qtyDelta: l.qtyDelta, unitCost: unitCost ?? (await computeItemCogs(l.productId, 1, dbc)) });
   }
   const net = netInventoryValue(valued);
   if (Math.abs(net) < 0.01) return null;

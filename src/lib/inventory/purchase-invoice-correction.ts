@@ -15,6 +15,7 @@ import { voidJournal } from "@/lib/accounting/journal";
 import { postPurchaseInvoiceJournal } from "@/lib/accounting/postings";
 import { payPurchaseInvoice, prorateLandedCosts } from "@/lib/inventory/purchasing";
 import { recomputeCostPriceExcludingRef } from "@/lib/inventory/cost-replay";
+import { getCostMethod, onStockIn, onStockOut } from "@/lib/inventory/costing";
 import { logAudit } from "@/lib/audit/log";
 
 export interface ReconstructedInvoiceLine {
@@ -90,6 +91,8 @@ export async function reverseInvoiceEffects(purchaseInvoiceId: string, reason: s
   const affectedProductIds = new Set<string>();
   for (const line of lines) {
     if (line.qty <= 0) continue;
+    // FIFO: take the units back out of this invoice's own layer first.
+    await onStockOut(tx, { productId: line.productId, qty: Math.abs(line.qty), preferRefId: invoice.id });
     await tx.insert(stockMovements).values({
       productId: line.productId,
       type: "adjustment",
@@ -109,8 +112,12 @@ export async function reverseInvoiceEffects(purchaseInvoiceId: string, reason: s
   // Recompute costPrice for every affected product, excluding THIS invoice's movements
   // (original purchase_in + the reversal adjustment just inserted, both tagged refOrderId =
   // invoice.id) entirely from the replay — see recomputeCostPriceExcludingRef's doc comment.
-  for (const productId of affectedProductIds) {
-    await recomputeCostPriceExcludingRef(productId, invoice.id, tx);
+  // Rata-rata only — on a FIFO outlet onStockOut above already re-derived harga modal from the
+  // remaining layers, and an average replay would overwrite it with the wrong method.
+  if ((await getCostMethod(invoice.outletId, tx)) !== "fifo") {
+    for (const productId of affectedProductIds) {
+      await recomputeCostPriceExcludingRef(productId, invoice.id, tx);
+    }
   }
 
   if (invoice.journalEntryId) {
@@ -188,6 +195,7 @@ export async function applyInvoiceLines(purchaseInvoiceId: string, lines: Invoic
       .update(products)
       .set({ stockQty: sql`${products.stockQty} + ${line.qty}`, costPrice: Math.round(newCostPrice * 100) / 100 })
       .where(eq(products.id, line.productId));
+    await onStockIn(tx, { productId: line.productId, qty: line.qty, unitCost: line.landedUnitCost, source: "purchase", refId: invoice.id, stockBefore: product.stockQty });
 
     await tx.insert(purchaseInvoiceItems).values({
       purchaseInvoiceId: invoice.id,

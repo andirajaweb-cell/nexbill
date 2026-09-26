@@ -264,6 +264,7 @@ registerDict({
   "accounting.journal.source.purchaseReturn": { id: "Purchase Return", en: "Purchase Return", ms: "Pemulangan Belian", th: "การคืนสินค้าซื้อ", fil: "Purchase Return", vi: "Trả hàng mua" },
   "accounting.journal.source.expense": { id: "Expense", en: "Expense", ms: "Perbelanjaan", th: "ค่าใช้จ่าย", fil: "Expense", vi: "Chi phí" },
   "accounting.journal.source.refund": { id: "Refund", en: "Refund", ms: "Bayaran Balik", th: "การคืนเงิน", fil: "Refund", vi: "Hoàn tiền" },
+  "accounting.journal.source.historicalImport": { id: "Impor Historis", en: "Historical Import", ms: "Import Sejarah", th: "นำเข้าข้อมูลย้อนหลัง", fil: "Historical Import", vi: "Nhập dữ liệu lịch sử" },
   "accounting.journal.source.assetPurchasePayment": { id: "Bayar Utang Aset", en: "Asset Debt Payment", ms: "Bayar Hutang Aset", th: "ชำระหนี้สินทรัพย์", fil: "Bayad sa Utang ng Asset", vi: "Trả nợ tài sản" },
   "accounting.journal.source.assetPurchase": { id: "Pembelian Aset", en: "Asset Purchase", ms: "Belian Aset", th: "การซื้อสินทรัพย์", fil: "Pagbili ng Asset", vi: "Mua tài sản" },
   "accounting.journal.source.assetDisposal": { id: "Pelepasan Aset", en: "Asset Disposal", ms: "Pelupusan Aset", th: "การจำหน่ายสินทรัพย์", fil: "Pagtatapon ng Asset", vi: "Thanh lý tài sản" },
@@ -324,12 +325,12 @@ registerDict({
 
   // --- ReceivablesTab ---
   "accounting.receivables.explainer": {
-    id: "Piutang tercipta otomatis saat order/rental dibayar sebagian — sisa tagihan dibukukan ke akun 1100 Piutang Usaha. Terima pelunasan langsung dari sini lewat mekanisme pembayaran yang sama, tidak perlu input ulang.",
-    en: "A receivable is created automatically when an order/rental is partially paid — the remaining balance is booked to account 1100 Accounts Receivable. Collect payment directly from here using the same payment mechanism, no need to re-enter it.",
-    ms: "Piutang dicipta secara automatik apabila pesanan/sewa dibayar sebahagian — baki tagihan dibukukan ke akaun 1100 Akaun Belum Terima. Terima pelunasan terus dari sini melalui mekanisme pembayaran yang sama, tanpa perlu input semula.",
-    th: "ลูกหนี้จะถูกสร้างขึ้นโดยอัตโนมัติเมื่อออเดอร์/การเช่าถูกชำระเพียงบางส่วน — ยอดคงเหลือจะถูกบันทึกเข้าบัญชี 1100 ลูกหนี้การค้า รับชำระได้โดยตรงจากหน้านี้ผ่านกลไกการชำระเงินเดียวกัน ไม่ต้องกรอกซ้ำ",
-    fil: "Awtomatikong nagagawa ang receivable kapag bahagyang bayad ang order/rental — ang natitirang balanse ay itinatala sa account 1100 Accounts Receivable. Tumanggap ng bayad direkta dito gamit ang parehong payment mechanism, hindi na kailangang i-input ulit.",
-    vi: "Khoản phải thu được tạo tự động khi đơn hàng/hợp đồng cho thuê được thanh toán một phần — số tiền còn lại được ghi vào tài khoản 1100 Phải thu khách hàng. Thu nợ trực tiếp tại đây qua cùng cơ chế thanh toán, không cần nhập lại.",
+    id: "Piutang tercipta otomatis saat order/rental dibayar sebagian — sisa tagihan dibukukan ke akun 1141 Piutang Pelanggan. Terima pelunasan langsung dari sini lewat mekanisme pembayaran yang sama, tidak perlu input ulang.",
+    en: "A receivable is created automatically when an order/rental is partially paid — the remaining balance is booked to account 1141 Accounts Receivable. Collect payment directly from here using the same payment mechanism, no need to re-enter it.",
+    ms: "Piutang dicipta secara automatik apabila pesanan/sewa dibayar sebahagian — baki tagihan dibukukan ke akaun 1141 Akaun Belum Terima. Terima pelunasan terus dari sini melalui mekanisme pembayaran yang sama, tanpa perlu input semula.",
+    th: "ลูกหนี้จะถูกสร้างขึ้นโดยอัตโนมัติเมื่อออเดอร์/การเช่าถูกชำระเพียงบางส่วน — ยอดคงเหลือจะถูกบันทึกเข้าบัญชี 1141 ลูกหนี้การค้า รับชำระได้โดยตรงจากหน้านี้ผ่านกลไกการชำระเงินเดียวกัน ไม่ต้องกรอกซ้ำ",
+    fil: "Awtomatikong nagagawa ang receivable kapag bahagyang bayad ang order/rental — ang natitirang balanse ay itinatala sa account 1141 Accounts Receivable. Tumanggap ng bayad direkta dito gamit ang parehong payment mechanism, hindi na kailangang i-input ulit.",
+    vi: "Khoản phải thu được tạo tự động khi đơn hàng/hợp đồng cho thuê được thanh toán một phần — số tiền còn lại được ghi vào tài khoản 1141 Phải thu khách hàng. Thu nợ trực tiếp tại đây qua cùng cơ chế thanh toán, không cần nhập lại.",
   },
   "accounting.receivables.totalOutstanding": { id: "Total Piutang Outstanding ({count} tagihan)", en: "Total Outstanding Receivables ({count} invoices)", ms: "Jumlah Piutang Belum Selesai ({count} tagihan)", th: "ยอดลูกหนี้คงค้างรวม ({count} รายการ)", fil: "Kabuuang Outstanding Receivable ({count} invoice)", vi: "Tổng phải thu chưa thu ({count} hóa đơn)" },
   "accounting.receivables.fieldAmount": { id: "Jumlah diterima (Rp)", en: "Amount received (Rp)", ms: "Jumlah diterima (Rp)", th: "จำนวนที่รับ (Rp)", fil: "Halagang natanggap (Rp)", vi: "Số tiền nhận (Rp)" },
@@ -454,8 +455,8 @@ registerDict({
   },
   "accounting.migration.recoImporBold": { id: "Impor Data Historis", en: "Historical Data Import", ms: "Import Data Sejarah", th: "นำเข้าข้อมูลย้อนหลัง", fil: "Historical Data Import", vi: "Nhập dữ liệu lịch sử" },
   "accounting.migration.recoPart3": {
-    id: " lewat template Excel di bawah. Data yang diimpor langsung masuk ke jurnal dengan tanggal aslinya — tidak melalui alur kasir/approval biasa, karena memang sudah terjadi di masa lalu.",
-    en: " via the Excel template below. Imported data is posted straight to the journal with its original date — it doesn't go through the usual cashier/approval flow, since it already happened in the past.",
+    id: " lewat template Excel di bawah dengan mode \"Hanya riwayat Laba Rugi\" — supaya kas/bank tidak terhitung dua kali dengan Saldo Awal. Aset tetap lama dicatat lewat menu Aset → Pembelian Aset (Saldo awal), stok awal barang lewat Inventory.",
+    en: " via the Excel template below using the \"Profit & loss history only\" mode so cash/bank is not counted twice with the Opening Balance. Imported data is posted straight to the journal with its original date — it doesn't go through the usual cashier/approval flow, since it already happened in the past.",
     ms: " melalui templat Excel di bawah. Data yang diimport terus masuk ke jurnal dengan tarikh asalnya — tidak melalui aliran juruwang/kelulusan biasa, kerana ia memang sudah berlaku pada masa lalu.",
     th: " ผ่านเทมเพลต Excel ด้านล่าง ข้อมูลที่นำเข้าจะถูกบันทึกเข้าสมุดรายวันโดยตรงพร้อมวันที่จริง — ไม่ผ่านขั้นตอนแคชเชียร์/การอนุมัติตามปกติ เนื่องจากเป็นเหตุการณ์ที่เกิดขึ้นในอดีตแล้ว",
     fil: " gamit ang Excel template sa ibaba. Ang na-import na data ay direktang napupunta sa journal gamit ang orihinal na petsa nito — hindi dumadaan sa karaniwang cashier/approval flow, dahil nangyari na ito noon.",

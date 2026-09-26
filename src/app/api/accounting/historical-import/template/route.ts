@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const category = req.nextUrl.searchParams.get("category") as HistoricalCategory | null;
     if (!category || !FILE_NAME[category]) return NextResponse.json({ error: "Kategori tidak dikenali." }, { status: 400 });
 
-    const buffer = generateHistoricalImportTemplate(category);
+    const buffer = await generateHistoricalImportTemplate(session.outletId, category);
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {

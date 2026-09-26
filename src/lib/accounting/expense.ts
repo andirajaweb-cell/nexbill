@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit/log";
 import type { StaffRole } from "@/lib/auth/permissions";
 import { hasPermission, canReviewRequestOf, roleLabel } from "@/lib/auth/permissions";
 import { outletDateYmd } from "@/lib/time/outlet-time";
+import { assertSupplierUsable } from "@/lib/inventory/suppliers";
 
 /**
  * Approval-hierarchy check shared by approveExpense/rejectExpense — on top of the
@@ -140,6 +141,9 @@ export async function createExpense(input: CreateExpenseInput) {
     shiftId: nullIfBlank(input.shiftId),
     recurringTemplateId: nullIfBlank(input.recurringTemplateId),
   };
+  // Supplier must be this outlet's. An expense generated from a recurring template may still name a
+  // supplier archived after the template was set up — the bill still has to be recorded.
+  await assertSupplierUsable(input.outletId, input.supplierId, undefined, { allowArchived: Boolean(input.recurringTemplateId) });
 
   if (!input.recordAsPayable && !input.cashBankAccountId) {
     throw new Error("Pilih akun kas/bank untuk expense yang dibayar langsung, atau centang 'Catat sebagai hutang' jika belum dibayar.");
