@@ -1,9 +1,11 @@
 import { db } from "@/db/client";
-import { otherIncomes, cashBankAccounts } from "@/db/schema";
+import { otherIncomes, cashBankAccounts, costCenters, accounts } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { nomorBerikutnya } from "@/lib/db/nomor-urut";
-import { postJournal, voidJournal } from "./journal";
-import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "./account-mapping";
+import { postJournal, voidJournal, lockEntity } from "./journal";
+import { isPeriodLocked } from "./periods";
+import { getMappedAccountId, getCashBankAccountIdForPaymentMethod, previewPaymentDestinationAccount } from "./account-mapping";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 import { logAudit } from "@/lib/audit/log";
 import type { PaymentMethod } from "@/lib/payments/types";
 import { resolvePaymentFee, feeExpenseLine } from "./payment-fee";
@@ -40,7 +42,7 @@ export const OTHER_INCOME_CATEGORY_OPTIONS: { value: OtherIncomeCategory; label:
 ).map((value) => ({ value, label: OTHER_INCOME_CATEGORY_LABEL[value] }));
 
 /** Mirrors the "other_income" mapping module's defaults (see account-mapping.ts DEFAULT_MAPPING_SEED). */
-const CATEGORY_FALLBACK_CODE: Record<OtherIncomeCategory, string> = {
+export const CATEGORY_FALLBACK_CODE: Record<OtherIncomeCategory, string> = {
   vendor_commission: "4710",
   asset_rental: "4720",
   asset_sale: "4730",
@@ -71,10 +73,42 @@ function generateIncomeNumber(): Promise<string> {
   return nomorBerikutnya(otherIncomes, otherIncomes.incomeNumber, "INC");
 }
 
-/** Records one Other Income entry and posts its journal (Dr Kas/Bank per channel, Cr Pendapatan Lain-lain per category) in one shot — no separate submit/approve step, money's already in hand. */
+/**
+ * Tanggal diterima → ISO. Menerima YYYY-MM-DD (kalender outlet) atau ISO. Hari ini = jam sekarang;
+ * tanggal lampau dipatok 12.00 WIB supaya tidak bergeser hari. Masa depan ditolak.
+ */
+export function incomeDateToIso(value: string | null | undefined): string {
+  if (!value) return new Date().toISOString();
+  const today = outletDateYmd(new Date());
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    if (value > today) throw new Error("Tanggal diterima tidak boleh di masa depan.");
+    return value === today ? new Date().toISOString() : new Date(`${value}T12:00:00+07:00`).toISOString();
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) throw new Error("Tanggal diterima tidak valid.");
+  if (outletDateYmd(d) > today) throw new Error("Tanggal diterima tidak boleh di masa depan.");
+  return d.toISOString();
+}
+
+/**
+ * Records one Other Income entry and posts its journal (Dr Kas/Bank per channel, Cr Pendapatan
+ * Lain-lain per category) in one shot — no separate submit/approve step, money's already in hand.
+ *
+ * DIPERBAIKI (2026-09-27): jurnal dulu SELALU bertanggal hari ini walau incomeDate diisi (termasuk
+ * dari Impor Data Historis), jadi pendapatan bulan lalu masuk Laba Rugi bulan ini. Sekarang jurnal
+ * memakai incomeDate; bila periodenya sudah ditutup, jatuh ke hari ini (sama seperti expense).
+ * Baris + jurnal + penanda jurnal kini satu transaksi — dulu kegagalan jurnal meninggalkan entri
+ * "posted" tanpa jurnal.
+ */
 export async function createOtherIncome(input: CreateOtherIncomeInput) {
   if (!(input.amount > 0)) throw new Error("Nominal harus lebih dari 0.");
+  if (!OTHER_INCOME_CATEGORY_LABEL[input.category]) throw new Error("Kategori pendapatan tidak dikenal.");
   const amount = round(input.amount);
+  const incomeDate = incomeDateToIso(input.incomeDate);
+  if (input.costCenterId) {
+    const [cc] = await db.select({ outletId: costCenters.outletId }).from(costCenters).where(eq(costCenters.id, input.costCenterId)).limit(1);
+    if (!cc || cc.outletId !== input.outletId) throw new Error("Divisi/cost center tidak ditemukan di outlet ini.");
+  }
 
   const cashBankAccountId = await getCashBankAccountIdForPaymentMethod(input.outletId, input.paymentMethod);
   const [cashBankRow] = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.id, cashBankAccountId)).limit(1);
@@ -87,8 +121,11 @@ export async function createOtherIncome(input: CreateOtherIncomeInput) {
 
   const incomeNumber = await generateIncomeNumber();
   const label = input.description?.trim() || OTHER_INCOME_CATEGORY_LABEL[input.category];
+  const revenueAccountId = await getMappedAccountId(input.outletId, "other_income", input.category, CATEGORY_FALLBACK_CODE[input.category]);
+  const entryDate = (await isPeriodLocked(input.outletId, incomeDate)) ? new Date().toISOString() : incomeDate;
 
-  const [row] = await db
+  const saved = await db.transaction(async (tx) => {
+  const [row] = await tx
     .insert(otherIncomes)
     .values({
       incomeNumber,
@@ -105,14 +142,13 @@ export async function createOtherIncome(input: CreateOtherIncomeInput) {
       status: "posted",
       staffUserId: input.staffUserId,
       shiftId: input.shiftId ?? null,
-      incomeDate: input.incomeDate ?? new Date().toISOString(),
+      incomeDate,
     })
     .returning();
 
-  const revenueAccountId = await getMappedAccountId(input.outletId, "other_income", input.category, CATEGORY_FALLBACK_CODE[input.category]);
-
   const journalId = await postJournal({
     outletId: input.outletId,
+    entryDate,
     reference: incomeNumber,
     description: `Pendapatan Lain-lain — ${label}`,
     sourceType: "other_income",
@@ -123,9 +159,12 @@ export async function createOtherIncome(input: CreateOtherIncomeInput) {
       ...feeExpenseLine(feeAmount, input.paymentMethod),
       { accountId: revenueAccountId, debit: 0, credit: amount, description: OTHER_INCOME_CATEGORY_LABEL[input.category] },
     ],
-  });
+  }, tx);
 
-  await db.update(otherIncomes).set({ journalEntryId: journalId }).where(eq(otherIncomes.id, row.id));
+  await tx.update(otherIncomes).set({ journalEntryId: journalId }).where(eq(otherIncomes.id, row.id));
+  return { row, journalId };
+  });
+  const { row, journalId } = saved;
 
   await logAudit({
     outletId: input.outletId,
@@ -141,17 +180,20 @@ export async function createOtherIncome(input: CreateOtherIncomeInput) {
 
 /** Reverses an Other Income entry: voids the posted journal (exact reverse, history preserved) and flips status to "void" — never hard-deletes. */
 export async function voidOtherIncome(id: string, staffUserId: string, reason: string) {
-  const [row] = await db.select().from(otherIncomes).where(eq(otherIncomes.id, id)).limit(1);
-  if (!row) throw new Error("Pendapatan lain-lain tidak ditemukan.");
-  if (row.status === "void") throw new Error("Entri ini sudah di-void sebelumnya.");
-
-  if (row.journalEntryId) await voidJournal(row.journalEntryId, reason);
-
-  const [updated] = await db
-    .update(otherIncomes)
-    .set({ status: "void", voidedBy: staffUserId, voidedAt: new Date().toISOString(), voidReason: reason })
-    .where(eq(otherIncomes.id, id))
-    .returning();
+  // Lock + re-read: a double-clicked Batalkan used to reverse the journal twice.
+  const { row, updated } = await db.transaction(async (tx) => {
+    await lockEntity(tx, `other_income:${id}`);
+    const [row] = await tx.select().from(otherIncomes).where(eq(otherIncomes.id, id)).limit(1);
+    if (!row) throw new Error("Pendapatan lain-lain tidak ditemukan.");
+    if (row.status === "void") throw new Error("Entri ini sudah di-void sebelumnya.");
+    if (row.journalEntryId) await voidJournal(row.journalEntryId, reason, tx);
+    const [updated] = await tx
+      .update(otherIncomes)
+      .set({ status: "void", voidedBy: staffUserId, voidedAt: new Date().toISOString(), voidReason: reason })
+      .where(eq(otherIncomes.id, id))
+      .returning();
+    return { row, updated };
+  });
 
   await logAudit({ outletId: row.outletId, staffUserId, action: "void_other_income", entityType: "other_income", entityId: id, before: { status: row.status }, after: { status: "void", reason } });
   return updated;
@@ -179,4 +221,22 @@ export async function listOtherIncomes(filter: ListOtherIncomeFilter) {
   const filtered = rows.filter((r) => (!filter.from || r.incomeDate >= filter.from) && (!filter.to || r.incomeDate <= filter.to));
   const totalPosted = filtered.filter((r) => r.status === "posted").reduce((s, r) => s + r.amount, 0);
   return { rows: filtered, totalPosted };
+}
+
+/**
+ * Ke akun COA mana setiap kategori & metode pembayaran dibukukan — ditampilkan di form supaya
+ * pengguna tahu persis efeknya di Accounting. Hanya membaca (tidak membuat baris Kas/Bank baru).
+ */
+export async function describeOtherIncomeAccounts(outletId: string, methods: string[]) {
+  const accountLabel = async (accountId: string) => {
+    const [a] = await db.select({ code: accounts.code, name: accounts.name }).from(accounts).where(eq(accounts.id, accountId)).limit(1);
+    return a ? { code: a.code, name: a.name } : null;
+  };
+  const categories: Record<string, { code: string; name: string } | null> = {};
+  for (const c of Object.keys(OTHER_INCOME_CATEGORY_LABEL) as OtherIncomeCategory[]) {
+    categories[c] = await accountLabel(await getMappedAccountId(outletId, "other_income", c, CATEGORY_FALLBACK_CODE[c]));
+  }
+  const methodAccounts: Record<string, { code: string; name: string } | null> = {};
+  for (const m of methods) methodAccounts[m] = await previewPaymentDestinationAccount(outletId, m);
+  return { categories, methods: methodAccounts };
 }

@@ -105,6 +105,11 @@ export async function computeExpenseReport(outletId: string, from?: string, to?:
     totalRevenue: pl.totalRevenue,
     expenseToRevenueRatioPercent: pl.totalRevenue > 0 ? Math.round((totalExpense / pl.totalRevenue) * 1000) / 10 : null,
     netProfit: pl.netProfit,
+    // Laba Rugi's operating expenses for the same period — includes costs that never pass through
+    // Expense Management (penyusutan, pembelian habis pakai, selisih kas, jurnal manual), so the two
+    // numbers are shown side by side instead of one silently standing in for the other.
+    glOperatingExpense: pl.sections.operatingExpense.total,
+    glOtherExpense: pl.sections.otherExpense.total + pl.sections.incomeTax.total,
     detail,
     byCategory,
     byAccount,

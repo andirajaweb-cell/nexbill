@@ -17,6 +17,7 @@ import { SupplierTab } from "./SupplierTab";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
 import { CostMethodCard, FifoLayerList, type CostMethodInfo } from "./CostMethodCard";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 
 interface Product {
   id: string; name: string; category: string; price: number; costPrice: number;
@@ -932,6 +933,9 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const [recipeProductIds, setRecipeProductIds] = useState<Set<string>>(new Set());
   const [cashBankAccounts, setCashBankAccounts] = useState<any[]>([]);
   const [supplierId, setSupplierId] = useState("");
+  // Tanggal belanja (kalender WIB). Belanja kemarin yang baru dicatat hari ini tetap masuk ke
+  // Persediaan, Kas/Utang, dan laporan pada tanggal belanjanya.
+  const [purchaseDate, setPurchaseDate] = useState(() => outletDateYmd(new Date()));
   const [itemForm, setItemForm] = useState({ productId: "", qty: 1, unitCost: 0 });
   const [cart, setCart] = useState<{ productId: string; qty: number; unitCost: number }[]>([]);
   const [transportCost, setTransportCost] = useState(0);
@@ -1026,7 +1030,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       const res = await fetch("/api/supplier-purchases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ outletId, supplierId, items: cart, transportCost, parkingCost, otherCost, paidNow, cashBankAccountId: paidNow ? cashBankAccountId : undefined }),
+        body: JSON.stringify({ outletId, supplierId, purchaseDate, items: cart, transportCost, parkingCost, otherCost, paidNow, cashBankAccountId: paidNow ? cashBankAccountId : undefined }),
       });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
@@ -1035,6 +1039,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       fetchJsonArray<Product>("/api/products").then(setProducts);
       loadCostInfo();
       setCart([]);
+      setPurchaseDate(outletDateYmd(new Date()));
       setTransportCost(0);
       setParkingCost(0);
       setOtherCost(0);
@@ -1148,10 +1153,33 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
           )}
         </p>
 
-        <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-          <option value="">{t("inventory.option.chooseSupplier", "Pilih supplier")}</option>
-          {selectableSuppliers(suppliers, supplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <label className="space-y-1 sm:col-span-2">
+            <div className="text-xs text-neutral-500">{t("inventory.supplierPurchase.supplierLabel", "Supplier")}</div>
+            <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+              <option value="">{t("inventory.option.chooseSupplier", "Pilih supplier")}</option>
+              {selectableSuppliers(suppliers, supplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <div className="text-xs text-neutral-500">{t("inventory.supplierPurchase.dateLabel", "Tanggal belanja")}</div>
+            <input
+              type="date"
+              className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+              value={purchaseDate}
+              max={outletDateYmd(new Date())}
+              onChange={(e) => setPurchaseDate(e.target.value || outletDateYmd(new Date()))}
+            />
+          </label>
+        </div>
+        {purchaseDate !== outletDateYmd(new Date()) && (
+          <div className="text-xs text-amber-400">
+            {t("inventory.supplierPurchase.backdateHint", "Belanja dicatat pada {date} — stok, harga modal, kas/utang, dan jurnal memakai tanggal ini. Kalau periode itu sudah ditutup, jurnalnya jatuh ke hari ini.").replace(
+              "{date}",
+              new Date(`${purchaseDate}T12:00:00+07:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+            )}
+          </div>
+        )}
         {suppliers.length === 0 && <div className="text-xs text-amber-400">{t("inventory.supplierPurchase.noSupplierHint", 'Belum ada supplier — tambah dulu di tab "Supplier".')}</div>}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1258,7 +1286,10 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
 
       {lastResult && (
         <Card className="border-emerald-500/40 text-xs space-y-1">
-          <div className="font-medium text-sm mb-1">{t("inventory.supplierPurchase.savedResult", "Belanja tersimpan — {invoiceNumber}").replace("{invoiceNumber}", lastResult.invoice.invoiceNumber)}</div>
+          <div className="font-medium text-sm mb-1">
+            {t("inventory.supplierPurchase.savedResult", "Belanja tersimpan — {invoiceNumber}").replace("{invoiceNumber}", lastResult.invoice.invoiceNumber)}
+            <span className="ml-2 text-xs font-normal text-neutral-400">{new Date(lastResult.invoice.invoiceDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+          </div>
           {lastResult.lineBreakdown.map((l: any, i: number) => (
             <div key={i} className="flex justify-between">
               <span>{products.find((p) => p.id === l.productId)?.name} — {t("inventory.supplierPurchase.landedLabel", "harga + ongkos per unit")} {rupiah(l.landedUnitCost)}</span>

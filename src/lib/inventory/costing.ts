@@ -104,7 +104,7 @@ async function refreshCostPrice(dbc: DbOrTx, productId: string) {
  */
 export async function onStockIn(
   dbc: DbOrTx,
-  input: { productId: string; qty: number; unitCost?: number | null; source: "purchase" | "opening" | "adjustment" | "restock"; refId?: string | null; stockBefore?: number }
+  input: { productId: string; qty: number; unitCost?: number | null; source: "purchase" | "opening" | "adjustment" | "restock"; refId?: string | null; stockBefore?: number; receivedAt?: string }
 ): Promise<{ unitCost: number } | null> {
   if (!(input.qty > 0)) return null;
   // Cheap check first: rata-rata outlets (the default) never open a transaction here.
@@ -125,6 +125,7 @@ export async function onStockIn(
         unitCost,
         source: input.source,
         refId: input.refId ?? null,
+        ...(input.receivedAt ? { receivedAt: input.receivedAt } : {}),
       });
     }
     await refreshCostPrice(tx, p.id);

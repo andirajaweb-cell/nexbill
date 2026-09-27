@@ -2,12 +2,12 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import "@/lib/i18n/dict-reports";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
+import { PeriodBar, resolvePeriodPreset, describePeriod, type PeriodPreset } from "@/components/reports/PeriodPicker";
 
 // recharts moved to its own lazy-loaded chunks (one per tab's chart) — see BusyHoursChart.tsx's
 // doc comment for the rationale. Only whichever report tab the user actually opens pays for it.
@@ -32,23 +32,29 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Kesehatan Keuangan": { key: "reports.tab.financialHealth", fallback: "Kesehatan Keuangan" },
 };
 
-function DateRangePicker({ from, to, setFrom, setTo, onApply }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void; onApply: () => void }) {
-  const { t } = useDashboardLang();
-  return (
-    <Card>
-      <div className="flex flex-wrap items-end gap-2">
-        <div>
-          <label className="text-xs text-neutral-500">{t("reports.dateFrom", "Dari Tanggal")}</label>
-          <input type="date" className="block rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-xs text-neutral-500">{t("reports.dateTo", "Sampai Tanggal")}</label>
-          <input type="date" className="block rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-        <Button onClick={onApply}>{t("reports.apply", "Terapkan")}</Button>
-      </div>
+/**
+ * Periode laporan — pemilih yang sama dengan tab Accounting (PeriodBar), default "Bulan ini", dan
+ * laporan langsung dimuat ulang saat periode berubah. Dulu setiap tab mulai "sepanjang waktu",
+ * harus menekan Terapkan, dan mengirim tanggal mentah yang membuat hari terakhir hilang.
+ */
+function useReportPeriod(defaultPreset: PeriodPreset = "this_month") {
+  const [preset, setPreset] = useState<PeriodPreset>(defaultPreset);
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const { from, to } = resolvePeriodPreset(preset, customFrom, customTo);
+  const bar = (
+    <Card className="space-y-1">
+      <PeriodBar preset={preset} setPreset={setPreset} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
+      <div className="text-[11px] text-neutral-500">{describePeriod(preset, from, to)}</div>
     </Card>
   );
+  const query = (outletId: string) => {
+    const params = new URLSearchParams({ outletId });
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    return params.toString();
+  };
+  return { from, to, bar, query };
 }
 
 export default function ReportsPage() {
@@ -100,28 +106,56 @@ function SalesTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const period = useReportPeriod();
 
-  const load = () => {
-    const params = new URLSearchParams({ outletId });
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    fetchJsonObject(`/api/reports/sales?${params}`).then(setData);
-  };
-  useEffect(load, [outletId]);
+  useEffect(() => {
+    fetchJsonObject(`/api/reports/sales?${period.query(outletId)}`).then(setData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletId, period.from, period.to]);
   if (!data) return null;
 
   return (
     <div className="space-y-4">
-      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} onApply={load} />
+      {period.bar}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card><div className="text-xs text-neutral-500">{t("reports.sales.totalRevenue", "Total Pendapatan")}</div><div className="text-xl font-bold text-emerald-400">{rupiah(data.totalRevenue)}</div></Card>
         <Card><div className="text-xs text-neutral-500">{t("reports.sales.rentalRevenue", "Pendapatan Rental")}</div><div className="text-xl font-bold">{rupiah(data.revenueRental)}</div></Card>
         <Card><div className="text-xs text-neutral-500">{t("reports.sales.posRevenue", "Pendapatan POS / F&B")}</div><div className="text-xl font-bold">{rupiah(data.revenuePos)}</div></Card>
-        <Card><div className="text-xs text-neutral-500">{t("reports.sales.paidOrders", "Jumlah Order Lunas")}</div><div className="text-xl font-bold">{data.ordersCount}</div></Card>
+        <Card>
+          <div className="text-xs text-neutral-500">{t("reports.sales.recognizedOrders", "Jumlah Order (lunas + sebagian)")}</div>
+          <div className="text-xl font-bold">{data.ordersCount}</div>
+          {data.partialCount > 0 && (
+            <div className="text-[11px] text-amber-400">
+              {t("reports.sales.partialNote", "{n} belum lunas · piutang {amount}").replace("{n}", String(data.partialCount)).replace("{amount}", rupiah(data.receivableFromPartial))}
+            </div>
+          )}
+        </Card>
       </div>
+
+      {data.accounting && (
+        <Card className="space-y-2 border-sky-500/25">
+          <h2 className="font-medium text-sm">{t("reports.sales.reconTitle", "Cocokkan dengan Accounting (Laba Rugi periode sama)")}</h2>
+          <div className="grid gap-1 text-sm sm:grid-cols-2">
+            <div className="flex justify-between"><span className="text-neutral-400">{t("reports.sales.reconOrders", "Penjualan kasir & rental (laporan ini)")}</span><span>{rupiah(data.totalRevenue)}</span></div>
+            <div className="flex justify-between"><span className="text-neutral-400">{t("reports.sales.reconGl", "Pendapatan usaha di Laba Rugi")}</span><span className="font-medium">{rupiah(data.accounting.operatingRevenue)}</span></div>
+          </div>
+          <div className="text-xs space-y-0.5">
+            {data.accounting.groups.map((g: { group: string; label: string; amount: number }) => (
+              <div key={g.group} className="flex justify-between text-neutral-400"><span><span className="font-mono text-[10px] text-neutral-600 mr-1">{g.group}</span>{g.label}</span><span>{rupiah(g.amount)}</span></div>
+            ))}
+            {data.accounting.otherIncome !== 0 && (
+              <div className="flex justify-between text-neutral-500"><span>{t("reports.sales.reconOther", "Pendapatan lain-lain (47xx/7xxx, di luar pendapatan usaha)")}</span><span>{rupiah(data.accounting.otherIncome)}</span></div>
+            )}
+          </div>
+          <p className="text-[11px] text-neutral-500">
+            {t(
+              "reports.sales.reconNote",
+              "Selisih wajar karena laporan ini hanya berisi order kasir & rental (termasuk pajak & service charge), sedangkan Laba Rugi juga memuat fee PPOB, iuran membership, dan Home Rental. Selisih di luar itu → cek Accounting → Rekonsiliasi."
+            )}
+          </p>
+        </Card>
+      )}
 
       <Card style={{ height: 280 }}>
         <h2 className="font-medium mb-2 text-sm text-neutral-400">{t("reports.sales.dailyTrend", "Tren Pendapatan Harian")}</h2>
@@ -134,7 +168,7 @@ function SalesTab({ outletId }: { outletId: string }) {
         <Card>
           <h2 className="font-medium mb-2">{t("reports.sales.byPaymentMethod", "Pendapatan per Metode Pembayaran")}</h2>
           {data.byPaymentMethod.map((m: any) => (
-            <div key={m.method} className="flex justify-between text-sm py-1 capitalize"><span>{m.method.replace("_", " ")}</span><span>{rupiah(m.amount)}</span></div>
+            <div key={m.method} className="flex justify-between text-sm py-1 capitalize"><span>{m.method.replace(/_/g, " ")}</span><span>{rupiah(m.amount)}</span></div>
           ))}
           {data.byPaymentMethod.length === 0 && <p className="text-sm text-neutral-500">{t("reports.noData", "Tidak ada data.")}</p>}
         </Card>
@@ -153,27 +187,27 @@ function RentalTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const period = useReportPeriod();
 
-  const load = () => {
-    const params = new URLSearchParams({ outletId });
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    fetchJsonObject(`/api/reports/rental?${params}`).then(setData);
-  };
-  useEffect(load, [outletId]);
+  useEffect(() => {
+    fetchJsonObject(`/api/reports/rental?${period.query(outletId)}`).then(setData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletId, period.from, period.to]);
   if (!data) return null;
 
   const minutesLabel = t("reports.minutesSuffix", "menit");
 
   return (
     <div className="space-y-4">
-      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} onApply={load} />
+      {period.bar}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card><div className="text-xs text-neutral-500">{t("reports.rental.totalRevenue", "Total Pendapatan Rental")}</div><div className="text-xl font-bold text-emerald-400">{rupiah(data.totalRevenue)}</div></Card>
-        <Card><div className="text-xs text-neutral-500">{t("reports.rental.totalSessions", "Total Sesi Selesai")}</div><div className="text-xl font-bold">{data.totalSessions}</div></Card>
+        <Card>
+          <div className="text-xs text-neutral-500">{t("reports.rental.totalSessions", "Total Sesi Selesai")}</div>
+          <div className="text-xl font-bold">{data.totalSessions}</div>
+          {data.excludedCancelled > 0 && <div className="text-[11px] text-neutral-500">{t("reports.rental.excludedCancelled", "{n} sesi dengan tagihan dibatalkan tidak dihitung").replace("{n}", String(data.excludedCancelled))}</div>}
+        </Card>
         <Card><div className="text-xs text-neutral-500">{t("reports.rental.avgDuration", "Rata-rata Durasi")}</div><div className="text-xl font-bold">{data.avgDurationMinutes} {minutesLabel}</div></Card>
         <Card><div className="text-xs text-neutral-500">{t("reports.rental.unitCount", "Jumlah Unit PS")}</div><div className="text-xl font-bold">{data.unitCount}</div></Card>
       </div>
@@ -205,21 +239,17 @@ function HomeRentalTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const period = useReportPeriod();
 
-  const load = () => {
-    const params = new URLSearchParams({ outletId });
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    fetchJsonObject(`/api/reports/home-rental?${params}`).then(setData);
-  };
-  useEffect(load, [outletId]);
+  useEffect(() => {
+    fetchJsonObject(`/api/reports/home-rental?${period.query(outletId)}`).then(setData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletId, period.from, period.to]);
   if (!data) return null;
 
   return (
     <div className="space-y-4">
-      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} onApply={load} />
+      {period.bar}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card><div className="text-xs text-neutral-500">{t("reports.homeRental.totalRevenue", "Total Pendapatan Home Rental")}</div><div className="text-xl font-bold text-emerald-400">{rupiah(data.revenue.totalAmount)}</div></Card>
@@ -272,30 +302,35 @@ function InventoryTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const period = useReportPeriod();
 
-  const load = () => {
-    const params = new URLSearchParams({ outletId });
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    fetchJsonObject(`/api/reports/inventory?${params}`).then(setData);
-  };
-  useEffect(load, [outletId]);
+  useEffect(() => {
+    fetchJsonObject(`/api/reports/inventory?${period.query(outletId)}`).then(setData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletId, period.from, period.to]);
   if (!data) return null;
 
   return (
     <div className="space-y-4">
-      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} onApply={load} />
+      {period.bar}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card><div className="text-xs text-neutral-500">{t("reports.inventory.productRevenue", "Pendapatan Produk")}</div><div className="text-xl font-bold text-emerald-400">{rupiah(data.totalRevenue)}</div></Card>
-        <Card><div className="text-xs text-neutral-500">{t("reports.inventory.totalCogs", "Total HPP")}</div><div className="text-xl font-bold">{rupiah(data.totalCogs)}</div></Card>
+        <Card>
+          <div className="text-xs text-neutral-500">{t("reports.inventory.totalCogs", "Total HPP")}</div>
+          <div className="text-xl font-bold">{rupiah(data.totalCogs)}</div>
+          <div className="text-[11px] text-neutral-500">{t("reports.inventory.glCogs", "HPP di Laba Rugi: {amount}").replace("{amount}", rupiah(data.glCogs ?? 0))}</div>
+        </Card>
         <Card><div className="text-xs text-neutral-500">{t("reports.inventory.grossMargin", "Margin Kotor")}</div><div className={`text-xl font-bold ${data.totalMargin >= 0 ? "text-emerald-400" : "text-red-400"}`}>{rupiah(data.totalMargin)}</div></Card>
       </div>
 
       <Card>
-        <h2 className="font-medium mb-3">{t("reports.inventory.marginPerProduct", "Margin per Produk")}</h2>
+        <h2 className="font-medium mb-1">{t("reports.inventory.marginPerProduct", "Margin per Produk")}</h2>
+        {data.anyEstimated && (
+          <p className="text-[11px] text-neutral-500 mb-2">
+            {t("reports.inventory.estimatedNote", "* HPP bertanda bintang dihitung dengan harga modal SAAT INI (tidak ada catatan harga pokok per order — metode rata-rata, produk resep, atau order lama). HPP resmi ada di Laba Rugi; selisih kecil terhadapnya wajar.")}
+          </p>
+        )}
         <table className="w-full text-sm">
           <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("reports.table.product", "Produk")}</th><th className="text-right">{t("reports.table.qtySold", "Qty Terjual")}</th><th className="text-right">{t("reports.table.revenue", "Pendapatan")}</th><th className="text-right">{t("reports.table.cogs", "HPP")}</th><th className="text-right">{t("reports.table.margin", "Margin")}</th><th className="text-right">{t("reports.table.marginPercent", "Margin %")}</th></tr></thead>
           <tbody>
@@ -304,7 +339,7 @@ function InventoryTab({ outletId }: { outletId: string }) {
                 <td className="py-2">{p.name}</td>
                 <td className="text-right">{p.qty}</td>
                 <td className="text-right">{rupiah(p.revenue)}</td>
-                <td className="text-right">{rupiah(p.cogs)}</td>
+                <td className="text-right">{rupiah(p.cogs)}{p.estimated ? " *" : ""}</td>
                 <td className={`text-right font-medium ${p.margin >= 0 ? "" : "text-red-400"}`}>{rupiah(p.margin)}</td>
                 <td className="text-right">{p.marginPercent}%</td>
               </tr>
@@ -336,24 +371,24 @@ function CustomerTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const period = useReportPeriod();
 
-  const load = () => {
-    const params = new URLSearchParams({ outletId });
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    fetchJsonObject(`/api/reports/customers?${params}`).then(setData);
-  };
-  useEffect(load, [outletId]);
+  useEffect(() => {
+    fetchJsonObject(`/api/reports/customers?${period.query(outletId)}`).then(setData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletId, period.from, period.to]);
   if (!data) return null;
 
   return (
     <div className="space-y-4">
-      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} onApply={load} />
+      {period.bar}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card><div className="text-xs text-neutral-500">{t("reports.customer.totalRegistered", "Total Pelanggan Terdaftar")}</div><div className="text-xl font-bold">{data.totalCustomers}</div></Card>
+        <Card>
+          <div className="text-xs text-neutral-500">{t("reports.customer.totalRegistered", "Total Pelanggan Terdaftar")}</div>
+          <div className="text-xl font-bold">{data.totalCustomers}</div>
+          <div className="text-[11px] text-neutral-500">{t("reports.customer.activePeriod", "{n} bertransaksi pada periode ini · {amount}").replace("{n}", String(data.activeInPeriod ?? 0)).replace("{amount}", rupiah(data.spendingInPeriod ?? 0))}</div>
+        </Card>
         <Card>
           <div className="text-xs text-neutral-500 mb-1">{t("reports.customer.tierDistribution", "Distribusi Membership Tier")}</div>
           <div className="flex flex-wrap gap-2">
@@ -391,16 +426,12 @@ function ExpenseReportTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const period = useReportPeriod();
 
-  const load = () => {
-    const params = new URLSearchParams({ outletId });
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    fetchJsonObject(`/api/reports/expenses?${params}`).then(setData);
-  };
-  useEffect(load, [outletId]);
+  useEffect(() => {
+    fetchJsonObject(`/api/reports/expenses?${period.query(outletId)}`).then(setData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletId, period.from, period.to]);
   if (!data) return null;
 
   const Breakdown = ({ title, rows }: { title: string; rows: any[] }) => (
@@ -414,10 +445,16 @@ function ExpenseReportTab({ outletId }: { outletId: string }) {
 
   return (
     <div className="space-y-4">
-      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} onApply={load} />
+      {period.bar}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card><div className="text-xs text-neutral-500">{t("reports.expense.total", "Total Expense")}</div><div className="text-xl font-bold text-red-400">{rupiah(data.totalExpense)}</div></Card>
+        <Card>
+          <div className="text-xs text-neutral-500">{t("reports.expense.total", "Total Expense")}</div>
+          <div className="text-xl font-bold text-red-400">{rupiah(data.totalExpense)}</div>
+          <div className="text-[11px] text-neutral-500" title={t("reports.expense.glHint", "Beban operasional (6xxx) di Laba Rugi juga memuat penyusutan, selisih stok/kas, dan jurnal manual yang tidak lewat Expense Management.")}>
+            {t("reports.expense.glOperating", "Beban operasional di Laba Rugi: {amount}").replace("{amount}", rupiah(data.glOperatingExpense ?? 0))}
+          </div>
+        </Card>
         <Card><div className="text-xs text-neutral-500">{t("reports.expense.totalRevenueSamePeriod", "Total Revenue (periode sama)")}</div><div className="text-xl font-bold text-emerald-400">{rupiah(data.totalRevenue)}</div></Card>
         <Card><div className="text-xs text-neutral-500">{t("reports.expense.vsRevenue", "Expense vs Revenue")}</div><div className="text-xl font-bold">{data.expenseToRevenueRatioPercent != null ? `${data.expenseToRevenueRatioPercent}%` : "-"}</div></Card>
         <Card><div className="text-xs text-neutral-500">{t("reports.expense.netProfitSamePeriod", "Laba Bersih (periode sama)")}</div><div className={`text-xl font-bold ${data.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{rupiah(data.netProfit)}</div></Card>
@@ -463,14 +500,6 @@ function ExpenseReportTab({ outletId }: { outletId: string }) {
   );
 }
 
-function monthStart(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-}
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function RatioCard({ label, value, hint, tone = "default" }: { label: string; value: string; hint?: string; tone?: "default" | "good" | "warn" }) {
   const toneClass = tone === "good" ? "text-emerald-400" : tone === "warn" ? "text-amber-400" : "text-neutral-100";
   return (
@@ -493,14 +522,12 @@ function FinancialHealthTab({ outletId }: { outletId: string }) {
   const { t } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(today());
+  const period = useReportPeriod();
 
-  const load = () => {
-    const params = new URLSearchParams({ outletId, from, to });
-    fetchJsonObject(`/api/reports/financial-health?${params}`).then(setData);
-  };
-  useEffect(load, [outletId]);
+  useEffect(() => {
+    fetchJsonObject(`/api/reports/financial-health?${period.query(outletId)}`).then(setData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletId, period.from, period.to]);
   if (!data) return null;
 
   const pct = (v: number | null) => (v == null ? "-" : `${v.toFixed(1)}%`);
@@ -508,7 +535,7 @@ function FinancialHealthTab({ outletId }: { outletId: string }) {
 
   return (
     <div className="space-y-6">
-      <DateRangePicker from={from} to={to} setFrom={setFrom} setTo={setTo} onApply={load} />
+      {period.bar}
 
       <div>
         <h2 className="text-sm font-semibold text-neutral-300 mb-2">{t("reports.health.profitability", "Profitabilitas")}</h2>
@@ -530,7 +557,7 @@ function FinancialHealthTab({ outletId }: { outletId: string }) {
             value={data.profitability.salesTargetMonthly ? pct(data.profitability.bepAchievementPercent) : "-"}
             hint={
               data.profitability.salesTargetMonthly
-                ? `${t("reports.health.bepHintPrefix", "Target bulanan")}: ${rupiah(data.profitability.salesTargetMonthly)}`
+                ? `${t("reports.health.bepHintPrefix", "Target bulanan")}: ${rupiah(data.profitability.salesTargetMonthly)} → ${t("reports.health.bepPeriod", "target periode ini ({days} hari)").replace("{days}", String(data.profitability.days ?? ""))}: ${rupiah(data.profitability.salesTargetForPeriod ?? 0)}, ${t("reports.health.bepBasis", "dibandingkan dengan pendapatan usaha")}`
                 : t("reports.health.bepNotSet", "Target Omzet Bulanan belum diatur di Pengaturan")
             }
             tone={data.profitability.bepAchievementPercent != null && data.profitability.bepAchievementPercent >= 100 ? "good" : "warn"}
@@ -568,7 +595,7 @@ function FinancialHealthTab({ outletId }: { outletId: string }) {
           <RatioCard
             label={t("reports.health.opexRatio", "Rasio Beban Operasional / Pendapatan")}
             value={pct(data.efficiency.opexRatioPercent)}
-            hint={t("reports.health.opexRatioHint", "Di luar HPP — gaji, sewa, listrik, dll.")}
+            hint={t("reports.health.opexRatioHint2", "Beban operasional 6xxx (gaji, sewa, listrik, penyusutan, dll.) ÷ pendapatan usaha")}
           />
           <RatioCard
             label={t("reports.health.unitUtilization", "Utilisasi Unit PS")}

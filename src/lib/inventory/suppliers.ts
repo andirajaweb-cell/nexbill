@@ -166,6 +166,31 @@ export async function deleteSupplier(outletId: string, id: string, staffUserId?:
   return { ok: true };
 }
 
+/**
+ * Gabungkan supplier dobel: semua transaksi yang menunjuk `sourceId` (faktur, PO, retur, expense,
+ * expense rutin, aset, pembelian aset, supplier utama produk) dipindah ke `targetId`, lalu
+ * `sourceId` dihapus. Supplier hanya label pada transaksi — nominal dan jurnalnya tidak berubah.
+ */
+export async function mergeSupplier(outletId: string, sourceId: string, targetId: string, staffUserId?: string) {
+  if (sourceId === targetId) throw new Error("Pilih supplier tujuan yang berbeda.");
+  const source = await requireSupplier(outletId, sourceId);
+  const target = await requireSupplier(outletId, targetId);
+  const usage = await getSupplierUsage(sourceId);
+  await db.transaction(async (tx) => {
+    await tx.update(purchaseInvoices).set({ supplierId: targetId }).where(eq(purchaseInvoices.supplierId, sourceId));
+    await tx.update(purchaseOrders).set({ supplierId: targetId }).where(eq(purchaseOrders.supplierId, sourceId));
+    await tx.update(purchaseReturns).set({ supplierId: targetId }).where(eq(purchaseReturns.supplierId, sourceId));
+    await tx.update(expenses).set({ supplierId: targetId }).where(eq(expenses.supplierId, sourceId));
+    await tx.update(recurringExpenseTemplates).set({ supplierId: targetId }).where(eq(recurringExpenseTemplates.supplierId, sourceId));
+    await tx.update(fixedAssets).set({ supplierId: targetId }).where(eq(fixedAssets.supplierId, sourceId));
+    await tx.update(assetPurchases).set({ supplierId: targetId }).where(eq(assetPurchases.supplierId, sourceId));
+    await tx.update(products).set({ preferredSupplierId: targetId }).where(eq(products.preferredSupplierId, sourceId));
+    await tx.delete(suppliers).where(and(eq(suppliers.id, sourceId), eq(suppliers.outletId, outletId)));
+  });
+  await logAudit({ outletId, staffUserId, action: "merge_supplier", entityType: "supplier", entityId: targetId, before: { merged: source.name, mergedId: sourceId }, after: { into: target.name, moved: usage } });
+  return { moved: usage.total, into: target.name };
+}
+
 /** Daftar supplier outlet + jumlah pemakaian (satu query agregat per tabel, bukan per supplier). */
 export async function listSuppliersWithUsage(outletId: string) {
   const rows = await db.select().from(suppliers).where(eq(suppliers.outletId, outletId)).orderBy(suppliers.name);

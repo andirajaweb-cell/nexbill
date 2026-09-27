@@ -16,6 +16,7 @@ import { lockEntity } from "@/lib/accounting/journal";
 import { receiveStockForItem } from "@/lib/inventory/stock";
 import { assertSupplierUsable } from "@/lib/inventory/suppliers";
 import { onStockOut } from "@/lib/inventory/costing";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 
 export interface CreatePurchaseOrderInput {
   outletId: string;
@@ -166,7 +167,7 @@ export async function receivePurchaseOrder(
  * one bill (and the second write of paidAmount was computed from a stale read), and nothing stopped
  * paying more than the invoice was worth — Hutang Supplier went negative in the Neraca.
  */
-export async function payPurchaseInvoice(purchaseInvoiceId: string, amount: number, method: string, cashBankAccountId: string, staffUserId?: string) {
+export async function payPurchaseInvoice(purchaseInvoiceId: string, amount: number, method: string, cashBankAccountId: string, staffUserId?: string, paidAt?: string) {
   if (!(amount > 0)) throw new Error("Nominal pembayaran harus lebih dari 0.");
   return db.transaction(async (tx) => {
     await lockEntity(tx, `purchase_invoice:${purchaseInvoiceId}`);
@@ -180,7 +181,7 @@ export async function payPurchaseInvoice(purchaseInvoiceId: string, amount: numb
 
     const [payment] = await tx
       .insert(purchasePayments)
-      .values({ purchaseInvoiceId, amount, method, cashBankAccountId, staffUserId })
+      .values({ purchaseInvoiceId, amount, method, cashBankAccountId, staffUserId, ...(paidAt ? { paidAt } : {}) })
       .returning();
 
     const journalEntryId = await postPurchasePaymentJournal(payment.id, tx);
@@ -262,6 +263,17 @@ export interface RecordSupplierPurchaseInput {
    *  or bank accounts record which one actually paid for this purchase, instead of always guessing "the" cash account. */
   cashBankAccountId?: string;
   staffUserId?: string;
+  /** Tanggal belanja (YYYY-MM-DD, kalender outlet). Kosong = hari ini. */
+  purchaseDate?: string;
+}
+
+/** YYYY-MM-DD → ISO. Hari ini memakai jam sekarang; tanggal lain dipatok 12.00 WIB agar tidak bergeser hari. */
+export function purchaseDateToIso(ymd: string | undefined | null): string {
+  if (!ymd) return new Date().toISOString();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) throw new Error("Tanggal belanja tidak valid.");
+  const today = outletDateYmd(new Date());
+  if (ymd > today) throw new Error("Tanggal belanja tidak boleh di masa depan.");
+  return ymd === today ? new Date().toISOString() : new Date(`${ymd}T12:00:00+07:00`).toISOString();
 }
 
 /**
@@ -308,6 +320,7 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
   const { itemsSubtotal, grandTotal, lineBreakdown } = prorateLandedCosts(input.items, additionalCostsTotal);
 
   const invoiceNumber = input.invoiceNumber ?? `BLJ-${Date.now().toString(36).toUpperCase()}`;
+  const invoiceDate = purchaseDateToIso(input.purchaseDate);
 
   // Invoice + every line's stock-in + every line row commit together or not at all.
   //
@@ -329,6 +342,7 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
         outletId: input.outletId,
         supplierId: input.supplierId,
         invoiceNumber,
+        invoiceDate,
         amount: grandTotal,
         status: "unpaid",
         staffUserId: input.staffUserId,
@@ -343,7 +357,8 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
         inv.id,
         `Belanja supplier ${invoiceNumber}${additionalCostsTotal > 0 ? " (termasuk ongkos transport/parkir/lain-lain)" : ""}`,
         input.staffUserId,
-        tx
+        tx,
+        invoiceDate
       );
       await tx.insert(purchaseInvoiceItems).values({
         purchaseInvoiceId: inv.id,
@@ -365,7 +380,7 @@ export async function recordSupplierPurchase(input: RecordSupplierPurchaseInput)
     const method = input.paymentMethod ?? "cash";
     const cashBankAccountId = input.cashBankAccountId || (await getCashBankAccountIdForPaymentMethod(input.outletId, method));
     // Immediately settles the payable just posted above — net effect Dr 1200 / Cr Kas,Bank.
-    payment = await payPurchaseInvoice(invoice.id, grandTotal, method, cashBankAccountId, input.staffUserId);
+    payment = await payPurchaseInvoice(invoice.id, grandTotal, method, cashBankAccountId, input.staffUserId, invoiceDate);
   }
 
   const [finalInvoice] = await db.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, invoice.id)).limit(1);

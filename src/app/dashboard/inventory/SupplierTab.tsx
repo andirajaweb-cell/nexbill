@@ -55,6 +55,8 @@ export function SupplierTab() {
   const [busy, setBusy] = useState<string | null>(null);
   const [view, setView] = useState<View>("active");
   const [query, setQuery] = useState("");
+  // Supplier yang sudah dipakai transaksi: hapus = gabungkan ke supplier lain (atau arsipkan).
+  const [removing, setRemoving] = useState<{ supplier: SupplierRow; targetId: string } | null>(null);
 
   const load = () => {
     fetchJsonArray<SupplierRow>("/api/suppliers").then(setRows);
@@ -94,8 +96,28 @@ export function SupplierTab() {
     await send(`archive:${s.id}`, `/api/suppliers/${s.id}`, "PATCH", { archived });
   };
   const remove = async (s: SupplierRow) => {
+    if (s.usageCount > 0) {
+      // Suggest the same-named active supplier as the merge target when there is one.
+      const twin = (rows ?? []).find((r) => r.id !== s.id && !r.archivedAt && r.name.toLowerCase() === s.name.toLowerCase());
+      setRemoving({ supplier: s, targetId: twin?.id ?? "" });
+      return;
+    }
     if (!(await showConfirm(t("inventory.supplier.confirmDeletePermanent", "Hapus permanen \"{name}\"? Supplier ini belum pernah dipakai transaksi apa pun. Tindakan ini tidak bisa dibatalkan.").replace("{name}", s.name)))) return;
     await send(`delete:${s.id}`, `/api/suppliers/${s.id}`, "DELETE");
+  };
+
+  const merge = async () => {
+    if (!removing) return;
+    const target = (rows ?? []).find((r) => r.id === removing.targetId);
+    if (!target) return showAlert(t("inventory.supplier.chooseTarget", "Pilih supplier tujuan."));
+    const ok = await showConfirm(
+      t("inventory.supplier.confirmMerge", "Pindahkan {n} transaksi dari \"{from}\" ke \"{to}\", lalu hapus \"{from}\"? Nominal dan jurnal tidak berubah — hanya nama supplier pada transaksinya.")
+        .replace("{n}", String(removing.supplier.usageCount))
+        .split("{from}").join(removing.supplier.name)
+        .replace("{to}", target.name)
+    );
+    if (!ok) return;
+    if (await send(`merge:${removing.supplier.id}`, `/api/suppliers/${removing.supplier.id}/merge`, "POST", { targetId: target.id })) setRemoving(null);
   };
 
   const counts = useMemo(() => ({ active: (rows ?? []).filter((r) => !r.archivedAt).length, archived: (rows ?? []).filter((r) => r.archivedAt).length }), [rows]);
@@ -149,6 +171,35 @@ export function SupplierTab() {
         </p>
       )}
 
+      {removing && (
+        <Card className="space-y-2 border-red-500/40">
+          <h3 className="text-sm font-medium">{t("inventory.supplier.removeTitle", "Hapus supplier \"{name}\"").replace("{name}", removing.supplier.name)}</h3>
+          <p className="text-xs text-neutral-400">
+            {t(
+              "inventory.supplier.removeUsed",
+              "Supplier ini sudah dipakai di {n} transaksi, jadi tidak bisa langsung dihapus. Pilih supplier tujuan untuk menggabungkan: semua transaksinya dipindah ke sana, lalu supplier ini dihapus. Cocok untuk supplier dobel. Kalau bukan dobel dan hanya tidak dipakai lagi, pilih Arsipkan."
+            ).replace("{n}", String(removing.supplier.usageCount))}
+          </p>
+          <select className={inputCls} value={removing.targetId} onChange={(e) => setRemoving({ ...removing, targetId: e.target.value })}>
+            <option value="">{t("inventory.supplier.chooseTarget", "Pilih supplier tujuan...")}</option>
+            {(rows ?? [])
+              .filter((r) => r.id !== removing.supplier.id && !r.archivedAt)
+              .map((r) => <option key={r.id} value={r.id}>{r.name}{r.phone ? ` · ${r.phone}` : ""}</option>)}
+          </select>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={merge} disabled={!removing.targetId || busy === `merge:${removing.supplier.id}`}>
+              {busy === `merge:${removing.supplier.id}` ? t("inventory.supplier.saving", "Menyimpan...") : t("inventory.supplier.mergeButton", "Gabungkan & Hapus")}
+            </Button>
+            {!removing.supplier.archivedAt && (
+              <Button variant="secondary" onClick={async () => { const s = removing.supplier; setRemoving(null); await archive(s, true); }}>
+                {t("inventory.supplier.archive", "Arsipkan")}
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => setRemoving(null)}>{t("inventory.supplier.cancel", "Batal")}</Button>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {visible.map((s) =>
           editing?.id === s.id ? (
@@ -192,7 +243,7 @@ export function SupplierTab() {
                     >
                       {s.archivedAt ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                     </button>
-                    {s.usageCount === 0 && (
+                    {(
                       <button title={t("inventory.supplier.deleteButton", "Hapus")} className="p-1 text-neutral-400 hover:text-red-400 disabled:opacity-40" disabled={busy === `delete:${s.id}`} onClick={() => remove(s)}>
                         <Trash2 size={14} />
                       </button>

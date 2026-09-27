@@ -60,7 +60,9 @@ export async function receiveStockForItem(
   refId: string,
   note: string,
   staffUserId?: string,
-  dbc: DbOrTx = db
+  dbc: DbOrTx = db,
+  /** Tanggal barang diterima (ISO) — urutan lapisan FIFO. Kosong = sekarang. */
+  receivedAt?: string
 ) {
   const [product] = await dbc.select().from(products).where(eq(products.id, productId)).limit(1);
   if (!product) throw new Error("Produk tidak ditemukan.");
@@ -77,7 +79,7 @@ export async function receiveStockForItem(
     .set({ stockQty: sql`${products.stockQty} + ${qty}`, costPrice: Math.round(newCostPrice * 100) / 100 })
     .where(eq(products.id, productId));
   // FIFO outlets: this receipt becomes its own cost layer (costPrice is then re-derived from layers).
-  await onStockIn(dbc, { productId, qty, unitCost: landedUnitCost, source: "purchase", refId, stockBefore: product.stockQty });
+  await onStockIn(dbc, { productId, qty, unitCost: landedUnitCost, source: "purchase", refId, stockBefore: product.stockQty, receivedAt });
 
   return { newCostPrice };
 }

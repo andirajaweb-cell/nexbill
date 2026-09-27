@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createOtherIncome, listOtherIncomes } from "@/lib/accounting/other-income";
+import { createOtherIncome, describeOtherIncomeAccounts, incomeDateToIso, listOtherIncomes } from "@/lib/accounting/other-income";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
@@ -23,6 +24,12 @@ export async function GET(req: NextRequest) {
       category: params.get("category") ?? undefined,
       status: params.get("status") ?? undefined,
     });
+    // ?accounts=cash,qris,... → also return where each category / method lands in the COA.
+    const methodList = params.get("accounts");
+    if (methodList !== null) {
+      const accountsInfo = await describeOtherIncomeAccounts(outletId, methodList.split(",").filter(Boolean));
+      return NextResponse.json({ ...result, accounts: accountsInfo });
+    }
     return NextResponse.json(result);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
@@ -44,7 +51,11 @@ export async function POST(req: NextRequest) {
 
     // Auto-attach the cashier's currently-open shift (if any) so cash received this way folds
     // into that shift's cash-count reconciliation instead of silently going unaccounted for.
-    const drawerShiftId = await resolveDrawerShiftId(session.outletId, session.sub);
+    // Only for money received TODAY: a back-dated entry (recorded late) was never in this shift's
+    // drawer, and attaching it would make the drawer look short/over by exactly that amount.
+    const incomeDate = incomeDateToIso(body.incomeDate || undefined);
+    const isToday = outletDateYmd(new Date(incomeDate)) === outletDateYmd(new Date());
+    const drawerShiftId = isToday ? await resolveDrawerShiftId(session.outletId, session.sub) : null;
     const currentShift = drawerShiftId ? { id: drawerShiftId } : null;
 
     const result = await createOtherIncome({
@@ -56,7 +67,7 @@ export async function POST(req: NextRequest) {
       paymentMethod: body.paymentMethod,
       costCenterId: body.costCenterId || undefined,
       attachmentUrl: body.attachmentUrl || undefined,
-      incomeDate: body.incomeDate || undefined,
+      incomeDate,
       staffUserId: session.sub,
       shiftId: currentShift?.id ?? null,
     });

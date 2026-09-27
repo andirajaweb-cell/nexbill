@@ -656,10 +656,16 @@ export async function postPurchaseInvoiceJournal(purchaseInvoiceId: string) {
   return db.transaction(async (tx) => {
     const [invoice] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
     if (!invoice) throw new Error("Purchase invoice tidak ditemukan.");
+    // Dibukukan pada tanggal belanja (invoiceDate), bukan hari input — belanja kemarin yang baru
+    // dicatat hari ini masuk ke Persediaan/Laba Rugi hari kemarin. Periode yang sudah ditutup:
+    // jatuh ke hari ini, sama seperti expense.
+    const invoiceDate = invoice.invoiceDate ?? new Date().toISOString();
+    const entryDate = (await isPeriodLocked(invoice.outletId, invoiceDate, tx)) ? new Date().toISOString() : invoiceDate;
 
     const journalId = await postJournal(
       {
         outletId: invoice.outletId,
+        entryDate,
         reference: invoice.invoiceNumber ?? `PINV-${invoice.id.slice(0, 8)}`,
         description: `Pembelian dari supplier — invoice ${invoice.invoiceNumber ?? invoice.id.slice(0, 8)}`,
         sourceType: "purchase_invoice",
@@ -686,10 +692,13 @@ export async function postPurchasePaymentJournal(purchasePaymentId: string, dbc:
     if (!invoice) throw new Error("Purchase invoice terkait tidak ditemukan.");
 
     const cashBankGlAccountId = await getCashBankGlAccountId(payment.cashBankAccountId, tx);
+    const paidAt = payment.paidAt ?? new Date().toISOString();
+    const entryDate = (await isPeriodLocked(invoice.outletId, paidAt, tx)) ? new Date().toISOString() : paidAt;
 
     const journalId = await postJournal(
       {
         outletId: invoice.outletId,
+        entryDate,
         reference: `PPAY-${payment.id.slice(0, 8)}`,
         description: `Pembayaran hutang supplier — invoice ${invoice.invoiceNumber ?? invoice.id.slice(0, 8)}`,
         sourceType: "purchase_payment",
