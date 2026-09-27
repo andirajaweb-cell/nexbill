@@ -48,6 +48,8 @@ export const outlets = pgTable("outlets", {
   // pertama keluar pertama (lapisan di inventoryCostLayers). LIFO tidak diizinkan SAK EMKM/PSAK 14.
   inventoryCostMethod: text("inventory_cost_method", { enum: ["average", "fifo"] }).notNull().default("average"),
   inventoryCostMethodSince: text("inventory_cost_method_since"),
+  /** Satu akun hanya boleh login di satu perangkat/browser sekaligus (migrasi 0023). */
+  singleDeviceLogin: boolean("single_device_login").notNull().default(true),
   printerName: text("printer_name"),
   printerPaperWidthMm: integer("printer_paper_width_mm").notNull().default(58),
   receiptFooterText: text("receipt_footer_text"),
@@ -149,6 +151,12 @@ export const staffUsers = pgTable("staff_users", {
     .notNull()
     .default("cashier"),
   isActive: boolean("is_active").notNull().default(true),
+  // Satu perangkat aktif per akun (migrasi 0023, lib/auth/single-session.ts): id sesi yang berlaku,
+  // kapan terakhir aktif, dan perangkat/IP-nya (ditampilkan di Staf & Hak Akses).
+  activeSessionId: text("active_session_id"),
+  activeSessionAt: text("active_session_at"),
+  activeSessionDevice: text("active_session_device"),
+  activeSessionIp: text("active_session_ip"),
   // Email verification module — see lib/auth/email-verification.ts (token) and
   // /api/auth/verify-email + /api/auth/resend-verification (routes). Defaults to TRUE
   // deliberately, not false: this column's default is what every pre-existing account gets

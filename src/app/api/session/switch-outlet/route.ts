@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       role: session.role,
       name: session.name,
       email: session.email,
+      sid: session.sid,
     });
     const res = NextResponse.json({ outletId: targetOutletId });
     res.cookies.set(SESSION_COOKIE_NAME, token, {

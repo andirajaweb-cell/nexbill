@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { outlets, staffUsers } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getSession } from "@/lib/auth/session";
+import { getSession, inspectSession } from "@/lib/auth/session";
 import { ALL_PERMISSIONS, hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { getAccessibleOutlets } from "@/lib/outlets/membership";
 import { describeError } from "@/lib/api/error";
@@ -22,7 +22,11 @@ import { describeError } from "@/lib/api/error";
  */
 export async function GET() {
   try {
-    const session = await getSession();
+    // Distinguish "sesi ini sudah tidak berlaku" (akun dipakai di perangkat lain / dikeluarkan Owner)
+    // from "belum login", so the app can tell the user WHY it sent them back to the login page.
+    const inspected = await inspectSession();
+    if (inspected.ended) return NextResponse.json({ error: "Sesi ini sudah tidak berlaku.", code: "SESSION_ENDED" }, { status: 401 });
+    const session = inspected.session ? await getSession() : null;
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
     // getSession() already refreshed the permissions cache above, so this reads current data.
     const role = session.role as StaffRole;

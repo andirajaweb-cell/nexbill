@@ -57,6 +57,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     fetch("/api/auth/me")
       .then(async (res) => {
+        if (res.status === 401) {
+          const body = await res.json().catch(() => ({}));
+          // Satu perangkat aktif per akun: sesi browser ini sudah diganti/dikeluarkan. Bersihkan
+          // cookie-nya dan kembali ke login dengan penjelasan (hanya dari halaman dashboard).
+          if (body?.code === "SESSION_ENDED" && typeof window !== "undefined" && window.location.pathname.startsWith("/dashboard")) {
+            await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+            window.location.href = "/login?error=session_ended";
+            return;
+          }
+        }
         const data: AuthUser | null = res.ok ? await res.json() : null;
         setUser(data);
         // Warms this tab's in-memory permission cache (see permissions.ts) so
@@ -69,6 +79,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Periksa ulang saat tab kembali aktif dan setiap 2 menit, supaya browser yang sesinya sudah
+  // dikeluarkan tidak terus menampilkan dashboard kosong tanpa penjelasan.
+  useEffect(() => {
+    const recheck = () => {
+      if (document.visibilityState !== "visible" || !window.location.pathname.startsWith("/dashboard")) return;
+      fetch("/api/auth/me").then(async (res) => {
+        if (res.status !== 401) return;
+        const body = await res.json().catch(() => ({}));
+        if (body?.code === "SESSION_ENDED") {
+          await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+          window.location.href = "/login?error=session_ended";
+        }
+      }).catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", recheck);
+    const timer = window.setInterval(recheck, 120_000);
+    return () => {
+      document.removeEventListener("visibilitychange", recheck);
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });

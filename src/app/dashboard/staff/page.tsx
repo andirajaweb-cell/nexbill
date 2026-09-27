@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -49,6 +50,16 @@ export default function StaffPage() {
   const [voidReason, setVoidReason] = useState("");
   const [voidMsg, setVoidMsg] = useState("");
 
+  // Satu akun = satu perangkat aktif (lib/auth/single-session.ts): perangkat tiap staf + aturan outlet.
+  const [sessionInfo, setSessionInfo] = useState<{
+    singleDeviceLogin: boolean;
+    idleMinutes: number;
+    sessions: { staffId: string; hasSession: boolean; active: boolean; lastSeen: string | null; device: string | null; ip: string | null; isYou: boolean }[];
+  } | null>(null);
+  const [sessionBusy, setSessionBusy] = useState<string | null>(null);
+  const [sessionCheckedAt, setSessionCheckedAt] = useState(0);
+  const router = useRouter();
+
   const [matrix, setMatrix] = useState<MatrixCell[] | null>(null);
   const [matrixMsg, setMatrixMsg] = useState("");
   const [matrixBusyKey, setMatrixBusyKey] = useState<string | null>(null);
@@ -60,6 +71,58 @@ export default function StaffPage() {
     fetchJsonArray(`/api/staff?outletId=${oid}`).then(setStaff);
     fetchJsonArray(`/api/approvals?outletId=${oid}`).then(setApprovals);
     fetchJsonArray(`/api/audit-logs?outletId=${oid}`).then(setAudit);
+    fetchJsonObject("/api/staff/sessions").then((d) => {
+      if (!d) return;
+      setSessionInfo(d);
+      setSessionCheckedAt(Date.now());
+    });
+  };
+
+  const revokeStaffSession = async (s: { id: string; name: string }) => {
+    const self = s.id === meId;
+    const ok = await showConfirm(
+      self
+        ? "Keluarkan akunmu sendiri dari perangkat ini? Kamu akan diminta login lagi."
+        : `Keluarkan ${s.name} dari perangkat yang sedang dipakainya? Sesi di perangkat itu langsung berakhir dan ${s.name} bisa login di perangkat lain.`
+    );
+    if (!ok) return;
+    setSessionBusy(s.id);
+    try {
+      const res = await fetch(`/api/staff/${s.id}/revoke-session`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? "Gagal mengeluarkan sesi.");
+      if (data.self) {
+        router.replace("/login?error=session_ended");
+        return;
+      }
+      if (outletId) load(outletId);
+    } finally {
+      setSessionBusy(null);
+    }
+  };
+
+  const toggleSingleDevice = async (on: boolean) => {
+    const ok = await showConfirm(
+      on
+        ? "Aktifkan aturan satu akun satu perangkat? Akun yang sedang aktif di satu browser tidak bisa login di browser/PC lain sampai logout, 30 menit tidak dipakai, atau dikeluarkan dari halaman ini."
+        : "Matikan aturan ini? Satu akun bisa login di beberapa browser/PC sekaligus — kurang aman bila password staf bocor. Matikan hanya bila outlet memang memakai satu akun di beberapa perangkat (mis. kasir + tablet dapur)."
+    );
+    if (!ok) return;
+    setSessionBusy("toggle");
+    try {
+      const res = await fetch("/api/staff/sessions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ singleDeviceLogin: on }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? "Gagal menyimpan.");
+      if (outletId) load(outletId);
+    } finally {
+      setSessionBusy(null);
+    }
+  };
+  const sessionOf = (staffId: string) => sessionInfo?.sessions.find((x) => x.staffId === staffId);
+  const ago = (iso: string | null) => {
+    if (!iso) return "";
+    const m = Math.max(0, Math.round((sessionCheckedAt - new Date(iso).getTime()) / 60000));
+    return m < 1 ? "baru saja" : m < 60 ? `${m} menit lalu` : `${Math.round(m / 60)} jam lalu`;
   };
 
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
@@ -228,9 +291,27 @@ export default function StaffPage() {
             <div className="text-xs text-neutral-500 italic">{t("staff.addStaff.noPermission", "Role kamu ({role}) tidak punya izin menambah staf.").replace("{role}", roleLabel(myRole))}</div>
           )}
 
+          {sessionInfo && (
+            <Card className="flex flex-wrap items-center justify-between gap-3 border-sky-500/25">
+              <div className="text-sm">
+                <div className="font-medium">{t("staff.singleDevice.title", "Keamanan login: satu akun = satu perangkat")}</div>
+                <div className="text-xs text-neutral-500">
+                  {sessionInfo.singleDeviceLogin
+                    ? t("staff.singleDevice.onDesc", "AKTIF — akun yang sedang dipakai di satu browser tidak bisa login di browser/PC lain sampai logout, {n} menit tidak dipakai, atau dikeluarkan di bawah.").replace("{n}", String(sessionInfo.idleMinutes))
+                    : t("staff.singleDevice.offDesc", "NONAKTIF — satu akun bisa login di beberapa browser/PC sekaligus.")}
+                </div>
+              </div>
+              {hasPermission(myRole, "manage_staff") && hasPermission(myRole, "manage_settings") && (
+                <Button variant={sessionInfo.singleDeviceLogin ? "secondary" : "primary"} disabled={sessionBusy === "toggle"} onClick={() => toggleSingleDevice(!sessionInfo.singleDeviceLogin)}>
+                  {sessionInfo.singleDeviceLogin ? t("staff.singleDevice.turnOff", "Matikan") : t("staff.singleDevice.turnOn", "Aktifkan")}
+                </Button>
+              )}
+            </Card>
+          )}
+
           <Card>
             <table className="w-full text-sm">
-              <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("staff.table.name", "Nama")}</th><th>{t("staff.table.email", "Email")}</th><th>{t("staff.table.role", "Role")}</th><th>{t("staff.table.status", "Status")}</th><th></th></tr></thead>
+              <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("staff.table.name", "Nama")}</th><th>{t("staff.table.email", "Email")}</th><th>{t("staff.table.role", "Role")}</th><th>{t("staff.table.status", "Status")}</th><th>{t("staff.table.device", "Perangkat aktif")}</th><th></th></tr></thead>
               <tbody>
                 {staff.map((s) => (
                   <tr key={s.id} className="border-b border-neutral-900">
@@ -247,7 +328,28 @@ export default function StaffPage() {
                       ) : roleLabel(s.role)}
                     </td>
                     <td><Badge status={s.isActive ? "available" : "maintenance"}>{s.isActive ? t("staff.status.active", "Aktif") : t("staff.status.inactive", "Nonaktif")}</Badge></td>
+                    <td className="text-xs">
+                      {(() => {
+                        const ss = sessionOf(s.id);
+                        if (!ss?.hasSession) return <span className="text-neutral-500">—</span>;
+                        return (
+                          <div>
+                            <span className={ss.active ? "text-emerald-400" : "text-neutral-500"}>{ss.device ?? "Perangkat"}</span>
+                            {ss.isYou && <span className="ml-1 text-[10px] text-sky-400">(kamu)</span>}
+                            <div className="text-[10px] text-neutral-500">
+                              {ss.active ? `aktif ${ago(ss.lastSeen)}` : `tidak aktif sejak ${ago(ss.lastSeen)}`}
+                              {ss.ip ? ` · ${ss.ip}` : ""}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="text-right space-x-1">
+                      {hasPermission(myRole, "manage_staff") && sessionOf(s.id)?.hasSession && (
+                        <Button variant="ghost" className="text-amber-400" disabled={sessionBusy === s.id} onClick={() => revokeStaffSession(s)}>
+                          {t("staff.action.revokeSession", "Keluarkan")}
+                        </Button>
+                      )}
                       {hasPermission(myRole, "manage_staff") && (
                         <Button variant="ghost" onClick={() => toggleActive(s)}>{s.isActive ? t("staff.action.deactivate", "Nonaktifkan") : t("staff.action.activate", "Aktifkan")}</Button>
                       )}

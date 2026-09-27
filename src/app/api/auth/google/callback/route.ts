@@ -3,7 +3,8 @@ import { createClient as createSupabaseServerClient } from "@/lib/server";
 import { db } from "@/db/client";
 import { staffUsers } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { signSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
+import { signSessionToken, readSessionCookie, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
+import { claimSession, SessionConflictError } from "@/lib/auth/single-session";
 import { signGooglePendingToken, GOOGLE_PENDING_COOKIE, GOOGLE_PENDING_MAX_AGE_SECONDS } from "@/lib/auth/google-pending";
 import { describeError } from "@/lib/api/error";
 
@@ -86,7 +87,23 @@ export async function GET(req: NextRequest) {
       if (!existing.googleId) {
         await db.update(staffUsers).set({ googleId }).where(eq(staffUsers.id, existing.id));
       }
-      const token = signSessionToken({ sub: existing.id, outletId: existing.outletId, role: existing.role, name: existing.name, email: existing.email });
+      let sid: string;
+      try {
+        const current = await readSessionCookie();
+        sid = await claimSession(existing, {
+          userAgent: req.headers.get("user-agent"),
+          ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+          currentSid: current?.sub === existing.id ? current.sid ?? null : null,
+        });
+      } catch (err) {
+        if (err instanceof SessionConflictError) {
+          loginUrl.searchParams.set("error", "session_active");
+          if (err.device) loginUrl.searchParams.set("device", err.device);
+          return NextResponse.redirect(loginUrl);
+        }
+        throw err;
+      }
+      const token = signSessionToken({ sub: existing.id, outletId: existing.outletId, role: existing.role, name: existing.name, email: existing.email, sid });
       const res = NextResponse.redirect(new URL(next, url.origin));
       res.cookies.set(SESSION_COOKIE_NAME, token, { httpOnly: true, sameSite: "lax", path: "/", maxAge: SESSION_MAX_AGE_SECONDS });
       return res;

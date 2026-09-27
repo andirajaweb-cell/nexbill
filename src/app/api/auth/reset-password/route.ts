@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { verifyPasswordResetToken, fingerprintPasswordHash } from "@/lib/auth/password-reset";
 import { describeError } from "@/lib/api/error";
+import { revokeSession } from "@/lib/auth/single-session";
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 10);
     await db.update(staffUsers).set({ passwordHash, updatedAt: new Date().toISOString() }).where(eq(staffUsers.id, user.id));
+    // Password baru = semua sesi lama gugur (termasuk perangkat siapa pun yang memakai password lama).
+    await revokeSession(user.id);
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

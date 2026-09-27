@@ -3,7 +3,8 @@ import { db } from "@/db/client";
 import { staffUsers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { signSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
+import { signSessionToken, readSessionCookie, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
+import { claimSession, SessionConflictError } from "@/lib/auth/single-session";
 import { describeError } from "@/lib/api/error";
 
 export async function POST(req: NextRequest) {
@@ -29,7 +30,22 @@ export async function POST(req: NextRequest) {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return NextResponse.json({ error: "Email atau password salah." }, { status: 401 });
 
-    const token = signSessionToken({ sub: user.id, outletId: user.outletId, role: user.role, name: user.name, email: user.email });
+    // Satu akun = satu perangkat aktif (lib/auth/single-session.ts). Login ulang di browser yang
+    // sama boleh; browser/PC lain ditolak selama sesi yang ada masih aktif.
+    let sid: string;
+    try {
+      const current = await readSessionCookie();
+      sid = await claimSession(user, {
+        userAgent: req.headers.get("user-agent"),
+        ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+        currentSid: current?.sub === user.id ? current.sid ?? null : null,
+      });
+    } catch (err) {
+      if (err instanceof SessionConflictError) return NextResponse.json({ error: err.message, code: "SESSION_ACTIVE_ELSEWHERE" }, { status: 409 });
+      throw err;
+    }
+
+    const token = signSessionToken({ sub: user.id, outletId: user.outletId, role: user.role, name: user.name, email: user.email, sid });
     const res = NextResponse.json({ id: user.id, name: user.name, email: user.email, role: user.role, outletId: user.outletId });
     res.cookies.set(SESSION_COOKIE_NAME, token, {
       httpOnly: true,

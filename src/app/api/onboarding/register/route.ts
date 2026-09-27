@@ -15,6 +15,7 @@ import { attachReferralOnSignup } from "@/lib/referral/service";
 import { getGooglePending, GOOGLE_PENDING_COOKIE } from "@/lib/auth/google-pending";
 import { signEmailVerificationToken } from "@/lib/auth/email-verification";
 import { sendEmail, verifyEmailEmail } from "@/lib/notifications/email";
+import { claimSession } from "@/lib/auth/single-session";
 
 /**
  * The self-service signup flow this app never had (see full-reset.ts's old comment: "staff
@@ -222,7 +223,8 @@ export async function POST(req: NextRequest) {
       void sendEmail({ to: owner.email, subject, html });
     }
 
-    const token = signSessionToken({ sub: owner.id, outletId: primary.id, role: owner.role, name: owner.name, email: owner.email });
+    const sid = await claimSession({ id: owner.id, outletId: owner.outletId, role: owner.role }, { userAgent: req.headers.get("user-agent"), ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null });
+    const token = signSessionToken({ sub: owner.id, outletId: primary.id, role: owner.role, name: owner.name, email: owner.email, sid });
     const res = NextResponse.json({
       outlet: { id: primary.id, name: primary.name, slug: primary.slug },
       branchesCreated,

@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { refreshPermissionsCache } from "./permissions-store";
+import { isSessionCurrent } from "./single-session";
 
 /**
  * Real login/session system. Stateless JWT in an httpOnly cookie — no session
@@ -17,6 +18,8 @@ export interface SessionPayload {
   role: string;
   name: string;
   email: string;
+  /** Id sesi perangkat ini (lib/auth/single-session.ts). Kosong pada token lama & sesi superuser. */
+  sid?: string;
 }
 
 const SECRET = process.env.JWT_SECRET || "dev-insecure-secret-change-me-in-.env";
@@ -44,11 +47,30 @@ export function verifySessionToken(token: string): SessionPayload | null {
  * always sees up-to-date permissions without every one of those ~30 call
  * sites needing to become async or await anything itself.
  */
+/** Token cookie yang valid secara kriptografi, TANPA cek sesi-aktif — untuk login ulang/logout di browser yang sama. */
+export async function readSessionCookie(): Promise<SessionPayload | null> {
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE_NAME)?.value;
+  return token ? verifySessionToken(token) : null;
+}
+
+/** Sama dengan getSession(), tapi membedakan "belum login" dari "sesi sudah diganti/dikeluarkan". */
+export async function inspectSession(): Promise<{ session: SessionPayload | null; ended: boolean }> {
+  const raw = await readSessionCookie();
+  if (!raw) return { session: null, ended: false };
+  if (!(await isSessionCurrent(raw))) return { session: null, ended: true };
+  return { session: raw, ended: false };
+}
+
 export async function getSession(): Promise<SessionPayload | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
-  const session = verifySessionToken(token);
+  const verified = verifySessionToken(token);
+  // Satu perangkat aktif per akun: token yang sid-nya sudah bukan sesi berlaku (akun login di
+  // perangkat lain setelah sesi ini habis, logout, atau dikeluarkan Owner) ditolak di sini — satu
+  // tempat yang dilewati setiap route.
+  const session = verified && (await isSessionCurrent(verified)) ? verified : null;
   if (session) {
     // NOTE: "owner" was briefly merged into "superuser" earlier in this project's history, then
     // split back out as its own real role (see StaffRole in permissions.ts) — do NOT reintroduce

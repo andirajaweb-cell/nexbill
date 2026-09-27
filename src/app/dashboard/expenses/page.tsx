@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
+import { useSavingOverlay, fetchJson } from "@/lib/ui/use-saving-overlay";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import { outletDateYmd } from "@/lib/time/outlet-time";
@@ -179,6 +180,8 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   const canVoid = hasPermission(role, "void_expense");
   // Penjaga klik ganda untuk semua aksi yang menyimpan data di tab ini — lihat use-proses-tunggal.ts.
   const proses = useProsesTunggal();
+  // Pop-up loading selama server memproses simpan/bayar/approve/batal (lib/ui/use-saving-overlay.tsx).
+  const saving = useSavingOverlay();
 
   // Cash Out Cepat — a minimal 3-field shortcut for small register spending (parkir, beli air
   // galon, dll) that doesn't need the full expense form below. It's still a real Expense under
@@ -196,7 +199,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
     try {
       const accountRow = bundle.accounts.find((a: any) => a.id === cashOutForm.accountId);
       const accountLabel = accountRow ? coaAccountName(t, accountRow) : "Cash Out";
-      const res = await fetch("/api/expenses", {
+      const { res, data } = await saving.run(t("expenses.overlay.cashOut", "Mencatat Cash Out..."), () => fetchJson("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -210,8 +213,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
           cashBankAccountId: defaultCashAccount.id,
           recordAsPayable: false,
         }),
-      });
-      const data = await res.json();
+      }));
       if (!res.ok) return showAlert(data.error);
       if (data.submitResult === "pending_approval") {
         showAlert(t("expenses.alert.overThreshold", 'Nominal melebihi batas approval otomatis — Cash Out ini menunggu persetujuan dulu (lihat status "Pending Approval" di daftar bawah).'));
@@ -310,12 +312,16 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
       ? new Date(`${form.expenseDate}T12:00:00+07:00`).toISOString()
       : new Date().toISOString();
 
-    const res = await fetch("/api/expenses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, outletId, qty: Number(form.qty) || 1, amount: Number(form.amount), taxAmount: Number(form.taxAmount) || 0, expenseDate: expenseDateIso }),
-    });
-    const data = await res.json();
+    const { res, data } = await saving.run(
+      t("expenses.overlay.create", "Menyimpan expense..."),
+      () =>
+        fetchJson("/api/expenses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, outletId, qty: Number(form.qty) || 1, amount: Number(form.amount), taxAmount: Number(form.taxAmount) || 0, expenseDate: expenseDateIso }),
+        }),
+      t("expenses.overlay.createHint", "Mencatat expense, mengecek batas approval, dan membuat jurnal bila langsung disetujui. Jangan tutup halaman ini.")
+    );
     if (!res.ok) return showAlert(data.error);
     // expenseDate dikembalikan ke hari ini, bukan dikosongkan — form kosong tanpa tanggal adalah
     // keadaan yang tidak valid, dan mengosongkannya hanya memindahkan beban mengisinya ke pemakai.
@@ -327,9 +333,17 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   /** Aksi per baris. Kuncinya per BARIS (`row:<id>`), jadi satu baris yang sedang diproses tidak mengunci baris lain. */
   const act = (id: string, action: "submit" | "approve" | "cancel" | "reject" | "void", extra?: any) =>
     proses.jalankan(`row:${id}`, async () => {
-      const res = await fetch(`/api/expenses/${id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(extra ?? {}) });
-      const data = await res.json().catch(() => ({ error: "Gagal memproses. Coba lagi." }));
-      if (!res.ok) return showAlert(data.error);
+      const message = ({
+  submit: "Mengirim expense...",
+  approve: "Menyetujui & membukukan expense...",
+  cancel: "Membatalkan expense...",
+  reject: "Menolak expense...",
+  void: "Membatalkan expense & membalik jurnal...",
+})[action];
+      const { res, data } = await saving.run(message, () =>
+        fetchJson(`/api/expenses/${id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(extra ?? {}) })
+      );
+      if (!res.ok) return showAlert(data.error ?? "Gagal memproses. Coba lagi.");
       load();
     });
 
@@ -349,8 +363,9 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
 
   const submitPay = () => proses.jalankan("pay", async () => {
     if (!payFor?.cashBankAccountId) return showAlert(t("expenses.alert.selectCashBank", "Pilih akun kas/bank."));
-    const res = await fetch(`/api/expenses/${payFor.id}/pay`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: payFor.method, cashBankAccountId: payFor.cashBankAccountId }) });
-    const data = await res.json();
+    const { res, data } = await saving.run(t("expenses.overlay.pay", "Membayar expense..."), () =>
+      fetchJson(`/api/expenses/${payFor.id}/pay`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: payFor.method, cashBankAccountId: payFor.cashBankAccountId }) })
+    );
     if (!res.ok) return showAlert(data.error);
     setPayFor(null);
     load();
@@ -358,6 +373,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
 
   return (
     <div className="space-y-4">
+      {saving.element}
       {canManage && (
         <Card className="space-y-2 border-amber-500/30">
           <div>
@@ -788,10 +804,12 @@ function CostCenterTab({ outletId, role }: { outletId: string; role: StaffRole }
   useEffect(() => { load(); }, [outletId]);
   const proses = useProsesTunggal();
 
+  const saving = useSavingOverlay();
   const create = () => proses.jalankan("create", async () => {
     if (!form.name) return;
-    const res = await fetch("/api/cost-centers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId }) });
-    const data = await res.json();
+    const { res, data } = await saving.run(t("expenses.overlay.costCenter", "Menyimpan cost center..."), () =>
+      fetchJson("/api/cost-centers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId }) })
+    );
     if (!res.ok) return showAlert(data.error);
     setForm({ name: "", code: "" });
     load();
@@ -799,6 +817,7 @@ function CostCenterTab({ outletId, role }: { outletId: string; role: StaffRole }
 
   return (
     <div className="space-y-4">
+      {saving.element}
       <p className="text-xs text-neutral-500">{t("expenses.costCenterExplainer", 'Cost center = pembagian biaya per divisi/area (Rental, F&B, Kitchen, Administration, dst) dalam satu cabang — dipakai untuk laporan "biaya per cost center".')}</p>
       {canManage && (
         <Card>
@@ -835,11 +854,13 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
   };
   useEffect(() => { load(); }, [outletId]);
   const proses = useProsesTunggal();
+  const saving = useSavingOverlay();
 
   const create = () => proses.jalankan("create", async () => {
     if (!form.name || !form.accountId || !form.category || !form.amount || !form.nextDueDate) return showAlert(t("expenses.alert.recurringRequiredFields", "Nama, akun, kategori, nominal, dan tanggal jatuh tempo berikutnya wajib diisi."));
-    const res = await fetch("/api/expenses/recurring", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId, amount: Number(form.amount), taxAmount: Number(form.taxAmount) || 0, dayOfMonth: Number(form.dayOfMonth) || undefined, nextDueDate: new Date(form.nextDueDate).toISOString() }) });
-    const data = await res.json();
+    const { res, data } = await saving.run(t("expenses.overlay.recurring", "Menyimpan template recurring..."), () =>
+      fetchJson("/api/expenses/recurring", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId, amount: Number(form.amount), taxAmount: Number(form.taxAmount) || 0, dayOfMonth: Number(form.dayOfMonth) || undefined, nextDueDate: new Date(form.nextDueDate).toISOString() }) })
+    );
     if (!res.ok) return showAlert(data.error);
     setForm({ name: "", accountId: "", category: "", amount: 0, taxAmount: 0, recordAsPayable: true, frequency: "monthly", dayOfMonth: 1, nextDueDate: "" });
     load();
@@ -847,12 +868,9 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
 
   const deactivate = (id: string) => proses.jalankan(`row:${id}`, async () => {
     if (!await showConfirm(t("expenses.confirmDeactivateRecurring", "Nonaktifkan recurring expense ini?"), { tone: "danger" })) return;
-    const res = await fetch(`/api/expenses/recurring/${id}`, { method: "DELETE" });
+    const { res, data } = await saving.run(t("expenses.overlay.deactivate", "Menonaktifkan template..."), () => fetchJson(`/api/expenses/recurring/${id}`, { method: "DELETE" }));
     // Dulu hasilnya tidak dicek sama sekali: gagal pun layar diam, dan template tetap aktif tanpa pemberitahuan.
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({ error: "Gagal menonaktifkan template." }));
-      return showAlert(data.error);
-    }
+    if (!res.ok) return showAlert(data.error ?? "Gagal menonaktifkan template.");
     load();
   });
 
@@ -863,8 +881,9 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
   const generate = () => proses.jalankan("generate", async () => {
     setGenerating(true);
     try {
-      const res = await fetch("/api/expenses/recurring/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId }) });
-      const data = await res.json();
+      const { res, data } = await saving.run(t("expenses.overlay.generate", "Membuat draft expense dari template..."), () =>
+        fetchJson("/api/expenses/recurring/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId }) })
+      );
       if (!res.ok) return showAlert(data.error);
       setLastResult(data);
       load();
@@ -877,6 +896,7 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
 
   return (
     <div className="space-y-4">
+      {saving.element}
       <p className="text-xs text-neutral-500">{t("expenses.recurringExplainer", "Untuk biaya rutin — listrik, internet, sewa, gaji, dst. Setiap periode buat draft expense baru secara otomatis (lewat tombol Generate di bawah), lalu tinggal Submit seperti expense biasa.")}</p>
 
       {canManage && (

@@ -949,6 +949,10 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   // `submitting` disables the button for the duration of the request, and a themed showAlert
   // confirms the save so the user isn't left guessing whether their first click registered.
   const [submitting, setSubmitting] = useState(false);
+  // Pop-up loading selama server memproses (simpan / koreksi / batalkan / hapus permanen belanja).
+  // Ditutup begitu server menjawab — sebelum pesan sukses/gagal ditampilkan — supaya tombol OK di
+  // pesan itu tidak tertutup modal.
+  const [overlay, setOverlay] = useState<null | { message: string; hint: string }>(null);
   const [viewing, setViewing] = useState<{ invoice: any; lines: any[]; isLegacy: boolean; additionalCost: number | null } | null>(null);
   const [editing, setEditing] = useState<{ invoiceId: string; invoiceNumber: string; cart: { productId: string; qty: number; unitCost: number }[]; additionalCost: number; reason: string } | null>(null);
   const [editItemForm, setEditItemForm] = useState({ productId: "", qty: 1, unitCost: 0 });
@@ -1026,13 +1030,18 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       return showAlert(t("inventory.supplierPurchase.chooseCashBankAlert", "Pilih sumber kas/bank yang dipakai untuk membayar belanja ini."));
     }
     setSubmitting(true);
+    setOverlay({
+      message: t("inventory.supplierPurchase.savingOverlay", "Menyimpan belanja..."),
+      hint: t("inventory.supplierPurchase.savingOverlayHint", "Mencatat faktur, menambah stok, menghitung harga modal, dan membuat jurnal. Jangan tutup atau muat ulang halaman ini."),
+    });
     try {
       const res = await fetch("/api/supplier-purchases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ outletId, supplierId, purchaseDate, items: cart, transportCost, parkingCost, otherCost, paidNow, cashBankAccountId: paidNow ? cashBankAccountId : undefined }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: t("inventory.supplierPurchase.serverError", "Server tidak merespons dengan benar. Cek daftar belanja sebelum mencoba lagi.") }));
+      setOverlay(null);
       if (!res.ok) return showAlert(data.error);
       setLastResult(data);
       // Refresh products (new harga modal) and FIFO layers so the result card shows real numbers.
@@ -1048,7 +1057,11 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       // double-tap bug happened because nothing told the user their first click had already
       // worked, so they kept clicking.
       await showAlert(t("inventory.supplierPurchase.savedNotification", "Belanja {invoiceNumber} berhasil tersimpan.").replace("{invoiceNumber}", data.invoice.invoiceNumber));
+    } catch (err) {
+      setOverlay(null);
+      showAlert(t("inventory.supplierPurchase.networkError", "Gagal menghubungi server: {pesan}. Cek daftar belanja sebelum mencoba lagi — bisa jadi sudah tersimpan.").replace("{pesan}", err instanceof Error ? err.message : String(err)));
     } finally {
+      setOverlay(null);
       setSubmitting(false);
     }
   };
@@ -1081,6 +1094,10 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
     if (!editing || busyInvoiceId) return;
     if (editing.cart.length === 0) return showAlert(t("inventory.supplierPurchase.needItemAlert", "Tambah minimal 1 item belanja."));
     setBusyInvoiceId(editing.invoiceId);
+    setOverlay({
+      message: t("inventory.supplierPurchase.editingOverlay", "Menyimpan koreksi invoice..."),
+      hint: t("inventory.supplierPurchase.editingOverlayHint", "Membalik stok & jurnal lama lalu mencatat ulang. Jangan tutup halaman ini."),
+    });
     try {
       // Unit prices + ongkos only — the server prorates the ongkos into each line's landed cost
       // (HPP). Sending landedUnitCost = unitCost here used to drop the invoice's ongkos on every edit.
@@ -1090,12 +1107,14 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lines, additionalCost: editing.additionalCost, reason: editing.reason || undefined }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: t("inventory.supplierPurchase.serverError", "Server tidak merespons dengan benar. Cek daftar belanja sebelum mencoba lagi.") }));
+      setOverlay(null);
       if (!res.ok) return showAlert(data.error);
       setEditing(null);
       load();
       await showAlert(t("inventory.supplierPurchase.editSaved", "Koreksi invoice {invoiceNumber} tersimpan.").replace("{invoiceNumber}", editing.invoiceNumber));
     } finally {
+      setOverlay(null);
       setBusyInvoiceId(null);
     }
   };
@@ -1107,16 +1126,22 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
     );
     if (!ok) return;
     setBusyInvoiceId(invoiceId);
+    setOverlay({
+      message: t("inventory.supplierPurchase.cancellingOverlay", "Membatalkan invoice..."),
+      hint: t("inventory.supplierPurchase.cancellingOverlayHint", "Mengembalikan stok, harga modal, dan jurnal. Jangan tutup halaman ini."),
+    });
     try {
       const res = await fetch(`/api/purchase-invoices/${invoiceId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: "Dibatalkan dari tab Belanja Supplier" }),
       });
-      const data = await res.json();
-      if (!res.ok) return showAlert(data.error);
+      const data = await res.json().catch(() => ({}));
+      setOverlay(null);
+      if (!res.ok) return showAlert(data.error ?? "Gagal membatalkan invoice.");
       load();
     } finally {
+      setOverlay(null);
       setBusyInvoiceId(null);
     }
   };
@@ -1131,18 +1156,25 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
     );
     if (!ok) return;
     setBusyInvoiceId(invoiceId);
+    setOverlay({
+      message: t("inventory.supplierPurchase.purgingOverlay", "Menghapus invoice permanen..."),
+      hint: t("inventory.supplierPurchase.purgingOverlayHint", "Jangan tutup halaman ini."),
+    });
     try {
       const res = await fetch(`/api/purchase-invoices/${invoiceId}/purge`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) return showAlert(data.error);
+      const data = await res.json().catch(() => ({}));
+      setOverlay(null);
+      if (!res.ok) return showAlert(data.error ?? "Gagal menghapus invoice.");
       load();
     } finally {
+      setOverlay(null);
       setBusyInvoiceId(null);
     }
   };
 
   return (
     <div className="space-y-4">
+      {overlay && <ProcessingOverlay message={overlay.message} hint={overlay.hint} />}
       <CostMethodCard info={costInfo} onChanged={() => { loadCostInfo(); fetchJsonArray<Product>("/api/products").then(setProducts); }} />
       <Card className="space-y-3">
         <h2 className="font-medium">{t("inventory.supplierPurchase.title", "Belanja Supplier")}</h2>
