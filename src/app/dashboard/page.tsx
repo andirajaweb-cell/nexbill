@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useApi } from "@/lib/api/use-api";
+import type { BusyHourRow } from "@/lib/dashboard/busy-hours";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { LiveClock } from "@/components/dashboard/LiveClock";
@@ -51,16 +52,20 @@ interface OwnerDashboard {
   topGame: { name: string; count: number } | null;
   topGames: { name: string; count: number }[];
   topProducts: { name: string; qty: number; revenue: number }[];
-  busyHours: { hour: number; count: number }[];
-  busiestHour: { hour: number; count: number } | null;
-  quietestHour: { hour: number; count: number } | null;
+  busyHours: BusyHourRow[];
+  busiestHour: BusyHourRow | null;
+  quietestHour: BusyHourRow | null;
+  /** Jumlah hari (dari 30 hari terakhir) yang ada transaksi — pembagi rata-rata per hari. */
+  busyHoursActiveDays?: number;
   activeCustomersCount: number;
   lowStockProducts: { id: string; name: string; stockQty: number; lowStockThreshold: number }[];
   receivablesOutstanding: number;
   payablesOutstanding: number;
 }
 
-const jamLabel = (h: { hour: number; count: number } | null) => (h ? `${String(h.hour).padStart(2, "0")}:00 (${h.count}x)` : "—");
+/** "13:00 · 2,3/hari" — rata-rata per hari, bukan total 30 hari (lihat lib/dashboard/busy-hours.ts). */
+const jamLabel = (h: BusyHourRow | null, perDay: string) =>
+  h ? `${String(h.hour).padStart(2, "0")}:00 · ${(h.avgPerDay ?? h.count).toLocaleString("id-ID", { maximumFractionDigits: 1 })}${perDay}` : "—";
 
 type Glow = "cyan" | "emerald" | "purple" | "amber" | "rose" | "blue";
 const GLOW_STYLES: Record<Glow, { icon: string; ring: string; value: string }> = {
@@ -244,7 +249,14 @@ export default function OwnerDashboardPage() {
   useApi<{ id: string }>("/api/outlets/default");
   const { data } = useApi<OwnerDashboard>("/api/dashboard/owner", { refreshInterval: 30000 });
 
-  const busyHoursChartData = data?.busyHours.map((b) => ({ jam: `${b.hour}:00`, transaksi: b.count })) ?? [];
+  const busyHoursChartData =
+    data?.busyHours.map((b) => ({
+      jam: `${b.hour}:00`,
+      rata: b.avgPerDay ?? b.count,
+      transaksi: b.count,
+      operasional: b.operating ?? b.count > 0,
+      sorot: b.hour === data.busiestHour?.hour ? ("ramai" as const) : b.hour === data.quietestHour?.hour ? ("sepi" as const) : null,
+    })) ?? [];
 
   return (
     <div className="space-y-6">
@@ -314,11 +326,17 @@ export default function OwnerDashboardPage() {
           <h2 className="gm-heading font-semibold mb-3 flex items-center gap-2"><Sparkles size={14} className="text-cyan-300" /> {t("card.busyQuiet")}</h2>
           {busyHoursChartData.some((b) => b.transaksi > 0) ? (
             <>
-              <div className="flex gap-6 mb-3 text-sm">
-                <div><span className="text-neutral-500">{t("card.busyHour")} </span><span className="font-medium text-emerald-300">{jamLabel(data?.busiestHour ?? null)}</span></div>
-                <div><span className="text-neutral-500">{t("card.quietHour")} </span><span className="font-medium text-amber-300">{jamLabel(data?.quietestHour ?? null)}</span></div>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 mb-1 text-sm">
+                <div><span className="text-neutral-500">{t("card.busyHour")} </span><span className="font-medium text-emerald-300">{jamLabel(data?.busiestHour ?? null, t("card.perDay"))}</span></div>
+                <div><span className="text-neutral-500">{t("card.quietHour")} </span><span className="font-medium text-amber-300">{jamLabel(data?.quietestHour ?? null, t("card.perDay"))}</span></div>
               </div>
-              <BusyHoursChart data={busyHoursChartData} />
+              <p className="text-[11px] text-neutral-500 mb-3">
+                {t("card.busyQuietNote").replace("{days}", String(data?.busyHoursActiveDays ?? 0))}
+              </p>
+              <BusyHoursChart
+                data={busyHoursChartData}
+                labels={{ avg: t("card.avgPerDayShort"), total: t("card.total30Days"), outside: t("card.outsideHours"), busy: t("card.busyHour"), quiet: t("card.quietHour") }}
+              />
             </>
           ) : (
             <p className="text-sm text-neutral-500">{t("card.notEnoughData")}</p>

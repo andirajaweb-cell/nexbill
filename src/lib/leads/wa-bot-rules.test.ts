@@ -29,6 +29,9 @@ describe("botState", () => {
   it("QR basi tidak ditampilkan sebagai menunggu scan", () => {
     expect(botState({ connected: false, qrDataUrl: "data:x", lastHeartbeatAt: iso(BOT_STALE_AFTER_MS + 1) }, now)).toBe("offline");
   });
+  it("bot hidup tanpa QR & belum terhubung = menghubungkan, bukan offline", () => {
+    expect(botState({ connected: false, qrDataUrl: null, lastHeartbeatAt: iso(5_000) }, now)).toBe("menghubungkan");
+  });
   it("tanpa baris status = belum pernah", () => {
     expect(botState(null, now)).toBe("belum_pernah");
     expect(botState({ connected: true, qrDataUrl: null, lastHeartbeatAt: null }, now)).toBe("offline");

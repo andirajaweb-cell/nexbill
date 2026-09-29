@@ -29,6 +29,7 @@ interface BotData {
 const STATE_COLOR: Record<BotState, string> = {
   online: "text-emerald-300 border-emerald-400/40 bg-emerald-500/10",
   menunggu_scan: "text-amber-300 border-amber-400/40 bg-amber-500/10",
+  menghubungkan: "text-sky-300 border-sky-400/40 bg-sky-500/10",
   offline: "text-rose-300 border-rose-400/40 bg-rose-500/10",
   belum_pernah: "text-neutral-300 border-white/15 bg-white/5",
 };
@@ -76,8 +77,8 @@ export default function WhatsappBotPage() {
     }
   }, []);
 
-  // Saat menunggu scan QR, refresh lebih cepat supaya QR (berlaku ±20 detik) selalu yang terbaru.
-  const interval = data?.state === "menunggu_scan" ? 4000 : 15000;
+  // Saat menunggu scan / menyiapkan QR, refresh lebih cepat supaya QR (berlaku ±20 detik) selalu yang terbaru.
+  const interval = data?.state === "menunggu_scan" || data?.state === "menghubungkan" ? 3000 : 15000;
   useEffect(() => {
     void load();
     const h = window.setInterval(() => void load(), interval);
@@ -111,7 +112,12 @@ export default function WhatsappBotPage() {
         <Card className="lg:col-span-2 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <span className={clsx("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium", STATE_COLOR[state])}>
-              <span className={clsx("h-2 w-2 rounded-full", state === "online" ? "bg-emerald-400 animate-pulse" : state === "menunggu_scan" ? "bg-amber-400 animate-pulse" : "bg-rose-400")} />
+              <span
+                className={clsx(
+                  "h-2 w-2 rounded-full",
+                  state === "online" ? "bg-emerald-400 animate-pulse" : state === "menunggu_scan" ? "bg-amber-400 animate-pulse" : state === "menghubungkan" ? "bg-sky-400 animate-pulse" : "bg-rose-400"
+                )}
+              />
               {BOT_STATE_LABEL[state]}
             </span>
             <span className="text-xs text-neutral-500">Heartbeat terakhir: {ago(data?.status?.lastHeartbeatAt ?? null)}</span>
@@ -137,6 +143,12 @@ export default function WhatsappBotPage() {
                 <li>Scan QR di samping. QR berganti otomatis setiap ±20 detik — halaman ini menampilkan yang terbaru.</li>
                 <li className="text-amber-200">Jangan bagikan QR ini: siapa pun yang men-scan akan menautkan WhatsApp miliknya ke bot.</li>
               </ol>
+            </div>
+          )}
+
+          {state === "menghubungkan" && (
+            <div className="rounded-xl border border-sky-400/30 bg-sky-500/5 p-4 text-sm text-sky-100">
+              Bot berjalan dan sedang menyiapkan QR baru / menyambung ulang. Biasanya hanya beberapa detik — halaman ini memperbarui otomatis, QR akan muncul di sini.
             </div>
           )}
 

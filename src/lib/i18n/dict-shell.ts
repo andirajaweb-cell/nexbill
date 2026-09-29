@@ -138,6 +138,18 @@ registerDict({
   "card.busyQuiet": { id: "Jam Ramai vs Jam Sepi (30 Hari Terakhir)", en: "Busy vs Quiet Hours (Last 30 Days)", ms: "Waktu Sibuk vs Waktu Lengang (30 Hari Terakhir)", th: "ช่วงเวลาคึกคักเทียบกับช่วงเวลาเงียบ (30 วันล่าสุด)", fil: "Busy vs Tahimik na Oras (Huling 30 Araw)", vi: "Giờ cao điểm và thấp điểm (30 ngày qua)" },
   "card.busyHour": { id: "Jam Ramai:", en: "Busy Hour:", ms: "Waktu Sibuk:", th: "ช่วงเวลาคึกคัก:", fil: "Busy na Oras:", vi: "Giờ cao điểm:" },
   "card.quietHour": { id: "Jam Sepi:", en: "Quiet Hour:", ms: "Waktu Lengang:", th: "ช่วงเวลาเงียบ:", fil: "Tahimik na Oras:", vi: "Giờ thấp điểm:" },
+  "card.perDay": { id: "/hari", en: "/day", ms: "/hari", th: "/วัน", fil: "/araw", vi: "/ngày" },
+  "card.busyQuietNote": {
+    id: "Rata-rata transaksi per hari di tiap jam, dari {days} hari yang ada transaksi. Jam sepi dipilih dari jam operasional saja — jam yang hanya sesekali ada transaksi diredupkan.",
+    en: "Average transactions per day for each hour, over {days} days with sales. The quiet hour is picked from operating hours only — hours with only occasional sales are dimmed.",
+    ms: "Purata transaksi sehari bagi setiap jam, daripada {days} hari yang ada transaksi. Waktu lengang dipilih daripada waktu operasi sahaja — jam yang jarang ada transaksi dimalapkan.",
+    th: "จำนวนธุรกรรมเฉลี่ยต่อวันในแต่ละชั่วโมง จาก {days} วันที่มีการขาย ช่วงเวลาเงียบเลือกจากเวลาทำการเท่านั้น — ชั่วโมงที่มีการขายเป็นครั้งคราวจะแสดงแบบจาง",
+    fil: "Karaniwang dami ng transaksyon kada araw sa bawat oras, mula sa {days} araw na may benta. Ang tahimik na oras ay pinipili mula sa oras ng operasyon lang — pinalalabo ang mga oras na paminsan-minsan lang may benta.",
+    vi: "Số giao dịch trung bình mỗi ngày theo từng giờ, trong {days} ngày có bán hàng. Giờ thấp điểm chỉ chọn trong giờ hoạt động — các giờ chỉ thỉnh thoảng có giao dịch được làm mờ.",
+  },
+  "card.avgPerDayShort": { id: "Rata-rata/hari", en: "Average/day", ms: "Purata/hari", th: "เฉลี่ย/วัน", fil: "Karaniwan/araw", vi: "Trung bình/ngày" },
+  "card.total30Days": { id: "Total 30 hari", en: "30-day total", ms: "Jumlah 30 hari", th: "รวม 30 วัน", fil: "Kabuuan sa 30 araw", vi: "Tổng 30 ngày" },
+  "card.outsideHours": { id: "Di luar jam operasional", en: "Outside operating hours", ms: "Di luar waktu operasi", th: "นอกเวลาทำการ", fil: "Labas sa oras ng operasyon", vi: "Ngoài giờ hoạt động" },
   "card.notEnoughData": { id: "Belum cukup data transaksi.", en: "Not enough transaction data yet.", ms: "Data transaksi belum mencukupi.", th: "ข้อมูลธุรกรรมยังไม่เพียงพอ", fil: "Hindi pa sapat ang data ng transaksyon.", vi: "Chưa đủ dữ liệu giao dịch." },
 
   "card.revenuePerUnit": { id: "Pendapatan per Unit PS (Hari Ini)", en: "Revenue per PS Unit (Today)", ms: "Hasil per Unit PS (Hari Ini)", th: "รายได้ต่อเครื่อง PS (วันนี้)", fil: "Kita bawat Unit ng PS (Ngayong Araw)", vi: "Doanh thu theo từng máy PS (hôm nay)" },

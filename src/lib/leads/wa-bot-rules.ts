@@ -14,7 +14,14 @@ export const DEFAULT_DAILY_LIMIT = 150;
 export const SEND_DELAY_MIN_MS = 4_000;
 export const SEND_DELAY_MAX_MS = 9_000;
 
-export type BotState = "online" | "menunggu_scan" | "offline" | "belum_pernah";
+/**
+ * online         — terhubung & heartbeat segar
+ * menunggu_scan  — bot hidup, QR siap di-scan
+ * menghubungkan  — bot hidup tapi belum ada QR/koneksi (jeda beberapa detik saat bot membuat QR baru
+ *                  setelah putaran QR habis, atau saat menyambung ulang). BUKAN offline.
+ * offline        — heartbeat berhenti (proses bot mati / tidak bisa menulis ke database)
+ */
+export type BotState = "online" | "menunggu_scan" | "menghubungkan" | "offline" | "belum_pernah";
 
 export interface BotStatusLike {
   connected: boolean;
@@ -28,12 +35,13 @@ export function botState(s: BotStatusLike | null | undefined, now = Date.now()):
   if (!fresh) return "offline";
   if (s.connected) return "online";
   if (s.qrDataUrl) return "menunggu_scan";
-  return "offline";
+  return "menghubungkan";
 }
 
 export const BOT_STATE_LABEL: Record<BotState, string> = {
   online: "Online",
   menunggu_scan: "Menunggu scan QR",
+  menghubungkan: "Menyiapkan QR / menghubungkan",
   offline: "Offline",
   belum_pernah: "Belum pernah dijalankan",
 };

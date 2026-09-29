@@ -178,7 +178,15 @@ async function start() {
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
       const reasonName = Object.entries(DisconnectReason).find(([, v]) => v === statusCode)?.[0] ?? "unknown";
-      await status({ connected: false, qrDataUrl: null, number: null, lastError: loggedOut ? "Logout dari HP — hapus data/wa-auth lalu jalankan ulang untuk scan QR baru." : `Terputus: ${reasonName}` });
+      // Belum pernah ditautkan (creds.me kosong) + 408 = putaran QR habis tanpa di-scan. Itu normal,
+      // bukan gangguan — bot langsung membuat QR baru.
+      const belumTertaut = !state.creds.me;
+      const catatan = loggedOut
+        ? "Logout dari HP — hapus data/wa-auth lalu jalankan ulang untuk scan QR baru."
+        : belumTertaut
+          ? "QR sebelumnya kedaluwarsa tanpa di-scan — membuat QR baru…"
+          : `Terputus (${reasonName}) — menyambung ulang…`;
+      await status({ connected: false, qrDataUrl: null, number: null, lastError: catatan });
       console.log("Koneksi WhatsApp terputus.", { statusCode, reason: reasonName });
       if (statusCode === DisconnectReason.restartRequired) {
         console.log('Normal setelah QR pertama kali di-scan — restart otomatis, tunggu "terhubung sebagai".');

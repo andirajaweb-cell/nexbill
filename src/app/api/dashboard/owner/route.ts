@@ -10,7 +10,8 @@ import { computeProfitLoss, computeTrialBalance } from "@/lib/accounting/reports
 import { computeTransactionList } from "@/lib/reports/transactions";
 import { describeError } from "@/lib/api/error";
 import { getSession } from "@/lib/auth/session";
-import { outletHour, outletDayStartUtc } from "@/lib/time/outlet-time";
+import { outletHour, outletDayStartUtc, outletDateYmd } from "@/lib/time/outlet-time";
+import { computeBusyHours } from "@/lib/dashboard/busy-hours";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 
 /**
@@ -296,17 +297,17 @@ export async function GET(req: NextRequest) {
     // reads it back in the SERVER's own timezone, not the outlet's, which is exactly what made
     // this chart's hours not match reality whenever the app happens to run on a host set to UTC.
     // See src/lib/time/outlet-time.ts for the full explanation.
-    const hourCounts = new Array(24).fill(0);
-    for (const o of recentOrders) {
-      const h = outletHour(new Date(o.createdAt));
-      hourCounts[h]++;
-    }
-    const busyHours = hourCounts.map((count, hour) => ({ hour, count }));
-    const busiestHour = busyHours.reduce((max, h) => (h.count > max.count ? h : max), busyHours[0]);
-    const hoursWithActivity = busyHours.filter((h) => h.count > 0);
-    const quietestHour = hoursWithActivity.length
-      ? hoursWithActivity.reduce((min, h) => (h.count < min.count ? h : min), hoursWithActivity[0])
-      : null;
+    // Rata-rata per hari + jam sepi hanya dari jam operasional — lihat src/lib/dashboard/busy-hours.ts.
+    const busy = computeBusyHours(
+      recentOrders.map((o) => {
+        const d = new Date(o.createdAt);
+        return { hour: outletHour(d), ymd: outletDateYmd(d) };
+      })
+    );
+    const busyHours = busy.hours;
+    const busiestHour = busy.busiest;
+    const quietestHour = busy.quietest;
+    const busyHoursActiveDays = busy.activeDays;
 
     // ---- Customers: served today (distinct, from paid orders) + new members registered today ----
     const distinctCustomerIdsToday = new Set(paidTransactionsToday.map((t) => t.customerId).filter((id): id is string => !!id));
@@ -363,6 +364,7 @@ export async function GET(req: NextRequest) {
       busyHours,
       busiestHour,
       quietestHour,
+      busyHoursActiveDays,
       activeCustomersCount: activeCustomersRows.length,
       lowStockProducts,
       receivablesOutstanding,
