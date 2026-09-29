@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -7,11 +7,20 @@ import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import {
   LEAD_ACTIVITY_LABEL,
+  LEAD_BASE,
   LEAD_CLOSED_STATUSES,
+  LEAD_FUNNEL,
+  LEAD_PRIORITIES,
+  LEAD_PRIORITY_LABEL,
   LEAD_STATUSES,
   LEAD_STATUS_LABEL,
+  LEAD_TEMPERATURES,
+  LEAD_TEMPERATURE_LABEL,
+  distanceKm,
   type LeadActivityType,
+  type LeadPriority,
   type LeadStatus,
+  type LeadTemperature,
   type PlaceResult,
 } from "@/lib/leads/constants";
 
@@ -25,6 +34,26 @@ const STATUS_COLOR: Record<LeadStatus, string> = {
   trial: "text-fuchsia-300 border-fuchsia-400/30 bg-fuchsia-500/10",
   closing: "text-emerald-300 border-emerald-400/30 bg-emerald-500/10",
   tidak_tertarik: "text-neutral-400 border-white/10 bg-white/5",
+};
+
+const PRIORITY_COLOR: Record<LeadPriority, string> = {
+  A: "text-amber-300 border-amber-400/40 bg-amber-500/15",
+  B: "text-sky-300 border-sky-400/30 bg-sky-500/10",
+  C: "text-neutral-400 border-white/10 bg-white/5",
+};
+
+const TEMPERATURE_COLOR: Record<LeadTemperature, string> = {
+  hot: "text-rose-300 border-rose-400/40 bg-rose-500/15",
+  warm: "text-amber-300 border-amber-400/30 bg-amber-500/10",
+  cold: "text-slate-300 border-slate-400/30 bg-slate-500/10",
+};
+
+type SortKey = "terbaru" | "prioritas" | "jarak" | "ulasan";
+const SORT_LABEL: Record<SortKey, string> = {
+  terbaru: "Terakhir diubah",
+  prioritas: "Prioritas (A dulu)",
+  jarak: `Jarak dari ${LEAD_BASE.name} (rute kunjungan)`,
+  ulasan: "Jumlah ulasan",
 };
 
 const WA_TEMPLATE = (name: string) =>
@@ -44,7 +73,17 @@ interface Lead {
   mapsUrl: string | null;
   rating: number | null;
   reviewCount: number | null;
+  lat: number | null;
+  lng: number | null;
   contactName: string | null;
+  priority: LeadPriority | null;
+  temperature: LeadTemperature | null;
+  area: string | null;
+  currentBilling: string | null;
+  unitCount: number | null;
+  painPoints: string | null;
+  acquisitionAngle: string | null;
+  nextAction: string | null;
   status: LeadStatus;
   nextFollowUpDate: string | null;
   lastContactedAt: string | null;
@@ -68,6 +107,7 @@ interface ListData {
   counts: Record<LeadStatus, number>;
   dueCount: number;
   cities: string[];
+  areas: string[];
 }
 
 type SearchResult = PlaceResult & { existingLeadId: string | null };
@@ -86,6 +126,16 @@ async function send(url: string, method: string, body?: unknown) {
   return data;
 }
 
+function PriorityBadge({ priority }: { priority: LeadPriority | null }) {
+  if (!priority) return <span className="inline-grid place-items-center w-6 h-6 rounded-md border border-dashed border-white/15 text-[11px] text-neutral-600" title="Prioritas belum dinilai">?</span>;
+  return <span className={clsx("inline-grid place-items-center w-6 h-6 rounded-md border text-xs font-bold", PRIORITY_COLOR[priority])} title={LEAD_PRIORITY_LABEL[priority]}>{priority}</span>;
+}
+
+function TemperaturePill({ temperature }: { temperature: LeadTemperature | null }) {
+  if (!temperature) return null;
+  return <span className={clsx("inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide", TEMPERATURE_COLOR[temperature])}>{LEAD_TEMPERATURE_LABEL[temperature]}</span>;
+}
+
 function StatusPill({ status }: { status: LeadStatus }) {
   return <span className={clsx("inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap", STATUS_COLOR[status])}>{LEAD_STATUS_LABEL[status]}</span>;
 }
@@ -98,7 +148,7 @@ export default function PlatformLeadsPage() {
       <div>
         <h1 className="gm-display text-2xl font-bold text-amber-300">Leads & CRM</h1>
         <p className="text-sm text-neutral-500 mt-1">
-          Cari calon pelanggan NEXBILL (rental PS, warnet, game center) dari Google Maps, simpan sebagai prospek, lalu tindak lanjuti lewat pipeline: Baru → Dihubungi → Follow Up → Demo → Trial → Closing.
+          Cari calon pelanggan NEXBILL (rental PS, warnet, game center) dari Google Maps, simpan sebagai prospek, lalu tindak lanjuti lewat pipeline: Baru → Dihubungi → Follow Up → Demo → Trial → Closing. Beri prioritas A/B/C dan suhu HOT/WARM/COLD, lalu urutkan per jarak untuk rute kunjungan.
         </p>
       </div>
 
@@ -297,10 +347,22 @@ function CrmTab() {
   const [city, setCity] = useState("");
   const [q, setQ] = useState("");
   const [due, setDue] = useState(false);
+  const [priority, setPriority] = useState<LeadPriority | "">("");
+  const [temperature, setTemperature] = useState<LeadTemperature | "">("");
+  const [area, setArea] = useState("");
+  const [sort, setSort] = useState<SortKey>("terbaru");
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
-  const query = new URLSearchParams({ ...(status && { status }), ...(city && { city }), ...(q.trim() && { q: q.trim() }), ...(due && { due: "1" }) }).toString();
+  const query = new URLSearchParams({
+    ...(status && { status }),
+    ...(city && { city }),
+    ...(q.trim() && { q: q.trim() }),
+    ...(due && { due: "1" }),
+    ...(priority && { priority }),
+    ...(temperature && { temperature }),
+    ...(area && { area }),
+  }).toString();
 
   const load = useCallback(() => fetchJsonObject<ListData>(`/api/platform-admin/leads?${query}`).then(setData), [query]);
   useEffect(() => {
@@ -320,6 +382,26 @@ function CrmTab() {
   const total = data ? Object.values(data.counts).reduce((a, b) => a + b, 0) : 0;
   const todayStr = today();
 
+  // Server orders by updatedAt; the other orders are applied here (the list is a few hundred rows at most).
+  const leads = useMemo(() => {
+    const rows = (data?.leads ?? []).map((l) => ({ ...l, distance: distanceKm(l.lat, l.lng) }));
+    const rank = (p: LeadPriority | null) => (p ? LEAD_PRIORITIES.indexOf(p) : LEAD_PRIORITIES.length);
+    if (sort === "prioritas") rows.sort((a, b) => rank(a.priority) - rank(b.priority) || (b.reviewCount ?? 0) - (a.reviewCount ?? 0));
+    else if (sort === "jarak") rows.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+    else if (sort === "ulasan") rows.sort((a, b) => (b.reviewCount ?? 0) - (a.reviewCount ?? 0));
+    return rows;
+  }, [data, sort]);
+
+  // Funnel: how many leads reached each stage (at it or beyond), and the share that got past the previous one.
+  const funnel = useMemo(() => {
+    if (!data) return [];
+    return LEAD_FUNNEL.map((s, i) => {
+      const reached = LEAD_FUNNEL.slice(i).reduce((sum, st) => sum + data.counts[st], 0);
+      const prev = i === 0 ? null : LEAD_FUNNEL.slice(i - 1).reduce((sum, st) => sum + data.counts[st], 0);
+      return { status: s, reached, rate: prev ? Math.round((reached / prev) * 100) : null };
+    });
+  }, [data]);
+
   return (
     <div className="space-y-4">
       {data && (
@@ -337,6 +419,27 @@ function CrmTab() {
         </div>
       )}
 
+      {data && total > 0 && (
+        <div className="overflow-x-auto">
+          <div className="flex items-stretch gap-1 min-w-max text-[11px]">
+            <div className="pr-2 self-center text-neutral-500 uppercase tracking-wide">Konversi</div>
+            {funnel.map((f, i) => (
+              <div key={f.status} className="flex items-center gap-1">
+                {i > 0 && <span className="text-neutral-600">→</span>}
+                <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2.5 py-1.5">
+                  <div className="text-neutral-500">{LEAD_STATUS_LABEL[f.status].replace(" (Jadi Pelanggan)", "")}</div>
+                  <div className="text-neutral-100 font-semibold tabular-nums">
+                    {f.reached}
+                    {f.rate != null && <span className={clsx("ml-1.5 font-normal", f.rate >= 50 ? "text-emerald-400" : f.rate >= 20 ? "text-amber-300" : "text-rose-300")}>{f.rate}%</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="pl-2 self-center text-neutral-500">Tidak tertarik: {data.counts.tidak_tertarik}</div>
+          </div>
+        </div>
+      )}
+
       <Card>
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex-1 min-w-[180px]">
@@ -350,6 +453,35 @@ function CrmTab() {
               {data?.cities.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+          <div className="w-32">
+            <label className="text-xs text-neutral-500">Prioritas</label>
+            <select className={inputCls} value={priority} onChange={(e) => setPriority(e.target.value as LeadPriority | "")}>
+              <option value="">Semua</option>
+              {LEAD_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div className="w-32">
+            <label className="text-xs text-neutral-500">Suhu</label>
+            <select className={inputCls} value={temperature} onChange={(e) => setTemperature(e.target.value as LeadTemperature | "")}>
+              <option value="">Semua</option>
+              {LEAD_TEMPERATURES.map((t) => <option key={t} value={t}>{LEAD_TEMPERATURE_LABEL[t]}</option>)}
+            </select>
+          </div>
+          {!!data?.areas.length && (
+            <div className="w-48">
+              <label className="text-xs text-neutral-500">Area</label>
+              <select className={inputCls} value={area} onChange={(e) => setArea(e.target.value)}>
+                <option value="">Semua area</option>
+                {data.areas.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="w-56">
+            <label className="text-xs text-neutral-500">Urutkan</label>
+            <select className={inputCls} value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
+            </select>
+          </div>
           <Button variant={due ? "primary" : "secondary"} onClick={() => { setDue(!due); setStatus(""); }}>
             Jatuh Tempo Follow Up{data ? ` (${data.dueCount})` : ""}
           </Button>
@@ -361,7 +493,7 @@ function CrmTab() {
       <Card>
         {!data ? (
           <p className="text-sm text-neutral-500">Memuat...</p>
-        ) : data.leads.length === 0 ? (
+        ) : leads.length === 0 ? (
           <p className="text-sm text-neutral-500">
             {total === 0 ? "Belum ada prospek. Mulai dari tab \"Cari di Google Maps\" atau tambah lead manual." : "Tidak ada prospek yang cocok dengan filter."}
           </p>
@@ -370,8 +502,10 @@ function CrmTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wide text-neutral-500 border-b border-white/10">
+                  <th className="py-2 pr-2 w-8" title="Prioritas">Pr.</th>
                   <th className="py-2 pr-3">Usaha</th>
-                  <th className="py-2 pr-3">Kota</th>
+                  <th className="py-2 pr-3">Area / Kota</th>
+                  <th className="py-2 pr-3 text-right">Jarak</th>
                   <th className="py-2 pr-3">Kontak</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 pr-3">Follow Up</th>
@@ -379,18 +513,28 @@ function CrmTab() {
                 </tr>
               </thead>
               <tbody>
-                {data.leads.map((l) => {
+                {leads.map((l) => {
                   const overdue = !!l.nextFollowUpDate && l.nextFollowUpDate <= todayStr && !LEAD_CLOSED_STATUSES.includes(l.status);
                   return (
                     <tr key={l.id} className="border-b border-white/5 align-top hover:bg-white/[0.02]">
+                      <td className="py-2 pr-2"><PriorityBadge priority={l.priority} /></td>
                       <td className="py-2 pr-3">
-                        <button onClick={() => setOpenId(l.id)} className="text-left text-neutral-100 hover:text-amber-300">{l.name}</button>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => setOpenId(l.id)} className="text-left text-neutral-100 hover:text-amber-300">{l.name}</button>
+                          <TemperaturePill temperature={l.temperature} />
+                        </div>
                         <div className="text-[11px] text-neutral-500">
                           {l.category ?? (l.source === "manual" ? "Input manual" : "—")}
                           {l.rating != null && ` · ★ ${l.rating} (${l.reviewCount ?? 0})`}
+                          {l.currentBilling && ` · billing: ${l.currentBilling}`}
                         </div>
+                        {l.nextAction && <div className="text-[11px] text-cyan-300/80">→ {l.nextAction}</div>}
                       </td>
-                      <td className="py-2 pr-3 text-neutral-400">{l.city ?? "—"}</td>
+                      <td className="py-2 pr-3 text-neutral-400">
+                        {l.area ?? l.city ?? "—"}
+                        {l.area && l.city && <div className="text-[11px] text-neutral-600">{l.city}</div>}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-neutral-400 tabular-nums whitespace-nowrap">{l.distance != null ? `${l.distance} km` : "—"}</td>
                       <td className="py-2 pr-3 text-neutral-300 whitespace-nowrap">
                         {l.contactName && <div className="text-[11px] text-neutral-400">{l.contactName}</div>}
                         {l.phone ?? "—"}
@@ -449,6 +593,14 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
       nextFollowUpDate: d.lead.nextFollowUpDate ?? "",
       notes: d.lead.notes ?? "",
       convertedOutletId: d.lead.convertedOutletId ?? "",
+      priority: d.lead.priority ?? "",
+      temperature: d.lead.temperature ?? "",
+      area: d.lead.area ?? "",
+      currentBilling: d.lead.currentBilling ?? "",
+      unitCount: d.lead.unitCount != null ? String(d.lead.unitCount) : "",
+      painPoints: d.lead.painPoints ?? "",
+      acquisitionAngle: d.lead.acquisitionAngle ?? "",
+      nextAction: d.lead.nextAction ?? "",
     });
   }
 
@@ -560,6 +712,39 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
                     {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                   </select>
                 </div>
+                <div className="sm:col-span-3 border-t border-white/10 pt-3 mt-1">
+                  <h3 className="gm-heading font-semibold text-sm">Kualifikasi</h3>
+                  <p className="text-[11px] text-neutral-500">Kosongkan jika belum diketahui. Suhu HOT hanya kalau merchant sudah menunjukkan minat langsung.</p>
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500">Prioritas</label>
+                  <select className={inputCls} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+                    <option value="">— belum dinilai —</option>
+                    {LEAD_PRIORITIES.map((p) => <option key={p} value={p}>{LEAD_PRIORITY_LABEL[p]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500">Suhu Lead</label>
+                  <select className={inputCls} value={form.temperature} onChange={(e) => setForm({ ...form, temperature: e.target.value })}>
+                    <option value="">— belum dinilai —</option>
+                    {LEAD_TEMPERATURES.map((t) => <option key={t} value={t}>{LEAD_TEMPERATURE_LABEL[t]}</option>)}
+                  </select>
+                </div>
+                {field("area", "Area / Klaster", { placeholder: "mis. Majalaya/Solokanjeruk" })}
+                {field("currentBilling", "Billing Dipakai Sekarang", { placeholder: "mis. stopwatch, aplikasi X, belum ada" })}
+                {field("unitCount", "Jumlah Unit PS", { type: "number", min: 0, inputMode: "numeric" })}
+                <div className="text-[11px] text-neutral-500 self-end pb-2">
+                  {(() => {
+                    const km = distanceKm(lead.lat, lead.lng);
+                    return km != null ? `± ${km} km dari ${LEAD_BASE.name}` : "Lokasi belum ada koordinat";
+                  })()}
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="text-xs text-neutral-500">Pain Point</label>
+                  <textarea className={inputCls} rows={2} value={form.painPoints} onChange={(e) => setForm({ ...form, painPoints: e.target.value })} placeholder="mis. tutup shift manual 1 jam, sering selisih kas, owner tidak bisa pantau dari rumah" />
+                </div>
+                <div className="sm:col-span-3">{field("acquisitionAngle", "Angle Akuisisi", { placeholder: "mis. multi-outlet dari 1 akun + laporan per cabang" })}</div>
+                <div className="sm:col-span-3">{field("nextAction", "Next Action", { placeholder: "mis. kunjungi Sabtu sore, bawa demo di HP" })}</div>
                 <div className="sm:col-span-3">
                   <label className="text-xs text-neutral-500">Catatan</label>
                   <textarea className={inputCls} rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="mis. 6 unit PS4, masih pakai stopwatch, tertarik fitur TV otomatis" />
@@ -617,7 +802,7 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
 /* ============================== TAMBAH LEAD MANUAL ============================== */
 
 function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ name: "", contactName: "", phone: "", city: "", address: "", notes: "" });
+  const [form, setForm] = useState({ name: "", contactName: "", phone: "", city: "", area: "", address: "", priority: "", notes: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -657,8 +842,18 @@ function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
               {input("contactName", "Nama Pemilik / Kontak")}
               {input("phone", "Telepon / WA", "08xxx")}
             </div>
-            {input("city", "Kota")}
+            <div className="grid grid-cols-2 gap-2">
+              {input("city", "Kota")}
+              {input("area", "Area / Klaster", "mis. Majalaya/Solokanjeruk")}
+            </div>
             {input("address", "Alamat")}
+            <div>
+              <label className="text-xs text-neutral-500">Prioritas</label>
+              <select className={inputCls} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+                <option value="">— belum dinilai —</option>
+                {LEAD_PRIORITIES.map((p) => <option key={p} value={p}>{LEAD_PRIORITY_LABEL[p]}</option>)}
+              </select>
+            </div>
             {input("notes", "Catatan", "mis. kenalan dari grup FB pengusaha rental PS")}
             <Button type="submit" disabled={busy || !form.name.trim()}>{busy ? "Menyimpan..." : "Simpan"}</Button>
           </form>

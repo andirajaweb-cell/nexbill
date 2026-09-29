@@ -27,6 +27,7 @@
     "ipaymu:proxy": "tsx scripts/ipaymu-egress-proxy.ts",
     "subscription:scheduler": "tsx scripts/subscription-scheduler.ts",
     "seed:platform-admin": "tsx scripts/seed-platform-admin.ts",
+    "seed:leads-majalaya": "tsx scripts/seed-leads-majalaya.ts",
     "reset:staff-password": "tsx scripts/reset-staff-password.ts",
     "create:superuser": "tsx scripts/create-superuser.ts",
     "biteship:setup-origin": "tsx scripts/biteship-setup-origin.ts",

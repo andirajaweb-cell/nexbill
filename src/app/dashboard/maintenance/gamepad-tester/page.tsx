@@ -5,6 +5,16 @@ import { Card } from "@/components/ui/Card";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-maintenance";
 import { IndikatorLive, PemeriksaanTerpandu } from "./doctor";
+import { bukaKunciAudio, bunyiTerhubung, bunyiTerputus, siapBerbunyi } from "./sound";
+
+const KUNCI_SUARA = "nexbill.gamepadTester.suara";
+
+interface NotifKoneksi {
+  jenis: "terhubung" | "terputus";
+  label: string;
+  slot: number;
+  kunci: number;
+}
 
 /**
  * Live controller (gamepad) tester — pure client-side, built on the browser's standard Gamepad
@@ -308,6 +318,88 @@ export default function GamepadTesterPage() {
     };
   }, []);
 
+  // --- Suara & notifikasi koneksi controller ---
+  const [suara, setSuara] = useState(true);
+  const [audioTerkunci, setAudioTerkunci] = useState(false);
+  const [notif, setNotif] = useState<NotifKoneksi | null>(null);
+  const suaraRef = useRef(true);
+
+  useEffect(() => {
+    try {
+      const simpan = window.localStorage.getItem(KUNCI_SUARA);
+      if (simpan === "0") {
+        setSuara(false);
+        suaraRef.current = false;
+      }
+    } catch {
+      /* localStorage tidak tersedia — pakai default (aktif) */
+    }
+    // Klik menu dashboard sebelumnya biasanya sudah cukup untuk membuka audio.
+    void bukaKunciAudio().then((ok) => setAudioTerkunci(!ok));
+
+    // Tombol di stik tidak dihitung interaksi oleh browser, jadi buka kunci audio pada klik/keyboard pertama.
+    const buka = () => {
+      void bukaKunciAudio().then((ok) => {
+        if (ok) {
+          setAudioTerkunci(false);
+          window.removeEventListener("pointerdown", buka);
+          window.removeEventListener("keydown", buka);
+        }
+      });
+    };
+    window.addEventListener("pointerdown", buka);
+    window.addEventListener("keydown", buka);
+
+    const labelDari = (id: string) => FAMILY_LABEL[detectFamily(id)];
+    const onConnect = (e: GamepadEvent) => {
+      setNotif({ jenis: "terhubung", label: labelDari(e.gamepad.id), slot: e.gamepad.index + 1, kunci: Date.now() });
+      if (suaraRef.current && !bunyiTerhubung()) setAudioTerkunci(true);
+    };
+    const onDisconnect = (e: GamepadEvent) => {
+      setNotif({ jenis: "terputus", label: labelDari(e.gamepad.id), slot: e.gamepad.index + 1, kunci: Date.now() });
+      if (suaraRef.current && !bunyiTerputus()) setAudioTerkunci(true);
+    };
+    window.addEventListener("gamepadconnected", onConnect);
+    window.addEventListener("gamepaddisconnected", onDisconnect);
+    return () => {
+      window.removeEventListener("pointerdown", buka);
+      window.removeEventListener("keydown", buka);
+      window.removeEventListener("gamepadconnected", onConnect);
+      window.removeEventListener("gamepaddisconnected", onDisconnect);
+    };
+  }, []);
+
+  // Notifikasi hilang sendiri setelah 4 detik (kunci berubah tiap event → timer di-reset).
+  useEffect(() => {
+    if (!notif) return;
+    const h = window.setTimeout(() => setNotif(null), 4000);
+    return () => window.clearTimeout(h);
+  }, [notif]);
+
+  const gantiSuara = async () => {
+    const baru = !suara;
+    setSuara(baru);
+    suaraRef.current = baru;
+    try {
+      window.localStorage.setItem(KUNCI_SUARA, baru ? "1" : "0");
+    } catch {
+      /* abaikan */
+    }
+    if (baru) {
+      const ok = await bukaKunciAudio();
+      setAudioTerkunci(!ok);
+      if (ok) bunyiTerhubung();
+    }
+  };
+
+  const tesSuara = async () => {
+    const ok = await bukaKunciAudio();
+    setAudioTerkunci(!ok);
+    if (!ok) return;
+    bunyiTerhubung();
+    window.setTimeout(() => bunyiTerputus(), 900);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -324,6 +416,69 @@ export default function GamepadTesterPage() {
           )}
         </p>
       </div>
+
+      {supported && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={gantiSuara}
+            aria-pressed={suara}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              suara
+                ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                : "border-white/15 bg-white/5 text-neutral-400 hover:bg-white/10"
+            }`}
+          >
+            {suara ? t("maintenance.gamepad.sound.on", "Suara: Aktif") : t("maintenance.gamepad.sound.off", "Suara: Mati")}
+          </button>
+          <button
+            type="button"
+            onClick={tesSuara}
+            className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/10"
+          >
+            {t("maintenance.gamepad.sound.test", "Tes Suara")}
+          </button>
+          <span className="text-xs text-neutral-500">
+            {t("maintenance.gamepad.sound.hint", "Nada naik = controller terhubung, nada turun = controller terputus.")}
+          </span>
+          {suara && audioTerkunci && (
+            <span className="w-full text-xs text-amber-300">
+              {t(
+                "maintenance.gamepad.sound.locked",
+                "Klik sekali di mana saja pada halaman ini agar suara bisa berbunyi — browser memblokir suara sebelum ada klik (menekan tombol stik tidak dihitung)."
+              )}
+            </span>
+          )}
+        </div>
+      )}
+
+      {notif && (
+        <div
+          key={notif.kunci}
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border px-4 py-3 shadow-2xl backdrop-blur ${
+            notif.jenis === "terhubung"
+              ? "border-emerald-500/50 bg-emerald-950/90 text-emerald-200"
+              : "border-rose-500/50 bg-rose-950/90 text-rose-200"
+          }`}
+        >
+          <span
+            className={`h-2.5 w-2.5 rounded-full ${notif.jenis === "terhubung" ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`}
+            aria-hidden
+          />
+          <div className="text-sm">
+            <div className="font-semibold">
+              {notif.jenis === "terhubung"
+                ? t("maintenance.gamepad.toast.connected", "Controller terhubung")
+                : t("maintenance.gamepad.toast.disconnected", "Controller terputus")}
+            </div>
+            <div className="text-xs opacity-80">
+              {notif.label} · {t("maintenance.gamepad.toast.slot", "Slot")} {notif.slot}
+            </div>
+          </div>
+        </div>
+      )}
 
       {!supported && (
         <Card className="border border-rose-700/40 bg-rose-950/10">

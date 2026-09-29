@@ -6,7 +6,7 @@ import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
 import { LEAD_STATUS_LABEL } from "@/lib/leads/constants";
 import { toWhatsappNumber } from "@/lib/leads/places";
-import { addLeadActivity, isLeadStatus } from "@/lib/leads/service";
+import { addLeadActivity, isLeadStatus, parseQualification } from "@/lib/leads/service";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -40,7 +40,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const [lead] = await db.select().from(platformLeads).where(eq(platformLeads.id, id));
     if (!lead) return NextResponse.json({ error: "Lead tidak ditemukan." }, { status: 404 });
 
-    const patch: Partial<typeof platformLeads.$inferInsert> = { updatedAt: new Date().toISOString() };
+    let qualification;
+    try {
+      qualification = parseQualification(body);
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
+    }
+    const patch: Partial<typeof platformLeads.$inferInsert> = { ...qualification, updatedAt: new Date().toISOString() };
     for (const key of EDITABLE_TEXT) {
       if (key in body) patch[key] = String(body[key] ?? "").trim() || null;
     }

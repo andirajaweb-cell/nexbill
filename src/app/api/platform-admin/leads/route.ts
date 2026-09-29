@@ -4,7 +4,7 @@ import { platformLeads } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
 import { toWhatsappNumber } from "@/lib/leads/places";
-import { leadSummary, listLeads, parseLeadFilters } from "@/lib/leads/service";
+import { leadSummary, listLeads, parseLeadFilters, parseQualification } from "@/lib/leads/service";
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,6 +25,12 @@ export async function POST(req: NextRequest) {
     const name = String(body.name ?? "").trim();
     if (!name) return NextResponse.json({ error: "Nama usaha wajib diisi." }, { status: 400 });
     const phone = String(body.phone ?? "").trim() || null;
+    let qualification;
+    try {
+      qualification = parseQualification(body);
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
+    }
 
     const [row] = await db
       .insert(platformLeads)
@@ -37,6 +43,7 @@ export async function POST(req: NextRequest) {
         address: String(body.address ?? "").trim() || null,
         city: String(body.city ?? "").trim() || null,
         notes: String(body.notes ?? "").trim() || null,
+        ...qualification,
         createdBy: session.sub,
       })
       .returning();

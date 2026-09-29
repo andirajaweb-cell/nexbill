@@ -186,4 +186,28 @@ registerDict({
     fil: "Walang driver na ii-install: buksan ang pahinang ito sa Chrome ng Android phone at ikonekta ang PS3 controller gamit ang OTG cable. Direktang nababasa ng Android ang PS3 controller.",
     vi: "Không cần cài driver: mở trang này bằng Chrome trên điện thoại Android và cắm tay cầm PS3 qua cáp OTG. Android đọc được tay cầm PS3 trực tiếp.",
   },
+
+  // --- Suara & notifikasi koneksi controller ---
+  "maintenance.gamepad.sound.on": { id: "Suara: Aktif", en: "Sound: On", ms: "Bunyi: Hidup", th: "เสียง: เปิด", fil: "Tunog: Naka-on", vi: "Âm thanh: Bật" },
+  "maintenance.gamepad.sound.off": { id: "Suara: Mati", en: "Sound: Off", ms: "Bunyi: Mati", th: "เสียง: ปิด", fil: "Tunog: Naka-off", vi: "Âm thanh: Tắt" },
+  "maintenance.gamepad.sound.test": { id: "Tes Suara", en: "Test Sound", ms: "Uji Bunyi", th: "ทดสอบเสียง", fil: "Subukan ang Tunog", vi: "Thử âm thanh" },
+  "maintenance.gamepad.sound.hint": {
+    id: "Nada naik = controller terhubung, nada turun = controller terputus.",
+    en: "Rising tone = controller connected, falling tone = controller disconnected.",
+    ms: "Nada naik = kawalan disambung, nada turun = kawalan terputus.",
+    th: "เสียงไล่ขึ้น = จอยเชื่อมต่อแล้ว, เสียงไล่ลง = จอยหลุดการเชื่อมต่อ",
+    fil: "Pataas na tunog = nakakonekta ang controller, pababang tunog = naputol ang controller.",
+    vi: "Âm đi lên = tay cầm đã kết nối, âm đi xuống = tay cầm bị ngắt kết nối.",
+  },
+  "maintenance.gamepad.sound.locked": {
+    id: "Klik sekali di mana saja pada halaman ini agar suara bisa berbunyi — browser memblokir suara sebelum ada klik (menekan tombol stik tidak dihitung).",
+    en: "Click once anywhere on this page so sounds can play — the browser blocks sound until you click (pressing controller buttons doesn't count).",
+    ms: "Klik sekali di mana-mana pada halaman ini supaya bunyi boleh dimainkan — pelayar menyekat bunyi sebelum ada klik (menekan butang kawalan tidak dikira).",
+    th: "คลิกหนึ่งครั้งที่ใดก็ได้ในหน้านี้เพื่อให้เล่นเสียงได้ — เบราว์เซอร์บล็อกเสียงจนกว่าจะมีการคลิก (การกดปุ่มจอยไม่นับ)",
+    fil: "Mag-click nang isang beses kahit saan sa pahinang ito para tumunog — hinaharangan ng browser ang tunog hangga't walang click (hindi binibilang ang pagpindot sa controller).",
+    vi: "Nhấp một lần vào bất kỳ đâu trên trang này để phát được âm thanh — trình duyệt chặn âm thanh cho đến khi có cú nhấp (bấm nút tay cầm không được tính).",
+  },
+  "maintenance.gamepad.toast.connected": { id: "Controller terhubung", en: "Controller connected", ms: "Kawalan disambung", th: "จอยเชื่อมต่อแล้ว", fil: "Nakakonekta ang controller", vi: "Tay cầm đã kết nối" },
+  "maintenance.gamepad.toast.disconnected": { id: "Controller terputus", en: "Controller disconnected", ms: "Kawalan terputus", th: "จอยหลุดการเชื่อมต่อ", fil: "Naputol ang controller", vi: "Tay cầm đã ngắt kết nối" },
+  "maintenance.gamepad.toast.slot": { id: "Slot", en: "Slot", ms: "Slot", th: "ช่อง", fil: "Slot", vi: "Khe" },
 });

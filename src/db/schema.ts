@@ -2854,6 +2854,17 @@ export const platformLeads = pgTable(
     reviewCount: integer("review_count"),
     businessStatus: text("business_status"),
     contactName: text("contact_name"),
+    // Kualifikasi (migrasi 0024). NULL = belum diketahui/belum dinilai.
+    // priority: sinyal publik (ulasan, multi-cabang, PS5, kafe/24 jam) → urutan kunjungan.
+    priority: text("priority", { enum: ["A", "B", "C"] }),
+    // temperature: niat merchant — hot hanya setelah merchant menunjukkan minat langsung.
+    temperature: text("temperature", { enum: ["hot", "warm", "cold"] }),
+    area: text("area"),
+    currentBilling: text("current_billing"),
+    unitCount: integer("unit_count"),
+    painPoints: text("pain_points"),
+    acquisitionAngle: text("acquisition_angle"),
+    nextAction: text("next_action"),
     status: text("status", { enum: ["baru", "dihubungi", "follow_up", "demo", "trial", "closing", "tidak_tertarik"] })
       .notNull()
       .default("baru"),
@@ -2870,6 +2881,8 @@ export const platformLeads = pgTable(
     uniqueIndex("platform_leads_place_id_idx").on(t.placeId),
     index("platform_leads_status_idx").on(t.status),
     index("platform_leads_follow_up_idx").on(t.nextFollowUpDate),
+    index("platform_leads_priority_idx").on(t.priority),
+    index("platform_leads_area_idx").on(t.area),
   ]
 );
 

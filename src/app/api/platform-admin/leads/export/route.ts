@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
-import { LEAD_STATUS_LABEL } from "@/lib/leads/constants";
+import { LEAD_STATUS_LABEL, LEAD_TEMPERATURE_LABEL, distanceKm } from "@/lib/leads/constants";
 import { listLeads, parseLeadFilters } from "@/lib/leads/service";
 import { outletDateYmd } from "@/lib/time/outlet-time";
 
@@ -25,6 +25,15 @@ export async function GET(req: NextRequest) {
       "Website": l.website ?? "",
       "Google Maps": l.mapsUrl ?? "",
       "Status": LEAD_STATUS_LABEL[l.status],
+      "Prioritas": l.priority ?? "",
+      "Suhu": l.temperature ? LEAD_TEMPERATURE_LABEL[l.temperature] : "",
+      "Area": l.area ?? "",
+      "Jarak dari Base (km)": distanceKm(l.lat, l.lng) ?? "",
+      "Billing Sekarang": l.currentBilling ?? "",
+      "Jumlah Unit": l.unitCount ?? "",
+      "Pain Point": l.painPoints ?? "",
+      "Angle Akuisisi": l.acquisitionAngle ?? "",
+      "Next Action": l.nextAction ?? "",
       "Follow Up Berikutnya": l.nextFollowUpDate ?? "",
       "Terakhir Dihubungi": l.lastContactedAt ? l.lastContactedAt.slice(0, 10) : "",
       "Catatan": l.notes ?? "",
