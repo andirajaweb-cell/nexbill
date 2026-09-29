@@ -52,11 +52,37 @@ function formatPriceLabel(raw: string | null): string | null {
 // (not user-facing) so the displayed label can be translated independently below.
 const ALL_CATEGORY = "Semua";
 
+/**
+ * Mode fokus "smart plug" (?fokus=smart-plug) — dibuka dari peringatan TV non-Android di Kontrol
+ * Perangkat. Kategori produk diisi bebas oleh kurator di /platform-admin/affiliate, jadi pencocokan
+ * memakai kata kunci pada kategori ATAU judul asli (Bahasa Indonesia), bukan nama kategori persis.
+ */
+const POLA_SMART_PLUG = /smart\s*-?\s*plug|stop\s*kontak\s*(pintar|wifi|smart)|colokan\s*(pintar|wifi|smart)|saklar\s*(pintar|wifi)|tuya|sonoff|tasmota/i;
+function produkSmartPlug(p: { title: string; category: string | null }): boolean {
+  return POLA_SMART_PLUG.test(`${p.category ?? ""} ${p.title}`);
+}
+
 export default function RekomendasiProdukPage() {
   const { t, lang } = useDashboardLang();
   const [items, setItems] = useState<AffiliateProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORY);
+  const [fokusSmartPlug, setFokusSmartPlug] = useState(false);
+  const [dariDevices, setDariDevices] = useState(false);
+
+  // Dibaca dari window (bukan useSearchParams) supaya halaman tidak perlu dibungkus Suspense.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setFokusSmartPlug(q.get("fokus") === "smart-plug");
+    setDariDevices(q.get("dari") === "devices");
+  }, []);
+
+  const lepasFokus = () => {
+    setFokusSmartPlug(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("fokus");
+    window.history.replaceState(null, "", url.toString());
+  };
 
   useEffect(() => {
     fetchJsonArray<AffiliateProduct>("/api/affiliate-products").then((rows) => {
@@ -89,7 +115,13 @@ export default function RekomendasiProdukPage() {
     return [{ key: ALL_CATEGORY, label: t("rekomendasiProduk.categoryAll", "Semua") }, ...Array.from(byKey, ([key, label]) => ({ key, label }))];
   }, [localized, t]);
 
-  const filtered = activeCategory === ALL_CATEGORY ? localized : localized.filter((p) => p.categoryKey === activeCategory);
+  // Pencocokan smart plug memakai data asli (items), bukan hasil terjemahan, lalu dipetakan ke versi lokal.
+  const idSmartPlug = useMemo(() => new Set(items.filter(produkSmartPlug).map((p) => p.id)), [items]);
+  const filtered = fokusSmartPlug
+    ? localized.filter((p) => idSmartPlug.has(p.id))
+    : activeCategory === ALL_CATEGORY
+      ? localized
+      : localized.filter((p) => p.categoryKey === activeCategory);
 
   return (
     <div className="min-h-screen bg-[#05060a]">
@@ -104,9 +136,15 @@ export default function RekomendasiProdukPage() {
       />
 
       <div className="mx-auto max-w-6xl px-6 py-10">
-        <Link href="/dashboard/billing" className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-amber-300 transition mb-6">
-          <ArrowLeft size={13} /> {t("rekomendasiProduk.backToBilling", "Kembali ke Langganan")}
-        </Link>
+        {dariDevices ? (
+          <Link href="/dashboard/devices" className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-amber-300 transition mb-6">
+            <ArrowLeft size={13} /> {t("rekomendasiProduk.backToDevices", "Kembali ke Kontrol Perangkat")}
+          </Link>
+        ) : (
+          <Link href="/dashboard/billing" className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-amber-300 transition mb-6">
+            <ArrowLeft size={13} /> {t("rekomendasiProduk.backToBilling", "Kembali ke Langganan")}
+          </Link>
+        )}
 
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 bg-amber-500/5 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-amber-300/90 mb-5">
@@ -123,7 +161,28 @@ export default function RekomendasiProdukPage() {
           </p>
         </div>
 
-        {categories.length > 1 && (
+        {fokusSmartPlug && (
+          <div className="mx-auto mb-10 max-w-2xl rounded-2xl border border-amber-400/30 bg-amber-500/[0.06] px-5 py-4 text-center">
+            <div className="text-sm font-semibold text-amber-200">
+              {t("rekomendasiProduk.smartPlug.title", "Smart Plug untuk TV non-Android")}
+            </div>
+            <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
+              {t(
+                "rekomendasiProduk.smartPlug.desc",
+                "Smart TV biasa dan TV analog hanya bisa dinyalakan/dimatikan otomatis lewat smart plug. Pilih yang kompatibel (Tuya/Smart Life, Sonoff eWeLink, atau Tasmota), lalu hubungkan di menu Kontrol Perangkat."
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={lepasFokus}
+              className="mt-3 text-[11px] text-amber-300/80 underline-offset-2 hover:underline"
+            >
+              {t("rekomendasiProduk.smartPlug.showAll", "Lihat semua produk rekomendasi")}
+            </button>
+          </div>
+        )}
+
+        {!fokusSmartPlug && categories.length > 1 && (
           <div className="flex flex-wrap justify-center gap-2 mb-10">
             {categories.map((c) => (
               <button
@@ -147,7 +206,11 @@ export default function RekomendasiProdukPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
             <ShoppingBag className="mx-auto mb-3 text-neutral-700" size={36} />
-            <p className="text-sm text-neutral-500">{t("rekomendasiProduk.emptyState", "Belum ada produk rekomendasi untuk kategori ini.")}</p>
+            <p className="text-sm text-neutral-500">
+              {fokusSmartPlug
+                ? t("rekomendasiProduk.smartPlug.empty", "Rekomendasi smart plug sedang disiapkan tim NEXBILL. Sementara itu, hubungi Customer Service untuk saran smart plug yang kompatibel.")
+                : t("rekomendasiProduk.emptyState", "Belum ada produk rekomendasi untuk kategori ini.")}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

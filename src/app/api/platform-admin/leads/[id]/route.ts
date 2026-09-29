@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { outlets, platformLeadActivities, platformLeads } from "@/db/schema";
+import { outlets, platformLeadActivities, platformLeads, platformWaOutbox } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
 import { LEAD_STATUS_LABEL } from "@/lib/leads/constants";
@@ -22,7 +22,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const [convertedOutlet] = lead.convertedOutletId
       ? await db.select({ id: outlets.id, name: outlets.name }).from(outlets).where(eq(outlets.id, lead.convertedOutletId))
       : [];
-    return NextResponse.json({ lead, activities, convertedOutlet: convertedOutlet ?? null });
+    // Pesan bot WA yang belum terkirim / gagal untuk lead ini (yang sudah terkirim tampil sebagai aktivitas).
+    const waQueue = await db
+      .select({
+        id: platformWaOutbox.id,
+        status: platformWaOutbox.status,
+        templateTitle: platformWaOutbox.templateTitle,
+        body: platformWaOutbox.body,
+        error: platformWaOutbox.error,
+        createdAt: platformWaOutbox.createdAt,
+      })
+      .from(platformWaOutbox)
+      .where(and(eq(platformWaOutbox.leadId, id), inArray(platformWaOutbox.status, ["pending", "sending", "failed"])))
+      .orderBy(desc(platformWaOutbox.createdAt));
+    return NextResponse.json({ lead, activities, convertedOutlet: convertedOutlet ?? null, waQueue });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "UNAUTHENTICATED") return NextResponse.json({ error: "Belum login." }, { status: 401 });
     return NextResponse.json({ error: describeError(err) }, { status: 500 });

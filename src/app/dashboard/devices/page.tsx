@@ -1,5 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { unitButuhSmartPlug, URL_REKOMENDASI_SMART_PLUG } from "@/lib/tv/smart-plug-need";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -29,6 +32,8 @@ interface RentalUnit {
   id: string;
   name: string;
   deviceId: string | null;
+  tvType: string | null;
+  isActive?: boolean | null;
 }
 
 interface RelayAgent {
@@ -121,11 +126,50 @@ export default function DevicesPage() {
   const [claimName, setClaimName] = useState("");
   const [claiming, setClaiming] = useState(false);
 
+  // true setelah perangkat & unit SAMA-SAMA termuat — peringatan smart plug baru dihitung setelah
+  // itu, supaya unit yang sudah terpasang smart plug tidak sempat terbaca "butuh" saat daftar
+  // perangkat belum datang.
+  const [dataLengkap, setDataLengkap] = useState(false);
   const load = () => {
-    fetchJsonArray<Device>("/api/devices").then(setDevices);
-    fetchJsonArray<RentalUnit>("/api/rental-units").then(setUnits);
+    void Promise.all([
+      fetchJsonArray<Device>("/api/devices").then(setDevices),
+      fetchJsonArray<RentalUnit>("/api/rental-units").then(setUnits),
+    ]).then(() => setDataLengkap(true));
     if (outletId) fetchJsonArray<RelayAgent>(`/api/settings/relay-agents?outletId=${outletId}`).then(setRelayAgents);
   };
+
+  // --- Peringatan TV non-Android yang belum punya smart plug ---
+  const router = useRouter();
+  const butuhSmartPlug = useMemo(() => (dataLengkap ? unitButuhSmartPlug(units, devices) : []), [dataLengkap, units, devices]);
+  const popupSudahTampil = useRef(false);
+  useEffect(() => {
+    if (!canManage || !outletId || butuhSmartPlug.length === 0 || popupSudahTampil.current) return;
+    popupSudahTampil.current = true;
+    // Pop-up cukup sekali per sesi browser per outlet; setelah ditutup, banner di halaman tetap ada.
+    const kunci = `nexbill.devices.peringatanSmartPlug.${outletId}`;
+    try {
+      if (window.sessionStorage.getItem(kunci)) return;
+      window.sessionStorage.setItem(kunci, "1");
+    } catch {
+      /* sessionStorage tidak tersedia — tetap tampilkan */
+    }
+    const nama = butuhSmartPlug.slice(0, 6).map((u) => u.name).join(", ") + (butuhSmartPlug.length > 6 ? ", …" : "");
+    void showConfirm(
+      t(
+        "devices.smartPlugWarn.body",
+        "Ada {n} unit dengan TV non-Android (smart TV biasa / TV analog) yang belum terpasang smart plug: {units}.\n\nTV jenis ini tidak bisa dinyalakan/dimatikan otomatis lewat NexbillAgent — satu-satunya cara adalah smart plug yang mengatur aliran listriknya. Tanpa smart plug, TV di unit tersebut harus dinyalakan/dimatikan manual oleh staf."
+      )
+        .replace("{n}", String(butuhSmartPlug.length))
+        .replace("{units}", nama),
+      {
+        title: t("devices.smartPlugWarn.title", "TV non-Android perlu Smart Plug"),
+        confirmLabel: t("devices.smartPlugWarn.cta", "Lihat Rekomendasi Smart Plug"),
+        cancelLabel: t("devices.smartPlugWarn.later", "Nanti saja"),
+      }
+    ).then((ok) => {
+      if (ok) router.push(URL_REKOMENDASI_SMART_PLUG);
+    });
+  }, [canManage, outletId, butuhSmartPlug, router, t]);
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
     if (outlet) setOutletId(outlet.id);
@@ -312,6 +356,28 @@ export default function DevicesPage() {
           {!canManage && t("devices.pageSubtitleViewOnly", " Kamu hanya bisa menyalakan/mematikan — hanya role tertentu yang bisa tambah/edit/hapus perangkat.")}
         </p>
       </div>
+
+      {canManage && butuhSmartPlug.length > 0 && (
+        <Card className="border border-amber-500/40 bg-amber-950/20">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <h2 className="font-medium text-amber-200">
+                {t("devices.smartPlugWarn.bannerTitle", "{n} unit TV non-Android belum punya smart plug").replace("{n}", String(butuhSmartPlug.length))}
+              </h2>
+              <p className="text-xs text-neutral-400 mt-1">
+                {butuhSmartPlug.map((u) => u.name).join(", ")} —{" "}
+                {t("devices.smartPlugWarn.bannerDesc", "TV di unit ini harus dinyalakan/dimatikan manual sampai smart plug dipasang dan dihubungkan di halaman ini.")}
+              </p>
+            </div>
+            <Link
+              href={URL_REKOMENDASI_SMART_PLUG}
+              className="shrink-0 rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-500/25 text-center"
+            >
+              {t("devices.smartPlugWarn.cta", "Lihat Rekomendasi Smart Plug")}
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {canManage && <DeviceSetupGuide />}
 

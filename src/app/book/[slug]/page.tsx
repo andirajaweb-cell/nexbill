@@ -561,7 +561,7 @@ export default function PublicBookingPage() {
                   {result.status === "waitlisted" && `Waiting list posisi #${result.waitlistPosition}`}
                 </div>
                 <div className="text-[#93a2c4]">Jadwal: {new Date(result.scheduledStart).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</div>
-                <p className="text-xs text-[#93a2c4]">Simpan kode ini untuk cek status atau tunjukkan ke kasir saat datang. Konfirmasi juga dikirim ke WhatsApp kamu.</p>
+                <p className="text-xs text-[#93a2c4]">Simpan kode ini (screenshot halaman ini) untuk cek status atau tunjukkan ke kasir saat datang.</p>
                 <button onClick={() => setResult(null)} className="text-xs text-blue-300 underline mt-2 hover:text-blue-200">Buat booking lain</button>
               </div>
             ) : (

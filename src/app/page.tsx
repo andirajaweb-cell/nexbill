@@ -1149,14 +1149,11 @@ function LandingPageInner() {
       </section>
 
       {/* SECTION: HARGA & ADD-ONS */}
-      {/* HARGA — premium redesign: satu "bundle" visual (kartu langganan + konektor "+" + kartu
-          hardware opsional) menggantikan layout lama (kartu tunggal + grid 3-addon terpisah),
-          dengan glow gradient di latar dan trust-row metode pembayaran iPaymu di bawah CTA. Harga
-          Smart Plug diturunkan lagi ke Rp149.000/unit (dari Rp249.000 sebelumnya) — ditampilkan
-          dengan framing "mulai dari" karena harga aktual dikontrol dari platform-admin (Plans) dan
-          bisa naik untuk varian smart plug lain di masa depan. Fallback ke literal 149.000 kalau
-          pricingEntry belum termuat ATAU kalau admin belum sempat mengisi angka realnya (nilai 0
-          dianggap "belum diisi", bukan harga sungguhan Rp0). */}
+      {/* HARGA — satu kartu "Paket Lengkap" dengan glow gradient di latar dan trust-row metode
+          pembayaran iPaymu di bawah CTA. Kartu Smart Plug "Opsional" yang dulu terpisah (dengan
+          konektor "+") sudah digabung ke dalam kartu ini, TANPA menampilkan harga smart plug —
+          harga smart plug tetap dikontrol dari platform-admin (Plans) dan hanya muncul di alur
+          daftar/billing. Harga langganan: fallback ke literal kalau pricingEntry belum termuat. */}
       <section id="harga" style={{ backgroundColor: 'transparent', position: 'relative', overflow: 'hidden' }}>
         <div className="harga-glow" aria-hidden="true" />
         <div className="wrap">
@@ -1183,6 +1180,37 @@ function LandingPageInner() {
                   <li key={i}><span className="check">✓</span> {f}</li>
                 ))}
               </ul>
+
+              {/* Smart Plug digabung ke dalam kartu Paket Lengkap (dulu kartu "Opsional" terpisah).
+                  Harga smart plug SENGAJA tidak ditampilkan di halaman publik — cukup info fungsi &
+                  kompatibilitasnya; harga/pemesanan diurus lewat dashboard/tim support. */}
+              <div className="price-smartplug">
+                <div className="price-smartplug-head">
+                  <div className="price-smartplug-photo">
+                    <picture>
+                      <source srcSet="/smart-plug.webp" type="image/webp" />
+                      <img src="/smart-plug.jpg" alt="Smart Plug WiFi Tuya" loading="lazy" decoding="async" width={500} height={500} />
+                    </picture>
+                  </div>
+                  <div>
+                    <h4>{t.harga.addonTitle}</h4>
+                    <p>{t.harga.addonDesc}</p>
+                  </div>
+                </div>
+                {/* Hanya TV tanpa kontrol jaringan sendiri (analog/tabung, TV digital biasa, smart TV
+                    non-Android) yang butuh smart plug fisik; Android TV dikontrol langsung lewat software. */}
+                <div className="addon-compat">
+                  <div className="addon-compat-row addon-compat-need">
+                    <span className="addon-compat-icon">✓</span>
+                    <span><strong>{t.harga.compatNeedLabel}</strong> {t.harga.compatNeedText}</span>
+                  </div>
+                  <div className="addon-compat-row addon-compat-skip">
+                    <span className="addon-compat-icon">–</span>
+                    <span><strong>{t.harga.compatSkipLabel}</strong> {t.harga.compatSkipText}</span>
+                  </div>
+                </div>
+              </div>
+
               <Link href="/daftar" className="btn btn-primary btn-block">{t.harga.cta}</Link>
 
               <div className="price-pay-trust">
@@ -1193,52 +1221,6 @@ function LandingPageInner() {
                   ))}
                 </div>
               </div>
-            </div>
-
-            <div className="harga-connector" aria-hidden="true">
-              <span className="harga-connector-line" />
-              <span className="harga-connector-plus">+</span>
-              <span className="harga-connector-line" />
-            </div>
-
-            <div className="addon-card addon-card-premium">
-              <div className="addon-card-tag">{t.harga.addonTag}</div>
-              <div className="addon-photo">
-                <picture>
-                  <source srcSet="/smart-plug.webp" type="image/webp" />
-                  <img src="/smart-plug.jpg" alt="Smart Plug WiFi Tuya" loading="lazy" decoding="async" width={500} height={500} />
-                </picture>
-              </div>
-              <h4>{t.harga.addonTitle}</h4>
-              <div className="a-price">
-                {t.harga.addonFromPrefix}
-                {pricingEntry && pricingEntry.smartPlugPrice > 0 ? formatPlanPrice(pricingEntry.currency, pricingEntry.smartPlugPrice) : "Rp149.000"}
-                <span>{t.harga.addonPriceSuffix}</span>
-              </div>
-              <p>{t.harga.addonDesc}</p>
-              {/* Kompatibilitas: hanya TV yang TIDAK punya kontrol jaringan sendiri yang butuh smart
-                  plug fisik ini (TV analog/tabung, TV digital biasa, dan smart TV non-Android seperti
-                  Viva OS/Hisense OS/webOS dll — Tuya-nya yang mengendalikan aliran listrik ke TV).
-                  Android TV sudah punya sistem operasi berbasis Android yang bisa dikontrol/dimatikan
-                  langsung lewat integrasi software NEXBILL tanpa hardware tambahan, jadi TIDAK perlu
-                  beli smart plug untuk unit Android TV. */}
-              <div className="addon-compat">
-                <div className="addon-compat-row addon-compat-need">
-                  <span className="addon-compat-icon">✓</span>
-                  <span><strong>{t.harga.compatNeedLabel}</strong> {t.harga.compatNeedText}</span>
-                </div>
-                <div className="addon-compat-row addon-compat-skip">
-                  <span className="addon-compat-icon">–</span>
-                  <span><strong>{t.harga.compatSkipLabel}</strong> {t.harga.compatSkipText}</span>
-                </div>
-              </div>
-              {/* Opsi "beli smart plug sendiri + biaya integrasi Rp50.000/unit" SENGAJA tidak
-                  ditampilkan di halaman harga publik ini (per keputusan eksplisit user) — supaya
-                  pesan "satu harga, tanpa biaya tersembunyi" tetap simpel & tidak menambah cabang
-                  pilihan yang bisa membingungkan calon pelanggan di titik ini. Opsi itu tetap ada,
-                  tapi dipindah ke alur onboarding/setup di dashboard (lihat DeviceSetupGuide di
-                  src/app/dashboard/devices), di mana tim support bisa cek dulu kompatibilitas unit
-                  yang dipunyai customer sebelum disetujui — lebih aman dari sisi support/garansi. */}
             </div>
           </div>
         </div>

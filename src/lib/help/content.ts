@@ -178,7 +178,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         intro: "Lewati bagian ini kalau customer walk-in langsung tanpa reservasi.",
         steps: [
           "Customer reservasi lewat WhatsApp/telepon → kasir input manual di menu Booking, ATAU customer reservasi sendiri lewat link halaman booking publik outlet (dari Pengaturan → Business & Tax).",
-          "Kalau jadwal yang diminta bentrok, booking otomatis masuk Waiting List, bukan ditolak — sistem kirim reminder WhatsApp otomatis di H-24 jam, H-2 jam, dan H-15 menit sebelum jadwal.",
+          "Kalau jadwal yang diminta bentrok, booking otomatis masuk Waiting List, bukan ditolak. Kalau perlu mengingatkan customer, hubungi manual lewat nomor WhatsApp di detail booking.",
           "Saat customer datang, kasir cukup ketik kode booking di kotak \"Cari Kode Booking\" untuk check-in cepat — unit otomatis ditandai terpakai.",
         ],
       },
@@ -367,7 +367,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       "\"Batalkan No-show\" (mengembalikan status ke Confirmed) hanya terlihat untuk akun Owner/Superuser, dan hanya pada booking yang statusnya sedang No-show.",
     ],
     notes: [
-      "Reminder WhatsApp otomatis terkirim di H-24 jam, H-2 jam, dan 15 menit sebelum jadwal mulai — ini berjalan otomatis lewat scheduler, tidak perlu dipicu manual.",
+      "Pengingat WhatsApp otomatis ke customer saat ini tidak aktif — kalau perlu, ingatkan customer secara manual lewat nomor WhatsApp yang tercatat di booking.",
       "Booking yang tidak pernah di-check-in akan otomatis dilepas (auto-release) oleh scheduler setelah lewat batas waktu.",
       "Badge warna pada tiap booking menunjukkan sumbernya: Kasir (input manual), Online (booking publik), atau WhatsApp.",
     ],

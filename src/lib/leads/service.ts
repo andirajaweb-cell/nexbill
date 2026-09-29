@@ -134,7 +134,8 @@ export async function leadSummary() {
   return { counts, dueCount: due?.count ?? 0, cities: cities.map((c) => c.city as string), areas: areas.map((a) => a.area as string) };
 }
 
-export async function addLeadActivity(leadId: string, type: LeadActivityType, content: string, admin: { sub: string; name: string }) {
+/** admin.sub null = dicatat oleh sistem (mis. bot WhatsApp mencatat balasan masuk dari lead). */
+export async function addLeadActivity(leadId: string, type: LeadActivityType, content: string, admin: { sub: string | null; name: string }) {
   const [row] = await db
     .insert(platformLeadActivities)
     .values({ leadId, type, content, createdBy: admin.sub, createdByName: admin.name })

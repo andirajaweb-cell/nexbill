@@ -23,6 +23,8 @@ import {
   type LeadTemperature,
   type PlaceResult,
 } from "@/lib/leads/constants";
+import { leadWaNumber } from "@/lib/leads/wa-template";
+import { WaComposer, WaTemplatesTab } from "./wa-templates";
 
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 
@@ -56,10 +58,7 @@ const SORT_LABEL: Record<SortKey, string> = {
   ulasan: "Jumlah ulasan",
 };
 
-const WA_TEMPLATE = (name: string) =>
-  `Halo kak, pemilik ${name}? Saya dari NEXBILL — aplikasi kasir & billing khusus rental PS: TV nyala/mati otomatis sesuai sesi, booking, member, stok F&B, dan laporan keuangan dalam satu aplikasi. Boleh saya kirim demo singkatnya?`;
-
-const waLink = (wa: string, name: string) => `https://wa.me/${wa}?text=${encodeURIComponent(WA_TEMPLATE(name))}`;
+// Pesan WA sekarang disusun dari Template WA per tahap (tab "Template WA", lihat ./wa-templates.tsx).
 
 interface Lead {
   id: string;
@@ -91,6 +90,18 @@ interface Lead {
   source: "google_maps" | "manual";
   searchQuery: string | null;
   convertedOutletId: string | null;
+  /** Balasan WA dari lead ke nomor bot CRM yang belum dibuka admin (migrasi 0026). */
+  inboundUnread?: boolean;
+  lastInboundAt?: string | null;
+  createdAt: string;
+}
+
+interface WaQueueItem {
+  id: string;
+  status: "pending" | "sending" | "failed";
+  templateTitle: string | null;
+  body: string;
+  error: string | null;
   createdAt: string;
 }
 
@@ -141,7 +152,7 @@ function StatusPill({ status }: { status: LeadStatus }) {
 }
 
 export default function PlatformLeadsPage() {
-  const [tab, setTab] = useState<"crm" | "search">("crm");
+  const [tab, setTab] = useState<"crm" | "templates" | "search">("crm");
 
   return (
     <div className="space-y-6">
@@ -152,22 +163,23 @@ export default function PlatformLeadsPage() {
         </p>
       </div>
 
-      <div className="flex gap-2 border-b border-white/10">
+      <div className="flex gap-1 sm:gap-2 border-b border-white/10 overflow-x-auto">
         {([
           ["crm", "Pipeline CRM"],
+          ["templates", "Template WA"],
           ["search", "Cari di Google Maps"],
         ] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={clsx("px-4 py-2 text-sm -mb-px border-b-2 transition", tab === key ? "border-amber-400 text-amber-300" : "border-transparent text-neutral-500 hover:text-neutral-300")}
+            className={clsx("shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 text-sm -mb-px border-b-2 transition", tab === key ? "border-amber-400 text-amber-300" : "border-transparent text-neutral-500 hover:text-neutral-300")}
           >
             {label}
           </button>
         ))}
       </div>
 
-      {tab === "crm" ? <CrmTab /> : <SearchTab onImported={() => setTab("crm")} />}
+      {tab === "crm" ? <CrmTab /> : tab === "templates" ? <WaTemplatesTab /> : <SearchTab onImported={() => setTab("crm")} />}
     </div>
   );
 }
@@ -179,6 +191,7 @@ function SearchTab({ onImported }: { onImported: () => void }) {
   const [keyword, setKeyword] = useState("rental ps");
   const [location, setLocation] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
+  const [activeLocation, setActiveLocation] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -215,6 +228,7 @@ function SearchTab({ onImported }: { onImported: () => void }) {
     const q = [keyword.trim(), location.trim()].filter(Boolean).join(" di ");
     if (!q) return;
     setActiveQuery(q);
+    setActiveLocation(location.trim());
     runSearch(q);
   };
 
@@ -231,7 +245,7 @@ function SearchTab({ onImported }: { onImported: () => void }) {
     if (places.length === 0) return;
     setBusy(true);
     try {
-      const data = await send("/api/platform-admin/leads/import", "POST", { places, searchQuery: activeQuery });
+      const data = await send("/api/platform-admin/leads/import", "POST", { places, searchQuery: activeQuery, area: activeLocation });
       await showAlert(`${data.inserted} prospek tersimpan ke CRM${data.skipped ? `, ${data.skipped} dilewati karena sudah ada` : ""}.`);
       onImported();
     } catch (e) {
@@ -353,6 +367,8 @@ function CrmTab() {
   const [sort, setSort] = useState<SortKey>("terbaru");
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [waLead, setWaLead] = useState<Lead | null>(null);
+  const [onlyReplies, setOnlyReplies] = useState(false);
 
   const query = new URLSearchParams({
     ...(status && { status }),
@@ -389,8 +405,10 @@ function CrmTab() {
     if (sort === "prioritas") rows.sort((a, b) => rank(a.priority) - rank(b.priority) || (b.reviewCount ?? 0) - (a.reviewCount ?? 0));
     else if (sort === "jarak") rows.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
     else if (sort === "ulasan") rows.sort((a, b) => (b.reviewCount ?? 0) - (a.reviewCount ?? 0));
-    return rows;
-  }, [data, sort]);
+    return onlyReplies ? rows.filter((l) => l.inboundUnread) : rows;
+  }, [data, sort, onlyReplies]);
+  // Dihitung dari daftar yang sedang dimuat (sesuai filter aktif lainnya).
+  const replyCount = (data?.leads ?? []).filter((l) => l.inboundUnread).length;
 
   // Funnel: how many leads reached each stage (at it or beyond), and the share that got past the previous one.
   const funnel = useMemo(() => {
@@ -485,6 +503,11 @@ function CrmTab() {
           <Button variant={due ? "primary" : "secondary"} onClick={() => { setDue(!due); setStatus(""); }}>
             Jatuh Tempo Follow Up{data ? ` (${data.dueCount})` : ""}
           </Button>
+          {(replyCount > 0 || onlyReplies) && (
+            <Button variant={onlyReplies ? "primary" : "secondary"} onClick={() => setOnlyReplies(!onlyReplies)} title="Lead yang membalas WhatsApp bot dan belum dibuka">
+              Balasan WA Baru ({replyCount})
+            </Button>
+          )}
           <a href={`/api/platform-admin/leads/export?${query}`} className="rounded-lg px-3 py-2 text-sm font-medium bg-white/5 border border-white/10 text-neutral-100 hover:bg-white/10">Export Excel</a>
           <Button variant="secondary" onClick={() => setShowAdd(true)}>+ Lead Manual</Button>
         </div>
@@ -522,6 +545,14 @@ function CrmTab() {
                         <div className="flex items-center gap-2">
                           <button onClick={() => setOpenId(l.id)} className="text-left text-neutral-100 hover:text-amber-300">{l.name}</button>
                           <TemperaturePill temperature={l.temperature} />
+                          {l.inboundUnread && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 whitespace-nowrap"
+                              title={l.lastInboundAt ? `Balasan WA masuk ${fmtDateTime(l.lastInboundAt)}` : "Balasan WA baru"}
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Balasan baru
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-neutral-500">
                           {l.category ?? (l.source === "manual" ? "Input manual" : "—")}
@@ -549,7 +580,9 @@ function CrmTab() {
                         {overdue && <div className="text-[10px]">jatuh tempo</div>}
                       </td>
                       <td className="py-2 whitespace-nowrap space-x-2 text-[12px]">
-                        {l.waNumber && <a href={waLink(l.waNumber, l.name)} target="_blank" rel="noreferrer" className="text-emerald-400 hover:underline">WA</a>}
+                        {leadWaNumber(l.waNumber, l.phone) && (
+                          <button onClick={() => setWaLead(l)} className="text-emerald-400 hover:underline" title="Kirim WA dengan template sesuai tahap">WA</button>
+                        )}
                         {l.mapsUrl && <a href={l.mapsUrl} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">Maps</a>}
                         <button onClick={() => setOpenId(l.id)} className="text-amber-300 hover:underline">Detail</button>
                       </td>
@@ -562,6 +595,16 @@ function CrmTab() {
         )}
       </Card>
 
+      {waLead && (
+        <WaComposer
+          leadId={waLead.id}
+          status={waLead.status}
+          waNumber={leadWaNumber(waLead.waNumber, waLead.phone)}
+          lead={waLead}
+          onClose={() => setWaLead(null)}
+          onSent={load}
+        />
+      )}
       {openId && <LeadDetail id={openId} onClose={() => setOpenId(null)} onChanged={load} />}
       {showAdd && <AddLeadModal onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
     </div>
@@ -578,11 +621,18 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
   const [act, setAct] = useState<{ type: LeadActivityType; content: string; nextFollowUpDate: string }>({ type: "whatsapp", content: "", nextFollowUpDate: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [composer, setComposer] = useState(false);
+  const [waQueue, setWaQueue] = useState<WaQueueItem[]>([]);
 
-  function apply(d: { lead: Lead; activities: Activity[] } | null) {
+  function apply(d: { lead: Lead; activities: Activity[]; waQueue?: WaQueueItem[] } | null) {
     if (!d) return;
     setLead(d.lead);
     setActivities(d.activities);
+    setWaQueue(d.waQueue ?? []);
+    // Membuka detail = balasan WA dari lead dianggap sudah dibaca.
+    if (d.lead.inboundUnread) {
+      void fetch(`/api/platform-admin/leads/${d.lead.id}/read`, { method: "POST" }).then(() => onChanged());
+    }
     setForm({
       name: d.lead.name,
       contactName: d.lead.contactName ?? "",
@@ -604,7 +654,17 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
     });
   }
 
-  const load = useCallback(() => fetchJsonObject<{ lead: Lead; activities: Activity[] }>(`/api/platform-admin/leads/${id}`).then(apply), [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const load = useCallback(() => fetchJsonObject<{ lead: Lead; activities: Activity[]; waQueue?: WaQueueItem[] }>(`/api/platform-admin/leads/${id}`).then(apply), [id]);
+
+  const waQueueAction = async (qid: string, action: "retry" | "cancel") => {
+    try {
+      await send(`/api/platform-admin/wa-bot/outbox/${qid}`, "POST", { action });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   useEffect(() => {
     load();
@@ -677,8 +737,12 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
                     {" · "}
                     {lead.source === "google_maps" ? `Google Maps: "${lead.searchQuery ?? "-"}"` : "Input manual"}
                   </div>
-                  <div className="flex gap-3 mt-2 text-[12px]">
-                    {lead.waNumber && <a href={waLink(lead.waNumber, lead.name)} target="_blank" rel="noreferrer" className="text-emerald-400 hover:underline">Chat WhatsApp</a>}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[12px]">
+                    {(lead.waNumber || lead.phone) && (
+                      <button type="button" onClick={() => setComposer(true)} className="text-emerald-400 hover:underline">
+                        Kirim WhatsApp (Template)
+                      </button>
+                    )}
                     {lead.phone && <a href={`tel:${lead.phone.replace(/[^\d+]/g, "")}`} className="text-cyan-400 hover:underline">Telepon</a>}
                     {lead.mapsUrl && <a href={lead.mapsUrl} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">Google Maps</a>}
                     {lead.website && <a href={lead.website} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">Website</a>}
@@ -755,6 +819,37 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
                 </div>
               </div>
 
+              {waQueue.length > 0 && (
+                <div className="border-t border-white/10 pt-4 space-y-2">
+                  <h3 className="gm-heading font-semibold text-sm">Antrean Bot WhatsApp</h3>
+                  {waQueue.map((q) => (
+                    <div key={q.id} className="rounded-lg border border-white/10 px-3 py-2 text-sm">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={clsx(
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            q.status === "failed" ? "text-rose-300 bg-rose-500/10" : "text-sky-300 bg-sky-500/10"
+                          )}
+                        >
+                          {q.status === "failed" ? "Gagal" : q.status === "sending" ? "Mengirim" : "Menunggu bot"}
+                        </span>
+                        <span className="text-xs text-neutral-400">{q.templateTitle ? `Template "${q.templateTitle}"` : "Pesan bebas"}</span>
+                        <span className="flex-1" />
+                        <span className="text-[11px] text-neutral-500">{fmtDateTime(q.createdAt)}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-neutral-400 line-clamp-2 whitespace-pre-line">{q.body}</div>
+                      {q.error && <div className="mt-1 text-xs text-rose-300">{q.error}</div>}
+                      {q.status !== "sending" && (
+                        <div className="mt-1.5 flex gap-3 text-xs">
+                          {q.status === "failed" && <button className="text-amber-300 hover:underline" onClick={() => void waQueueAction(q.id, "retry")}>Kirim ulang</button>}
+                          <button className="text-rose-400 hover:underline" onClick={() => void waQueueAction(q.id, "cancel")}>Batalkan</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="border-t border-white/10 pt-4 space-y-3">
                 <h3 className="gm-heading font-semibold text-sm">Catat Aktivitas Follow Up</h3>
                 <form onSubmit={logActivity} className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-end">
@@ -795,6 +890,28 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
           )}
         </Card>
       </div>
+      {composer && lead && (
+        <WaComposer
+          leadId={lead.id}
+          status={lead.status}
+          waNumber={leadWaNumber(lead.waNumber, lead.phone)}
+          // Pakai isian form terbaru (mis. nama kontak yang baru diketik) supaya sapaan langsung benar.
+          lead={{
+            name: form.name || lead.name,
+            contactName: form.contactName ?? lead.contactName,
+            city: form.city ?? lead.city,
+            area: form.area ?? lead.area,
+            unitCount: form.unitCount ? Number(form.unitCount) : lead.unitCount,
+            currentBilling: form.currentBilling ?? lead.currentBilling,
+            painPoints: form.painPoints ?? lead.painPoints,
+          }}
+          onClose={() => setComposer(false)}
+          onSent={() => {
+            void load();
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }

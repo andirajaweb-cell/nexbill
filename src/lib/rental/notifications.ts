@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { bookingNotifications, outlets } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { OUTLET_WHATSAPP_NOTIFICATIONS_ENABLED } from "@/lib/notifications/outlet-whatsapp";
 
 export type BookingNotificationType =
   | "reminder_h24"
@@ -37,6 +38,8 @@ export async function queueBookingNotification(input: {
   phone?: string | null;
   message: string;
 }) {
+  // Notifikasi WA ke pelanggan outlet dimatikan — lihat lib/notifications/outlet-whatsapp.ts.
+  if (!OUTLET_WHATSAPP_NOTIFICATIONS_ENABLED) return null;
   if (!input.phone) return null;
 
   const [existing] = await db

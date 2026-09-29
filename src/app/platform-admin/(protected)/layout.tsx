@@ -1,29 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getPlatformSession } from "@/lib/auth/platform-session";
-import { PlatformAdminTopBar } from "@/components/platform-admin/PlatformAdminTopBar";
+import { PlatformAdminShell } from "@/components/platform-admin/PlatformAdminShell";
 
-const NAV = [
-  { href: "/platform-admin", label: "Ringkasan" },
-  { href: "/platform-admin/outlets", label: "Outlet / Merchant" },
-  { href: "/platform-admin/leads", label: "Leads & CRM" },
-  { href: "/platform-admin/announcements", label: "Pengumuman" },
-  { href: "/platform-admin/subscriptions", label: "Penjualan Langganan" },
-  { href: "/platform-admin/cogs", label: "COGS Aplikasi" },
-  { href: "/platform-admin/purchases", label: "Pembelian" },
-  { href: "/platform-admin/performance", label: "Performance" },
-  { href: "/platform-admin/accounting", label: "Accounting per Outlet" },
-  { href: "/platform-admin/support", label: "Customer Service" },
-  { href: "/platform-admin/plans", label: "Produk Langganan" },
-  { href: "/platform-admin/market-risk", label: "Market Risk (Kurs)" },
-  { href: "/platform-admin/products", label: "Etalase Produk" },
-  { href: "/platform-admin/affiliate", label: "Rekomendasi Produk" },
-  { href: "/platform-admin/referrals", label: "Program Referral" },
-  { href: "/platform-admin/marketplace-disputes", label: "Sengketa Marketplace" },
-  { href: "/platform-admin/ipaymu", label: "iPaymu (Gateway)" },
-  { href: "/platform-admin/relay-agents", label: "Relay Agent (TV)" },
-  { href: "/platform-admin/hardware", label: "Hardware (Smart Plug)" },
-];
+// Daftar menu (dikelompokkan + ikon) sekarang ada di components/platform-admin/PlatformAdminShell.tsx.
 
 /**
  * Server-guarded shell for the entire /platform-admin/** tree (except /platform-admin/login,
@@ -37,29 +16,5 @@ export default async function PlatformAdminLayout({ children }: { children: Reac
   const session = await getPlatformSession();
   if (!session) redirect("/platform-admin/login");
 
-  return (
-    <div className="min-h-screen bg-[#05060d] text-neutral-100 flex">
-      <aside className="w-56 shrink-0 border-r border-white/10 bg-[#07080f] flex flex-col">
-        <div className="px-4 py-4 border-b border-white/10">
-          <div className="gm-display text-sm font-bold text-amber-400">NEXBILL</div>
-          <div className="text-[10px] uppercase tracking-widest text-neutral-500">Platform Control</div>
-        </div>
-        <nav className="flex-1 py-3 space-y-0.5">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className="block px-4 py-2 text-sm text-neutral-400 hover:text-amber-300 hover:bg-white/5 transition"
-            >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex-1 flex flex-col min-w-0">
-        <PlatformAdminTopBar name={session.name} />
-        <main className="flex-1 p-6 overflow-y-auto">{children}</main>
-      </div>
-    </div>
-  );
+  return <PlatformAdminShell name={session.name}>{children}</PlatformAdminShell>;
 }

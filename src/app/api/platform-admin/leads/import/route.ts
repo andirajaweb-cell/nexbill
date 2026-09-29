@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { platformLeads } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
@@ -18,6 +19,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const places: Partial<PlaceResult>[] = Array.isArray(body.places) ? body.places : [];
     const searchQuery = str(body.searchQuery);
+    // The "Lokasi" typed in the search box becomes the lead's area, so the CRM can filter/route by it.
+    const area = str(body.area);
 
     const rows = places
       .filter((p) => str(p.placeId) && str(p.name))
@@ -38,14 +41,25 @@ export async function POST(req: NextRequest) {
         rating: num(p.rating),
         reviewCount: num(p.reviewCount),
         businessStatus: str(p.businessStatus),
+        area,
         createdBy: session.sub,
       }));
 
     if (rows.length === 0) return NextResponse.json({ error: "Tidak ada hasil yang dipilih." }, { status: 400 });
 
+    // Same outlet already in the CRM under the same name (manual/seeded leads have no Place ID) → skip.
+    const names = rows.map((r) => r.name.toLowerCase());
+    const sameName = await db
+      .select({ name: sql<string>`lower(trim(${platformLeads.name}))` })
+      .from(platformLeads)
+      .where(inArray(sql`lower(trim(${platformLeads.name}))`, names));
+    const taken = new Set(sameName.map((e) => e.name));
+    const fresh = rows.filter((r) => !taken.has(r.name.toLowerCase()));
+    if (fresh.length === 0) return NextResponse.json({ inserted: 0, skipped: rows.length });
+
     const inserted = await db
       .insert(platformLeads)
-      .values(rows)
+      .values(fresh)
       .onConflictDoNothing({ target: platformLeads.placeId })
       .returning({ id: platformLeads.id });
 

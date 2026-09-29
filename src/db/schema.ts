@@ -2874,6 +2874,9 @@ export const platformLeads = pgTable(
     notes: text("notes"),
     // Diisi saat prospek sudah jadi pelanggan — menautkan ke outlet NEXBILL-nya.
     convertedOutletId: text("converted_outlet_id").references(() => outlets.id),
+    // Balasan WhatsApp masuk dari lead ke nomor bot CRM (migrasi 0026).
+    lastInboundAt: text("last_inbound_at"),
+    inboundUnread: boolean("inbound_unread").notNull().default(false),
     createdBy: text("created_by").references(() => platformAdmins.id),
     ...timestamps,
   },
@@ -2900,4 +2903,63 @@ export const platformLeadActivities = pgTable(
     createdAt: text("created_at").notNull().$defaultFn(nowIso),
   },
   (t) => [index("platform_lead_activities_lead_idx").on(t.leadId)]
+);
+
+/*
+ * Template pesan WhatsApp per tahap pipeline CRM (migrasi 0025). stage = status lead atau "umum";
+ * element = unsur pesan (lihat WA_TEMPLATE_ELEMENTS di lib/leads/wa-template.ts). Teks boleh berisi
+ * placeholder {nama_usaha}, {nama_kontak}, dst. yang diisi dari data lead saat dikirim.
+ */
+export const platformWaTemplates = pgTable(
+  "platform_wa_templates",
+  {
+    id: id(),
+    stage: text("stage").notNull(),
+    element: text("element").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    usageCount: integer("usage_count").notNull().default(0),
+    lastUsedAt: text("last_used_at"),
+    createdBy: text("created_by").references(() => platformAdmins.id),
+    ...timestamps,
+  },
+  (t) => [index("platform_wa_templates_stage_idx").on(t.stage, t.sortOrder)]
+);
+
+/*
+ * Bot WhatsApp NEXBILL khusus CRM platform-admin (migrasi 0026). Satu baris status (id "main")
+ * ditulis oleh scripts/whatsapp-bot.mts; outbox berisi pesan ke lead yang menunggu dikirim bot.
+ */
+export const platformWaBotStatus = pgTable("platform_wa_bot_status", {
+  id: text("id").primaryKey(),
+  connected: boolean("connected").notNull().default(false),
+  number: text("number"),
+  qrDataUrl: text("qr_data_url"),
+  lastHeartbeatAt: text("last_heartbeat_at"),
+  lastError: text("last_error"),
+  updatedAt: text("updated_at").notNull().$defaultFn(nowIso),
+});
+
+export const platformWaOutbox = pgTable(
+  "platform_wa_outbox",
+  {
+    id: id(),
+    leadId: text("lead_id")
+      .notNull()
+      .references(() => platformLeads.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    body: text("body").notNull(),
+    templateId: text("template_id").references(() => platformWaTemplates.id, { onDelete: "set null" }),
+    templateTitle: text("template_title"),
+    status: text("status", { enum: ["pending", "sending", "sent", "failed"] }).notNull().default("pending"),
+    error: text("error"),
+    attempts: integer("attempts").notNull().default(0),
+    createdBy: text("created_by").references(() => platformAdmins.id),
+    createdByName: text("created_by_name"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+    sentAt: text("sent_at"),
+  },
+  (t) => [index("platform_wa_outbox_status_idx").on(t.status, t.createdAt), index("platform_wa_outbox_lead_idx").on(t.leadId)]
 );

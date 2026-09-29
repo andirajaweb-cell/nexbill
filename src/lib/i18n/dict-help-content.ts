@@ -384,11 +384,11 @@ registerDict({
     vi: 'Nút "Hoàn tác Không đến" (đưa trạng thái về Confirmed) chỉ hiện với tài khoản Owner/Superuser, và chỉ trên các đặt chỗ đang ở trạng thái No-show.',
   },
   "help.content.booking.note0": {
-    en: "Automatic WhatsApp reminders are sent at 24h before, 2h before, and 15 minutes before the start time — this runs automatically via a scheduler, no manual trigger needed.",
-    ms: "Peringatan WhatsApp automatik dihantar 24 jam sebelum, 2 jam sebelum, dan 15 minit sebelum waktu mula — ini berjalan automatik melalui penjadual, tiada cetusan manual diperlukan.",
-    th: "การแจ้งเตือน WhatsApp อัตโนมัติจะถูกส่งที่ 24 ชั่วโมงก่อน 2 ชั่วโมงก่อน และ 15 นาทีก่อนเวลาเริ่ม — ทำงานอัตโนมัติผ่านตัวจัดตารางเวลา ไม่ต้องเรียกใช้ด้วยตนเอง",
-    fil: "Awtomatikong ipinapadala ang WhatsApp reminder 24 oras bago, 2 oras bago, at 15 minuto bago ang oras ng simula — awtomatiko itong tumatakbo sa pamamagitan ng scheduler, walang kailangang manual na i-trigger.",
-    vi: "Nhắc nhở WhatsApp tự động được gửi trước 24 giờ, trước 2 giờ, và trước 15 phút so với giờ bắt đầu — chạy tự động qua bộ lập lịch, không cần kích hoạt thủ công.",
+    en: "Automatic WhatsApp reminders to customers are currently not active — if needed, remind customers manually using the WhatsApp number saved on the booking.",
+    ms: "Peringatan WhatsApp automatik kepada pelanggan buat masa ini tidak aktif — jika perlu, ingatkan pelanggan secara manual melalui nombor WhatsApp yang disimpan pada tempahan.",
+    th: "ขณะนี้ยังไม่เปิดใช้การแจ้งเตือน WhatsApp อัตโนมัติถึงลูกค้า — หากจำเป็น ให้แจ้งเตือนลูกค้าเองผ่านหมายเลข WhatsApp ที่บันทึกไว้ในการจอง",
+    fil: "Hindi pa aktibo sa ngayon ang awtomatikong WhatsApp reminder sa customer — kung kailangan, paalalahanan nang mano-mano ang customer gamit ang WhatsApp number na naka-save sa booking.",
+    vi: "Nhắc nhở WhatsApp tự động cho khách hiện chưa hoạt động — nếu cần, hãy nhắc khách thủ công qua số WhatsApp được lưu trong đặt chỗ.",
   },
   "help.content.booking.note1": {
     en: "A booking that's never checked in will be automatically released by the scheduler once its time window passes.",

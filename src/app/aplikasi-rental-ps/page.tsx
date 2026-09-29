@@ -28,7 +28,7 @@ const FAQ = [
   },
   {
     q: "Bisa terima booking online tanpa aplikasi terpisah?",
-    a: "Bisa. Pelanggan cek slot kosong dan booking sendiri lewat halaman outlet Anda, lengkap dengan konfirmasi dan pengingat WhatsApp otomatis — semua dari aplikasi yang sama dengan kasir.",
+    a: "Bisa. Pelanggan cek slot kosong dan booking sendiri lewat halaman outlet Anda, lalu mendapat kode booking untuk cek status dan check-in di kasir — semua dari aplikasi yang sama dengan kasir.",
   },
   {
     q: "Bisa pantau beberapa cabang dari satu aplikasi?",
@@ -68,7 +68,7 @@ export default function AplikasiRentalPsPage() {
         features={[
           { title: "Manajemen Unit PS4, PS5 & PS6", desc: "Setiap unit dicatat terpisah lengkap dengan kondisi, tipe TV, dan riwayat pemakaian. Pelanggan booking online tahu persis unit generasi mana yang kosong dan spesifikasinya." },
           { title: "Kontrol TV & Konsol Otomatis", desc: "TV dan konsol otomatis menyala saat sesi dimulai dan mati saat waktu habis — terintegrasi dengan smart plug, tanpa kasir harus jalan ke tiap unit." },
-          { title: "Booking Online 24 Jam", desc: "Pelanggan cek slot kosong dan booking sendiri lewat halaman outlet Anda kapan saja, lengkap dengan konfirmasi & pengingat WhatsApp otomatis." },
+          { title: "Booking Online 24 Jam", desc: "Pelanggan cek slot kosong dan booking sendiri lewat halaman outlet Anda kapan saja, lengkap dengan kode booking untuk cek status dan check-in cepat di kasir." },
           { title: "Hak Akses Staf & Jejak Audit", desc: "Setiap staf login dengan akun dan hak aksesnya sendiri — semua transaksi tercatat by user, jadi jelas siapa yang bertanggung jawab kalau ada selisih." },
         ]}
         quote="Sejak pakai NEXBILL, tutup shift cuma 5 menit — dulu bisa satu jam."

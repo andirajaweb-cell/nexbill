@@ -133,9 +133,10 @@ function DaftarPageInner() {
     if (!plan) return null;
     const smartPlugQty = nonAndroidTv;
     const extraConsoleQty = Math.max(0, totalTv - plan.includedConsoles);
-    const smartPlugCost = smartPlugQty * plan.smartPlugPrice;
+    // Biaya smart plug sengaja TIDAK dihitung/ditampilkan di halaman daftar — cukup jumlah unitnya.
+    // Pembelian diarahkan lewat Rekomendasi Produk (kategori smart plug) dari menu Kontrol Perangkat.
     const extraConsoleCost = extraConsoleQty * plan.extraConsolePrice;
-    return { smartPlugQty, extraConsoleQty, smartPlugCost, extraConsoleCost };
+    return { smartPlugQty, extraConsoleQty, extraConsoleCost };
   }, [plan, totalTv, nonAndroidTv]);
 
   const staffTotal = empKasir + empDapur + empLainnya;
@@ -436,7 +437,7 @@ function DaftarPageInner() {
                   {preview.smartPlugQty > 0 && (
                     <div>
                       TV analog/smart TV butuh Smart Plug agar bisa dikontrol otomatis dari sistem —{" "}
-                      <span className="text-cyan-400 font-medium">{preview.smartPlugQty} unit</span> (~{rupiah(preview.smartPlugCost)})
+                      <span className="text-cyan-400 font-medium">{preview.smartPlugQty} unit</span>
                     </div>
                   )}
                   {preview.extraConsoleQty > 0 && (

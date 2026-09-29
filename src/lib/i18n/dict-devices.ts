@@ -129,5 +129,27 @@ registerDict({
 
   // --- Alerts / confirms ---
   "devices.alert.nameRequired": { id: "Nama perangkat wajib diisi.", en: "Device name is required.", ms: "Nama peranti wajib diisi.", th: "ต้องกรอกชื่ออุปกรณ์", fil: "Kailangan ang pangalan ng device.", vi: "Bắt buộc nhập tên thiết bị." },
+
+  // --- Peringatan TV non-Android tanpa smart plug ---
+  "devices.smartPlugWarn.title": { id: "TV non-Android perlu Smart Plug", en: "Non-Android TVs need a Smart Plug", ms: "TV bukan-Android perlukan Smart Plug", th: "ทีวีที่ไม่ใช่ Android ต้องใช้สมาร์ทปลั๊ก", fil: "Kailangan ng Smart Plug ang non-Android na TV", vi: "TV không phải Android cần Smart Plug" },
+  "devices.smartPlugWarn.body": {
+    id: "Ada {n} unit dengan TV non-Android (smart TV biasa / TV analog) yang belum terpasang smart plug: {units}.\n\nTV jenis ini tidak bisa dinyalakan/dimatikan otomatis lewat NexbillAgent — satu-satunya cara adalah smart plug yang mengatur aliran listriknya. Tanpa smart plug, TV di unit tersebut harus dinyalakan/dimatikan manual oleh staf.",
+    en: "{n} unit(s) have a non-Android TV (regular smart TV / analog TV) without a smart plug: {units}.\n\nThese TVs can't be switched on/off automatically through NexbillAgent — the only way is a smart plug that controls their power. Without one, staff must switch those TVs on/off by hand.",
+    ms: "Ada {n} unit dengan TV bukan-Android (smart TV biasa / TV analog) yang belum dipasang smart plug: {units}.\n\nTV jenis ini tidak boleh dihidupkan/dimatikan secara automatik melalui NexbillAgent — satu-satunya cara ialah smart plug yang mengawal bekalan elektriknya. Tanpa smart plug, TV di unit tersebut perlu dihidupkan/dimatikan secara manual oleh kakitangan.",
+    th: "มี {n} ยูนิตที่ใช้ทีวีที่ไม่ใช่ Android (สมาร์ททีวีทั่วไป / ทีวีอนาล็อก) และยังไม่ได้ติดตั้งสมาร์ทปลั๊ก: {units}\n\nทีวีประเภทนี้เปิด/ปิดอัตโนมัติผ่าน NexbillAgent ไม่ได้ — วิธีเดียวคือใช้สมาร์ทปลั๊กควบคุมไฟ หากไม่มีสมาร์ทปลั๊ก พนักงานต้องเปิด/ปิดทีวีในยูนิตเหล่านี้เอง",
+    fil: "May {n} unit na may non-Android na TV (karaniwang smart TV / analog TV) na wala pang smart plug: {units}.\n\nHindi kayang i-on/i-off nang awtomatiko ang ganitong TV sa pamamagitan ng NexbillAgent — ang tanging paraan ay smart plug na kumokontrol sa kuryente nito. Kung walang smart plug, mano-manong i-o-on/i-o-off ng staff ang TV sa mga unit na iyon.",
+    vi: "Có {n} máy dùng TV không phải Android (smart TV thường / TV analog) chưa lắp smart plug: {units}.\n\nLoại TV này không thể tự bật/tắt qua NexbillAgent — cách duy nhất là dùng smart plug để điều khiển nguồn điện. Nếu không có smart plug, nhân viên phải bật/tắt TV ở các máy này bằng tay.",
+  },
+  "devices.smartPlugWarn.cta": { id: "Lihat Rekomendasi Smart Plug", en: "See Recommended Smart Plugs", ms: "Lihat Cadangan Smart Plug", th: "ดูสมาร์ทปลั๊กที่แนะนำ", fil: "Tingnan ang Inirerekomendang Smart Plug", vi: "Xem Smart Plug đề xuất" },
+  "devices.smartPlugWarn.later": { id: "Nanti saja", en: "Later", ms: "Nanti dahulu", th: "ไว้ทีหลัง", fil: "Mamaya na", vi: "Để sau" },
+  "devices.smartPlugWarn.bannerTitle": { id: "{n} unit TV non-Android belum punya smart plug", en: "{n} non-Android TV unit(s) have no smart plug yet", ms: "{n} unit TV bukan-Android belum ada smart plug", th: "มี {n} ยูนิตทีวีที่ไม่ใช่ Android ที่ยังไม่มีสมาร์ทปลั๊ก", fil: "{n} unit ng non-Android na TV ang wala pang smart plug", vi: "{n} máy TV không phải Android chưa có smart plug" },
+  "devices.smartPlugWarn.bannerDesc": {
+    id: "TV di unit ini harus dinyalakan/dimatikan manual sampai smart plug dipasang dan dihubungkan di halaman ini.",
+    en: "TVs on these units must be switched on/off by hand until a smart plug is installed and linked on this page.",
+    ms: "TV di unit ini perlu dihidupkan/dimatikan secara manual sehingga smart plug dipasang dan disambungkan di halaman ini.",
+    th: "ทีวีในยูนิตเหล่านี้ต้องเปิด/ปิดเองจนกว่าจะติดตั้งสมาร์ทปลั๊กและเชื่อมต่อในหน้านี้",
+    fil: "Mano-manong i-on/i-off ang TV sa mga unit na ito hanggang maikabit at maikonekta ang smart plug sa pahinang ito.",
+    vi: "TV ở các máy này phải bật/tắt bằng tay cho đến khi smart plug được lắp và liên kết tại trang này.",
+  },
   "devices.confirm.deleteDevice": { id: 'Hapus perangkat "{name}"? Unit rental yang terhubung ke perangkat ini akan otomatis dilepas.', en: 'Delete device "{name}"? Rental units linked to this device will be automatically unlinked.', ms: 'Padam peranti "{name}"? Unit sewa yang dihubungkan ke peranti ini akan dinyahtaut secara automatik.', th: 'ลบอุปกรณ์ "{name}" หรือไม่? เครื่องเช่าที่เชื่อมต่อกับอุปกรณ์นี้จะถูกยกเลิกการเชื่อมต่อโดยอัตโนมัติ', fil: 'Tanggalin ang device na "{name}"? Awtomatikong madi-disconnect ang mga rental unit na naka-link sa device na ito.', vi: 'Xóa thiết bị "{name}"? Các máy cho thuê đang liên kết với thiết bị này sẽ tự động bị hủy liên kết.' },
 });

@@ -28,7 +28,7 @@ const FAQ = [
   },
   {
     q: "Can customers book online without a separate app?",
-    a: "Yes. Customers check open slots and book themselves through your outlet's page, with automatic WhatsApp confirmations and reminders — all from the same app your staff use at the counter.",
+    a: "Yes. Customers check open slots and book themselves through your outlet's page, then get a booking code to check status and check in at the counter — all from the same app your staff use at the counter.",
   },
   {
     q: "Can I monitor multiple branches from one app?",
@@ -68,7 +68,7 @@ export default function PlaystationRentalAppPage() {
         features={[
           { title: "PS4, PS5 & PS6 Unit Management", desc: "Every unit is tracked separately with its condition, TV type, and usage history. Online booking customers know exactly which generation of unit is free and its specs." },
           { title: "Automatic TV & Console Control", desc: "TVs and consoles turn on automatically when a session starts and off when time runs out — integrated with smart plugs, so staff never have to walk to each unit." },
-          { title: "24/7 Online Booking", desc: "Customers check open slots and book themselves through your outlet's page anytime, complete with automatic WhatsApp confirmations and reminders." },
+          { title: "24/7 Online Booking", desc: "Customers check open slots and book themselves through your outlet's page anytime, complete with a booking code to check status and check in fast at the counter." },
           { title: "Staff Access Rights & Audit Trail", desc: "Every staff member logs in with their own account and permissions — every transaction is recorded by user, so it's clear who's responsible if something doesn't add up." },
         ]}
         quote="Since switching to NEXBILL, closing a shift takes 5 minutes — it used to take an hour."

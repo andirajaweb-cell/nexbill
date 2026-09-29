@@ -86,4 +86,25 @@ registerDict({
     fil: "Ang mga link sa pahinang ito ay affiliate link patungo sa mga online store ng partner — ang pagbili, pagbabayad, at paghahatid ay ganap na hawak ng store na patutunguhan, sa labas ng sistema ng NEXBILL.",
     vi: "Các liên kết trên trang này là liên kết liên kết (affiliate) đến các cửa hàng trực tuyến đối tác — việc mua hàng, thanh toán và giao hàng hoàn toàn do cửa hàng đích xử lý, nằm ngoài hệ thống NEXBILL.",
   },
+
+  // --- Mode fokus smart plug (?fokus=smart-plug, dari peringatan di Kontrol Perangkat) ---
+  "rekomendasiProduk.backToDevices": { id: "Kembali ke Kontrol Perangkat", en: "Back to Device Control", ms: "Kembali ke Kawalan Peranti", th: "กลับไปที่การควบคุมอุปกรณ์", fil: "Bumalik sa Device Control", vi: "Quay lại Điều khiển thiết bị" },
+  "rekomendasiProduk.smartPlug.title": { id: "Smart Plug untuk TV non-Android", en: "Smart Plugs for Non-Android TVs", ms: "Smart Plug untuk TV bukan-Android", th: "สมาร์ทปลั๊กสำหรับทีวีที่ไม่ใช่ Android", fil: "Smart Plug para sa non-Android na TV", vi: "Smart Plug cho TV không phải Android" },
+  "rekomendasiProduk.smartPlug.desc": {
+    id: "Smart TV biasa dan TV analog hanya bisa dinyalakan/dimatikan otomatis lewat smart plug. Pilih yang kompatibel (Tuya/Smart Life, Sonoff eWeLink, atau Tasmota), lalu hubungkan di menu Kontrol Perangkat.",
+    en: "Regular smart TVs and analog TVs can only be switched on/off automatically with a smart plug. Choose a compatible one (Tuya/Smart Life, Sonoff eWeLink, or Tasmota), then link it in Device Control.",
+    ms: "Smart TV biasa dan TV analog hanya boleh dihidupkan/dimatikan secara automatik melalui smart plug. Pilih yang serasi (Tuya/Smart Life, Sonoff eWeLink, atau Tasmota), kemudian sambungkan di menu Kawalan Peranti.",
+    th: "สมาร์ททีวีทั่วไปและทีวีอนาล็อกเปิด/ปิดอัตโนมัติได้ผ่านสมาร์ทปลั๊กเท่านั้น เลือกรุ่นที่รองรับ (Tuya/Smart Life, Sonoff eWeLink หรือ Tasmota) แล้วเชื่อมต่อในเมนูการควบคุมอุปกรณ์",
+    fil: "Ang karaniwang smart TV at analog TV ay maa-on/off lang nang awtomatiko gamit ang smart plug. Pumili ng compatible (Tuya/Smart Life, Sonoff eWeLink, o Tasmota), saka ikonekta sa Device Control.",
+    vi: "Smart TV thường và TV analog chỉ có thể tự bật/tắt bằng smart plug. Hãy chọn loại tương thích (Tuya/Smart Life, Sonoff eWeLink hoặc Tasmota), rồi liên kết trong mục Điều khiển thiết bị.",
+  },
+  "rekomendasiProduk.smartPlug.showAll": { id: "Lihat semua produk rekomendasi", en: "See all recommended products", ms: "Lihat semua produk cadangan", th: "ดูสินค้าแนะนำทั้งหมด", fil: "Tingnan ang lahat ng inirerekomendang produkto", vi: "Xem tất cả sản phẩm đề xuất" },
+  "rekomendasiProduk.smartPlug.empty": {
+    id: "Rekomendasi smart plug sedang disiapkan tim NEXBILL. Sementara itu, hubungi Customer Service untuk saran smart plug yang kompatibel.",
+    en: "The NEXBILL team is preparing smart plug recommendations. Meanwhile, contact Customer Service for advice on a compatible smart plug.",
+    ms: "Cadangan smart plug sedang disediakan oleh pasukan NEXBILL. Sementara itu, hubungi Khidmat Pelanggan untuk nasihat smart plug yang serasi.",
+    th: "ทีม NEXBILL กำลังเตรียมรายการสมาร์ทปลั๊กที่แนะนำ ระหว่างนี้ติดต่อฝ่ายบริการลูกค้าเพื่อขอคำแนะนำสมาร์ทปลั๊กที่รองรับ",
+    fil: "Inihahanda pa ng team ng NEXBILL ang mga inirerekomendang smart plug. Samantala, kontakin ang Customer Service para sa payo sa compatible na smart plug.",
+    vi: "Đội NEXBILL đang chuẩn bị danh sách smart plug đề xuất. Trong lúc chờ, hãy liên hệ Chăm sóc khách hàng để được tư vấn smart plug tương thích.",
+  },
 });

@@ -192,8 +192,10 @@ export default function PlatformSupportPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px]">
-        <Card className="overflow-y-auto">
+      {/* Mobile/tablet: daftar tiket (tinggi terbatas) di atas, percakapan (tinggi tetap) di bawah.
+          Desktop: dua kolom setinggi 600px seperti semula. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:h-[600px]">
+        <Card className="overflow-y-auto max-h-72 lg:max-h-none">
           <h2 className="font-medium mb-2 text-sm">Tiket Masuk</h2>
           <div className="space-y-1">
             {visibleThreads.map((t) => (
@@ -218,10 +220,10 @@ export default function PlatformSupportPage() {
           </div>
         </Card>
 
-        <Card className="lg:col-span-2 flex flex-col">
+        <Card className="lg:col-span-2 flex flex-col h-[70vh] min-h-[420px] lg:h-auto lg:min-h-0">
           {selected ? (
             <>
-              <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap border-b border-white/10 pb-2 mb-2">
                 <div>
                   <div className="text-sm font-medium">{selected.outletName}</div>
                   <div className="text-xs text-neutral-500">{selected.subject || CATEGORY_LABEL[selected.category]} — {CATEGORY_LABEL[selected.category]}</div>

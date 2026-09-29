@@ -139,7 +139,7 @@ export default function BookingPage() {
     <div className="space-y-6">
       <div>
         <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("booking.pageTitle", "Booking / Reservasi")}</h1>
-        <p className="text-sm text-neutral-500">{t("booking.pageSubtitle", "DP opsional, deteksi bentrok otomatis (termasuk booking \"konsol apa saja\"), waiting list auto-promote, reminder WhatsApp H-24/H-2/15 menit, dan auto-release bila belum check-in.")}</p>
+        <p className="text-sm text-neutral-500">{t("booking.pageSubtitle", "DP opsional, deteksi bentrok otomatis (termasuk booking \"konsol apa saja\"), waiting list auto-promote, dan auto-release bila belum check-in.")}</p>
       </div>
 
       <Card className="flex flex-wrap items-end gap-2">

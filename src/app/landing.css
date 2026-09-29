@@ -979,6 +979,22 @@
 .nb-landing .addon-card-premium .a-price span { display: block; font-size: 11.5px; color: var(--text-faint); font-weight: 500; margin-top: 2px; }
 .nb-landing .addon-card-premium p { color: var(--text-faint); font-size: 12.5px; line-height: 1.5; }
 
+/* Smart Plug di dalam kartu Paket Lengkap (menggantikan kartu "Opsional" terpisah; tanpa harga). */
+.nb-landing .price-smartplug {
+  margin: -8px 0 26px; padding: 16px; border-radius: 16px; text-align: left;
+  background: rgba(6,182,212,.06); border: 1px solid rgba(56,189,248,.18);
+}
+.nb-landing .price-smartplug-head { display: flex; align-items: center; gap: 14px; }
+.nb-landing .price-smartplug-photo {
+  width: 64px; height: 64px; flex-shrink: 0; border-radius: 14px; padding: 6px;
+  background: radial-gradient(circle, rgba(56,189,248,.18), transparent 70%);
+  display: flex; align-items: center; justify-content: center;
+}
+.nb-landing .price-smartplug-photo img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 12px rgba(0,0,0,.4)); }
+.nb-landing .price-smartplug h4 { font-size: 14px; margin: 0 0 4px; color: var(--text); }
+.nb-landing .price-smartplug p { font-size: 12px; line-height: 1.5; color: var(--text-faint); margin: 0; }
+.nb-landing .price-smartplug .addon-compat { margin-top: 12px; padding-top: 10px; }
+
 @media (max-width: 900px) {
   .nb-landing .harga-bundle { flex-direction: column; }
   .nb-landing .harga-connector { flex-direction: row; width: 100%; justify-content: center; }
