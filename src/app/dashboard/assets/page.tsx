@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -14,6 +14,8 @@ import { coaAccountName } from "@/lib/accounting/coa-data";
 import "@/lib/i18n/dict-assets";
 import "@/lib/i18n/dict-coa";
 import { AssetPurchaseTab } from "./AssetPurchaseTab";
+import { AssetImportPanel } from "./AssetImportPanel";
+import { ASSET_CATEGORIES, assetDateYmd, filterAssets, filterToParams, isFilterActive, summarizeAssets, type AssetFilter } from "@/lib/assets/asset-filter";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 
@@ -81,10 +83,39 @@ export default function AssetsPage() {
   );
 }
 
+const EMPTY_FILTER: AssetFilter = { q: "", category: "", status: "", unit: "", from: "", to: "" };
+const inputCls = "rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm";
+
 function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; role: StaffRole; onOpenPurchase: () => void }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [bundle, setBundle] = useState<any>({ assets: [], rentalUnits: [], suppliers: [], cashBankAccounts: [], maintenanceLogs: [] });
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [filter, setFilter] = useState<AssetFilter>(EMPTY_FILTER);
+
+  const unitNames = useMemo(() => Object.fromEntries((bundle.rentalUnits as { id: string; name: string }[]).map((u) => [u.id, u.name])), [bundle.rentalUnits]);
+  const visible = useMemo(() => filterAssets(bundle.assets as any[], filter, unitNames), [bundle.assets, filter, unitNames]);
+  const summary = summarizeAssets(visible);
+  const filterOn = isFilterActive(filter);
+
+  /** Ringkasan filter untuk baris "Filter:" di file Excel. */
+  const filterLabel = () => {
+    const parts: string[] = [];
+    if (filter.q?.trim()) parts.push(`"${filter.q.trim()}"`);
+    if (filter.category) parts.push(categoryLabel(t, filter.category));
+    if (filter.status === "not_disposed") parts.push(t("assets.io.statusNotDisposed", "Semua kecuali dilepas"));
+    else if (filter.status) parts.push(statusLabel(t, filter.status));
+    if (filter.unit === "linked") parts.push(t("assets.io.unitLinked", "Terhubung unit PS"));
+    if (filter.unit === "unlinked") parts.push(t("assets.io.unitUnlinked", "Tanpa unit PS"));
+    if (filter.from || filter.to) parts.push(`${filter.from || "…"} – ${filter.to || "…"}`);
+    return parts.length ? parts.join(", ") : t("assets.io.allAssets", "Semua aset");
+  };
+  const exportHref = () => {
+    const p = filterToParams(filter);
+    p.set("lang", lang);
+    p.set("label", filterLabel());
+    return `/api/assets/export?${p.toString()}`;
+  };
   const [form, setForm] = useState<any>({
     name: "", category: "playstation", rentalUnitId: "", acquisitionCost: 0, salvageValue: 0, usefulLifeMonths: 36,
     supplierId: "", notes: "", recordAsPayable: false, paymentMethod: "cash", cashBankAccountId: "",
@@ -141,13 +172,78 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm text-neutral-500">{t("assets.registeredCount", "{n} aset terdaftar").replace("{n}", String(bundle.assets.length))}</div>
-        {canManage && (
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={onOpenPurchase}>{t("assets.purchase.new", "+ Pembelian Aset")}</Button>
-            <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t("assets.closeForm", "Tutup Form") : t("assets.newAssetButton", "+ Aset Baru")}</Button>
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={exportHref()}
+            className={`rounded-lg px-3 py-2 text-sm font-medium border border-white/10 bg-white/5 text-neutral-100 hover:bg-white/10 ${visible.length === 0 ? "pointer-events-none opacity-50" : ""}`}
+            title={t("assets.io.downloadHint", "Unduh daftar aset sesuai filter yang sedang aktif")}
+          >
+            {filterOn ? t("assets.io.downloadFiltered", "Download Excel (terfilter)") : t("assets.io.download", "Download Excel")}
+          </a>
+          {canManage && (
+            <>
+              <Button variant="secondary" onClick={() => { setShowImport((s) => !s); setShowForm(false); }}>{t("assets.io.upload", "Upload Excel")}</Button>
+              <Button variant="secondary" onClick={onOpenPurchase}>{t("assets.purchase.new", "+ Pembelian Aset")}</Button>
+              <Button onClick={() => { setShowForm((s) => !s); setShowImport(false); }}>{showForm ? t("assets.closeForm", "Tutup Form") : t("assets.newAssetButton", "+ Aset Baru")}</Button>
+            </>
+          )}
+        </div>
       </div>
+
+      {showImport && canManage && (
+        <AssetImportPanel
+          cashBankAccounts={bundle.cashBankAccounts}
+          suppliers={bundle.suppliers}
+          onClose={() => setShowImport(false)}
+          onDone={() => {
+            setShowImport(false);
+            load();
+          }}
+        />
+      )}
+
+      <Card className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
+          <input
+            className={`${inputCls} lg:col-span-2`}
+            placeholder={t("assets.io.searchPlaceholder", "Cari nama, catatan, unit PS...")}
+            value={filter.q}
+            onChange={(e) => setFilter({ ...filter, q: e.target.value })}
+          />
+          <select className={inputCls} value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })}>
+            <option value="">{t("assets.io.allCategories", "Semua kategori")}</option>
+            {ASSET_CATEGORIES.map((k) => <option key={k} value={k}>{categoryLabel(t, k)}</option>)}
+          </select>
+          <select className={inputCls} value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value })}>
+            <option value="">{t("assets.io.allStatuses", "Semua status")}</option>
+            <option value="not_disposed">{t("assets.io.statusNotDisposed", "Semua kecuali dilepas")}</option>
+            <option value="active">{statusLabel(t, "active")}</option>
+            <option value="under_maintenance">{statusLabel(t, "under_maintenance")}</option>
+            <option value="disposed">{statusLabel(t, "disposed")}</option>
+          </select>
+          <select className={inputCls} value={filter.unit} onChange={(e) => setFilter({ ...filter, unit: e.target.value })}>
+            <option value="">{t("assets.io.allUnits", "Semua (unit PS)")}</option>
+            <option value="linked">{t("assets.io.unitLinked", "Terhubung unit PS")}</option>
+            <option value="unlinked">{t("assets.io.unitUnlinked", "Tanpa unit PS")}</option>
+          </select>
+          <div className="flex items-center gap-1 sm:col-span-2 lg:col-span-1">
+            <input type="date" aria-label={t("assets.io.dateFrom", "Dari tanggal")} title={t("assets.io.dateFrom", "Dari tanggal")} className={`${inputCls} w-full min-w-0 px-2`} value={filter.from} onChange={(e) => setFilter({ ...filter, from: e.target.value })} />
+            <span className="text-neutral-600 text-xs">–</span>
+            <input type="date" aria-label={t("assets.io.dateTo", "Sampai tanggal")} title={t("assets.io.dateTo", "Sampai tanggal")} className={`${inputCls} w-full min-w-0 px-2`} value={filter.to} onChange={(e) => setFilter({ ...filter, to: e.target.value })} />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
+          <span>
+            {t("assets.io.showing", "Menampilkan {n} dari {total} aset").replace("{n}", String(summary.count)).replace("{total}", String(bundle.assets.length))}
+          </span>
+          <span>{t("assets.tableAcquisition", "Perolehan")}: <b className="text-neutral-200">{rupiah(summary.cost)}</b></span>
+          <span>{t("assets.tableAccumDepreciation", "Akum. Penyusutan")}: <b className="text-neutral-200">{rupiah(summary.accumulated)}</b></span>
+          <span>{t("assets.tableBookValue", "Nilai Buku")}: <b className="text-emerald-300">{rupiah(summary.bookValue)}</b></span>
+          {filterOn && (
+            <button className="text-cyan-300 hover:underline" onClick={() => setFilter(EMPTY_FILTER)}>{t("assets.io.resetFilter", "Reset filter")}</button>
+          )}
+        </div>
+      </Card>
 
       {showForm && (
         <Card className="space-y-3">
@@ -244,14 +340,15 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
       )}
 
       <Card>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[760px]">
           <thead>
             <tr className="text-left text-neutral-500 border-b border-neutral-800">
-              <th className="py-2">{t("assets.tableName", "Nama")}</th><th>{t("assets.tableCategory", "Kategori")}</th><th>{t("assets.tableAcquisition", "Perolehan")}</th><th>{t("assets.tableAccumDepreciation", "Akum. Penyusutan")}</th><th>{t("assets.tableBookValue", "Nilai Buku")}</th><th>{t("assets.tableStatus", "Status")}</th><th></th>
+              <th className="py-2">{t("assets.tableName", "Nama")}</th><th>{t("assets.tableCategory", "Kategori")}</th><th>{t("assets.io.col.date", "Tanggal Perolehan")}</th><th>{t("assets.tableAcquisition", "Perolehan")}</th><th>{t("assets.tableAccumDepreciation", "Akum. Penyusutan")}</th><th>{t("assets.tableBookValue", "Nilai Buku")}</th><th>{t("assets.tableStatus", "Status")}</th><th></th>
             </tr>
           </thead>
           <tbody>
-            {bundle.assets.map((a: any) => {
+            {visible.map((a: any) => {
               const bookValue = a.acquisitionCost - a.accumulatedDepreciation;
               return (
                 <tr key={a.id} className="border-b border-neutral-900 align-top">
@@ -260,7 +357,11 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
                     {a.purchaseId && a.notes && <div className="text-[11px] font-normal text-neutral-500">{a.notes}</div>}
                     {a.status === "disposed" && a.disposalReason && <div className="text-[11px] font-normal text-neutral-500">{a.disposalReason}</div>}
                   </td>
-                  <td className="text-xs">{categoryLabel(t, a.category)}</td>
+                  <td className="text-xs">
+                    {categoryLabel(t, a.category)}
+                    {a.rentalUnitId && unitNames[a.rentalUnitId] && <div className="text-[11px] text-cyan-300/80">{unitNames[a.rentalUnitId]}</div>}
+                  </td>
+                  <td className="text-xs whitespace-nowrap">{assetDateYmd(a.acquisitionDate)}</td>
                   <td className="text-xs">{rupiah(a.acquisitionCost)}</td>
                   <td className="text-xs">{rupiah(a.accumulatedDepreciation)}</td>
                   <td className="text-xs">{rupiah(bookValue)}</td>
@@ -280,7 +381,11 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
             })}
           </tbody>
         </table>
+        </div>
         {bundle.assets.length === 0 && <div className="text-sm text-neutral-500 py-4 text-center">{t("assets.emptyAssets", "Belum ada aset terdaftar.")}</div>}
+        {bundle.assets.length > 0 && visible.length === 0 && (
+          <div className="text-sm text-neutral-500 py-4 text-center">{t("assets.io.noMatch", "Tidak ada aset yang cocok dengan filter.")}</div>
+        )}
       </Card>
     </div>
   );
