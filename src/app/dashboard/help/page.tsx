@@ -4,9 +4,9 @@ import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { HELP_CATEGORIES, HELP_GROUPS_ORDER, type HelpCategory, type HelpSubsection } from "@/lib/help/content";
+import { HELP_GROUP_IDS, type HelpBook, type HelpCategory, type HelpLang, type HelpSubsection } from "@/lib/help/types";
+import { HELP_BOOK_ID, loadHelpBook, mergeWithSource } from "@/lib/help/content/index";
 import "@/lib/i18n/dict-help";
-import "@/lib/i18n/dict-help-content";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useAuth } from "@/lib/auth/client";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
@@ -17,8 +17,8 @@ import { showAlert, showConfirm } from "@/lib/ui/dialog";
  * client bundle). */
 type EditableHelpFields = Partial<Pick<HelpCategory, "label" | "navHint" | "summary" | "roles" | "steps" | "notes" | "subsections">>;
 
-/** Flattens every searchable string in a category into one lowercase blob, so search matches inside steps/notes/subsections too, not just the label.
- * Deliberately searches the Indonesian source text (content.ts, or a Superuser's edited replacement of it) regardless of active dashboard language — see dict-help-content.ts's header comment for why full-text search across 5 translated languages is out of scope for this pass. */
+/** Semua teks satu kategori (judul, langkah, catatan, sub-bagian) dalam satu string huruf kecil,
+ * supaya pencarian juga menemukan kata di dalam langkah — dalam bahasa yang sedang tampil. */
 function searchBlob(c: HelpCategory): string {
   const parts = [c.label, c.summary, c.navHint ?? "", c.roles ?? "", ...(c.steps ?? []), ...(c.notes ?? [])];
   for (const s of c.subsections ?? []) {
@@ -42,20 +42,33 @@ export default function HelpPage() {
 }
 
 function HelpPageInner() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { user } = useAuth();
   const canEdit = user?.role === "superuser";
 
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
-  const [activeId, setActiveId] = useState(HELP_CATEGORIES[0].id);
+  const [activeId, setActiveId] = useState(HELP_BOOK_ID.categories[0].id);
+
+  // Buku bantuan bahasa aktif (dimuat terpisah per bahasa), digabung ke daftar versi Indonesia
+  // supaya topik yang belum diterjemahkan tetap muncul.
+  const [book, setBook] = useState<HelpBook>(HELP_BOOK_ID);
+  useEffect(() => {
+    let batal = false;
+    loadHelpBook(lang as HelpLang)
+      .then((b) => !batal && setBook(mergeWithSource(b)))
+      .catch(() => !batal && setBook(HELP_BOOK_ID));
+    return () => {
+      batal = true;
+    };
+  }, [lang]);
 
   // Deep-link support (e.g. Settings > Integrasi Tuya Cloud API links here with
   // ?category=devices) — only honored if the id actually exists, so a stale/typo'd link just
   // falls back to the default first category instead of showing a blank panel.
   useEffect(() => {
     const wanted = searchParams.get("category");
-    if (wanted && HELP_CATEGORIES.some((c) => c.id === wanted)) setActiveId(wanted);
+    if (wanted && HELP_BOOK_ID.categories.some((c) => c.id === wanted)) setActiveId(wanted);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
   const [overrides, setOverrides] = useState<Record<string, EditableHelpFields>>({});
@@ -78,8 +91,8 @@ function HelpPageInner() {
   // mergeHelpCategories() (kept duplicated client-side since that module also imports the DB
   // client, which must never end up in a browser bundle).
   const categories = useMemo<HelpCategory[]>(
-    () => HELP_CATEGORIES.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c)),
-    [overrides]
+    () => book.categories.map((c) => (overrides[c.id] ? { ...c, ...overrides[c.id] } : c)),
+    [overrides, book]
   );
 
   const q = query.trim().toLowerCase();
@@ -94,7 +107,7 @@ function HelpPageInner() {
       if (!map.has(c.group)) map.set(c.group, []);
       map.get(c.group)!.push(c);
     }
-    return HELP_GROUPS_ORDER.map((g) => ({ group: g, items: map.get(g) ?? [] })).filter((g) => g.items.length > 0);
+    return HELP_GROUP_IDS.map((g) => ({ group: g, items: map.get(g) ?? [] })).filter((g) => g.items.length > 0);
   }, [filtered]);
 
   const active = categories.find((c) => c.id === activeId) ?? filtered[0] ?? categories[0];
@@ -123,7 +136,7 @@ function HelpPageInner() {
             {grouped.map(({ group, items }) => (
               <div key={group} className="mb-2 last:mb-0">
                 <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-neutral-600 font-semibold">
-                  {t(`help.content.group.${group}`, group)}
+                  {book.groups[group] ?? group}
                 </div>
                 {items.map((c) => (
                   <button
@@ -133,7 +146,7 @@ function HelpPageInner() {
                       active?.id === c.id ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" : "text-neutral-400 border border-transparent hover:bg-white/5 hover:text-neutral-200"
                     }`}
                   >
-                    <span>{t(`help.content.${c.id}.label`, c.label)}</span>
+                    <span>{c.label}</span>
                     {overrides[c.id] && <span className="text-[9px] uppercase tracking-wider text-amber-400/80 flex-shrink-0">{t("help.editedBadge", "diedit")}</span>}
                   </button>
                 ))}
@@ -187,12 +200,9 @@ function HelpArticle({
   onReset: () => void;
 }) {
   const { t } = useDashboardLang();
-  // Every string in content.ts is translated via a key generated from the category's stable id
-  // + field path (help.content.<id>.<field>[.<index>]) — see dict-help-content.ts. The
-  // Indonesian text already written in content.ts (or a Superuser's edited replacement) is
-  // always passed as the fallback, so a key with no translation yet for the active language
-  // silently falls back to Indonesian instead of ever rendering blank.
-  const tc = (key: string, fallback: string) => t(`help.content.${key}`, fallback);
+  // Teks sudah dalam bahasa aktif (buku per bahasa di src/lib/help/content/<lang>/), jadi
+  // langsung ditampilkan — tidak lewat kamus kunci-per-kalimat seperti versi lama.
+  const tc = (_key: string, text: string) => text;
 
   return (
     <Card className="space-y-5">
