@@ -21,7 +21,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Suriin ang status ng device sa Kontrol ng Device. Kung offline: siguraduhing naka-on at nakakonekta sa internet ang PC ng cashier na nagpapatakbo ng NexbillAgent.",
           "Android TV: siguraduhing nasa parehong WiFi ang TV at PC ng cashier at hindi nagbago ang IP ng TV (i-lock ang IP ayon sa Gabay sa NexbillAgent). Tingnan ang 28 karaniwang problema (code P01–P28) sa Kumpletong Gabay sa NexbillAgent.",
-          "Biglang hindi tumutugon ang lahat ng Tuya smart plug: malamang nag-expire na ang Tuya Cloud Trial — i-extend ito sa iot.tuya.com.",
+          "Biglang hindi tumutugon ang lahat ng Tuya smart plug: malamang nag-expire na ang Tuya Cloud Trial — i-extend ito sa iot.tuya.com. Kung ilan ang Tuya account ng outlet, suriin ang Setting → Tuya Cloud API Integration: ang account na \"Hindi konektado\" ang kailangang i-extend.",
           "TV na hindi Android: kailangan nitong gumamit ng smart plug. Pindutin ang \"Tingnan ang Rekomendadong Smart Plug\" sa Kontrol ng Device.",
           "Habang hindi pa naaayos, buksan nang mano-mano ang TV gamit ang remote — tuloy pa rin nang normal ang rental session.",
         ],

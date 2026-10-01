@@ -17,6 +17,7 @@ import { currencyForCountry, flagForCountry } from "@/lib/currency/format";
 import { formatNumber } from "@/lib/format/number";
 import { formatDate } from "@/lib/format/date";
 import "@/lib/i18n/dict-settings";
+import { TuyaAccountsCard } from "./TuyaAccountsCard";
 
 const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "Banner Iklan", "TV Screensaver", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
 type Tab = (typeof TABS)[number];
@@ -215,35 +216,10 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
   const [form, setForm] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [tuyaStatus, setTuyaStatus] = useState<{ ok: boolean; message: string } | null>(null);
-  const [testingTuya, setTestingTuya] = useState(false);
   const { t } = useDashboardLang();
 
   const load = () => fetchJsonObject(`/api/settings/outlet?outletId=${outletId}`).then(setForm);
   useEffect(() => { load(); }, [outletId]);
-
-  const testTuya = async () => {
-    setTestingTuya(true);
-    setTuyaStatus(null);
-    try {
-      const res = await fetch("/api/settings/outlet/test-tuya", { method: "POST" });
-      const data = await res.json();
-      setTuyaStatus({ ok: !!data.ok, message: data.message ?? data.error ?? "Gagal menguji koneksi." });
-    } catch {
-      setTuyaStatus({ ok: false, message: "Gagal menghubungi server." });
-    } finally {
-      setTestingTuya(false);
-    }
-  };
-
-  // Auto-test once, right after the form loads, ONLY if credentials are already filled in — so
-  // the indicator reflects real Tuya connectivity on page load without the user having to click
-  // anything first. Re-tests after Save happen via the explicit call inside save() below, not this
-  // effect (form changing on every keystroke would otherwise spam Tuya's token endpoint).
-  useEffect(() => {
-    if (form?.tuyaAccessId && form?.tuyaAccessSecret) testTuya();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!form]);
 
   const save = async () => {
     setSaving(true);
@@ -253,7 +229,6 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
       if (!res.ok) return showAlert(data.error);
       setForm(data);
       showAlert(t("settings.businessTax.savedAlert", "Pengaturan disimpan."));
-      if (data.tuyaAccessId && data.tuyaAccessSecret) testTuya();
     } finally {
       setSaving(false);
     }
@@ -381,73 +356,7 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
         </p>
       </Card>
 
-      <Card className="space-y-3 border border-amber-700/40 bg-amber-950/10">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h2 className="font-medium">{t("settings.tuya.heading", "Integrasi Tuya Cloud API (Smart Plug Tuya)")}</h2>
-          <div className="flex items-center gap-2">
-            {!form.tuyaAccessId || !form.tuyaAccessSecret ? (
-              <Badge status="unknown">{t("settings.tuya.statusNotSet", "Belum diatur")}</Badge>
-            ) : testingTuya ? (
-              <Badge status="pending">{t("settings.tuya.statusTesting", "Menguji...")}</Badge>
-            ) : tuyaStatus === null ? (
-              <Badge status="unknown">{t("settings.tuya.statusUnknown", "Belum diuji")}</Badge>
-            ) : tuyaStatus.ok ? (
-              <Badge status="success">{t("settings.tuya.statusConnected", "Terhubung")}</Badge>
-            ) : (
-              <Badge status="failed">{t("settings.tuya.statusDisconnected", "Tidak terhubung")}</Badge>
-            )}
-            {canManage && form.tuyaAccessId && form.tuyaAccessSecret && (
-              <Button variant="secondary" className="text-xs px-2.5 py-1.5" onClick={testTuya} disabled={testingTuya}>
-                {t("settings.tuya.testButton", "Tes Koneksi")}
-              </Button>
-            )}
-          </div>
-        </div>
-        {tuyaStatus && !tuyaStatus.ok && (
-          <p className="text-xs text-rose-400/90 rounded-lg bg-rose-500/5 border border-rose-500/20 px-3 py-2">{tuyaStatus.message}</p>
-        )}
-        <p className="text-xs text-neutral-500">
-          {t(
-            "settings.tuya.desc",
-            "Kalau outlet ini pakai smart plug Tuya Smart Life (bukan Tasmota/hardware NEXBILL), isi kredensial Tuya Cloud API milik outlet SENDIRI di bawah — setiap outlet baru wajib punya akun sendiri, tidak lagi berbagi satu akun dengan outlet lain. Ini artinya masa aktif langganan Tuya (Trial/berbayar) dan batas jumlah device jadi tanggung jawab outlet ini sendiri."
-          )}
-        </p>
-        <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-300">
-          {t(
-            "settings.tuya.riskBanner",
-            "Risiko: akun Tuya Cloud API gratis (Trial) hanya berlaku ~1 bulan dan wajib diperpanjang manual, serta dibatasi maksimal 10 device yang bisa dikontrol. Kalau lupa diperpanjang, SEMUA smart plug Tuya outlet ini berhenti merespon sampai diperpanjang. Baca panduan lengkap & cara mengatasi cepat di Pusat Bantuan → Kontrol Perangkat."
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t("settings.tuya.accessId", "Access ID / Client ID")}>
-            <input className={inputCls} disabled={!canManage} value={form.tuyaAccessId ?? ""} onChange={(e) => setForm({ ...form, tuyaAccessId: e.target.value })} placeholder="mis. abcdef1234567890" />
-          </Field>
-          <Field label={t("settings.tuya.accessSecret", "Access Secret / Client Secret")}>
-            <input type="password" className={inputCls} disabled={!canManage} value={form.tuyaAccessSecret ?? ""} onChange={(e) => setForm({ ...form, tuyaAccessSecret: e.target.value })} placeholder="••••••••••••••••" />
-          </Field>
-          <Field label={t("settings.tuya.projectCode", "Project Code (opsional)")}>
-            <input className={inputCls} disabled={!canManage} value={form.tuyaProjectCode ?? ""} onChange={(e) => setForm({ ...form, tuyaProjectCode: e.target.value })} />
-          </Field>
-          <Field label={t("settings.tuya.region", "Data Center / Region")}>
-            <select className={inputCls} disabled={!canManage} value={form.tuyaRegion ?? "sg"} onChange={(e) => setForm({ ...form, tuyaRegion: e.target.value })}>
-              <option value="sg">{t("settings.tuya.regionSg", "Singapore (Indonesia/Malaysia/Thailand/Vietnam)")}</option>
-              <option value="cn">{t("settings.tuya.regionCn", "China")}</option>
-              <option value="us">{t("settings.tuya.regionUs", "Amerika (Barat)")}</option>
-              <option value="us_e">{t("settings.tuya.regionUsE", "Amerika (Timur)")}</option>
-              <option value="eu">{t("settings.tuya.regionEu", "Eropa (Tengah)")}</option>
-              <option value="eu_w">{t("settings.tuya.regionEuW", "Eropa (Barat)")}</option>
-              <option value="in">{t("settings.tuya.regionIn", "India")}</option>
-            </select>
-          </Field>
-        </div>
-        <p className="text-xs text-neutral-500">
-          {t(
-            "settings.tuya.helpLinkDesc",
-            "Belum punya akun Tuya Cloud API? Lihat panduan lengkap (cara bikin akun, cara ambil Access ID/Secret, cara memperpanjang Trial, dan cara mengganti akun/email) di"
-          )}{" "}
-          <a href="/dashboard/help?category=devices" className="text-amber-400 hover:underline">{t("settings.tuya.helpLinkText", "Pusat Bantuan → Kontrol Perangkat")}</a>.
-        </p>
-      </Card>
+      <TuyaAccountsCard canManage={canManage} />
 
       <Card className="space-y-3">
         <h2 className="font-medium">{t("settings.businessTax.salesTargetHeading", "Target Penjualan (BEP)")}</h2>

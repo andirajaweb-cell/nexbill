@@ -340,11 +340,11 @@ export const OPERASIONAL: HelpCategory[] = [
         steps: [
           "Official NEXBILL smart plug: enter the serial number printed on the label in the \"Claim NEXBILL Smart Plug\" section — no other setup needed.",
           "Tasmota: enter the device name and MQTT topic.",
-          "Tuya / Smart Life: each outlet uses its own Tuya Cloud API account. Enter the Access ID & Secret in Settings → Business & Tax → Tuya Cloud API Integration, then add devices with their Device ID.",
+          "Tuya / Smart Life: each outlet uses its own Tuya Cloud API accounts — more than one is allowed. Add an account (Access ID & Secret) in Settings → Business & Tax → Tuya Cloud API Integration, then add devices with their Device ID. With several accounts, leave the account choice on \"Automatic\": the system finds the account that owns that Device ID.",
           "After adding, link the device to a unit in the \"Link Devices to Rental Units\" table.",
         ],
         notes: [
-          "The free Tuya Cloud account (Trial) must be extended about once a month at iot.tuya.com (Service API → IoT Core → Extend Trial) and is limited to 10 devices. If you forget, all the outlet's Tuya smart plugs stop responding. Put the date in your calendar.",
+          "A free Tuya Cloud account (Trial) can only control about 8 devices and must be extended about once a month at iot.tuya.com (Service API → IoT Core → Extend Trial). Have more smart plugs than that? Create a second Tuya Cloud account (different email), link some smart plugs to it, then add it as a new account in Settings. If one account isn't extended, every smart plug on that account stops responding — put each account's extension date in your calendar.",
           "During the subscription trial, smart plugs can't be added yet and Android TV control is limited to 1 unit.",
         ],
       },

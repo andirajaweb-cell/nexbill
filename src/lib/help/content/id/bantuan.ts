@@ -21,7 +21,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Cek status perangkat di Kontrol Perangkat. Kalau offline: pastikan PC kasir yang menjalankan NexbillAgent menyala dan terhubung internet.",
           "Android TV: pastikan TV dan PC kasir di jaringan WiFi yang sama dan IP TV tidak berubah (kunci IP sesuai Panduan NexbillAgent). Lihat 28 masalah umum (kode P01–P28) di Panduan Lengkap NexbillAgent.",
-          "Smart plug Tuya tiba-tiba tidak merespons semua: kemungkinan langganan Trial Tuya Cloud habis — perpanjang di iot.tuya.com.",
+          "Smart plug Tuya tiba-tiba tidak merespons semua: kemungkinan langganan Trial Tuya Cloud habis — perpanjang di iot.tuya.com. Kalau outlet punya beberapa akun Tuya, cek Pengaturan → Integrasi Tuya Cloud API: akun yang berstatus \"Tidak terhubung\" adalah yang perlu diperpanjang.",
           "TV bukan Android: harus memakai smart plug. Tekan \"Lihat Rekomendasi Smart Plug\" di Kontrol Perangkat.",
           "Sementara belum beres, nyalakan TV manual dengan remote — sesi rental tetap berjalan normal.",
         ],

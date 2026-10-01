@@ -21,7 +21,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Kiểm tra trạng thái thiết bị trong Điều khiển thiết bị. Nếu ngoại tuyến: đảm bảo PC thu ngân chạy NexbillAgent đang bật và có internet.",
           "Android TV: đảm bảo TV và PC thu ngân cùng WiFi và IP của TV không đổi (khóa IP như trong Hướng dẫn NexbillAgent). Xem 28 sự cố thường gặp (mã P01–P28) trong Hướng dẫn đầy đủ NexbillAgent.",
-          "Mọi ổ cắm Tuya đột nhiên không phản hồi: có lẽ Tuya Cloud Trial đã hết hạn — gia hạn tại iot.tuya.com.",
+          "Mọi ổ cắm Tuya đột nhiên không phản hồi: có lẽ Tuya Cloud Trial đã hết hạn — gia hạn tại iot.tuya.com. Nếu cửa hàng có nhiều tài khoản Tuya, kiểm tra Cài đặt → Tích hợp Tuya Cloud API: tài khoản hiện \"Chưa kết nối\" là tài khoản cần gia hạn.",
           "TV không phải Android: bắt buộc dùng ổ cắm thông minh. Bấm \"Xem ổ cắm thông minh đề xuất\" trong Điều khiển thiết bị.",
           "Trong lúc chưa sửa xong, hãy bật TV thủ công bằng điều khiển — phiên thuê vẫn chạy bình thường.",
         ],

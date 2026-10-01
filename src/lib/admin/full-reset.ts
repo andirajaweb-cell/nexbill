@@ -23,7 +23,8 @@ import { sql, type SQL } from "drizzle-orm";
  *    preserving one without the other would leave devices pointing at a relay agent that
  *    no longer exists.
  */
-const PRESERVE_TABLES = new Set(["outlets", "staff_users", "devices", "relay_agents"]);
+// outlet_tuya_accounts ikut dipertahankan: perangkat Tuya menunjuk akunnya lewat devices.config.accountId.
+const PRESERVE_TABLES = new Set(["outlets", "staff_users", "devices", "relay_agents", "outlet_tuya_accounts"]);
 
 /**
  * Detail/child tables that hold outlet-scoped data but have NO direct outlet_id column of

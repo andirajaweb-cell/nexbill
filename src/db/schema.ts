@@ -213,6 +213,24 @@ export const devices = pgTable("devices", {
   ...timestamps,
 });
 
+/**
+ * Beberapa akun Tuya Cloud API per outlet (migrasi 0027, 2026-10-02). Akun Trial Tuya hanya bisa
+ * mengontrol sedikit perangkat, jadi outlet dengan banyak smart plug mendaftarkan beberapa akun.
+ * Perangkat Tuya menyimpan akun yang dipakainya di devices.config.accountId (lihat
+ * lib/devices/adapters/tuya.ts). Kolom outlets.tuya* lama disalin jadi "Akun 1" oleh migrasi.
+ */
+export const outletTuyaAccounts = pgTable("outlet_tuya_accounts", {
+  id: id(),
+  outletId: text("outlet_id").notNull().references(() => outlets.id),
+  label: text("label").notNull(),
+  accessId: text("access_id").notNull(),
+  accessSecret: text("access_secret").notNull(),
+  projectCode: text("project_code"),
+  region: text("region", { enum: ["cn", "us", "us_e", "eu", "eu_w", "in", "sg"] }).notNull().default("sg"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  ...timestamps,
+});
+
 export const relayAgents = pgTable("relay_agents", {
   id: id(),
   outletId: text("outlet_id").notNull().references(() => outlets.id),

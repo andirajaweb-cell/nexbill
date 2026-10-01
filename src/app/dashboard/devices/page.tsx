@@ -28,6 +28,13 @@ interface Device {
   lastSeenAt: string | null;
 }
 
+/** Akun Tuya Cloud API outlet (GET /api/settings/tuya-accounts) — secret tidak pernah dikirim. */
+interface TuyaAccount {
+  id: string;
+  label: string;
+  deviceCount: number;
+}
+
 interface RentalUnit {
   id: string;
   name: string;
@@ -54,14 +61,14 @@ const PROTOCOL_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
   android_tv_adb: { key: "devices.form.protocol.androidTvAdb", fallback: "Android TV / Google TV (ADB Jaringan langsung)" },
 };
 
-/** Pulls { deviceId, switchCode } out of a device's config JSON — malformed/empty config just reads as "unset" rather than throwing. */
-function parseTuyaConfig(config: string | null): { deviceId: string; switchCode: string } {
-  if (!config) return { deviceId: "", switchCode: "" };
+/** Pulls { deviceId, switchCode, accountId } out of a device's config JSON — malformed/empty config just reads as "unset" rather than throwing. */
+function parseTuyaConfig(config: string | null): { deviceId: string; switchCode: string; accountId: string } {
+  if (!config) return { deviceId: "", switchCode: "", accountId: "" };
   try {
     const parsed = JSON.parse(config);
-    return { deviceId: parsed.deviceId ?? "", switchCode: parsed.switchCode ?? "" };
+    return { deviceId: parsed.deviceId ?? "", switchCode: parsed.switchCode ?? "", accountId: parsed.accountId ?? "" };
   } catch {
-    return { deviceId: "", switchCode: "" };
+    return { deviceId: "", switchCode: "", accountId: "" };
   }
 }
 
@@ -100,6 +107,7 @@ const emptyForm = {
   httpStatusUrl: "",
   tuyaDeviceId: "",
   tuyaSwitchCode: "",
+  tuyaAccountId: "", // "" = otomatis: server mencari akun Tuya yang memiliki Device ID ini
   tvIp: "",
   tvPort: "5555",
   tvAdbPath: "",
@@ -116,6 +124,8 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [units, setUnits] = useState<RentalUnit[]>([]);
   const [relayAgents, setRelayAgents] = useState<RelayAgent[]>([]);
+  const [tuyaAccounts, setTuyaAccounts] = useState<TuyaAccount[]>([]);
+  const [tuyaTrialLimit, setTuyaTrialLimit] = useState(8);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
@@ -136,6 +146,12 @@ export default function DevicesPage() {
       fetchJsonArray<RentalUnit>("/api/rental-units").then(setUnits),
     ]).then(() => setDataLengkap(true));
     if (outletId) fetchJsonArray<RelayAgent>(`/api/settings/relay-agents?outletId=${outletId}`).then(setRelayAgents);
+    void fetchJsonObject<{ accounts: TuyaAccount[]; trialLimit: number }>("/api/settings/tuya-accounts").then((r) => {
+      if (r) {
+        setTuyaAccounts(r.accounts ?? []);
+        setTuyaTrialLimit(r.trialLimit ?? 8);
+      }
+    });
   };
 
   // --- Peringatan TV non-Android yang belum punya smart plug ---
@@ -182,7 +198,11 @@ export default function DevicesPage() {
 
   const buildConfig = (f: typeof emptyForm) => {
     if (f.protocol === "tuya" && (f.tuyaDeviceId || f.tuyaSwitchCode)) {
-      return JSON.stringify({ deviceId: f.tuyaDeviceId || undefined, switchCode: f.tuyaSwitchCode || undefined });
+      return JSON.stringify({
+        deviceId: f.tuyaDeviceId.trim() || undefined,
+        switchCode: f.tuyaSwitchCode.trim() || undefined,
+        accountId: f.tuyaAccountId || undefined,
+      });
     }
     if (f.protocol === "android_tv_adb" && f.tvIp) {
       return JSON.stringify({ ip: f.tvIp, port: Number(f.tvPort) || 5555, adbPath: f.tvAdbPath || undefined });
@@ -222,6 +242,7 @@ export default function DevicesPage() {
     if (!res.ok) return showAlert(data.error);
     setForm(emptyForm);
     load();
+    if (data.tuyaWarning) showAlert(data.tuyaWarning);
   };
 
   // Self-service .bat generator for the local "keep ADB connected" loop some outlets run on their
@@ -311,6 +332,7 @@ export default function DevicesPage() {
       httpStatusUrl: d.httpStatusUrl ?? "",
       tuyaDeviceId: tuyaCfg.deviceId,
       tuyaSwitchCode: tuyaCfg.switchCode,
+      tuyaAccountId: tuyaCfg.accountId,
       tvIp: tvCfg.ip,
       tvPort: tvCfg.port || "5555",
       tvAdbPath: tvCfg.adbPath,
@@ -337,6 +359,7 @@ export default function DevicesPage() {
     if (!res.ok) return showAlert(data.error);
     cancelEdit();
     load();
+    if (data.tuyaWarning) showAlert(data.tuyaWarning);
   };
 
   const deleteDevice = async (d: Device) => {
@@ -426,7 +449,7 @@ export default function DevicesPage() {
       {canManage && (
         <Card>
           <h2 className="font-medium mb-3">{t("devices.addDevice", "Tambah Perangkat")}</h2>
-          <DeviceFormFields form={form} setForm={setForm} relayAgents={relayAgents} />
+          <DeviceFormFields form={form} setForm={setForm} relayAgents={relayAgents} tuyaAccounts={tuyaAccounts} tuyaTrialLimit={tuyaTrialLimit} />
           <Button className="mt-2" onClick={addDevice}>{t("devices.addDevice", "Tambah Perangkat")}</Button>
         </Card>
       )}
@@ -436,7 +459,7 @@ export default function DevicesPage() {
           <Card key={d.id} className="space-y-2">
             {editingId === d.id ? (
               <div className="space-y-2">
-                <DeviceFormFields form={editForm} setForm={setEditForm} relayAgents={relayAgents} compact />
+                <DeviceFormFields form={editForm} setForm={setEditForm} relayAgents={relayAgents} tuyaAccounts={tuyaAccounts} tuyaTrialLimit={tuyaTrialLimit} compact />
                 <div className="flex gap-2">
                   <Button className="text-xs" onClick={() => saveEdit(d.id)}>{t("devices.action.save", "Simpan")}</Button>
                   <Button variant="ghost" className="text-xs" onClick={cancelEdit}>{t("devices.action.cancel", "Batal")}</Button>
@@ -452,6 +475,9 @@ export default function DevicesPage() {
                   {PROTOCOL_LABEL_KEYS[d.protocol] ? t(PROTOCOL_LABEL_KEYS[d.protocol].key, PROTOCOL_LABEL_KEYS[d.protocol].fallback) : d.protocol}
                   {d.mqttTopic ? ` · ${d.mqttTopic}` : ""}
                   {d.protocol === "tuya" && parseTuyaConfig(d.config).deviceId ? ` · ${parseTuyaConfig(d.config).deviceId}` : ""}
+                  {d.protocol === "tuya" && tuyaAccounts.length > 1
+                    ? ` · ${tuyaAccounts.find((a) => a.id === parseTuyaConfig(d.config).accountId)?.label ?? tuyaAccounts[0].label}`
+                    : ""}
                   {(d.protocol === "android_tv_adb" || d.protocol === "android_tv_relay") && parseAndroidTvConfig(d.config).ip
                     ? ` · ${parseAndroidTvConfig(d.config).ip}:${parseAndroidTvConfig(d.config).port || "5555"}`
                     : ""}
@@ -523,11 +549,15 @@ function DeviceFormFields({
   form,
   setForm,
   relayAgents,
+  tuyaAccounts,
+  tuyaTrialLimit,
   compact,
 }: {
   form: typeof emptyForm;
   setForm: (f: typeof emptyForm) => void;
   relayAgents: RelayAgent[];
+  tuyaAccounts: TuyaAccount[];
+  tuyaTrialLimit: number;
   compact?: boolean;
 }) {
   const { t } = useDashboardLang();
@@ -571,6 +601,17 @@ function DeviceFormFields({
         <>
           <input className={cls} placeholder={t("devices.form.tuyaDeviceIdPlaceholder", "Tuya Device ID")} value={form.tuyaDeviceId} onChange={(e) => setForm({ ...form, tuyaDeviceId: e.target.value })} />
           <input className={cls} placeholder={t("devices.form.tuyaSwitchCodePlaceholder", "Kode DP Switch (opsional, default switch_1)")} value={form.tuyaSwitchCode} onChange={(e) => setForm({ ...form, tuyaSwitchCode: e.target.value })} />
+          {/* Pilihan akun hanya muncul kalau outlet punya lebih dari satu akun Tuya. */}
+          {tuyaAccounts.length > 1 && (
+            <select className={cls} value={form.tuyaAccountId} onChange={(e) => setForm({ ...form, tuyaAccountId: e.target.value })}>
+              <option value="">{t("devices.form.tuyaAccountAuto", "Akun Tuya: Otomatis (dicari sendiri)")}</option>
+              {tuyaAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label} ({t("devices.form.tuyaAccountCount", "{n}/{max} perangkat").replace("{n}", String(a.deviceCount)).replace("{max}", String(tuyaTrialLimit))})
+                </option>
+              ))}
+            </select>
+          )}
         </>
       )}
       {form.protocol === "android_tv_adb" && (
@@ -604,6 +645,19 @@ function DeviceFormFields({
         </>
       )}
     </div>
+    {form.protocol === "tuya" && tuyaAccounts.length === 0 && (
+      <p className="text-[11px] text-amber-400 mt-1">
+        {t("devices.form.tuyaNoAccount", "Outlet ini belum punya akun Tuya Cloud API. Tambahkan dulu di Pengaturan → Business & Tax → Integrasi Tuya Cloud API.")}
+      </p>
+    )}
+    {form.protocol === "tuya" && tuyaAccounts.length > 1 && (
+      <p className="text-[11px] text-neutral-500 mt-1">
+        {t(
+          "devices.form.tuyaAccountHint",
+          "Outlet ini punya beberapa akun Tuya. Biarkan \"Otomatis\" supaya sistem mencari sendiri akun yang memiliki Device ID ini, atau pilih akunnya kalau sudah tahu."
+        )}
+      </p>
+    )}
     {form.protocol === "tasmota_mqtt" && (
       <p className="text-[11px] text-neutral-500 mt-1">
         {t(

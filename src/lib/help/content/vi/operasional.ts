@@ -340,11 +340,11 @@ export const OPERASIONAL: HelpCategory[] = [
         steps: [
           "Ổ cắm thông minh chính hãng NEXBILL: nhập số sê-ri in trên nhãn ở mục \"Nhận ổ cắm thông minh NEXBILL\" — không cần thiết lập gì thêm.",
           "Tasmota: nhập tên thiết bị và chủ đề MQTT.",
-          "Tuya / Smart Life: mỗi cửa hàng dùng tài khoản Tuya Cloud API riêng. Nhập Access ID & Secret tại Cài đặt → Kinh doanh & Thuế → Tích hợp Tuya Cloud API, rồi thêm thiết bị bằng Device ID.",
+          "Tuya / Smart Life: mỗi cửa hàng dùng tài khoản Tuya Cloud API riêng — được dùng nhiều hơn một tài khoản. Thêm tài khoản (Access ID & Secret) tại Cài đặt → Kinh doanh & Thuế → Tích hợp Tuya Cloud API, rồi thêm thiết bị bằng Device ID. Nếu có nhiều tài khoản, để lựa chọn tài khoản là \"Tự động\": hệ thống tự tìm tài khoản sở hữu Device ID đó.",
           "Sau khi thêm, liên kết thiết bị với máy trong bảng \"Liên kết thiết bị với máy cho thuê\".",
         ],
         notes: [
-          "Tài khoản Tuya Cloud miễn phí (Trial) phải gia hạn khoảng mỗi tháng một lần tại iot.tuya.com (Service API → IoT Core → Extend Trial) và giới hạn 10 thiết bị. Nếu quên, mọi ổ cắm Tuya của cửa hàng sẽ ngừng phản hồi. Hãy ghi ngày vào lịch.",
+          "Tài khoản Tuya Cloud miễn phí (Trial) chỉ điều khiển được khoảng 8 thiết bị và phải gia hạn khoảng mỗi tháng một lần tại iot.tuya.com (Service API → IoT Core → Extend Trial). Có nhiều ổ cắm hơn thế? Tạo tài khoản Tuya Cloud thứ hai (email khác), liên kết một phần ổ cắm vào tài khoản đó, rồi thêm làm tài khoản mới trong Cài đặt. Nếu quên gia hạn một tài khoản, mọi ổ cắm trong tài khoản đó sẽ ngừng phản hồi — hãy ghi ngày gia hạn của từng tài khoản vào lịch.",
           "Trong thời gian dùng thử gói đăng ký, chưa thể thêm ổ cắm thông minh và điều khiển Android TV giới hạn 1 máy.",
         ],
       },

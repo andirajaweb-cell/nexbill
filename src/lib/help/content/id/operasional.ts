@@ -340,11 +340,11 @@ export const OPERASIONAL: HelpCategory[] = [
         steps: [
           "Smart plug resmi NEXBILL: isi nomor seri yang tertera di label di bagian \"Klaim Smart Plug NEXBILL\" — tidak perlu pengaturan lain.",
           "Tasmota: isi nama dan topik MQTT perangkat.",
-          "Tuya / Smart Life: setiap outlet memakai akun Tuya Cloud API sendiri. Isi Access ID & Secret di Pengaturan → Business & Tax → Integrasi Tuya Cloud API, lalu tambahkan perangkat dengan Device ID-nya.",
+          "Tuya / Smart Life: setiap outlet memakai akun Tuya Cloud API sendiri — boleh lebih dari satu akun. Tambahkan akun (Access ID & Secret) di Pengaturan → Business & Tax → Integrasi Tuya Cloud API, lalu tambahkan perangkat dengan Device ID-nya. Kalau ada beberapa akun, biarkan pilihan akun \"Otomatis\": sistem mencari sendiri akun yang memiliki Device ID itu.",
           "Setelah ditambah, hubungkan perangkat ke unit di tabel \"Hubungkan Perangkat ke Unit Rental\".",
         ],
         notes: [
-          "Akun Tuya Cloud gratis (Trial) harus diperpanjang sekitar sebulan sekali di iot.tuya.com (Service API → IoT Core → Extend Trial) dan dibatasi 10 perangkat. Kalau lupa diperpanjang, semua smart plug Tuya outlet berhenti merespons. Catat tanggalnya di kalender.",
+          "Akun Tuya Cloud gratis (Trial) hanya bisa mengontrol sekitar 8 perangkat dan harus diperpanjang sekitar sebulan sekali di iot.tuya.com (Service API → IoT Core → Extend Trial). Punya smart plug lebih dari itu? Buat akun Tuya Cloud kedua (email lain), tautkan sebagian smart plug ke akun itu, lalu tambahkan sebagai akun baru di Pengaturan. Kalau satu akun lupa diperpanjang, semua smart plug di akun itu berhenti merespons — catat tanggal perpanjangan tiap akun di kalender.",
           "Selama masa percobaan langganan, smart plug belum bisa ditambahkan dan kontrol Android TV dibatasi 1 unit.",
         ],
       },

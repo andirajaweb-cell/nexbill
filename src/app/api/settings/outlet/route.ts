@@ -28,11 +28,9 @@ const EDITABLE_FIELDS = [
   "decimalStyle", "decimalPlaces", "dateFormat",
   // Anti-fraud shift-review thresholds — see lib/shift/fraud-detection.ts.
   "fraudVarianceThreshold", "fraudVoidCountThreshold", "maxManualDiscountPercent", "allowMultipleOpenShifts",
-  // Settings > Integrasi Tuya Cloud API — the outlet's own Tuya IoT Platform Cloud Project
-  // credentials (see outlets.tuyaAccessId's doc comment in schema.ts). Deliberately NOT including
-  // "tuyaUseSharedPlatformAccount" here — that legacy shared-account exception flag is
-  // platform-admin-only, never editable by the outlet itself.
-  "tuyaAccessId", "tuyaAccessSecret", "tuyaProjectCode", "tuyaRegion",
+  // Kredensial Tuya TIDAK lagi diubah lewat sini (2026-10-02): outlet bisa punya beberapa akun
+  // Tuya, dikelola lewat /api/settings/tuya-accounts (tabel outlet_tuya_accounts). Kolom
+  // outlets.tuya* lama hanya cadangan untuk outlet yang belum dimigrasi.
 ] as const;
 
 export async function GET(_req: NextRequest) {
@@ -48,7 +46,9 @@ export async function GET(_req: NextRequest) {
     if (!row) return NextResponse.json({ error: "Outlet tidak ditemukan." }, { status: 404 });
     // Lazily backfill outlets created before the slug column existed — see ensureOutletSlug().
     if (!row.slug) row.slug = await ensureOutletSlug(row.id);
-    return NextResponse.json(row);
+    // Secret Tuya lama tidak perlu dikirim ke browser — akun Tuya kini dikelola /api/settings/tuya-accounts.
+    const { tuyaAccessSecret: _secret, ...safe } = row;
+    return NextResponse.json(safe);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }
@@ -87,7 +87,8 @@ export async function PATCH(req: NextRequest) {
     // otherwise edit another outlet's WiFi/tax/printer settings.
     const [updated] = await db.update(outlets).set(patch).where(eq(outlets.id, session.outletId)).returning();
     if (!updated) return NextResponse.json({ error: "Outlet tidak ditemukan." }, { status: 404 });
-    return NextResponse.json(updated);
+    const { tuyaAccessSecret: _secret, ...safe } = updated;
+    return NextResponse.json(safe);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });
   }

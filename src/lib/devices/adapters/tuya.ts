@@ -1,32 +1,37 @@
 import crypto from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { outlets } from "@/db/schema";
+import { devices, outlets, outletTuyaAccounts } from "@/db/schema";
 import { DeviceAdapter, DeviceRecord, DevicePowerState } from "../types";
+import {
+  accountsToProbe,
+  isNotOwnedError,
+  mergeTuyaConfig,
+  parseTuyaConfig,
+  pickAccountForDevice,
+  sortAccounts,
+} from "../tuya-accounts";
 
 /**
  * Real Tuya IoT Platform (cloud.tuya.com) OpenAPI v1.0 adapter — HMAC-SHA256 signed requests per
  * Tuya's official signing spec.
  *
- * Credentials resolution (changed 2026-09-15 — see outlets.tuyaAccessId's doc comment in
- * schema.ts): every outlet reads its OWN Access ID/Secret/region from its own Settings page. This
- * used to fall back to a single platform-wide shared account (`platformTuyaAccount`,
- * `outlets.tuyaUseSharedPlatformAccount`) for legacy outlets — that fallback was retired
- * 2026-09-15 once the last outlet on it (Xtream Playstation) was migrated to its own Tuya Cloud
- * API credentials via its own Settings page. `outlets.tuyaUseSharedPlatformAccount` and the
- * `platformTuyaAccount` table still exist in schema.ts (unused) rather than being dropped via a
- * migration, but nothing reads them anymore — every outlet with the "tuya" protocol simply must
- * have its own Access ID/Secret, or device control throws a clear self-service error.
+ * Credentials (2026-10-02, migrasi 0027): setiap outlet bisa punya BEBERAPA akun Tuya Cloud API
+ * (tabel outlet_tuya_accounts), karena akun Trial Tuya hanya bisa mengontrol sedikit perangkat
+ * (sekitar 8–10). Tiap perangkat menyimpan akun yang dipakainya di devices.config.accountId:
+ *   { "deviceId": "...", "switchCode": "switch_1", "accountId": "<outlet_tuya_accounts.id>" }
+ * Perangkat lama tanpa accountId memakai akun pertama. Kalau Tuya menjawab "perangkat bukan milik
+ * akun ini", akun lain dicoba satu per satu dan akun yang cocok langsung disimpan ke config, jadi
+ * percobaan ulang hanya terjadi sekali per perangkat.
  *
- * An outlet only ever stores its own device's Tuya `deviceId` (and optionally a non-default DP
- * switch code) in `devices.config` as JSON: { "deviceId": "...", "switchCode": "switch_1" }.
+ * Sebelum 2026-10-02 kredensial ada di kolom outlets.tuya_access_id/secret/region (satu akun).
+ * Migrasi 0027 menyalinnya jadi "Akun 1"; kalau outlet belum punya baris akun sama sekali, kolom
+ * lama tetap dipakai sebagai cadangan (id virtual "legacy").
  */
 
-// Matches Tuya IoT Platform's actual data center endpoints. The region picked
-// in Settings must be whichever data center the outlet's Tuya app account/
-// Cloud Project actually lives in (see cloud.tuya.com > OEM App > Map Account
-// to Data Center) — the wrong one means every request 401s even with
-// correct credentials.
+// Matches Tuya IoT Platform's actual data center endpoints. The region picked must be whichever
+// data center the Tuya app account/Cloud Project actually lives in — the wrong one means every
+// request 401s even with correct credentials.
 const REGION_BASE_URL: Record<string, string> = {
   cn: "https://openapi.tuyacn.com", // China Data Center
   us: "https://openapi.tuyaus.com", // Western America Data Center
@@ -37,50 +42,69 @@ const REGION_BASE_URL: Record<string, string> = {
   sg: "https://openapi-sg.iotbing.com", // Singapore Data Center
 };
 
+const LEGACY_ACCOUNT_ID = "legacy";
+
 interface TuyaCreds {
   accessId: string;
   accessSecret: string;
   baseUrl: string;
 }
 
-// Bounded so a Tuya API hiccup fails fast instead of hanging the whole start/stop/transfer
-// session request — this shared cloud account is used by every outlet, so a slow response here
-// used to directly delay every cashier's checkout, not just this one outlet's.
-const TUYA_TIMEOUT_MS = 5000;
-
-interface TuyaDeviceConfig {
-  deviceId?: string;
-  switchCode?: string;
+export interface TuyaAccountRow {
+  id: string;
+  label: string;
+  accessId: string;
+  accessSecret: string;
+  region: string;
+  sortOrder: number;
+  createdAt: string;
 }
 
-function parseConfig(device: DeviceRecord): TuyaDeviceConfig {
-  if (!device.config) return {};
-  try {
-    return JSON.parse(device.config);
-  } catch {
-    return {};
+/** Galat dari API Tuya, membawa kode Tuya supaya bisa dibedakan "bukan milik akun ini" vs kredensial. */
+export class TuyaApiError extends Error {
+  constructor(message: string, readonly code: unknown) {
+    super(message);
+    this.name = "TuyaApiError";
   }
 }
 
-async function getCreds(outletId: string): Promise<TuyaCreds> {
-  const [outlet] = await db
+// Bounded so a Tuya API hiccup fails fast instead of hanging the whole start/stop/transfer
+// session request.
+const TUYA_TIMEOUT_MS = 5000;
+
+function credsOf(acc: TuyaAccountRow): TuyaCreds {
+  return { accessId: acc.accessId, accessSecret: acc.accessSecret, baseUrl: REGION_BASE_URL[acc.region] ?? REGION_BASE_URL.sg };
+}
+
+/** Semua akun Tuya outlet, urut. Cadangan: kolom lama di outlets bila belum ada baris akun. */
+export async function loadTuyaAccounts(outletId: string): Promise<TuyaAccountRow[]> {
+  const rows = await db
     .select({
-      tuyaAccessId: outlets.tuyaAccessId,
-      tuyaAccessSecret: outlets.tuyaAccessSecret,
-      tuyaRegion: outlets.tuyaRegion,
+      id: outletTuyaAccounts.id,
+      label: outletTuyaAccounts.label,
+      accessId: outletTuyaAccounts.accessId,
+      accessSecret: outletTuyaAccounts.accessSecret,
+      region: outletTuyaAccounts.region,
+      sortOrder: outletTuyaAccounts.sortOrder,
+      createdAt: outletTuyaAccounts.createdAt,
     })
+    .from(outletTuyaAccounts)
+    .where(eq(outletTuyaAccounts.outletId, outletId));
+  if (rows.length > 0) return sortAccounts(rows);
+
+  const [outlet] = await db
+    .select({ tuyaAccessId: outlets.tuyaAccessId, tuyaAccessSecret: outlets.tuyaAccessSecret, tuyaRegion: outlets.tuyaRegion })
     .from(outlets)
     .where(eq(outlets.id, outletId))
     .limit(1);
-
   if (outlet?.tuyaAccessId && outlet.tuyaAccessSecret) {
-    return { accessId: outlet.tuyaAccessId, accessSecret: outlet.tuyaAccessSecret, baseUrl: REGION_BASE_URL[outlet.tuyaRegion] ?? REGION_BASE_URL.sg };
+    return [{ id: LEGACY_ACCOUNT_ID, label: "Akun 1", accessId: outlet.tuyaAccessId, accessSecret: outlet.tuyaAccessSecret, region: outlet.tuyaRegion, sortOrder: 0, createdAt: "" }];
   }
-
-  throw new Error(
-    "Outlet ini belum mengatur Tuya Cloud API sendiri. Setiap outlet wajib punya akun Tuya Cloud API sendiri (Access ID/Secret) — atur di Pengaturan > Integrasi Tuya Cloud API."
-  );
+  return [];
 }
+
+const NO_ACCOUNT_MESSAGE =
+  "Outlet ini belum mengatur akun Tuya Cloud API. Tambahkan akun (Access ID/Secret) di Pengaturan > Business & Tax > Integrasi Tuya Cloud API.";
 
 function sha256Hex(input: string): string {
   return crypto.createHash("sha256").update(input, "utf8").digest("hex");
@@ -120,7 +144,7 @@ async function getAccessToken(creds: TuyaCreds): Promise<string> {
   });
   const data = await res.json();
   if (!data.success) {
-    throw new Error(`Tuya token gagal (${data.code}): ${data.msg ?? "unknown error"} — cek Access ID/Secret & region.`);
+    throw new TuyaApiError(`Tuya token gagal (${data.code}): ${data.msg ?? "unknown error"} — cek Access ID/Secret & region.`, data.code);
   }
   const token = data.result.access_token as string;
   const expiresAt = Date.now() + (data.result.expire_time ?? 7200) * 1000;
@@ -150,22 +174,85 @@ async function tuyaRequest(creds: TuyaCreds, method: "GET" | "POST", urlPath: st
   });
   const data = await res.json();
   if (!data.success) {
-    throw new Error(`Tuya API gagal (${data.code}): ${data.msg ?? "unknown error"}`);
+    throw new TuyaApiError(`Tuya API gagal (${data.code}): ${data.msg ?? "unknown error"}`, data.code);
   }
   return data.result;
 }
 
-/**
- * Live connectivity check for the "Terhubung"/"Tidak terhubung" indicator on Settings >
- * Integrasi Tuya Cloud API — actually requests a real access token from Tuya (not just "are the
- * fields filled in"), since credentials can be saved but still wrong (typo, wrong region, expired
- * Trial) — see the whole "TV 1 aktif tapi tidak bisa" troubleshooting session on 2026-09-15 that
- * prompted this. Deliberately bypasses the tokenCache (fresh request every call) so re-testing
- * right after fixing a typo doesn't just replay a cached failure/success from seconds ago.
- */
-export async function testTuyaConnection(outletId: string): Promise<{ ok: boolean; message: string }> {
+/** Simpan akun yang ternyata memiliki perangkat ini, supaya berikutnya langsung tepat. */
+async function rememberAccount(device: DeviceRecord, accountId: string) {
+  if (accountId === LEGACY_ACCOUNT_ID) return;
   try {
-    const creds = await getCreds(outletId);
+    const [row] = await db.select({ config: devices.config }).from(devices).where(and(eq(devices.id, device.id), eq(devices.outletId, device.outletId))).limit(1);
+    if (!row) return;
+    await db.update(devices).set({ config: mergeTuyaConfig(row.config, { accountId }) }).where(eq(devices.id, device.id));
+  } catch {
+    /* hanya optimasi — gagal simpan tidak boleh menggagalkan kontrol perangkat */
+  }
+}
+
+/**
+ * Jalankan aksi dengan akun milik perangkat. Kalau Tuya bilang perangkat bukan milik akun itu dan
+ * outlet punya akun lain, coba akun lain lalu ingat akun yang berhasil.
+ */
+async function withDeviceAccount<T>(device: DeviceRecord, action: (creds: TuyaCreds) => Promise<T>): Promise<T> {
+  const accounts = await loadTuyaAccounts(device.outletId);
+  if (accounts.length === 0) throw new Error(NO_ACCOUNT_MESSAGE);
+  const cfg = parseTuyaConfig(device.config);
+  const first = pickAccountForDevice(accounts, cfg)!;
+  const ordered = accountsToProbe(accounts, first.id);
+
+  let lastErr: unknown = null;
+  for (let i = 0; i < ordered.length; i++) {
+    const acc = ordered[i];
+    try {
+      const result = await action(credsOf(acc));
+      if (acc.id !== cfg.accountId) await rememberAccount(device, acc.id);
+      return result;
+    } catch (err) {
+      lastErr = err;
+      const notOwned = err instanceof TuyaApiError && isNotOwnedError(err.code);
+      if (!notOwned) break; // galat kredensial/jaringan: jangan coba akun lain
+    }
+  }
+  if (accounts.length > 1 && lastErr instanceof TuyaApiError && isNotOwnedError(lastErr.code)) {
+    throw new Error(`Device ID "${cfg.deviceId}" tidak ditemukan di akun Tuya mana pun milik outlet ini. Pastikan smart plug sudah ditautkan ke salah satu akun Tuya Cloud (Devices > Link App Account).`);
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("Gagal menghubungi Tuya Cloud API.");
+}
+
+/**
+ * Cari akun Tuya outlet yang memiliki Device ID ini (dipakai saat menyimpan perangkat dengan
+ * pilihan akun "Otomatis"). Mengembalikan id akun, atau null bila tidak ada yang cocok.
+ * `error` diisi kalau ada akun yang gagal karena kredensial/jaringan (bukan "bukan milik").
+ */
+export async function findTuyaAccountForDevice(outletId: string, deviceId: string): Promise<{ accountId: string | null; label?: string; error?: string }> {
+  const accounts = await loadTuyaAccounts(outletId);
+  if (accounts.length === 0) return { accountId: null, error: NO_ACCOUNT_MESSAGE };
+  const errors: string[] = [];
+  for (const acc of accounts) {
+    try {
+      await tuyaRequest(credsOf(acc), "GET", `/v1.0/iot-03/devices/${encodeURIComponent(deviceId)}/status`);
+      return { accountId: acc.id === LEGACY_ACCOUNT_ID ? null : acc.id, label: acc.label };
+    } catch (err) {
+      if (!(err instanceof TuyaApiError && isNotOwnedError(err.code))) {
+        errors.push(`${acc.label}: ${err instanceof Error ? err.message : "gagal"}`);
+      }
+    }
+  }
+  return { accountId: null, error: errors.length ? errors.join(" · ") : undefined };
+}
+
+/**
+ * Tes koneksi satu akun — benar-benar meminta access token baru ke Tuya (bypass tokenCache),
+ * karena kredensial bisa tersimpan tapi salah (typo, region salah, Trial habis).
+ */
+export async function testTuyaAccount(outletId: string, accountId: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const accounts = await loadTuyaAccounts(outletId);
+    const acc = accounts.find((a) => a.id === accountId);
+    if (!acc) return { ok: false, message: "Akun Tuya tidak ditemukan." };
+    const creds = credsOf(acc);
     tokenCache.delete(creds.accessId);
     await getAccessToken(creds);
     return { ok: true, message: "Terhubung ke Tuya Cloud API." };
@@ -174,16 +261,34 @@ export async function testTuyaConnection(outletId: string): Promise<{ ok: boolea
   }
 }
 
+/** Tes semua akun outlet sekaligus (dipakai endpoint lama /api/settings/outlet/test-tuya). */
+export async function testTuyaConnection(outletId: string): Promise<{ ok: boolean; message: string }> {
+  const accounts = await loadTuyaAccounts(outletId);
+  if (accounts.length === 0) return { ok: false, message: NO_ACCOUNT_MESSAGE };
+  const failed: string[] = [];
+  for (const acc of accounts) {
+    const r = await testTuyaAccount(outletId, acc.id);
+    if (!r.ok) failed.push(`${acc.label}: ${r.message}`);
+  }
+  return failed.length ? { ok: false, message: failed.join(" · ") } : { ok: true, message: "Semua akun Tuya terhubung." };
+}
+
+/** Hapus token tersimpan sebuah Access ID (setelah kredensial diubah). */
+export function forgetTuyaToken(accessId: string) {
+  tokenCache.delete(accessId);
+}
+
 async function setSwitch(device: DeviceRecord, on: boolean) {
-  const cfg = parseConfig(device);
+  const cfg = parseTuyaConfig(device.config);
   if (!cfg.deviceId) {
     throw new Error(`Device "${device.name}" belum diisi Tuya Device ID.`);
   }
-  const creds = await getCreds(device.outletId);
   const code = cfg.switchCode || "switch_1";
-  await tuyaRequest(creds, "POST", `/v1.0/iot-03/devices/${cfg.deviceId}/commands`, {
-    commands: [{ code, value: on }],
-  });
+  await withDeviceAccount(device, (creds) =>
+    tuyaRequest(creds, "POST", `/v1.0/iot-03/devices/${cfg.deviceId}/commands`, {
+      commands: [{ code, value: on }],
+    }),
+  );
 }
 
 export const tuyaAdapter: DeviceAdapter = {
@@ -194,12 +299,13 @@ export const tuyaAdapter: DeviceAdapter = {
     await setSwitch(device, false);
   },
   async getState(device: DeviceRecord): Promise<DevicePowerState> {
-    const cfg = parseConfig(device);
+    const cfg = parseTuyaConfig(device.config);
     if (!cfg.deviceId) return "unknown";
     try {
-      const creds = await getCreds(device.outletId);
       const code = cfg.switchCode || "switch_1";
-      const status: { code: string; value: unknown }[] = await tuyaRequest(creds, "GET", `/v1.0/iot-03/devices/${cfg.deviceId}/status`);
+      const status: { code: string; value: unknown }[] = await withDeviceAccount(device, (creds) =>
+        tuyaRequest(creds, "GET", `/v1.0/iot-03/devices/${cfg.deviceId}/status`),
+      );
       const entry = status.find((s) => s.code === code);
       if (!entry) return "unknown";
       return entry.value ? "on" : "off";

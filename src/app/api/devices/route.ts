@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { assertDeviceAllowed } from "@/lib/subscription/service";
+import { resolveTuyaDeviceConfig } from "@/lib/devices/tuya-accounts-service";
 
 /**
  * All outlets share ONE physical MQTT broker (single global MQTT_BROKER_URL env var — see
@@ -57,10 +58,17 @@ export async function POST(req: NextRequest) {
     if (body.protocol === "tasmota_mqtt" && body.mqttTopic) {
       await assertMqttTopicGloballyUnique(body.mqttTopic);
     }
+    // Tuya: tentukan akun Tuya mana yang memiliki perangkat ini (outlet bisa punya beberapa akun).
+    let tuyaWarning: string | undefined;
+    if (body.protocol === "tuya") {
+      const r = await resolveTuyaDeviceConfig(session.outletId, body.config);
+      body.config = r.config;
+      tuyaWarning = r.warning;
+    }
     // outletId always comes from the session — never trust a client-supplied value, otherwise
     // a device could be created under a different outlet than the one just gated above.
     const [row] = await db.insert(devices).values({ ...body, outletId: session.outletId }).returning();
-    return NextResponse.json(row);
+    return NextResponse.json({ ...row, tuyaWarning });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });
   }

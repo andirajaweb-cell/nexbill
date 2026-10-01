@@ -21,7 +21,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Semak status peranti di Kawalan Peranti. Jika luar talian: pastikan PC juruwang yang menjalankan NexbillAgent hidup dan disambungkan ke internet.",
           "Android TV: pastikan TV dan PC juruwang berada dalam WiFi yang sama dan IP TV tidak berubah (kunci IP seperti dalam Panduan NexbillAgent). Lihat 28 masalah biasa (kod P01–P28) dalam Panduan Lengkap NexbillAgent.",
-          "Semua palam pintar Tuya tiba-tiba tidak bertindak balas: kemungkinan Tuya Cloud Trial sudah tamat — lanjutkan di iot.tuya.com.",
+          "Semua palam pintar Tuya tiba-tiba tidak bertindak balas: kemungkinan Tuya Cloud Trial sudah tamat — lanjutkan di iot.tuya.com. Jika outlet mempunyai beberapa akaun Tuya, semak Tetapan → Integrasi Tuya Cloud API: akaun berstatus \"Tidak disambungkan\" ialah yang perlu dilanjutkan.",
           "TV bukan Android: wajib menggunakan palam pintar. Tekan \"Lihat Cadangan Palam Pintar\" di Kawalan Peranti.",
           "Sementara belum dibaiki, hidupkan TV secara manual dengan alat kawalan jauh — sesi sewa tetap berjalan seperti biasa.",
         ],

@@ -340,11 +340,11 @@ export const OPERASIONAL: HelpCategory[] = [
         steps: [
           "Opisyal na smart plug ng NEXBILL: ilagay ang serial number na nakaprint sa label sa bahaging \"I-claim ang NEXBILL Smart Plug\" — wala nang ibang setup.",
           "Tasmota: ilagay ang pangalan ng device at MQTT topic.",
-          "Tuya / Smart Life: bawat outlet ay gumagamit ng sariling Tuya Cloud API account. Ilagay ang Access ID at Secret sa Setting → Negosyo at Buwis → Tuya Cloud API Integration, saka idagdag ang mga device gamit ang Device ID nila.",
+          "Tuya / Smart Life: bawat outlet ay gumagamit ng sariling Tuya Cloud API account — puwedeng higit sa isa. Magdagdag ng account (Access ID at Secret) sa Setting → Negosyo at Buwis → Tuya Cloud API Integration, saka idagdag ang mga device gamit ang Device ID nila. Kung ilan ang account, iwanang \"Awtomatiko\" ang pagpili ng account: hahanapin ng sistema ang account na may-ari ng Device ID na iyon.",
           "Pagkatapos idagdag, i-link ang device sa unit sa table na \"I-link ang Device sa Rental Unit\".",
         ],
         notes: [
-          "Ang libreng Tuya Cloud account (Trial) ay kailangang i-extend mga isang beses kada buwan sa iot.tuya.com (Service API → IoT Core → Extend Trial) at limitado sa 10 device. Kapag nakalimutan, titigil tumugon ang lahat ng Tuya smart plug ng outlet. Ilagay ang petsa sa kalendaryo mo.",
+          "Mga 8 device lang ang kayang kontrolin ng libreng Tuya Cloud account (Trial) at kailangan itong i-extend mga isang beses kada buwan sa iot.tuya.com (Service API → IoT Core → Extend Trial). Mas marami ang smart plug mo? Gumawa ng pangalawang Tuya Cloud account (ibang email), i-link dito ang ilang smart plug, saka idagdag bilang bagong account sa Setting. Kapag nakalimutang i-extend ang isang account, titigil tumugon ang lahat ng smart plug sa account na iyon — ilagay sa kalendaryo ang petsa ng extension ng bawat account.",
           "Habang nasa trial ng subscription, hindi pa makakapagdagdag ng smart plug at limitado sa 1 unit ang kontrol ng Android TV.",
         ],
       },

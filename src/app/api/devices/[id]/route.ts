@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { assertDeviceAllowed } from "@/lib/subscription/service";
+import { resolveTuyaDeviceConfig } from "@/lib/devices/tuya-accounts-service";
 
 /** Mirrors the same check in POST /api/devices — see that file's doc comment for why mqttTopic
  * must be unique across every outlet, not just this one (all outlets share one MQTT broker). */
@@ -46,9 +47,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (effectiveProtocol === "tasmota_mqtt" && effectiveTopic) {
       await assertMqttTopicGloballyUnique(effectiveTopic, id);
     }
+    // Tuya: tentukan akun Tuya pemilik perangkat ini bila config berubah (outlet bisa punya beberapa akun).
+    let tuyaWarning: string | undefined;
+    if (effectiveProtocol === "tuya" && patch.config !== undefined) {
+      const r = await resolveTuyaDeviceConfig(session.outletId, patch.config as string | null, id);
+      patch.config = r.config;
+      tuyaWarning = r.warning;
+    }
     const [updated] = await db.update(devices).set(patch).where(eq(devices.id, id)).returning();
     if (!updated) return NextResponse.json({ error: "Perangkat tidak ditemukan." }, { status: 404 });
-    return NextResponse.json(updated);
+    return NextResponse.json({ ...updated, tuyaWarning });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });
   }
