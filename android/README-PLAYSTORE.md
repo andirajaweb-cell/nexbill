@@ -31,7 +31,9 @@ Push & deploy seperti biasa, lalu cek di browser HP:
 
 ## Langkah 2 — Build aplikasi di PC Windows
 
-Butuh Node.js 18+ (sudah ada). Dari folder `android`:
+Butuh Node.js 18+ (sudah ada). Buka **jendela PowerShell biasa** (Start → ketik PowerShell), bukan
+terminal VS Code — build pertama mengunduh Gradle ± 150 MB dan cukup berat, terminal VS Code bisa
+ikut tertutup. Dari folder `android`:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1
@@ -46,7 +48,23 @@ Skrip ini:
    - `app-release-signed.apk` → untuk dipasang langsung di HP saat uji,
 5. menampilkan **SHA-256** kunci upload.
 
+Jendela tidak akan menutup sendiri saat error, dan semua output tercatat di `android/build-log.txt`.
+Kalau keystore & proyek sudah pernah dibuat, cukup ulangi bagian build saja:
+`powershell -ExecutionPolicy Bypass -File .\build.ps1 -Step build`.
+
 ## Langkah 3 — Sambungkan aplikasi dengan domain (wajib)
+
+**Di mana menemukan nilai `TWA_SHA256_FINGERPRINTS`?** Ada dua sidik jari, dua-duanya dimasukkan:
+
+1. **Kunci upload (di PC)** — dari file `nexbill-upload.keystore`:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\build.ps1 -Step fingerprint
+   ```
+   Masukkan password keystore → tampil `SHA-256 kunci upload: AB:CD:…` (otomatis disalin ke clipboard).
+2. **Kunci Google (Play Console)** — setelah AAB pertama diunggah: Play Console → pilih aplikasi →
+   **Uji dan rilis → Integritas aplikasi → tab Penandatanganan aplikasi** → bagian
+   *Sertifikat kunci penandatanganan aplikasi* → salin **Sidik jari sertifikat SHA-256**.
+   (Di halaman yang sama juga ada *Sertifikat kunci upload* — nilainya harus sama dengan nomor 1.)
 
 Tanpa ini aplikasi tetap jalan, tapi muncul bilah alamat Chrome di atas.
 

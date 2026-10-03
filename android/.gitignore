@@ -20,3 +20,4 @@ store_icon.png
 *.aab
 *.apk
 *.idsig
+build-log.txt
