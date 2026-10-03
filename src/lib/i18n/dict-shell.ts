@@ -12,6 +12,8 @@ registerDict({
   "shell.footerMadeBy": { id: "Dibuat oleh", en: "Made by", ms: "Dibuat oleh", th: "สร้างโดย", fil: "Ginawa ni", vi: "Được tạo bởi" },
   "sidebar.invalidSession": { id: "Sesi tidak valid — silakan login ulang.", en: "Invalid session — please log in again.", ms: "Sesi tidak sah — sila log masuk semula.", th: "เซสชันไม่ถูกต้อง — กรุณาเข้าสู่ระบบใหม่", fil: "Hindi valid ang session — mag-login muli.", vi: "Phiên không hợp lệ — vui lòng đăng nhập lại." },
   "sidebar.logout": { id: "Keluar", en: "Log Out", ms: "Log Keluar", th: "ออกจากระบบ", fil: "Mag-log Out", vi: "Đăng xuất" },
+  "sidebar.closeMenu": { id: "Tutup menu", en: "Close menu", ms: "Tutup menu", th: "ปิดเมนู", fil: "Isara ang menu", vi: "Đóng menu" },
+  "topbar.openMenu": { id: "Buka menu", en: "Open menu", ms: "Buka menu", th: "เปิดเมนู", fil: "Buksan ang menu", vi: "Mở menu" },
 
   // --- Sidebar: nav items ---
   "nav.summary": { id: "Ringkasan", en: "Overview", ms: "Ringkasan", th: "ภาพรวม", fil: "Buod", vi: "Tổng quan" },

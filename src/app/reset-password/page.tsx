@@ -51,7 +51,7 @@ function ResetPasswordForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center px-3 sm:px-4 py-5 sm:py-10">
       <div className="relative w-full max-w-sm">
         <div
           aria-hidden="true"
@@ -71,7 +71,7 @@ function ResetPasswordForm() {
           </Link>
         </div>
 
-        <div className="rounded-3xl border border-white/10 shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.03)_inset] bg-[#0a0d1a] p-8 sm:p-10 space-y-6">
+        <div className="rounded-3xl border border-white/10 shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.03)_inset] bg-[#0a0d1a] px-5 py-7 sm:p-10 space-y-6">
           {!done ? (
             <>
               <div className="space-y-1.5">

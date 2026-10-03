@@ -15,7 +15,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       title={isLight ? t("topbar.themeToggleToDark", "Ganti ke mode gelap") : t("topbar.themeToggleToLight", "Ganti ke mode terang")}
       aria-label={isLight ? t("topbar.themeToggleToDark", "Ganti ke mode gelap") : t("topbar.themeToggleToLight", "Ganti ke mode terang")}
-      className="relative rounded-lg p-1.5 text-neutral-400 hover:text-cyan-300 hover:bg-white/5 transition"
+      className="relative rounded-lg p-2 sm:p-1.5 text-neutral-400 hover:text-cyan-300 hover:bg-white/5 transition"
     >
       {isLight ? <Moon size={16} /> : <Sun size={16} />}
     </button>

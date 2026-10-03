@@ -228,7 +228,7 @@ function DaftarPageInner() {
 
   if (result) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#05070f] px-4 py-10">
+      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-[#05070f] px-3 sm:px-4 py-5 sm:py-10">
         <Card className="w-full max-w-lg space-y-5">
           <div>
             <div className="text-lg font-bold text-cyan-400">Pendaftaran Berhasil 🎉</div>
@@ -289,7 +289,7 @@ function DaftarPageInner() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#05070f] px-4 py-10">
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-[#05070f] px-3 sm:px-4 py-5 sm:py-10">
       <Card className="w-full max-w-lg space-y-4 relative">
         {busy && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-[inherit] bg-[#05070f]/90 backdrop-blur-sm">

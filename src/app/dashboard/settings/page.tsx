@@ -269,7 +269,7 @@ function BusinessTaxTab({ outletId, canManage }: { outletId: string; canManage: 
             </label>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label={t("settings.field.businessName", "Nama Bisnis")}><input className={inputCls} disabled={!canManage} value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <Field label={t("settings.field.phone", "Telepon")}><input className={inputCls} disabled={!canManage} value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
           <Field label={t("settings.field.address", "Alamat")}><input className={inputCls} disabled={!canManage} value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
@@ -1213,7 +1213,7 @@ function NotificationTab({ outletId, canManage }: { outletId: string; canManage:
       <Card className="space-y-3">
         <h2 className="font-medium">{t("settings.notification.heading", "Banner Notifikasi In-App")}</h2>
         <p className="text-xs text-neutral-500">{t("settings.notification.desc", 'Belum ada channel email/SMS/push — ini mengatur banner mana yang tampil di dalam aplikasi (mis. banner "jatuh tempo" di Expense Dashboard).')}</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {toggles.map((tg) => (
             <label key={tg.key} className="flex items-center gap-2 text-sm">
               <input type="checkbox" disabled={!canManage} checked={form[tg.key]} onChange={(e) => setForm({ ...form, [tg.key]: e.target.checked })} /> {t(tg.labelKey, tg.labelFallback)}

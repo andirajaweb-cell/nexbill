@@ -511,7 +511,7 @@ function TierFormFields({ form, setForm }: { form: TierForm; setForm: (f: TierFo
           <div className="text-xs font-medium text-emerald-300">{t("membership.autoBenefitsTitle", "Keuntungan Otomatis")}</div>
           <p className="text-[11px] text-neutral-500">{t("membership.autoBenefitsHint", "Dipotong sendiri oleh sistem. Kasir tidak perlu mengingatnya.")}</p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelKecil}>{t("membership.fieldDiscount", "Diskon Tarif Main (%)")}</label>
             <input type="number" min={0} max={100} className={isian} value={form.discountPercent || ""} onChange={(e) => set({ discountPercent: Number(e.target.value) })} />
@@ -530,7 +530,7 @@ function TierFormFields({ form, setForm }: { form: TierForm; setForm: (f: TierFo
             {t("membership.manualBenefitsHint", "Sistem hanya MENAMPILKAN ini sebagai pengingat di layar kasir — tidak memotongnya sendiri. Kasir yang memberikannya lewat diskon atau item gratis di bill.")}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelKecil}>{t("membership.fieldFreeMinutes", "Gratis Main (menit)")}</label>
             <input type="number" min={0} className={isian} value={form.freePlayMinutes || ""} onChange={(e) => set({ freePlayMinutes: Number(e.target.value) })} />

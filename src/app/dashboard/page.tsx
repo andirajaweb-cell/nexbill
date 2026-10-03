@@ -259,22 +259,22 @@ export default function OwnerDashboardPage() {
     })) ?? [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="space-y-5 sm:space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="gm-display text-2xl sm:text-3xl font-bold">
             <span className="gm-gradient-title">CONTROL CENTER</span>
           </h1>
           <p className="text-sm text-neutral-500 mt-1">{t("dash.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <LiveClock lang={lang} />
           {data && <Badge status="available">{t("dash.live")}</Badge>}
         </div>
       </div>
 
       <SectionTitle>{t("section.revenueProfit")}</SectionTitle>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard label={t("stat.todayRevenue")} value={data ? rupiah(data.omzet) : "—"} glow="emerald" icon={Wallet} sub={data ? `${data.transactionsCount} transaksi lunas` : undefined} />
         <StatCard label={t("stat.rentalRevenue")} value={data ? rupiah(data.revenueRental) : "—"} glow="cyan" icon={Gamepad2} />
         <StatCard label={t("stat.fnbRevenue")} value={data ? rupiah(data.revenueFnb) : "—"} glow="purple" icon={ShoppingBag} />
@@ -289,7 +289,7 @@ export default function OwnerDashboardPage() {
       <RevenueBreakdownCard data={data ?? null} />
 
       <SectionTitle>{t("section.transactionsCustomers")}</SectionTitle>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           label={t("stat.transactionCount")}
           value={data ? String(data.transactionsCount) : "—"}
@@ -303,7 +303,7 @@ export default function OwnerDashboardPage() {
       </div>
 
       <SectionTitle>{t("section.psUnitStatus")}</SectionTitle>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <StatCard label={t("stat.psPlaying")} value={data ? String(data.units.occupied) : "—"} glow="amber" icon={Gamepad2} />
         <StatCard label={t("stat.psAvailable")} value={data ? String(data.units.available) : "—"} glow="emerald" icon={CheckCircle2} />
         <StatCard label={t("stat.psBooked")} value={data ? String(data.units.booked) : "—"} glow="purple" icon={CalendarClock} />
@@ -312,7 +312,7 @@ export default function OwnerDashboardPage() {
       </div>
 
       <SectionTitle>{t("section.cashFinance")}</SectionTitle>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <StatCard label={t("stat.cashIn")} value={data ? rupiah(data.cashIn) : "—"} glow="emerald" icon={ArrowDownToLine} />
         <StatCard label={t("stat.cashOut")} value={data ? rupiah(data.kasKeluar) : "—"} glow="rose" icon={ArrowUpFromLine} />
         <StatCard label={t("stat.cashBalance")} value={data ? rupiah(data.saldoKas) : "—"} glow="cyan" icon={PiggyBank} />

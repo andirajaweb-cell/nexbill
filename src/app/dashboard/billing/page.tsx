@@ -942,7 +942,7 @@ export default function BillingPage() {
           </div>
 
           <div className="lg:col-span-1">
-            <Card className="p-4 space-y-3 sticky top-4">
+            <Card className="p-4 space-y-3 lg:sticky lg:top-16">
               <div className="flex items-center gap-2 font-semibold">
                 <ShoppingCart size={16} className="text-cyan-400" /> {t("billing.cart.heading", "Keranjang")}
               </div>
@@ -1518,7 +1518,7 @@ function ProductStoreTab({
           </div>
 
           <div className="lg:col-span-1">
-            <Card className="p-4 space-y-3 sticky top-4">
+            <Card className="p-4 space-y-3 lg:sticky lg:top-16">
               <div className="flex items-center gap-2 font-semibold">
                 <ShoppingCart size={16} className="text-cyan-400" /> {t("billing.cart.heading", "Keranjang")}
               </div>

@@ -275,3 +275,60 @@ html.theme-light [class~="bg-rose-900/20"] { background-color: rgba(244, 63, 94,
 html.theme-light [class~="bg-sky-950"] { background-color: #e0f2fe; }
 html.theme-light [class~="border-amber-800/50"] { border-color: rgba(180, 83, 9, 0.45); }
 html.theme-light [class~="border-rose-900/40"] { border-color: rgba(244, 63, 94, 0.3); }
+
+/* =============================================================================================
+   TAMPILAN PONSEL (2026-10-03) — aturan umum supaya ~30 halaman dashboard tetap terbaca di layar
+   kecil tanpa harus menulis ulang setiap halaman. Hanya berlaku di dalam <main class="dash-main">
+   (lihat app/dashboard/layout.tsx) dan hanya di lebar < 768px; tampilan desktop tidak berubah.
+   ============================================================================================= */
+@media (max-width: 767px) {
+  /* Judul halaman sedikit lebih kecil supaya tidak memakan 2–3 baris. */
+  .dash-main h1.text-2xl,
+  .dash-main h1.text-3xl {
+    font-size: 1.35rem;
+    line-height: 1.8rem;
+  }
+
+  /* Tabel lebar: bisa digeser ke samping di dalam kotaknya sendiri, bukan membuat seluruh
+     halaman ikut melebar/terpotong. Judul kolom tidak dipatah per kata. */
+  .dash-main table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dash-main th {
+    white-space: nowrap;
+  }
+
+  /* Deretan tab / filter yang sudah memakai overflow-x-auto: sembunyikan scrollbar tebal. */
+  .dash-main .overflow-x-auto {
+    scrollbar-width: thin;
+  }
+
+  /* Gambar & video tidak boleh melebihi lebar layar. */
+  .dash-main img,
+  .dash-main video,
+  .dash-main canvas {
+    max-width: 100%;
+  }
+}
+
+/* Dialog/modal (dashboard maupun pop-up global): isi panjang bisa di-scroll di dalam dialog,
+   tidak terpotong di atas/bawah layar ponsel. */
+@media (max-width: 1023px) {
+  .fixed.inset-0.items-center.justify-center > div {
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Area sentuh minimal di layar sentuh (pedoman ±40px) untuk tombol kecil di tabel/kartu. */
+@media (pointer: coarse) {
+  .dash-main button,
+  .dash-main select,
+  .dash-main [role="button"] {
+    touch-action: manipulation;
+  }
+}

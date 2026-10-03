@@ -833,15 +833,15 @@ function RecipeTab({ outletId }: { outletId: string }) {
           {rows.map((row, i) => (
             <div key={i} className="grid grid-cols-8 gap-2 items-center">
               <SearchableSelect
-                className="col-span-4"
+                className="col-span-8 sm:col-span-4"
                 value={row.ingredientProductId}
                 onChange={(v) => updateRow(setRows, i, { ingredientProductId: v })}
                 placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
                 options={ingredientOptions.map((p) => ({ value: p.id, label: p.name }))}
               />
-              <input type="number" className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" placeholder={t("inventory.recipe.qtyPerYieldPlaceholder", "Qty per yield")} value={row.qtyPerYield || ""} onChange={(e) => updateRow(setRows, i, { qtyPerYield: Number(e.target.value) })} />
-              <UnitSelect units={units} value={row.unit} onChange={(v) => updateRow(setRows, i, { unit: v })} className="col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" />
-              <button className="col-span-1 text-xs text-red-400" onClick={() => removeRow(setRows, i)}>{t("inventory.action.removeRow", "Hapus")}</button>
+              <input type="number" className="col-span-3 sm:col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" placeholder={t("inventory.recipe.qtyPerYieldPlaceholder", "Qty per yield")} value={row.qtyPerYield || ""} onChange={(e) => updateRow(setRows, i, { qtyPerYield: Number(e.target.value) })} />
+              <UnitSelect units={units} value={row.unit} onChange={(v) => updateRow(setRows, i, { unit: v })} className="col-span-3 sm:col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" />
+              <button className="col-span-2 sm:col-span-1 text-xs text-red-400" onClick={() => removeRow(setRows, i)}>{t("inventory.action.removeRow", "Hapus")}</button>
             </div>
           ))}
           <button className="text-xs text-emerald-400" onClick={() => addRow(setRows)}>{t("inventory.recipe.addIngredient", "+ Tambah Bahan")}</button>
@@ -860,15 +860,15 @@ function RecipeTab({ outletId }: { outletId: string }) {
                 {editRows.map((row, i) => (
                   <div key={i} className="grid grid-cols-8 gap-2 items-center">
                     <SearchableSelect
-                      className="col-span-4"
+                      className="col-span-8 sm:col-span-4"
                       value={row.ingredientProductId}
                       onChange={(v) => updateRow(setEditRows, i, { ingredientProductId: v })}
                       placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
                       options={ingredientOptions.map((p) => ({ value: p.id, label: p.name }))}
                     />
-                    <input type="number" className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={row.qtyPerYield || ""} onChange={(e) => updateRow(setEditRows, i, { qtyPerYield: Number(e.target.value) })} />
-                    <UnitSelect units={units} value={row.unit} onChange={(v) => updateRow(setEditRows, i, { unit: v })} className="col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" />
-                    <button className="col-span-1 text-xs text-red-400" onClick={() => removeRow(setEditRows, i)}>X</button>
+                    <input type="number" className="col-span-3 sm:col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={row.qtyPerYield || ""} onChange={(e) => updateRow(setEditRows, i, { qtyPerYield: Number(e.target.value) })} />
+                    <UnitSelect units={units} value={row.unit} onChange={(v) => updateRow(setEditRows, i, { unit: v })} className="col-span-3 sm:col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" />
+                    <button className="col-span-2 sm:col-span-1 text-xs text-red-400" onClick={() => removeRow(setEditRows, i)}>X</button>
                   </div>
                 ))}
                 <button className="text-xs text-emerald-400" onClick={() => addRow(setEditRows)}>{t("inventory.recipe.addIngredient", "+ Tambah Bahan")}</button>

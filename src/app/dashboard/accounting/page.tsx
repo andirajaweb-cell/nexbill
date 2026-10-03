@@ -713,17 +713,17 @@ function JournalTab({ outletId }: { outletId: string }) {
 
           <div className="space-y-2">
             {form.lines.map((line, i) => (
-              <div key={i} className="grid grid-cols-12 gap-2 items-center">
+              <div key={i} className="grid grid-cols-12 gap-2 items-center border-b border-neutral-800/60 pb-2 sm:border-0 sm:pb-0">
                 <SearchableSelect
-                  className="col-span-4"
+                  className="col-span-12 sm:col-span-4"
                   value={line.accountId}
                   onChange={(v) => updateLine(i, { accountId: v })}
                   placeholder={t("accounting.common.chooseAccount", "Pilih akun...")}
                   options={postableAccounts.map((a) => ({ value: a.id, label: `${a.code} — ${coaAccountName(t, a)}` }))}
                 />
-                <input className={`${inputClsSm} col-span-2`} placeholder={t("accounting.journal.placeholderKeterangan", "Keterangan")} value={line.description} onChange={(e) => updateLine(i, { description: e.target.value })} />
-                <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={line.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: e.target.value ? "" : line.credit })} />
-                <input type="number" className={`${inputClsSm} col-span-2`} placeholder={t("accounting.common.credit", "Kredit")} value={line.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: e.target.value ? "" : line.debit })} />
+                <input className={`${inputClsSm} col-span-12 sm:col-span-2`} placeholder={t("accounting.journal.placeholderKeterangan", "Keterangan")} value={line.description} onChange={(e) => updateLine(i, { description: e.target.value })} />
+                <input type="number" className={`${inputClsSm} col-span-5 sm:col-span-2`} placeholder={t("accounting.common.debit", "Debit")} value={line.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: e.target.value ? "" : line.credit })} />
+                <input type="number" className={`${inputClsSm} col-span-5 sm:col-span-2`} placeholder={t("accounting.common.credit", "Kredit")} value={line.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: e.target.value ? "" : line.debit })} />
                 <button className="col-span-2 text-xs text-red-400 hover:underline" onClick={() => removeLine(i)} disabled={form.lines.length <= 2}>{t("accounting.journal.removeLineButton", "Hapus baris")}</button>
               </div>
             ))}

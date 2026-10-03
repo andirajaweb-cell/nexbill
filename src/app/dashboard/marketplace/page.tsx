@@ -491,7 +491,7 @@ function BarangSayaTab({ bolehTransaksi, profilSaya }: { bolehTransaksi: boolean
             </div>
             {/* Setter fungsional: unggahan berjalan beberapa detik, dan isian lain yang diketik selama itu tidak boleh tertimpa. */}
             <PemilihFoto photos={form.photos} onChange={(p) => setForm((f) => ({ ...f, photos: p }))} onBusyChange={setFotoSibuk} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelKecil}>Kategori</label>
                 <select className={isian} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
@@ -505,7 +505,7 @@ function BarangSayaTab({ bolehTransaksi, profilSaya }: { bolehTransaksi: boolean
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelKecil}>Harga per Unit (Rp)</label>
                 <input type="number" min={0} className={isian} value={form.price || ""} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
@@ -515,7 +515,7 @@ function BarangSayaTab({ bolehTransaksi, profilSaya }: { bolehTransaksi: boolean
                 <input type="number" min={1} className={isian} value={form.qty} onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelKecil}>Kota</label>
                 <input className={isian} placeholder="Mis. Bandung" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />

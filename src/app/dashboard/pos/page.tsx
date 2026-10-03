@@ -106,6 +106,12 @@ export default function PosPage() {
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
   const [search, setSearch] = useState("");
   const isFirstRender = useRef(true);
+  // Fokus otomatis ke kolom cari/scan hanya di layar lebar — di ponsel autofocus langsung memunculkan
+  // keyboard dan menutupi separuh layar.
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) searchRef.current?.focus();
+  }, []);
 
   const loadOpenOrders = () => fetchJsonArray("/api/orders?status=open").then(setOpenOrders);
 
@@ -336,8 +342,8 @@ export default function PosPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 pb-20 lg:pb-0">
+      <div className="lg:col-span-2 space-y-4 lg:space-y-6">
         <div>
           <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("pos.title", "Kasir (POS)")}</h1>
           <p className="text-sm text-neutral-500">{t("pos.subtitle", "Makanan & minuman. Sewa perangkat dikelola di Home Rental / halaman Rental, bukan di sini.")}</p>
@@ -345,8 +351,8 @@ export default function PosPage() {
 
         <div>
           <input
-            autoFocus
-            className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+            ref={searchRef}
+            className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2.5 sm:py-2 text-sm"
             placeholder={t("pos.searchPlaceholder", "Cari nama produk (bisa beberapa kata) atau scan barcode...")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -444,7 +450,7 @@ export default function PosPage() {
         )}
       </div>
 
-      <Card className="h-fit sticky top-6 space-y-4">
+      <Card className="h-fit lg:sticky lg:top-16 space-y-4 scroll-mt-16" id="pos-cart">
         <h2 className="font-medium">{t("pos.cart", "Keranjang")}</h2>
         {cart.length === 0 && <p className="text-sm text-neutral-500">{t("pos.emptyCart", "Belum ada item.")}</p>}
         <div className="space-y-2">
@@ -530,6 +536,18 @@ export default function PosPage() {
           </div>
         )}
       </Card>
+      {/* Ponsel/tablet: keranjang ada di bawah daftar produk, jadi tampilkan bilah ringkas yang
+          selalu terlihat untuk langsung loncat ke keranjang & bayar. */}
+      {cart.length > 0 && (
+        <button
+          type="button"
+          onClick={() => document.getElementById("pos-cart")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          className="lg:hidden fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+        >
+          <span>{t("pos.cart", "Keranjang")} ({cart.reduce((n, l) => n + l.qty, 0)})</span>
+          <span>{rupiah(estimatedTotal)} →</span>
+        </button>
+      )}
     </div>
   );
 }

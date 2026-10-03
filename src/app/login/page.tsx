@@ -332,7 +332,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10 lg:px-8">
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center px-3 sm:px-4 py-5 sm:py-10 lg:px-8">
       <div className="relative w-full max-w-6xl">
         {/* Ambient premium glow specific to this page, layered on top of the global gm-body ambience */}
         <div
@@ -429,7 +429,7 @@ function LoginForm() {
           </div>
 
           {/* Right: form */}
-          <div className="flex items-center justify-center p-8 sm:p-12 lg:p-14 bg-[#0a0d1a]">
+          <div className="flex items-center justify-center px-5 py-7 sm:p-12 lg:p-14 bg-[#0a0d1a]">
             <div className="w-full max-w-sm space-y-7">
               <div className="space-y-1.5">
                 <h2 className="gm-display text-[1.65rem] font-bold text-white">{t.welcomeTitle}</h2>

@@ -1064,7 +1064,7 @@ export default function RentalPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <LiveClock lang={lang} />
           <NotificationVolumeControl onPreview={() => playAlertBeep()} />
           <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowUnitManager((v) => !v)}>
@@ -1078,7 +1078,7 @@ export default function RentalPage() {
           <h2 className="gm-heading font-semibold">{t("rental.manageUnitsHeading", "Kelola Unit PS")}</h2>
           <div className="space-y-2">
             {units.map((unit) => (
-              <div key={unit.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${unit.isActive === false ? "border-white/5 opacity-50" : unit.status === "maintenance" ? "border-amber-500/30" : "border-white/10"}`}>
+              <div key={unit.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${unit.isActive === false ? "border-white/5 opacity-50" : unit.status === "maintenance" ? "border-amber-500/30" : "border-white/10"}`}>
                 <div>
                   <span className="font-medium">{unit.name}</span>
                   <span className="text-xs text-neutral-500 ml-2 uppercase">{unit.consoleType} · {unit.tvType.replace("_", " ")} · {rupiah(unit.hourlyRate)}{t("rental.perHourSuffix", "/jam")}</span>
@@ -1093,7 +1093,7 @@ export default function RentalPage() {
                     </span>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-1 sm:gap-2">
                   {unit.isActive === false ? (
                     <Button variant="ghost" className="text-xs flex items-center gap-1" onClick={() => reactivateUnit(unit)}>
                       <RotateCcw size={12} /> {t("rental.activateUnit", "Aktifkan")}
@@ -1318,9 +1318,9 @@ export default function RentalPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4 lg:gap-6 items-start">
         {/* Station grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4">
           {activeUnits.map((unit) => {
             const session = sessions.find((s) => s.rentalUnitId === unit.id);
             const bill = session ? bills[session.id] : undefined;
@@ -1624,8 +1624,10 @@ export default function RentalPage() {
           )}
         </div>
 
-        {/* Right column: quick-start + recent activity */}
-        <div className="space-y-4">
+        {/* Right column: quick-start + recent activity. Di layar < xl panel ini tampil PALING ATAS
+            (order-first) supaya kasir di ponsel/tablet tidak perlu scroll melewati semua unit untuk
+            memulai sesi baru. */}
+        <div className="space-y-4 order-first xl:order-none">
           <Card className="space-y-3 border-cyan-400/20">
             <div>
               <h2 className="gm-heading font-semibold text-cyan-300">{t("rental.newSessionHeading", "SESI BARU")}</h2>

@@ -6,11 +6,12 @@ import { useAuth } from "@/lib/auth/client";
 import { roleLabel, type StaffRole } from "@/lib/auth/permissions";
 import { Badge } from "@/components/ui/Badge";
 import { useApi } from "@/lib/api/use-api";
-import { LogOut, Bell, ShieldCheck, Building2, Check, ChevronDown } from "lucide-react";
+import { LogOut, Bell, ShieldCheck, Building2, Check, ChevronDown, Menu, Gamepad2 } from "lucide-react";
 import type { NotificationItem } from "@/lib/notifications";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { LanguageSwitcher } from "@/components/dashboard/LanguageSwitcher";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
+import { useMobileNav } from "@/components/dashboard/MobileNav";
 
 /**
  * Role -> Badge status mapping. Superuser (the sole top-level role) is
@@ -42,6 +43,7 @@ export function TopBar() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const { t, lang } = useDashboardLang();
+  const { setOpen: setNavOpen } = useMobileNav();
   // Was a hand-rolled useEffect + setInterval(load, 60000) — moved to useApi/SWR so this poll
   // (which runs on every dashboard page, since TopBar lives in the persistent layout) pauses
   // automatically when the browser tab is backgrounded, and so `mutate()` below can do an
@@ -134,20 +136,32 @@ export function TopBar() {
   const remaining = items.length - visible.length;
 
   return (
-    <div className="relative z-30 flex items-center justify-between border-b border-white/10 bg-[#070b18]/80 backdrop-blur-md px-6 py-2.5">
-      <div className="flex items-center gap-2 text-xs text-neutral-500">
-        <span className="relative flex h-2 w-2">
+    <div className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/10 bg-[#070b18]/80 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2.5">
+      <div className="flex items-center gap-2 text-xs text-neutral-500 min-w-0">
+        {/* Ponsel/tablet portrait: tombol menu + logo, karena sidebar disembunyikan jadi drawer. */}
+        <button
+          onClick={() => setNavOpen(true)}
+          className="lg:hidden -ml-1 rounded-lg p-2 text-neutral-300 hover:text-cyan-300 hover:bg-white/5 transition"
+          aria-label={t("topbar.openMenu", "Buka menu")}
+        >
+          <Menu size={20} />
+        </button>
+        <Link href="/dashboard" className="lg:hidden flex items-center gap-1.5 min-w-0">
+          <Gamepad2 size={16} className="text-cyan-300 shrink-0" />
+          <span className="gm-display gm-gradient-title text-sm font-extrabold truncate">NEXBILL</span>
+        </Link>
+        <span className="relative hidden sm:flex h-2 w-2 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
         </span>
-        <span className="gm-heading tracking-wide">{t("topbar.controlCenterOnline")}</span>
+        <span className="gm-heading tracking-wide hidden md:inline truncate">{t("topbar.controlCenterOnline")}</span>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {loading ? (
           <span className="text-xs text-neutral-500">{t("topbar.loadingSession")}</span>
         ) : user ? (
           <>
-            <span className="text-sm text-neutral-300">
+            <span className="hidden xl:inline text-sm text-neutral-300">
               {t("topbar.loginAs")} <span className="font-medium text-neutral-100">{user.name}</span>
             </span>
             <Badge status={ROLE_BADGE_STATUS[user.role] ?? "unknown"}>{roleLabel(user.role as StaffRole)}</Badge>
@@ -160,11 +174,11 @@ export function TopBar() {
                   title={t("topbar.switchOutletTitle")}
                 >
                   <Building2 size={12} />
-                  <span className="max-w-[140px] truncate">{user.linkedOutlets.find((o) => o.id === user.outletId)?.name ?? "Outlet"}</span>
+                  <span className="max-w-[72px] sm:max-w-[140px] truncate">{user.linkedOutlets.find((o) => o.id === user.outletId)?.name ?? "Outlet"}</span>
                   <ChevronDown size={12} />
                 </button>
                 {outletMenuOpen && (
-                  <div className="absolute right-0 top-[calc(100%+8px)] w-64 rounded-xl border border-white/10 bg-[#0a0f1e] shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
+                  <div className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+8px)] sm:w-64 rounded-xl border border-white/10 bg-[#0a0f1e] shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
                     <div className="px-3.5 py-2.5 border-b border-white/10 text-[11px] uppercase tracking-wide text-neutral-500">
                       {t("topbar.yourOutlets")} ({user.linkedOutlets.length})
                     </div>
@@ -200,7 +214,7 @@ export function TopBar() {
                 target="_blank"
                 rel="noopener noreferrer"
                 title={t("topbar.adminPlatformTitle")}
-                className="flex items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[11px] font-medium text-amber-300 hover:bg-amber-400/20 hover:text-amber-200 transition"
+                className="hidden sm:flex items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[11px] font-medium text-amber-300 hover:bg-amber-400/20 hover:text-amber-200 transition"
               >
                 <ShieldCheck size={12} /> {t("topbar.adminPlatform")}
               </Link>
@@ -213,7 +227,7 @@ export function TopBar() {
         <ThemeToggle />
         <div className="relative" ref={panelRef}>
           <button
-            className="relative rounded-lg p-1.5 text-neutral-400 hover:text-cyan-300 hover:bg-white/5 transition"
+            className="relative rounded-lg p-2 sm:p-1.5 text-neutral-400 hover:text-cyan-300 hover:bg-white/5 transition"
             title={unreadCount > 0 ? t("topbar.unreadTooltip").replace("{n}", String(unreadCount)) : t("topbar.noNotificationsTooltip")}
             onClick={() => setOpen((v) => !v)}
           >
@@ -225,7 +239,7 @@ export function TopBar() {
             )}
           </button>
           {open && (
-            <div className="absolute right-0 top-[calc(100%+8px)] w-80 rounded-xl border border-white/10 bg-[#0a0f1e] shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
+            <div className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+8px)] sm:w-80 rounded-xl border border-white/10 bg-[#0a0f1e] shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
               <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-white/10">
                 <span className="text-sm font-medium text-neutral-100">{t("topbar.notifications")}</span>
                 {unreadCount > 0 && (
@@ -270,8 +284,8 @@ export function TopBar() {
             </div>
           )}
         </div>
-        <button onClick={logout} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-rose-400 transition">
-          <LogOut size={13} /> {t("sidebar.logout")}
+        <button onClick={logout} className="hidden sm:flex items-center gap-1 text-xs text-neutral-500 hover:text-rose-400 transition" title={t("sidebar.logout")}>
+          <LogOut size={13} /> <span className="hidden md:inline">{t("sidebar.logout")}</span>
         </button>
       </div>
     </div>

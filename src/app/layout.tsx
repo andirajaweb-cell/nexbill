@@ -105,6 +105,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: "#050810",
+  // Supaya env(safe-area-inset-*) terisi di ponsel berponi/gesture bar (dipakai top bar, drawer
+  // menu, dan bilah keranjang Kasir di dashboard) — penting juga untuk versi aplikasi Android (TWA).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

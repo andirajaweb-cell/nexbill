@@ -24,15 +24,15 @@ export function LanguageSwitcher() {
     <div className="relative" ref={panelRef}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-neutral-300 hover:border-cyan-400/30 hover:text-cyan-300 transition"
+        className="flex items-center gap-1 sm:gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 sm:px-2.5 py-1.5 sm:py-1 text-xs text-neutral-300 hover:border-cyan-400/30 hover:text-cyan-300 transition"
         title="Language"
       >
-        <Languages size={12} />
+        <Languages size={12} className="hidden sm:block" />
         <span>{active.flag}</span>
         <ChevronDown size={12} />
       </button>
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] w-52 rounded-xl border border-white/10 bg-[#0a0f1e] shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
+        <div className="fixed right-3 top-14 w-52 sm:absolute sm:right-0 sm:top-[calc(100%+8px)] rounded-xl border border-white/10 bg-[#0a0f1e] shadow-[0_8px_30px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
           {LANG_OPTIONS.map((o) => (
             <button
               key={o.code}

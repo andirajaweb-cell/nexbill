@@ -9,7 +9,7 @@ import "@/lib/i18n/dict-shell";
 export function DashboardFooter() {
   const { t } = useDashboardLang();
   return (
-    <footer className="px-6 py-3 text-center text-xs text-neutral-600 border-t border-neutral-900">
+    <footer className="px-3 sm:px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-neutral-600 border-t border-neutral-900">
       &copy; {new Date().getFullYear()} &mdash; {t("shell.footerMadeBy", "Dibuat oleh")}{" "}
       <a href="https://www.digitrajasa.web.id" target="_blank" rel="noreferrer" className="text-cyan-500 hover:text-cyan-400 underline underline-offset-2">
         Digitrajasa

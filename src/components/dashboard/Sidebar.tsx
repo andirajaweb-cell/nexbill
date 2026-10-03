@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
@@ -35,12 +35,13 @@ import {
   HelpCircle,
   Gift,
   Wrench,
-  Share2, Store,} from "lucide-react";
+  Share2, Store, X,} from "lucide-react";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { roleLabel, type StaffRole } from "@/lib/auth/permissions";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { useMobileNav } from "@/components/dashboard/MobileNav";
 
 const nav = [
   { href: "/dashboard", key: "nav.summary", icon: LayoutDashboard },
@@ -122,59 +123,137 @@ export function Sidebar() {
     items = [items[0], { href: "/dashboard/semua-outlet", key: "nav.allOutlets", icon: Building2 }, ...items.slice(1)];
   }
 
+  const { open: drawerOpen, setOpen: setDrawerOpen } = useMobileNav();
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Drawer (layar < 1024px): tutup saat pindah halaman.
+  useEffect(() => {
+    setDrawerOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Saat drawer terbuka: kunci scroll halaman, Esc menutup, fokus ke tombol tutup, dan tutup
+  // otomatis kalau layar diperlebar melewati breakpoint desktop.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    closeBtnRef.current?.focus();
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onMq = () => mq.matches && setDrawerOpen(false);
+    mq.addEventListener("change", onMq);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+      mq.removeEventListener("change", onMq);
+    };
+  }, [drawerOpen, setDrawerOpen]);
+
+  const brand = (
+    <div className="flex items-center gap-2.5 min-w-0">
+      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-400/30 shadow-[0_0_14px_rgba(34,211,238,0.35)]">
+        <Gamepad2 size={18} className="text-cyan-300" />
+      </div>
+      <div className="min-w-0">
+        <div className="gm-display gm-gradient-title text-base font-extrabold leading-tight truncate">NEXBILL</div>
+        <div className="text-[9px] uppercase tracking-wider text-neutral-500 truncate">{t("sidebar.tagline")}</div>
+      </div>
+    </div>
+  );
+
+  const navList = (
+    <nav className="flex-1 flex flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1" aria-label="Menu">
+      {items.map(({ href, key, icon: Icon }) => {
+        const active = pathname === href;
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={() => setDrawerOpen(false)}
+            aria-current={active ? "page" : undefined}
+            className={clsx(
+              "relative flex items-center gap-2.5 rounded-lg px-3 py-2.5 lg:py-2 text-sm transition",
+              active
+                ? "bg-gradient-to-r from-cyan-500/15 to-purple-500/10 text-cyan-300 border border-cyan-400/20 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
+                : "text-neutral-400 border border-transparent hover:bg-white/5 hover:text-neutral-100"
+            )}
+          >
+            {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
+            <Icon size={16} className="shrink-0" />
+            <span className="truncate flex-1">{t(key)}</span>
+            {href === "/dashboard/chat" && unreadTicketCount > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_6px_rgba(244,63,94,0.7)]">
+                {unreadTicketCount > 9 ? "9+" : unreadTicketCount}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+
+  const footer = (
+    <div className="mt-2 border-t border-white/10 pt-3 px-2 pb-[env(safe-area-inset-bottom)]">
+      {user ? (
+        <>
+          <div className="text-sm font-medium truncate text-neutral-200">{user.name}</div>
+          <div className="text-xs text-neutral-500 mb-2">{roleLabel(user.role as StaffRole)}</div>
+        </>
+      ) : (
+        <div className="text-xs text-amber-400 mb-2">{t("sidebar.invalidSession")}</div>
+      )}
+      <button
+        onClick={logout}
+        className="flex items-center gap-2 py-1 text-xs text-neutral-500 hover:text-rose-400 transition"
+      >
+        <LogOut size={13} /> {t("sidebar.logout")}
+      </button>
+    </div>
+  );
+
   return (
-    <aside className="w-64 shrink-0 border-r border-white/10 bg-[#070b18]/90 backdrop-blur-md p-3 flex flex-col gap-1">
-      <div className="mb-3 px-2 py-2 flex items-center gap-2.5">
-        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-400/30 shadow-[0_0_14px_rgba(34,211,238,0.35)]">
-          <Gamepad2 size={18} className="text-cyan-300" />
-        </div>
-        <div className="min-w-0">
-          <div className="gm-display gm-gradient-title text-base font-extrabold leading-tight truncate">NEXBILL</div>
-          <div className="text-[9px] uppercase tracking-wider text-neutral-500 truncate">{t("sidebar.tagline")}</div>
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col gap-0.5 overflow-y-auto pr-1">
-        {items.map(({ href, key, icon: Icon }) => {
-          const active = pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={clsx(
-                "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition",
-                active
-                  ? "bg-gradient-to-r from-cyan-500/15 to-purple-500/10 text-cyan-300 border border-cyan-400/20 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
-                  : "text-neutral-400 border border-transparent hover:bg-white/5 hover:text-neutral-100"
-              )}
-            >
-              {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
-              <Icon size={16} />
-              <span className="truncate flex-1">{t(key)}</span>
-              {href === "/dashboard/chat" && unreadTicketCount > 0 && (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_6px_rgba(244,63,94,0.7)]">
-                  {unreadTicketCount > 9 ? "9+" : unreadTicketCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </div>
-      <div className="mt-2 border-t border-white/10 pt-3 px-2">
-        {user ? (
-          <>
-            <div className="text-sm font-medium truncate text-neutral-200">{user.name}</div>
-            <div className="text-xs text-neutral-500 mb-2">{roleLabel(user.role as StaffRole)}</div>
-          </>
-        ) : (
-          <div className="text-xs text-amber-400 mb-2">{t("sidebar.invalidSession")}</div>
-        )}
-        <button
-          onClick={logout}
-          className="flex items-center gap-2 text-xs text-neutral-500 hover:text-rose-400 transition"
+    <>
+      {/* Desktop (≥1024px): sidebar tetap di kiri, menempel saat halaman di-scroll. */}
+      <aside className="hidden lg:flex sticky top-0 h-screen w-64 shrink-0 border-r border-white/10 bg-[#070b18]/90 backdrop-blur-md p-3 flex-col gap-1">
+        <div className="mb-3 px-2 py-2">{brand}</div>
+        {navList}
+        {footer}
+      </aside>
+
+      {/* Ponsel & tablet portrait (<1024px): drawer dari kiri, dibuka lewat tombol ☰ di TopBar. */}
+      <div className={clsx("lg:hidden fixed inset-0 z-50", drawerOpen ? "" : "pointer-events-none")} aria-hidden={!drawerOpen}>
+        <div
+          className={clsx("absolute inset-0 bg-black/60 transition-opacity duration-200", drawerOpen ? "opacity-100" : "opacity-0")}
+          onClick={() => setDrawerOpen(false)}
+        />
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+          className={clsx(
+            "absolute inset-y-0 left-0 w-72 max-w-[85vw] border-r border-white/10 bg-[#0a0f1e] p-3 pt-[max(0.75rem,env(safe-area-inset-top))] flex flex-col gap-1 shadow-[0_0_40px_rgba(0,0,0,0.6)] transition-transform duration-200",
+            drawerOpen ? "translate-x-0" : "-translate-x-full"
+          )}
         >
-          <LogOut size={13} /> {t("sidebar.logout")}
-        </button>
+          <div className="mb-2 px-2 py-1.5 flex items-center justify-between gap-2">
+            {brand}
+            <button
+              ref={closeBtnRef}
+              onClick={() => setDrawerOpen(false)}
+              className="rounded-lg p-2 text-neutral-400 hover:text-neutral-100 hover:bg-white/5"
+              aria-label={t("sidebar.closeMenu", "Tutup menu")}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          {navList}
+          {footer}
+        </aside>
       </div>
-    </aside>
+    </>
   );
 }
