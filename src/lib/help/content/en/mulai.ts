@@ -153,6 +153,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Plug the receipt printer into the cashier computer and make sure it's installed in Windows.",
           "Try printing a receipt from the test transaction (Step 10). If the width doesn't fit, set the paper width (58mm/80mm) and press \"Save for This Computer\" — repeat on every cashier computer.",
+          "Using a phone/the NEXBILL Android app with a Bluetooth printer? In Settings → Printer set How this device prints to \"Direct Bluetooth from phone (BLE printer)\", then tap \"Choose Bluetooth Printer\" and \"Test Print\" — or \"Via the RawBT app\" for Bluetooth Classic printers.",
         ],
       },
       {

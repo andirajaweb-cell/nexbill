@@ -1,8 +1,8 @@
 "use client";
+import { PrintReceiptButton } from "@/components/printer/PrintReceiptButton";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import Link from "next/link";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
@@ -530,9 +530,8 @@ export default function PosPage() {
                 {t("pos.confirmCashReceived", "Konfirmasi Cash Diterima")}
               </Button>
             )}
-            <Link href={`/receipt/${checkoutResult.order.id}`} target="_blank" className="block text-center text-emerald-400 underline mt-1">
-              {t("pos.printReceipt", "Cetak Struk")}
-            </Link>
+            {/* Mengikuti cara cetak perangkat ini: dialog print (PC) atau Bluetooth/RawBT (HP & aplikasi Android). */}
+            <PrintReceiptButton orderId={checkoutResult.order.id} label={t("pos.printReceipt", "Cetak Struk")} className="block w-full text-center text-emerald-400 underline mt-1 disabled:opacity-50" />
           </div>
         )}
       </Card>

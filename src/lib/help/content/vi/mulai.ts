@@ -153,6 +153,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Cắm máy in hóa đơn vào máy tính thu ngân và đảm bảo đã cài trong Windows.",
           "Thử in hóa đơn từ giao dịch thử (Bước 10). Nếu khổ giấy không vừa, đặt khổ giấy (58mm/80mm) rồi bấm \"Lưu cho máy tính này\" — lặp lại trên mọi máy tính thu ngân.",
+          "Dùng điện thoại/ứng dụng NEXBILL Android với máy in Bluetooth? Tại Cài đặt → Máy in chọn Cách thiết bị này in \"Bluetooth trực tiếp từ điện thoại (máy in BLE)\", rồi chạm \"Chọn máy in Bluetooth\" và \"In thử\" — hoặc \"Qua ứng dụng RawBT\" cho máy in Bluetooth Classic.",
         ],
       },
       {

@@ -1,4 +1,5 @@
 "use client";
+import { PrintReceiptButton } from "@/components/printer/PrintReceiptButton";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -454,7 +455,7 @@ function TransactionListTab({ outletId }: { outletId: string }) {
                   <td>
                     <div className="flex flex-wrap gap-1">
                       <Button variant="ghost" className="text-xs" onClick={() => setDetailId(row.id)}>{t("transactions.action.detail", "Detail")}</Button>
-                      <Button variant="ghost" className="text-xs" onClick={() => window.open(`/receipt/${row.id}`, "_blank")}>{t("transactions.action.receipt", "Struk")}</Button>
+                      <PrintReceiptButton orderId={row.id} label={t("transactions.action.receipt", "Struk")} className="rounded-lg px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5 disabled:opacity-50" />
                       {canRefund && (row.status === "paid" || row.status === "partial") && (
                         <Button variant="ghost" className="text-xs text-amber-400" onClick={() => doAction(row.id, "refund")}>{t("transactions.action.refund", "Refund")}</Button>
                       )}

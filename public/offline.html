@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#050810" />
+<title>NEXBILL — Tidak ada koneksi</title>
+<style>
+  html,body{margin:0;height:100%;background:#050810;color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+  .card{max-width:360px;text-align:center;border:1px solid rgba(34,211,238,.25);border-radius:20px;padding:28px 22px;background:rgba(15,20,38,.85)}
+  img{width:72px;height:72px;border-radius:18px}
+  h1{font-size:19px;margin:16px 0 8px;color:#a5f3fc}
+  p{font-size:14px;line-height:1.5;color:#9ca3af;margin:0 0 18px}
+  button{width:100%;border:0;border-radius:12px;padding:12px;font-size:15px;font-weight:600;color:#fff;background:linear-gradient(90deg,#06b6d4,#2563eb)}
+  small{display:block;margin-top:12px;color:#6b7280;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+  <img src="/icons/icon-192.png" alt="NEXBILL" />
+  <h1>Tidak ada koneksi internet</h1>
+  <p>NEXBILL butuh internet supaya tagihan, timer, dan kasir selalu sinkron. Periksa Wi-Fi atau data seluler, lalu coba lagi.</p>
+  <button onclick="location.reload()">Coba Lagi</button>
+  <small>No internet connection — check Wi-Fi or mobile data, then try again.</small>
+</div></div>
+<script>window.addEventListener('online',function(){location.reload()});</script>
+</body>
+</html>

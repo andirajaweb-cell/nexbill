@@ -71,6 +71,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Pastikan printer menyala, kertas terpasang, dan printer terpilih di dialog cetak browser.",
           "Atur lebar kertas (58mm/80mm) di Pengaturan → Business & Tax → Printer lalu \"Simpan untuk Komputer Ini\".",
+          "Printer Bluetooth di HP: nyalakan Bluetooth & printer, cek Cara cetak di Pengaturan → Printer, lalu \"Tes Cetak\". Kalau printer tidak muncul saat \"Pilih Printer Bluetooth\", printernya Bluetooth Classic — pilih mode \"Lewat aplikasi RawBT\". iPhone belum didukung.",
         ],
       },
       {

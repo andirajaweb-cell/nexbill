@@ -9,12 +9,25 @@ const nextConfig: NextConfig = {
   // paths resolve correctly.
   serverExternalPackages: ["pdfkit"],
 
+  // Digital Asset Links untuk aplikasi Android (TWA) — lihat src/app/api/assetlinks/route.ts.
+  async rewrites() {
+    return [{ source: "/.well-known/assetlinks.json", destination: "/api/assetlinks" }];
+  },
+
   // Technical-SEO / security hardening headers, applied to every route. HSTS is the actual
   // "enforce HTTPS" signal browsers + some SEO tools check for — actual TLS termination still
   // happens at the host/CDN (Cloudflare per the domain setup), this just tells browsers to never
   // downgrade to plain HTTP for this origin once they've seen it once.
   async headers() {
     return [
+      // Service worker harus selalu diperiksa ulang browser agar perubahan langsung terpakai.
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
       {
         source: "/:path*",
         headers: [

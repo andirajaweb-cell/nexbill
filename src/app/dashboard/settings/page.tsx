@@ -10,7 +10,10 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth, type AuthUser } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { getDevicePrinterSettings, saveDevicePrinterSettings, clearDevicePrinterSettings, type DevicePrinterSettings } from "@/lib/printer/deviceSettings";
+import { getDevicePrinterSettings, saveDevicePrinterSettings, clearDevicePrinterSettings, printConnectionOf, type DevicePrinterSettings, type PrintConnection } from "@/lib/printer/deviceSettings";
+import { isWebBluetoothSupported, pairPrinter, disconnectPrinter, PrinterError } from "@/lib/printer/bluetooth-printer";
+import { printTestReceipt } from "@/lib/printer/print-receipt";
+import "@/lib/i18n/dict-printer";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { SEA_BANKS, findSeaBank } from "@/lib/data/sea-banks";
 import { currencyForCountry, flagForCountry } from "@/lib/currency/format";
@@ -761,28 +764,84 @@ function PrinterCard({ outletId }: { outletId: string }) {
   const [settings, setSettings] = useState<DevicePrinterSettings | null>(null);
   const [printerName, setPrinterName] = useState("");
   const [paperWidthMm, setPaperWidthMm] = useState<58 | 80>(58);
+  const [connection, setConnection] = useState<PrintConnection>("system");
+  const [autoCut, setAutoCut] = useState(false);
+  const [btDevice, setBtDevice] = useState<{ id: string; name: string } | null>(null);
+  const [btBusy, setBtBusy] = useState(false);
+  const [btSupported, setBtSupported] = useState(true);
   const [saved, setSaved] = useState(false);
   const { t } = useDashboardLang();
+  const { user } = useAuth();
+  const outletName = user?.linkedOutlets?.find((o) => o.id === outletId)?.name ?? "NEXBILL";
 
   useEffect(() => {
     const existing = getDevicePrinterSettings(outletId);
     setSettings(existing);
     setPrinterName(existing?.printerName ?? "");
     setPaperWidthMm(existing?.paperWidthMm ?? 58);
+    setConnection(printConnectionOf(existing));
+    setAutoCut(!!existing?.autoCut);
+    setBtDevice(existing?.bluetoothDeviceId ? { id: existing.bluetoothDeviceId, name: existing.bluetoothDeviceName ?? "Printer Bluetooth" } : null);
+    setBtSupported(isWebBluetoothSupported());
   }, [outletId]);
 
+  const current = (): DevicePrinterSettings => ({
+    printerName: printerName.trim() || (connection === "bluetooth" ? btDevice?.name ?? "" : ""),
+    paperWidthMm,
+    connection,
+    autoCut,
+    bluetoothDeviceId: btDevice?.id ?? null,
+    bluetoothDeviceName: btDevice?.name ?? null,
+  });
+
   const save = () => {
-    saveDevicePrinterSettings(outletId, { printerName: printerName.trim(), paperWidthMm });
-    setSettings({ printerName: printerName.trim(), paperWidthMm });
+    const next = current();
+    saveDevicePrinterSettings(outletId, next);
+    setSettings(next);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
 
   const reset = () => {
     clearDevicePrinterSettings(outletId);
+    disconnectPrinter();
     setSettings(null);
     setPrinterName("");
     setPaperWidthMm(58);
+    setConnection("system");
+    setAutoCut(false);
+    setBtDevice(null);
+  };
+
+  const pair = async () => {
+    setBtBusy(true);
+    try {
+      const dev = await pairPrinter();
+      setBtDevice(dev);
+      const next = { ...current(), bluetoothDeviceId: dev.id, bluetoothDeviceName: dev.name, printerName: printerName.trim() || dev.name };
+      saveDevicePrinterSettings(outletId, next);
+      setSettings(next);
+      if (!printerName.trim()) setPrinterName(dev.name);
+    } catch (e) {
+      if (!(e instanceof PrinterError && e.code === "cancelled")) showAlert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBtBusy(false);
+    }
+  };
+
+  const testPrint = async () => {
+    setBtBusy(true);
+    try {
+      const next = current();
+      saveDevicePrinterSettings(outletId, next);
+      setSettings(next);
+      const dev = await printTestReceipt(outletId, next, outletName);
+      if (dev) setBtDevice(dev);
+    } catch (e) {
+      showAlert(`${t("printer.failed", "Gagal mencetak")}: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBtBusy(false);
+    }
   };
 
   return (
@@ -792,6 +851,36 @@ function PrinterCard({ outletId }: { outletId: string }) {
         {t("settings.printer.descPrefix", 'Saat klik "Cetak Struk", browser otomatis membuka dialog print yang sudah menampilkan semua printer terhubung ke komputer ini — tinggal pilih di sana, tidak perlu diatur di sini supaya bisa mencetak. Isi di bawah cuma supaya NEXBILL ')}<b>{t("settings.printer.descBold", "mengingat")}</b>{t("settings.printer.descSuffix", " nama printer & lebar kertas komputer ini (mis. PC kasir depan 58mm, PC dapur 80mm) — tersimpan khusus di komputer ini, tidak memengaruhi PC lain di outlet yang sama.")}
       </p>
       {settings && <p className="text-xs text-emerald-400">{t("settings.printer.savedPrefix", "Tersimpan di komputer ini:")} {settings.printerName || t("settings.printer.noNamePlaceholder", "(tanpa nama)")} — {settings.paperWidthMm}mm</p>}
+
+      <Field label={t("settings.printer.connection", "Cara cetak di perangkat ini")}>
+        <select className={inputCls} value={connection} onChange={(e) => setConnection(e.target.value as PrintConnection)}>
+          <option value="system">{t("settings.printer.conn.system", "Dialog print (PC / printer USB atau LAN)")}</option>
+          <option value="bluetooth">{t("settings.printer.conn.bluetooth", "Bluetooth langsung dari HP (printer BLE)")}</option>
+          <option value="rawbt">{t("settings.printer.conn.rawbt", "Lewat aplikasi RawBT (printer Bluetooth Classic)")}</option>
+        </select>
+      </Field>
+
+      {connection === "bluetooth" && (
+        <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/5 p-3 space-y-2">
+          {!btSupported ? (
+            <p className="text-xs text-amber-300">{t("settings.printer.btUnsupported", "Browser ini tidak mendukung Bluetooth web.")}</p>
+          ) : (
+            <p className="text-xs text-neutral-400">{t("settings.printer.btHint", "Nyalakan Bluetooth HP dan printer, lalu ketuk Pilih Printer Bluetooth.")}</p>
+          )}
+          {btDevice && <p className="text-xs text-emerald-400">{t("settings.printer.paired", "Printer tersambung: {name}").replace("{name}", btDevice.name)}</p>}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="text-xs" onClick={pair} disabled={btBusy || !btSupported}>{t("settings.printer.pair", "Pilih Printer Bluetooth")}</Button>
+            <Button variant="secondary" className="text-xs" onClick={testPrint} disabled={btBusy || !btSupported}>{btBusy ? t("printer.printing", "Mencetak...") : t("settings.printer.test", "Tes Cetak")}</Button>
+          </div>
+        </div>
+      )}
+      {connection === "rawbt" && (
+        <div className="rounded-lg border border-cyan-400/20 bg-cyan-500/5 p-3 space-y-2">
+          <p className="text-xs text-neutral-400">{t("settings.printer.rawbtHint", "Pasang aplikasi gratis RawBT dari Play Store dan pasangkan printer di RawBT sekali.")}</p>
+          <Button variant="secondary" className="text-xs" onClick={testPrint} disabled={btBusy}>{t("settings.printer.test", "Tes Cetak")}</Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Field label={t("settings.field.printerName", "Nama Printer (komputer ini)")}><input className={inputCls} value={printerName} onChange={(e) => setPrinterName(e.target.value)} placeholder={t("settings.printer.namePlaceholder", "mis. Epson TM-T82 Kasir Depan")} /></Field>
         <Field label={t("settings.field.printerPaperWidth", "Lebar Kertas (komputer ini)")}>
@@ -800,6 +889,12 @@ function PrinterCard({ outletId }: { outletId: string }) {
           </select>
         </Field>
       </div>
+      {connection !== "system" && (
+        <label className="flex items-center gap-2 text-xs text-neutral-400">
+          <input type="checkbox" checked={autoCut} onChange={(e) => setAutoCut(e.target.checked)} />
+          {t("settings.printer.autoCut", "Potong kertas otomatis (printer dengan cutter)")}
+        </label>
+      )}
       <div className="flex gap-2">
         <Button onClick={save} className="text-xs">{saved ? t("settings.printer.savedButton", "Tersimpan!") : t("settings.printer.saveButton", "Simpan untuk Komputer Ini")}</Button>
         {settings && <Button variant="secondary" className="text-xs" onClick={reset}>{t("settings.common.delete", "Hapus")}</Button>}

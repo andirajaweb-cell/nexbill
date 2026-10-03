@@ -71,6 +71,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Siguraduhing naka-on ang printer, may papel, at napili ang printer sa print dialog ng browser.",
           "I-set ang lapad ng papel (58mm/80mm) sa Setting → Negosyo at Buwis → Printer, saka \"I-save para sa Computer na Ito\".",
+          "Bluetooth printer sa phone: i-on ang Bluetooth at printer, tingnan ang Paano nagpi-print ang device na ito sa Setting → Printer, saka \"Test Print\". Kung hindi lumabas ang printer sa \"Pumili ng Bluetooth Printer\", Bluetooth Classic ito — piliin ang \"Sa RawBT app\". Hindi pa suportado ang iPhone.",
         ],
       },
       {

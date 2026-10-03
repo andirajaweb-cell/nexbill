@@ -153,6 +153,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Isaksak ang receipt printer sa computer ng cashier at siguraduhing naka-install ito sa Windows.",
           "Subukang mag-print ng resibo mula sa test na transaksyon (Hakbang 10). Kung hindi tugma ang lapad, i-set ang lapad ng papel (58mm/80mm) at pindutin ang \"I-save para sa Computer na Ito\" — ulitin sa bawat computer ng cashier.",
+          "Gamit ang phone/NEXBILL Android app na may Bluetooth printer? Sa Setting → Printer, itakda ang Paano nagpi-print ang device na ito sa \"Direktang Bluetooth mula sa phone (BLE printer)\", saka i-tap ang \"Pumili ng Bluetooth Printer\" at \"Test Print\" — o \"Sa RawBT app\" para sa Bluetooth Classic na printer.",
         ],
       },
       {

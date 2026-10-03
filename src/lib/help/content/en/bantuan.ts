@@ -71,6 +71,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Make sure the printer is on, the paper is loaded, and the printer is selected in the browser's print dialog.",
           "Set the paper width (58mm/80mm) in Settings → Business & Tax → Printer, then \"Save for This Computer\".",
+          "Bluetooth printer on a phone: turn on Bluetooth and the printer, check How this device prints in Settings → Printer, then \"Test Print\". If the printer doesn't appear under \"Choose Bluetooth Printer\", it's a Bluetooth Classic printer — choose \"Via the RawBT app\". iPhone isn't supported yet.",
         ],
       },
       {

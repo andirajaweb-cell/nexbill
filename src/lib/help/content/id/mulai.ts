@@ -153,6 +153,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Colokkan printer struk ke komputer kasir dan pastikan terpasang di Windows.",
           "Coba cetak struk dari transaksi uji coba (Langkah 10). Kalau lebar struk tidak pas, isi lebar kertas (58mm/80mm) lalu tekan \"Simpan untuk Komputer Ini\" — ulangi di setiap komputer kasir.",
+          "Pakai HP/aplikasi NEXBILL Android dengan printer Bluetooth? Di Pengaturan → Printer pilih Cara cetak \"Bluetooth langsung dari HP (printer BLE)\" lalu ketuk \"Pilih Printer Bluetooth\" dan \"Tes Cetak\" — atau \"Lewat aplikasi RawBT\" untuk printer Bluetooth Classic.",
         ],
       },
       {

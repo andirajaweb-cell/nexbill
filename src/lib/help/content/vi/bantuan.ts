@@ -71,6 +71,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Đảm bảo máy in đang bật, đã có giấy và máy in được chọn trong hộp thoại in của trình duyệt.",
           "Đặt khổ giấy (58mm/80mm) tại Cài đặt → Kinh doanh & Thuế → Máy in, rồi \"Lưu cho máy tính này\".",
+          "Máy in Bluetooth trên điện thoại: bật Bluetooth và máy in, kiểm tra Cách thiết bị này in tại Cài đặt → Máy in, rồi \"In thử\". Nếu máy in không hiện trong \"Chọn máy in Bluetooth\", đó là máy in Bluetooth Classic — chọn \"Qua ứng dụng RawBT\". Chưa hỗ trợ iPhone.",
         ],
       },
       {

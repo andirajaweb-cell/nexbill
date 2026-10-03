@@ -71,6 +71,7 @@ export const BANTUAN: HelpCategory[] = [
         steps: [
           "Pastikan pencetak hidup, kertas dimasukkan, dan pencetak dipilih dalam dialog cetak pelayar.",
           "Atur lebar kertas (58mm/80mm) di Tetapan → Perniagaan & Cukai → Pencetak, kemudian \"Simpan untuk Komputer Ini\".",
+          "Pencetak Bluetooth di telefon: hidupkan Bluetooth & pencetak, semak Cara peranti ini mencetak di Tetapan → Pencetak, kemudian \"Cetak Ujian\". Jika pencetak tidak muncul di \"Pilih Pencetak Bluetooth\", ia pencetak Bluetooth Classic — pilih \"Melalui aplikasi RawBT\". iPhone belum disokong.",
         ],
       },
       {

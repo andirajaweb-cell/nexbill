@@ -1,0 +1,22 @@
+# Kunci penandatanganan — JANGAN pernah di-commit. Simpan cadangannya di tempat aman (hilang =
+# tidak bisa update aplikasi kecuali lewat reset kunci upload di Play Console).
+*.keystore
+*.jks
+keystore-passwords.txt
+
+# Proyek Android yang dibuat ulang oleh Bubblewrap dari twa-manifest.json
+app/
+gradle/
+.gradle/
+build/
+gradlew
+gradlew.bat
+build.gradle
+settings.gradle
+gradle.properties
+local.properties
+manifest-checksum.txt
+store_icon.png
+*.aab
+*.apk
+*.idsig

@@ -153,6 +153,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Sambungkan pencetak resit ke komputer juruwang dan pastikan ia dipasang di Windows.",
           "Cuba cetak resit daripada transaksi percubaan (Langkah 10). Jika lebar resit tidak sesuai, isi lebar kertas (58mm/80mm) lalu tekan \"Simpan untuk Komputer Ini\" — ulangi di setiap komputer juruwang.",
+          "Guna telefon/aplikasi NEXBILL Android dengan pencetak Bluetooth? Di Tetapan → Pencetak pilih Cara peranti ini mencetak \"Bluetooth terus dari telefon (pencetak BLE)\", kemudian ketik \"Pilih Pencetak Bluetooth\" dan \"Cetak Ujian\" — atau \"Melalui aplikasi RawBT\" untuk pencetak Bluetooth Classic.",
         ],
       },
       {

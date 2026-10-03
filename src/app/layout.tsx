@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Orbitron, Rajdhani, Inter, Geist } from "next/font/google";
 import { DialogHost } from "@/components/DialogHost";
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { PsCursorSystem } from "@/components/PsCursorSystem";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,12 @@ export const metadata: Metadata = {
     // 🇻🇳 Vietnam
     "phần mềm quản lý quán PS5", "phần mềm tính tiền PlayStation", "hệ thống quản lý phòng game"
   ],
+  // Ikon aplikasi (PWA & aplikasi Android/TWA, lihat src/app/manifest.ts).
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  appleWebApp: { capable: true, title: "NEXBILL", statusBarStyle: "black-translucent" },
   authors: [{ name: "NEXBILL Team" }],
   creator: "NEXBILL",
   publisher: "NEXBILL",
@@ -181,6 +188,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="gm-body antialiased">
         {children}
         <DialogHost />
+        <ServiceWorkerRegister />
         <PsCursorSystem />
       </body>
     </html>
