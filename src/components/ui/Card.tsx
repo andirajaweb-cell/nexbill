@@ -2,16 +2,20 @@ import { clsx } from "clsx";
 import { CSSProperties } from "react";
 
 export function Card({
+  id,
   className,
   style,
   children,
 }: {
+  /** Opsional — mis. target loncatan (scrollIntoView) seperti keranjang Kasir di ponsel. */
+  id?: string;
   className?: string;
   style?: CSSProperties;
   children: React.ReactNode;
 }) {
   return (
     <div
+      id={id}
       style={style}
       className={clsx(
         "rounded-xl border p-4 backdrop-blur-md",
