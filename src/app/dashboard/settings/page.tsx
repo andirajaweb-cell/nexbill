@@ -17,6 +17,7 @@ import { currencyForCountry, flagForCountry } from "@/lib/currency/format";
 import { formatNumber } from "@/lib/format/number";
 import { formatDate } from "@/lib/format/date";
 import "@/lib/i18n/dict-settings";
+import "@/lib/i18n/dict-plan";
 import { TuyaAccountsCard } from "./TuyaAccountsCard";
 
 const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "Banner Iklan", "TV Screensaver", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
@@ -444,6 +445,9 @@ function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: 
   const [cashPools, setCashPools] = useState<{ id: string; name: string; type: string; isDefault: boolean; includeInShiftFloat: boolean }[]>([]);
   const [togglingPoolId, setTogglingPoolId] = useState<string | null>(null);
   const { t } = useDashboardLang();
+  // Anti-fraud shift termasuk paket Pro (struktur harga 2026-10) — beri tahu outlet Starter.
+  const { data: subInfo } = useApi<{ entitlements?: { features: string[] } }>("/api/subscription");
+  const fraudLocked = !!subInfo?.entitlements && !subInfo.entitlements.features.includes("anti_fraud");
 
   const load = () => fetchJsonObject(`/api/settings/outlet?outletId=${outletId}`).then(setForm);
   const loadCashPools = () => fetchJsonArray("/api/cash-bank-accounts").then((rows: any[]) => setCashPools(rows.filter((r) => r.type === "cash")));
@@ -604,6 +608,7 @@ function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: 
 
       <Card className="space-y-3">
         <h2 className="font-medium">{t("settings.preferences.fraudHeading", "Ambang Batas Anti-Fraud Shift")}</h2>
+        {fraudLocked && <p className="text-xs text-amber-300">🔒 {t("plan.antiFraudLocked", "Deteksi shift berisiko otomatis termasuk paket Pro.")}</p>}
         <p className="text-xs text-neutral-500">
           {t(
             "settings.preferences.fraudDesc",

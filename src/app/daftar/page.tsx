@@ -8,12 +8,9 @@ import { createClient } from "@/lib/client";
 import { SEA_BANKS } from "@/lib/data/sea-banks";
 
 interface PlanInfo {
-  name: string;
-  priceCurrent: number;
-  includedConsoles: number;
-  extraConsolePrice: number;
-  smartPlugPrice: number;
-  setupServicePrice: number;
+  starter: { name: string; pricePerUnit: number; minUnits: number } | null;
+  pro: { name: string; priceFlat: number; multiOutletDiscountPct: number } | null;
+  annualMonthsCharged: number;
 }
 
 const inputClass =
@@ -132,11 +129,13 @@ function DaftarPageInner() {
   const preview = useMemo(() => {
     if (!plan) return null;
     const smartPlugQty = nonAndroidTv;
-    const extraConsoleQty = Math.max(0, totalTv - plan.includedConsoles);
     // Biaya smart plug sengaja TIDAK dihitung/ditampilkan di halaman daftar — cukup jumlah unitnya.
     // Pembelian diarahkan lewat Rekomendasi Produk (kategori smart plug) dari menu Kontrol Perangkat.
-    const extraConsoleCost = extraConsoleQty * plan.extraConsolePrice;
-    return { smartPlugQty, extraConsoleQty, extraConsoleCost };
+    // Estimasi paket: Starter per unit (minimal N unit) vs Pro flat per outlet.
+    const starterUnits = plan.starter ? Math.max(plan.starter.minUnits, totalTv) : 0;
+    const starterMonthly = plan.starter ? starterUnits * plan.starter.pricePerUnit : null;
+    const proMonthly = plan.pro ? plan.pro.priceFlat : null;
+    return { smartPlugQty, starterUnits, starterMonthly, proMonthly };
   }, [plan, totalTv, nonAndroidTv]);
 
   const staffTotal = empKasir + empDapur + empLainnya;
@@ -245,10 +244,14 @@ function DaftarPageInner() {
                 Smart Plug dibutuhkan: <span className="text-cyan-400 font-medium">{result.recommendation.smartPlugQty} unit</span> (untuk TV
                 analog/smart TV)
               </div>
-              <div>
-                Slot konsol tambahan: <span className="text-cyan-400 font-medium">{result.recommendation.extraConsoleQty} unit</span> (di luar
-                jatah paket)
-              </div>
+              {result.recommendation.starterMonthly != null && result.recommendation.proMonthly != null && (
+                <div>
+                  Paket yang disarankan:{" "}
+                  <span className="text-cyan-400 font-medium">{result.recommendation.recommendedPlan === "pro" ? "Pro" : "Starter"}</span> — Starter{" "}
+                  {rupiah(result.recommendation.starterMonthly)}/bln ({result.recommendation.totalUnits} unit) · Pro {rupiah(result.recommendation.proMonthly)}/bln
+                  (unit tak terbatas + semua fitur). Bebas pilih setelah trial.
+                </div>
+              )}
               <div>
                 Estimasi akun staf yang perlu dibuat:{" "}
                 <span className="text-cyan-400 font-medium">{result.recommendation.staffAccountsSuggested} akun</span> (kasir/dapur/lainnya),
@@ -258,7 +261,7 @@ function DaftarPageInner() {
           </div>
 
           <p className="text-xs text-neutral-500">
-            Kamu sudah otomatis masuk (login). Lanjutkan ke halaman Langganan untuk menyelesaikan checkout smart plug/konsol tambahan, atau
+            Kamu sudah otomatis masuk (login). Lanjutkan ke halaman Langganan untuk memilih paket (Starter/Pro) dan membeli smart plug, atau
             langsung ke Dashboard.
           </p>
 
@@ -440,15 +443,17 @@ function DaftarPageInner() {
                       <span className="text-cyan-400 font-medium">{preview.smartPlugQty} unit</span>
                     </div>
                   )}
-                  {preview.extraConsoleQty > 0 && (
+                  {totalTv > 0 && preview.starterMonthly != null && preview.proMonthly != null && (
                     <div>
-                      Total unit lebih dari {plan?.includedConsoles} (jatah paket) — butuh{" "}
-                      <span className="text-cyan-400 font-medium">{preview.extraConsoleQty} slot konsol tambahan</span> (~
-                      {rupiah(preview.extraConsoleCost)})
+                      Estimasi setelah trial 30 hari: <span className="text-cyan-400 font-medium">Starter {rupiah(preview.starterMonthly)}/bln</span> (
+                      {preview.starterUnits} unit × {rupiah(plan?.starter?.pricePerUnit ?? 0)}
+                      {totalTv < (plan?.starter?.minUnits ?? 0) ? `, minimal ${plan?.starter?.minUnits} unit` : ""}) atau{" "}
+                      <span className="text-cyan-400 font-medium">Pro {rupiah(preview.proMonthly)}/bln</span> (unit tak terbatas + akuntansi, aset, PPOB,
+                      anti-fraud, AI, multi-cabang). Tahunan: bayar {plan?.annualMonthsCharged ?? 10} bulan, aktif 12 bulan.
                     </div>
                   )}
-                  {preview.smartPlugQty === 0 && preview.extraConsoleQty === 0 && totalTv > 0 && (
-                    <div>Semua unit TV Android dan masih dalam jatah paket — tidak perlu tambahan apa pun untuk memulai.</div>
+                  {preview.smartPlugQty === 0 && totalTv > 0 && (
+                    <div>Semua unit TV Android — tidak perlu smart plug untuk memulai.</div>
                   )}
                   {totalTv === 0 && <div>Belum ada unit diisi — bisa ditambah kapan saja nanti di menu Kelola Unit.</div>}
                 </div>

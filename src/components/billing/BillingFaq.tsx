@@ -25,37 +25,39 @@ const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
  * should be updated here too if those ever change.
  */
 export function BillingFaq({
-  planName,
-  planPrice,
-  includedConsoles,
-  extraConsolePrice,
+  starter,
+  pro,
+  annualMonthsCharged,
   smartPlugPrice,
   setupServicePrice,
   aiAddonPriceMonthly,
-  unlimitedEntitlement,
 }: {
-  planName?: string;
-  planPrice?: number;
-  includedConsoles?: number;
-  extraConsolePrice?: number;
+  /** Paket Starter (per unit/bulan, minimal minUnits unit) — lihat lib/subscription/pricing.ts. */
+  starter?: { name: string; pricePerUnit: number; minUnits: number };
+  /** Paket Pro (flat per outlet/bulan, diskon cabang ke-2 dst). */
+  pro?: { name: string; priceFlat: number; multiOutletDiscountPct: number };
+  annualMonthsCharged?: number;
   smartPlugPrice?: number;
   setupServicePrice?: number;
   aiAddonPriceMonthly?: number;
-  /** True for plans like NEXBILL Standard (flat Rp249.000/bulan) — unlimited consoles, branches,
-   * and users, AI bundled in, no "Konsol Tambahan" line item. See subscriptionPlans.unlimitedEntitlement. */
-  unlimitedEntitlement?: boolean;
 }) {
+  const starterName = starter?.name ?? "NEXBILL Starter";
+  const proName = pro?.name ?? "NEXBILL Pro";
+  const starterPrice = rupiah(starter?.pricePerUnit ?? 6000);
+  const starterMin = starter?.minUnits ?? 5;
+  const proPrice = rupiah(pro?.priceFlat ?? 199000);
+  const annualMonths = annualMonthsCharged ?? 10;
   const groups: FaqGroup[] = [
     {
       title: "Umum & Masa Percobaan",
       items: [
         {
           q: "Apa itu masa percobaan (trial) 30 hari?",
-          a: "Setiap outlet baru otomatis mendapat masa percobaan gratis 30 hari sejak pertama kali dibuat — tidak perlu aktivasi apa pun. Selama trial: fitur AI (Business Assistant & Insights) gratis dipakai tanpa batas, kontrol TV Android dibatasi 1 unit, dan Smart Plug (untuk TV non-Android) belum bisa dipakai sampai dibeli lewat etalase di halaman ini.",
+          a: "Setiap outlet baru otomatis mendapat masa percobaan gratis 30 hari sejak pertama kali dibuat — tidak perlu aktivasi apa pun. Selama trial semua fitur Pro terbuka (termasuk akuntansi, aset, PPOB, anti-fraud, dan AI), kontrol TV Android dibatasi 1 unit, dan Smart Plug (untuk TV non-Android) belum bisa dipakai sampai dibeli lewat etalase di halaman ini.",
         },
         {
           q: "Apa yang terjadi setelah 30 hari trial berakhir?",
-          a: 'Status berubah menjadi "Percobaan Berakhir" dan dashboard masuk mode read-only (data tetap aman, tidak hilang) sampai kamu menyelesaikan pembayaran checkout pertama di halaman ini. Setelah semua tagihan checkout lunas, akses penuh terbuka otomatis selama 30 hari.',
+          a: `Status berubah menjadi "Percobaan Berakhir" dan dashboard masuk mode read-only (data tetap aman, tidak hilang) sampai kamu memilih paket (${starterName} atau ${proName}) dan menyelesaikan pembayaran checkout pertama di halaman ini. Setelah semua tagihan checkout lunas, akses terbuka otomatis — 30 hari untuk bulanan, 12 bulan untuk tahunan.`,
         },
         {
           q: "Apakah data saya hilang kalau langganan terkunci/ditangguhkan?",
@@ -67,26 +69,30 @@ export function BillingFaq({
       title: "Harga, Paket & Add-on",
       items: [
         {
-          q: `Berapa harga paket ${planName ?? "langganan"} saat ini?`,
-          a: unlimitedEntitlement
-            ? `${rupiah(planPrice ?? 249000)}/bulan, flat — sudah termasuk unlimited konsol/unit TV, unlimited cabang/outlet, unlimited user staf, dan AI Business Assistant & Insights. Tidak ada biaya tambahan per unit atau add-on terpisah.`
-            : `${rupiah(planPrice ?? 249000)}/bulan, sudah termasuk kuota ${includedConsoles ?? 10} unit konsol/TV.`,
+          q: "Berapa harga paket NEXBILL?",
+          a: `${starterName}: ${starterPrice}/unit PS/bulan (minimal ${starterMin} unit) — fitur operasional: billing & timer, kasir F&B, booking online, membership, kontrol TV/smart plug, QR pelanggan. ${proName}: ${proPrice}/outlet/bulan flat — unit PS tak terbatas plus akuntansi & laporan keuangan, manajemen aset, PPOB, kontrol anti-fraud, AI Business Assistant, multi-cabang, dan rental ke rumah.`,
         },
-        ...(unlimitedEntitlement
-          ? []
-          : [
-              {
-                q: 'Apa itu "Konsol Tambahan"?',
-                a: `Kalau total unit TV/konsol di outlet lebih banyak dari kuota yang termasuk paket (${includedConsoles ?? 10} unit), setiap unit di luar kuota itu dikenai biaya tambahan ${rupiah(
-                  extraConsolePrice ?? 20000
-                )}/unit — otomatis dihitung dari jumlah unit rental yang sudah kamu buat di menu Kelola Unit, tidak perlu diisi manual saat checkout.`,
-              },
-            ]),
+        {
+          q: "Apakah ada harga tahunan?",
+          a: `Ada. Pilih siklus "Tahunan" saat checkout atau di Ganti Paket: bayar ${annualMonths} bulan, aktif 12 bulan — berlaku untuk Starter maupun Pro.`,
+        },
+        {
+          q: "Bagaimana kalau punya beberapa cabang?",
+          a: `Multi-cabang termasuk paket Pro. Outlet Pro ke-2 dan seterusnya dalam satu grup penagihan mendapat diskon ${pro?.multiOutletDiscountPct ?? 20}% per outlet, dan semua cabang ditagih dalam satu invoice gabungan.`,
+        },
+        {
+          q: "Bagaimana kuota unit di paket Starter?",
+          a: `Starter ditagih per unit PS aktif (minimal ${starterMin} unit). Kalau ingin menambah unit melebihi kuota, buka Ganti Paket lalu naikkan kuota — selisihnya ditagih prorata untuk sisa periode dan kuota baru langsung berlaku setelah dibayar. Atau upgrade ke Pro untuk unit tak terbatas.`,
+        },
+        {
+          q: "Bisa naik/turun paket kapan saja?",
+          a: "Bisa. Naik ke Pro atau tambah kuota unit langsung berlaku setelah selisih prorata dibayar. Turun ke Starter, kurangi kuota, atau ganti siklus bulanan/tahunan berlaku mulai perpanjangan berikutnya (tanpa refund sisa periode). Saat turun ke Starter, menu modul Pro terkunci tapi datanya tetap tersimpan.",
+        },
         {
           q: "Apa itu Smart Plug dan kenapa saya harus beli?",
           a: `TV Android bisa langsung dikontrol nyala/mati dari sistem tanpa alat tambahan. TV non-Android (Smart TV biasa/TV Analog) butuh Smart Plug (colokan pintar) supaya bisa dikontrol otomatis dari NEXBILL — harga mulai ${rupiah(
             smartPlugPrice ?? 275000
-          )}/unit, tersedia beberapa varian di etalase di atas. Ini tetap barang fisik terpisah dari harga langganan, berapa pun paketnya — beda dengan kuota konsol/AI yang sudah termasuk paket.`,
+          )}/unit, tersedia beberapa varian di etalase di atas. Ini barang fisik terpisah dari harga langganan, berapa pun paketnya.`,
         },
         {
           q: "Apa itu Jasa Setup Jarak Jauh?",
@@ -95,12 +101,10 @@ export function BillingFaq({
           )}) — kalau kamu tidak familiar menyambungkan Smart Plug ke akun cloud-nya sendiri, vendor akan bantu setting dari jarak jauh. Kalau dicentang saat checkout, kolom kontak PIC & alamat outlet akan diminta supaya vendor bisa menghubungi.`,
         },
         {
-          q: unlimitedEntitlement ? "Apakah fitur AI (Business Assistant & Insights) bayar terpisah?" : "Apa itu AI Add-on dan kenapa terpisah dari harga langganan?",
-          a: unlimitedEntitlement
-            ? "Tidak — di paket ini AI Business Assistant & Insights sudah termasuk dalam harga langganan flat, tanpa aktivasi atau biaya bulanan terpisah. Bisa langsung dipakai begitu langganan aktif."
-            : `AI Add-on (Business Assistant & Insights) gratis dipakai selama masa percobaan 30 hari. Setelah trial berakhir, fitur ini perlu diaktifkan terpisah (${rupiah(
-                aiAddonPriceMonthly ?? 149000
-              )}/bulan) di luar biaya langganan reguler — karena setiap pemakaiannya punya biaya nyata ke penyedia AI, tidak seperti fitur lain yang harganya flat. Hanya akun Owner atau Superuser yang bisa mengaktifkannya.`,
+          q: "Apakah fitur AI (Business Assistant & Insights) bayar terpisah?",
+          a: `Di paket Pro AI sudah termasuk tanpa biaya tambahan. Di paket Starter, AI bisa diaktifkan sebagai AI Add-on (${rupiah(
+            aiAddonPriceMonthly ?? 149000
+          )}/bulan) karena setiap pemakaiannya punya biaya nyata ke penyedia AI. Selama trial 30 hari AI gratis. Hanya akun Owner atau Superuser yang bisa memakainya.`,
         },
       ],
     },
@@ -121,7 +125,7 @@ export function BillingFaq({
         },
         {
           q: "Kapan akses penuh terbuka setelah bayar?",
-          a: 'Begitu SEMUA tagihan dari satu checkout yang sama berstatus lunas (bukan cuma sebagian), status langganan otomatis berubah menjadi "Aktif" untuk 30 hari ke depan — tidak perlu refresh manual atau menunggu approval tambahan.',
+          a: 'Begitu SEMUA tagihan dari satu checkout yang sama berstatus lunas (bukan cuma sebagian), status langganan otomatis berubah menjadi "Aktif" (30 hari untuk bulanan, 12 bulan untuk tahunan) — tidak perlu refresh manual atau menunggu approval tambahan.',
         },
         {
           q: "Saya sudah checkout tapi mau ubah/batalkan item — bisa?",

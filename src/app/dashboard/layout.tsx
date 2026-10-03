@@ -3,6 +3,7 @@ import { MobileNavProvider } from "@/components/dashboard/MobileNav";
 import { TopBar } from "@/components/dashboard/TopBar";
 import { AuthProvider } from "@/lib/auth/client";
 import { SubscriptionGate } from "@/components/dashboard/SubscriptionGate";
+import { PlanFeatureGate } from "@/components/dashboard/PlanFeatureGate";
 import { AnnouncementPopup } from "@/components/dashboard/AnnouncementPopup";
 import { GracePaymentReminderPopup } from "@/components/dashboard/GracePaymentReminderPopup";
 import { EmailVerificationBanner } from "@/components/dashboard/EmailVerificationBanner";
@@ -34,7 +35,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   ringkasan Langganan) tetap menempel saat halaman di-scroll. */}
               <main className="dash-main flex-1 p-3 sm:p-4 lg:p-6 overflow-x-clip">
                 <EmailVerificationBanner />
-                <SubscriptionGate>{children}</SubscriptionGate>
+                <SubscriptionGate>
+                  <PlanFeatureGate>{children}</PlanFeatureGate>
+                </SubscriptionGate>
               </main>
               <DashboardFooter />
             </div>

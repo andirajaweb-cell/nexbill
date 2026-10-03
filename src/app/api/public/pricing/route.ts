@@ -8,8 +8,8 @@ import type { LangCode } from "@/lib/i18n/registry";
 
 // Public, unauthenticated — powers the landing page's #harga (PRICING) section, per explicit
 // request to hook that section up to platform-admin's real plan data + the market-risk currency
-// system instead of the hardcoded "Rp249.000" literals landing-i18n.tsx has always used (see the
-// comment at the top of that file). Only ever GET, only ever active rows, and only the fields the
+// system instead of hardcoded price literals in landing-i18n.tsx. Sejak 2026-10 ada dua paket:
+// Starter (per unit, minimal minUnits) dan Pro (flat per outlet) — lihat lib/subscription/pricing.ts. Only ever GET, only ever active rows, and only the fields the
 // public pricing card actually needs — nothing here that isn't already meant to be shown to an
 // anonymous visitor.
 //
@@ -48,6 +48,11 @@ export async function GET() {
           smartPlugPrice: subscriptionPlans.smartPlugPrice,
           setupServicePrice: subscriptionPlans.setupServicePrice,
           unlimitedEntitlement: subscriptionPlans.unlimitedEntitlement,
+          tier: subscriptionPlans.tier,
+          pricingModel: subscriptionPlans.pricingModel,
+          minUnits: subscriptionPlans.minUnits,
+          annualMonthsCharged: subscriptionPlans.annualMonthsCharged,
+          multiOutletDiscountPct: subscriptionPlans.multiOutletDiscountPct,
         })
         .from(subscriptionPlans)
         .where(eq(subscriptionPlans.isActive, true))
@@ -90,6 +95,11 @@ export async function GET() {
         name: plan.name,
         includedConsoles: plan.includedConsoles,
         unlimitedEntitlement: plan.unlimitedEntitlement,
+        tier: plan.tier,
+        pricingModel: plan.pricingModel,
+        minUnits: plan.minUnits,
+        annualMonthsCharged: plan.annualMonthsCharged,
+        multiOutletDiscountPct: plan.multiOutletDiscountPct,
         byLang,
       };
     });

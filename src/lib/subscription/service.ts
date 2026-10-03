@@ -14,7 +14,7 @@ import {
   billingGroups,
   orders,
 } from "@/db/schema";
-import { eq, and, sql, inArray, lte, desc, gte } from "drizzle-orm";
+import { eq, and, sql, inArray, lte, desc, gte, or, isNull, gt } from "drizzle-orm";
 import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { DeviceProtocol } from "@/lib/devices/types";
 import {
@@ -31,7 +31,33 @@ import { PaymentGateway, VaBankMethod } from "@/lib/payments/types";
 import { resolveBillingCurrencyForOutlet, convertIdrToCurrency } from "@/lib/market-risk/currency";
 import { getRates } from "@/lib/shipping/biteship";
 import { TRIAL_DAYS, SMART_PLUG_PROTOCOLS, ANDROID_TV_PROTOCOLS, TRIAL_REMINDER_DAYS, RENEWAL_GRACE_DAYS, RENEWAL_INVOICE_LEAD_DAYS } from "./config";
-import { applyRefereeSignupDiscount, accrueReferralCommission } from "@/lib/referral/service";
+import { accrueReferralCommission } from "@/lib/referral/service";
+import {
+  computePlanCharge,
+  describeCharge,
+  prorateUpgrade,
+  resolveEntitlements,
+  hasFeature,
+  planTierOf,
+  minUnitsOf,
+  normalizeCycle,
+  TIER_INCLUDES_AI,
+  FEATURE_LABEL_ID,
+  type BillingCycle,
+  type PlanFeature,
+  type Entitlements,
+} from "./pricing";
+import {
+  ensureDefaultPlans,
+  listCatalogPlans,
+  getPlanById,
+  getPlanByCode,
+  countActiveUnits,
+  isAdditionalProOutlet,
+  desiredSelection,
+  chargeFor,
+  type PlanRow,
+} from "./plan-catalog";
 
 const round = (n: number) => Math.round(n);
 const addDaysIso = (fromIso: string, days: number) => new Date(new Date(fromIso).getTime() + days * 86_400_000).toISOString();
@@ -63,36 +89,54 @@ const PAID_STATUSES = new Set(["active", "grace", "free_forever"]);
  * whether or not the scheduler script happens to be running in this deployment) and by the
  * merchant-initiated "Perpanjang Sekarang" button on the Billing page (requestManualRenewal).
  */
-async function ensureRenewalInvoiceExists(sub: SubscriptionRow) {
+async function ensureRenewalInvoiceExists(sub: SubscriptionRow, opts: { force?: boolean } = {}) {
   // Bundled outlets never get their own individual renewal invoice — one shared "group_renewal"
   // invoice covers every member (see ensureGroupRenewalInvoiceExists below and billingGroupId
   // on schema.ts's subscriptions table).
-  if (sub.billingGroupId) return ensureGroupRenewalInvoiceExists(sub.billingGroupId);
+  if (sub.billingGroupId) return ensureGroupRenewalInvoiceExists(sub.billingGroupId, opts.force ? sub.id : undefined);
 
   const [existingUnpaid] = await db
     .select()
     .from(subscriptionInvoices)
-    .where(and(eq(subscriptionInvoices.subscriptionId, sub.id), eq(subscriptionInvoices.type, "subscription_fee"), eq(subscriptionInvoices.status, "unpaid")))
+    .where(and(eq(subscriptionInvoices.subscriptionId, sub.id), eq(subscriptionInvoices.type, "subscription_fee"), eq(subscriptionInvoices.status, "unpaid"), isRenewalFeeInvoice))
     .limit(1);
   if (existingUnpaid) return existingUnpaid;
-  if (!sub.planId) return null;
-  const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, sub.planId)).limit(1);
-  if (!plan) return null;
-
   const period = currentPeriodLabelFor(sub.currentPeriodEnd ?? new Date().toISOString());
+  const invoice = await createRenewalInvoice(sub, period);
+  if (!invoice) return null;
+  // Auto-pay from Saldo Deposit if the outlet has topped up in advance — see applyDepositToInvoice.
+  return applyDepositToInvoice(sub, invoice);
+}
+
+/**
+ * Membuat invoice perpanjangan untuk paket/siklus/kuota yang diinginkan (next* kalau ada —
+ * turun paket / ganti siklus berlaku di sini). Harga dari computePlanCharge (pricing.ts):
+ * Starter per unit (min 5), Pro flat (diskon cabang ke-2 dst), tahunan bayar 10 aktif 12.
+ */
+async function createRenewalInvoice(sub: SubscriptionRow, period: string) {
+  const want = desiredSelection(sub);
+  const plan = await getPlanById(want.planId);
+  if (!plan) return null;
+  const charge = await chargeFor(sub, plan, { cycle: want.cycle, units: want.units });
   const invoice = await createInvoice({
     outletId: sub.outletId,
     subscriptionId: sub.id,
     type: "subscription_fee",
-    description: `Langganan ${plan.name} — perpanjangan ${period}`,
+    description: `Perpanjangan ${period} — ${describeCharge(plan.name, charge)}`,
     qty: 1,
-    unitPrice: plan.priceCurrent,
+    unitPrice: charge.amount,
     period,
+    periodMonths: charge.monthsGranted,
+    targetPlanId: plan.id,
+    targetBillingCycle: charge.cycle,
+    targetPlanUnits: charge.pricingModel === "per_unit" ? charge.billedUnits : 0,
   });
   await logEvent(sub.outletId, sub.id, "renewal_invoice_created", `${invoice.invoiceNumber} untuk periode ${period}`);
-  // Auto-pay from Saldo Deposit if the outlet has topped up in advance — see applyDepositToInvoice.
-  return applyDepositToInvoice(sub, invoice);
+  return invoice;
 }
+
+/** Filter "invoice perpanjangan" — mengecualikan invoice upgrade prorata (periodMonths = 0). */
+const isRenewalFeeInvoice = or(isNull(subscriptionInvoices.periodMonths), gt(subscriptionInvoices.periodMonths, 0));
 
 interface GroupInvoiceLineItem {
   outletId: string;
@@ -100,54 +144,91 @@ interface GroupInvoiceLineItem {
   planName: string;
   period: string;
   amount: number;
+  // Struktur harga 2026-10 — diterapkan per anggota saat tagihan gabungan lunas. Opsional karena
+  // invoice gabungan lama (sebelum 2026-10) tidak punya field ini (diperlakukan 1 bulan).
+  subscriptionId?: string;
+  description?: string;
+  periodMonths?: number;
+  targetPlanId?: string;
+  targetBillingCycle?: BillingCycle;
+  targetPlanUnits?: number;
+}
+
+/** Anggota grup yang perlu ditagih sekarang: masa tenggang/ditangguhkan, atau aktif yang jatuh temponya dalam RENEWAL_INVOICE_LEAD_DAYS. */
+function isGroupMemberDue(m: SubscriptionRow, forceSubId?: string): boolean {
+  if (!m.planId && !m.nextPlanId) return false;
+  if (m.id === forceSubId && ["active", "grace", "suspended"].includes(m.status)) return true;
+  if (m.status === "grace" || m.status === "suspended") return true;
+  if (m.status !== "active") return false;
+  if (!m.currentPeriodEnd) return true;
+  const daysLeft = Math.ceil((new Date(m.currentPeriodEnd).getTime() - Date.now()) / 86_400_000);
+  return daysLeft <= RENEWAL_INVOICE_LEAD_DAYS;
 }
 
 /**
  * The consolidated equivalent of ensureRenewalInvoiceExists, for outlets bundled into a
  * billing group. Idempotent per group (one unpaid "group_renewal" invoice at a time, same as
- * the individual path) — every member subscription that has a plan contributes one line item,
- * summed into a single invoice/single payment. The anchor outlet (the row `outletId`/
- * `subscriptionId` point at, since every invoice needs exactly one of each for compatibility
- * with existing per-outlet queries) is the group owner's own outlet if it's a member, else
- * whichever member was created first.
+ * the individual path). Sejak struktur harga 2026-10 hanya anggota yang JATUH TEMPO yang masuk
+ * (tiap anggota bisa bulanan/tahunan dengan tanggal berbeda), tiap baris dihitung dengan
+ * computePlanCharge (Starter per unit, Pro flat + diskon cabang ke-2 dst, tahunan bayar 10 bulan),
+ * dan kalau ada anggota jatuh tempo yang belum tercakup invoice gabungan yang masih terbuka,
+ * invoice itu dikedaluwarsakan lalu dibuat ulang. The anchor outlet (the row `outletId`/
+ * `subscriptionId` point at) is whichever included member was created first.
  */
-async function ensureGroupRenewalInvoiceExists(billingGroupId: string) {
+async function ensureGroupRenewalInvoiceExists(billingGroupId: string, forceSubId?: string) {
+  const members = await db.select().from(subscriptions).where(eq(subscriptions.billingGroupId, billingGroupId));
+  const dueMembers = members.filter((m) => isGroupMemberDue(m, forceSubId));
+
   const [existingUnpaid] = await db
     .select()
     .from(subscriptionInvoices)
     .where(and(eq(subscriptionInvoices.billingGroupId, billingGroupId), eq(subscriptionInvoices.type, "group_renewal"), eq(subscriptionInvoices.status, "unpaid")))
     .limit(1);
-  if (existingUnpaid) return existingUnpaid;
+  if (existingUnpaid) {
+    let covered = new Set<string>();
+    try {
+      covered = new Set((JSON.parse(existingUnpaid.lineItemsJson ?? "[]") as GroupInvoiceLineItem[]).map((l) => l.outletId));
+    } catch {
+      // lineItemsJson rusak — anggap mencakup semua supaya tidak membuat ulang terus-menerus.
+      return existingUnpaid;
+    }
+    if (dueMembers.every((m) => covered.has(m.outletId))) return existingUnpaid;
+    await db
+      .update(subscriptionInvoices)
+      .set({ status: "expired", cancelReason: "regenerated_new_members", method: null, providerRef: null, qrString: null, qrImageUrl: null, vaNumber: null, vaBankCode: null })
+      .where(eq(subscriptionInvoices.id, existingUnpaid.id));
+  }
+  if (dueMembers.length === 0) return null;
 
   const [group] = await db.select().from(billingGroups).where(eq(billingGroups.id, billingGroupId)).limit(1);
-  const members = await db.select().from(subscriptions).where(eq(subscriptions.billingGroupId, billingGroupId));
-  const billableMembers = members.filter((m) => m.planId);
-  if (billableMembers.length === 0) return null;
-
-  const outletRows = await db.select({ id: outlets.id, name: outlets.name }).from(outlets).where(inArray(outlets.id, billableMembers.map((m) => m.outletId)));
+  const outletRows = await db.select({ id: outlets.id, name: outlets.name }).from(outlets).where(inArray(outlets.id, dueMembers.map((m) => m.outletId)));
   const outletNameById = new Map(outletRows.map((o) => [o.id, o.name]));
-  const planIds = Array.from(new Set(billableMembers.map((m) => m.planId as string)));
-  const planRows = await db.select().from(subscriptionPlans).where(inArray(subscriptionPlans.id, planIds));
-  const planById = new Map(planRows.map((p) => [p.id, p]));
 
   const period = currentPeriodLabel();
-  const lines: GroupInvoiceLineItem[] = billableMembers.map((m) => {
-    const plan = planById.get(m.planId as string);
-    return {
+  const lines: GroupInvoiceLineItem[] = [];
+  for (const m of dueMembers) {
+    const want = desiredSelection(m);
+    const plan = await getPlanById(want.planId);
+    if (!plan) continue;
+    const charge = await chargeFor(m, plan, { cycle: want.cycle, units: want.units });
+    lines.push({
       outletId: m.outletId,
       outletName: outletNameById.get(m.outletId) ?? "Outlet",
-      planName: plan?.name ?? "Langganan",
+      planName: plan.name,
       period,
-      amount: round(plan?.priceCurrent ?? 0),
-    };
-  });
+      amount: round(charge.amount),
+      subscriptionId: m.id,
+      description: describeCharge(plan.name, charge),
+      periodMonths: charge.monthsGranted,
+      targetPlanId: plan.id,
+      targetBillingCycle: charge.cycle,
+      targetPlanUnits: charge.pricingModel === "per_unit" ? charge.billedUnits : 0,
+    });
+  }
+  if (lines.length === 0) return null;
   const total = round(lines.reduce((s, l) => s + l.amount, 0));
-
-  // Anchor: the earliest-created member outlet. Purely cosmetic — which outlet the invoice row's
-  // own outletId/subscriptionId formally point at — every member outlet still sees this same
-  // invoice via billingGroupId regardless of which one is "anchor" (see the Billing page, which
-  // queries by billingGroupId whenever the viewer's own outlet has one).
-  const anchor = [...billableMembers].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  const included = dueMembers.filter((m) => lines.some((l) => l.subscriptionId === m.id));
+  const anchor = [...included].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
 
   const invoiceNumber = await generateInvoiceNumber();
   const [invoice] = await db
@@ -169,7 +250,7 @@ async function ensureGroupRenewalInvoiceExists(billingGroupId: string) {
     })
     .returning();
 
-  for (const m of billableMembers) {
+  for (const m of included) {
     await logEvent(m.outletId, m.id, "renewal_invoice_created", `${invoiceNumber} (tagihan gabungan) untuk periode ${period}`);
   }
   // Group deposit lives on billingGroups, not any one member's subscription — passing `anchor`
@@ -291,9 +372,116 @@ export async function requestManualRenewal(outletId: string) {
   if (!["active", "grace", "suspended"].includes(sub.status)) {
     throw new Error("Perpanjangan hanya berlaku untuk outlet yang sudah pernah berlangganan. Gunakan etalase belanja di atas untuk berlangganan pertama kali.");
   }
-  const invoice = await ensureRenewalInvoiceExists(sub);
+  const invoice = await ensureRenewalInvoiceExists(sub, { force: true });
   if (!invoice) throw new Error("Paket langganan tidak ditemukan. Hubungi NEXBILL untuk mengaktifkan katalog paket.");
   return invoice;
+}
+
+/** Kedaluwarsakan invoice perpanjangan yang masih terbuka (individu atau gabungan) supaya dibuat ulang dengan pilihan paket terbaru. */
+async function expireOpenRenewalInvoices(sub: SubscriptionRow, reason: string) {
+  const cleared = { status: "expired" as const, cancelReason: reason, method: null, providerRef: null, qrString: null, qrImageUrl: null, vaNumber: null, vaBankCode: null };
+  if (sub.billingGroupId) {
+    await db
+      .update(subscriptionInvoices)
+      .set(cleared)
+      .where(and(eq(subscriptionInvoices.billingGroupId, sub.billingGroupId), eq(subscriptionInvoices.type, "group_renewal"), eq(subscriptionInvoices.status, "unpaid")));
+  }
+  await db
+    .update(subscriptionInvoices)
+    .set(cleared)
+    .where(and(eq(subscriptionInvoices.subscriptionId, sub.id), eq(subscriptionInvoices.type, "subscription_fee"), eq(subscriptionInvoices.status, "unpaid"), isRenewalFeeInvoice));
+}
+
+export interface ChangePlanInput {
+  planCode: string;
+  billingCycle?: BillingCycle;
+  /** Kuota unit Starter. */
+  units?: number;
+}
+
+/**
+ * Ganti paket untuk outlet yang sudah berlangganan (active/grace/suspended):
+ *  - Naik paket (Starter → Pro) atau tambah kuota unit Starter saat aktif → invoice prorata
+ *    (periodMonths 0) untuk sisa periode; begitu lunas, paket/kuota baru langsung berlaku.
+ *  - Turun paket, kurangi kuota, atau ganti siklus bulanan/tahunan → berlaku di perpanjangan
+ *    berikutnya (disimpan di next*), tanpa refund.
+ * Outlet free_forever tidak bisa (dan tidak perlu) ganti paket — statusnya tidak disentuh.
+ */
+export async function changeSubscriptionPlan(outletId: string, input: ChangePlanInput) {
+  let sub = await getOrCreateSubscription(outletId);
+  if (sub.status === "free_forever") throw new Error("Outlet ini memiliki akses gratis selamanya — tidak perlu memilih paket.");
+  if (!["active", "grace", "suspended"].includes(sub.status)) {
+    throw new Error("Outlet ini belum berlangganan. Pilih paket lewat tombol Berlangganan di halaman Langganan.");
+  }
+  await ensureDefaultPlans();
+  const plan = await getPlanByCode(String(input.planCode ?? ""));
+  if (!plan || !plan.isActive) throw new Error("Paket tidak ditemukan.");
+  const isStarter = planTierOf(plan) === "starter";
+  const cycle = normalizeCycle(input.billingCycle ?? sub.nextBillingCycle ?? sub.billingCycle);
+  const activeUnits = await countActiveUnits(outletId);
+  const requested = Math.floor(Number(input.units) || 0);
+  const units = isStarter ? Math.max(minUnitsOf(plan), requested || sub.nextPlanUnits || sub.planUnits || 0, activeUnits) : 0;
+  if (isStarter && requested > 0 && requested < activeUnits) {
+    throw new Error(`Outlet ini punya ${activeUnits} unit PS aktif — kuota Starter minimal ${activeUnits} unit. Nonaktifkan unit di Rental PS dulu untuk menurunkan kuota.`);
+  }
+
+  const currentPlan = await getPlanById(sub.planId);
+  const currentCycle = normalizeCycle(sub.billingCycle);
+
+  // Invoice upgrade prorata lama yang belum dibayar diganti yang baru.
+  await db
+    .update(subscriptionInvoices)
+    .set({ status: "expired", cancelReason: "plan_changed", method: null, providerRef: null, qrString: null, qrImageUrl: null, vaNumber: null, vaBankCode: null })
+    .where(and(eq(subscriptionInvoices.subscriptionId, sub.id), eq(subscriptionInvoices.type, "subscription_fee"), eq(subscriptionInvoices.status, "unpaid"), eq(subscriptionInvoices.periodMonths, 0)));
+
+  let upgradeInvoice: typeof subscriptionInvoices.$inferSelect | null = null;
+  let appliedNow = false;
+  if (sub.status === "active" && currentPlan) {
+    const fromTier = planTierOf(currentPlan);
+    const toTier = planTierOf(plan);
+    const isUpgrade = (fromTier === "starter" && toTier === "pro") || (fromTier === "starter" && toTier === "starter" && units > (sub.planUnits || 0));
+    if (isUpgrade) {
+      const oldCharge = await chargeFor(sub, currentPlan, { cycle: currentCycle, units: sub.planUnits });
+      const newCharge = await chargeFor(sub, plan, { cycle: currentCycle, units });
+      const amount = prorateUpgrade({ oldCycleAmount: oldCharge.amount, newCycleAmount: newCharge.amount, periodStart: sub.currentPeriodStart, periodEnd: sub.currentPeriodEnd });
+      if (amount > 0) {
+        upgradeInvoice = await createInvoice({
+          outletId,
+          subscriptionId: sub.id,
+          type: "subscription_fee",
+          description:
+            toTier === "pro" && fromTier === "starter"
+              ? `Upgrade ke ${plan.name} (prorata sisa periode s/d ${sub.currentPeriodEnd?.slice(0, 10) ?? "-"})`
+              : `Tambah kuota ${plan.name} jadi ${newCharge.billedUnits} unit (prorata sisa periode s/d ${sub.currentPeriodEnd?.slice(0, 10) ?? "-"})`,
+          qty: 1,
+          unitPrice: amount,
+          periodMonths: 0,
+          targetPlanId: plan.id,
+          targetBillingCycle: currentCycle,
+          targetPlanUnits: isStarter ? newCharge.billedUnits : 0,
+        });
+      } else {
+        await applySelectionFromInvoice(sub.id, { planId: plan.id, cycle: currentCycle, units: isStarter ? units : 0 }, 0);
+        await grantUnlimitedEntitlementIfEligible(sub);
+        appliedNow = true;
+      }
+    }
+  }
+
+  // Pilihan untuk perpanjangan berikutnya (juga dipakai upgrade di atas setelah periode ini).
+  await db
+    .update(subscriptions)
+    .set({ nextPlanId: plan.id, nextBillingCycle: cycle, nextPlanUnits: isStarter ? units : 0 })
+    .where(eq(subscriptions.id, sub.id));
+  await logEvent(outletId, sub.id, "plan_changed", `Pilihan paket: ${plan.name}${isStarter ? ` ${units} unit` : ""}, ${cycle === "annual" ? "tahunan" : "bulanan"}${upgradeInvoice ? ` — upgrade prorata ${upgradeInvoice.invoiceNumber}` : ""}`);
+
+  // Invoice perpanjangan terbuka dibuat ulang dengan harga pilihan baru.
+  [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, sub.id)).limit(1);
+  await expireOpenRenewalInvoices(sub, "plan_changed");
+  const daysToEnd = sub.currentPeriodEnd ? Math.ceil((new Date(sub.currentPeriodEnd).getTime() - Date.now()) / 86_400_000) : 0;
+  const renewalInvoice = sub.status !== "active" || daysToEnd <= RENEWAL_INVOICE_LEAD_DAYS ? await ensureRenewalInvoiceExists(sub, { force: sub.status !== "active" }) : null;
+
+  return { upgradeInvoice, renewalInvoice, appliedNow };
 }
 
 /** Billing contact for trial/payment notification emails — prefers the outlet's Owner login, falls back to a legacy Superuser row, then to any staff email if neither exists (shouldn't happen in practice, but avoids silently dropping the notification). */
@@ -359,30 +547,124 @@ export function trialDaysLeft(sub: SubscriptionRow): number {
 /** Full gate summary a dashboard/UI needs to render trial banners, lock screens, and AI teasers — one call, no business-rule duplication in components. */
 export async function getSubscriptionSummary(outletId: string) {
   const sub = await getOrCreateSubscription(outletId);
-  const plan = sub.planId ? (await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, sub.planId)).limit(1))[0] : null;
+  const catalog = await ensureDefaultPlans();
+  const plan = await getPlanById(sub.planId);
+  const nextPlan = sub.nextPlanId ? await getPlanById(sub.nextPlanId) : null;
   // Mirrors assertAiAllowed's own rule (free during trial, else needs an unexpired AI Add-on,
-  // unless the plan bundles AI in via unlimitedEntitlement) — read-only here for UI display, the
-  // actual enforcement always goes through assertAiAllowed.
+  // unless the plan bundles AI in — Pro) — read-only here for UI display, the actual enforcement
+  // always goes through assertAiAllowed.
   const aiAddonPeriodActive = !!(sub.aiAddonActive && sub.aiAddonPeriodEnd && sub.aiAddonPeriodEnd > new Date().toISOString());
-  const includedViaUnlimitedPlan = !!(sub.hasUnlimitedEntitlement || plan?.unlimitedEntitlement);
-  const isAiLocked = sub.status !== "trial" && !aiAddonPeriodActive && !includedViaUnlimitedPlan;
+  const includedViaPlan = planIncludesAi(sub, plan);
+  const isAiLocked = sub.status !== "trial" && !aiAddonPeriodActive && !includedViaPlan;
+  const entitlements = entitlementsFor(sub, plan);
+  const activeUnits = await countActiveUnits(outletId);
+  const additionalOutlet = await isAdditionalProOutlet(sub);
+  const want = desiredSelection(sub);
+
+  // Harga tiap paket katalog untuk outlet ini (unit aktif sekarang, diskon cabang, bulanan & tahunan).
+  const catalogPricing = catalog.map((p) => {
+    const units = Math.max(activeUnits, minUnitsOf(p), planTierOf(p) === "starter" ? sub.planUnits || 0 : 0);
+    const isAdditional = planTierOf(p) === "pro" && additionalOutlet;
+    return {
+      plan: p,
+      tier: planTierOf(p),
+      monthly: computePlanCharge(p, { units, cycle: "monthly", additionalOutlet: isAdditional }),
+      annual: computePlanCharge(p, { units, cycle: "annual", additionalOutlet: isAdditional }),
+    };
+  });
+
+  const [pendingUpgrade] = await db
+    .select()
+    .from(subscriptionInvoices)
+    .where(and(eq(subscriptionInvoices.subscriptionId, sub.id), eq(subscriptionInvoices.type, "subscription_fee"), eq(subscriptionInvoices.status, "unpaid"), eq(subscriptionInvoices.periodMonths, 0)))
+    .limit(1);
+
   return {
     subscription: sub,
     plan: plan ?? null,
+    planTier: plan ? planTierOf(plan) : null,
+    nextPlan,
+    selection: { planId: want.planId, cycle: want.cycle, units: want.units },
+    entitlements,
+    activeUnits,
+    isAdditionalOutlet: additionalOutlet,
+    catalog: catalogPricing,
+    pendingUpgradeInvoice: pendingUpgrade ?? null,
     isLocked: isLockedStatus(sub.status),
     isPaid: isPaidStatus(sub.status),
     isAiLocked,
     aiAddon: {
       freeViaTrial: sub.status === "trial",
-      // True once the plan itself bundles AI in (NEXBILL Standard's flat pricing) — no separate
-      // purchase needed and never expires on its own, unlike the legacy per-month add-on below.
-      includedViaPlan: includedViaUnlimitedPlan,
+      // True when the current plan bundles AI in (Pro) — no separate purchase needed.
+      includedViaPlan,
       active: aiAddonPeriodActive,
       periodEnd: sub.aiAddonPeriodEnd,
       priceMonthly: (await ensureDefaultPlan()).aiAddonPriceMonthly,
     },
     trialDaysLeft: trialDaysLeft(sub),
   };
+}
+
+/** AI termasuk paket? Pro = ya. free_forever TIDAK berubah: hanya lewat hasUnlimitedEntitlement lamanya. */
+function planIncludesAi(sub: SubscriptionRow, plan: PlanRow | null): boolean {
+  if (sub.status === "free_forever") return sub.hasUnlimitedEntitlement;
+  if (!isPaidStatus(sub.status)) return false;
+  if (plan) return TIER_INCLUDES_AI[planTierOf(plan)];
+  return sub.hasUnlimitedEntitlement;
+}
+
+function entitlementsFor(sub: SubscriptionRow, plan: PlanRow | null): Entitlements {
+  return resolveEntitlements({
+    status: sub.status,
+    tier: plan ? planTierOf(plan) : null,
+    planUnits: sub.planUnits,
+    minUnits: plan ? minUnitsOf(plan) : null,
+  });
+}
+
+/** Hak fitur outlet saat ini (status + paket). */
+export async function getOutletEntitlements(outletId: string): Promise<{ sub: SubscriptionRow; plan: PlanRow | null; entitlements: Entitlements }> {
+  const sub = await getOrCreateSubscription(outletId);
+  const plan = await getPlanById(sub.planId);
+  return { sub, plan, entitlements: entitlementsFor(sub, plan) };
+}
+
+/** Error terkunci-paket — status 403 supaya route mengembalikan kode yang benar lewat errorStatus(). */
+export class PlanFeatureLockedError extends Error {
+  status = 403;
+  code = "PLAN_FEATURE_LOCKED";
+  constructor(public feature: PlanFeature) {
+    super(`Fitur ${FEATURE_LABEL_ID[feature]} hanya tersedia di paket NEXBILL Pro. Upgrade di menu Langganan untuk membukanya.`);
+  }
+}
+
+export async function outletHasPlanFeature(outletId: string, feature: PlanFeature): Promise<boolean> {
+  const { entitlements } = await getOutletEntitlements(outletId);
+  return hasFeature(entitlements, feature);
+}
+
+/** Lempar PlanFeatureLockedError kalau paket outlet tidak mencakup fitur ini. Superuser selalu lolos. */
+export async function assertPlanFeature(outletId: string, feature: PlanFeature, role?: string): Promise<void> {
+  if (role === "superuser") return;
+  if (!(await outletHasPlanFeature(outletId, feature))) throw new PlanFeatureLockedError(feature);
+}
+
+/**
+ * Batas kuota unit PS aktif untuk paket Starter — panggil sebelum membuat unit baru atau
+ * mengaktifkan kembali unit. Pro, trial, dan free_forever tidak dibatasi.
+ */
+export async function assertUnitQuotaAvailable(outletId: string, role?: string, excludeUnitId?: string): Promise<void> {
+  if (role === "superuser") return;
+  const { entitlements } = await getOutletEntitlements(outletId);
+  if (entitlements.unitLimit == null) return;
+  const active = await countActiveUnits(outletId, excludeUnitId);
+  if (active >= entitlements.unitLimit) {
+    const err = new Error(
+      `Kuota paket Starter: ${entitlements.unitLimit} unit aktif. Tambah kuota unit atau upgrade ke Pro (unit tak terbatas) di menu Langganan.`
+    ) as Error & { status: number };
+    err.status = 403;
+    throw err;
+  }
 }
 
 /**
@@ -467,25 +749,13 @@ export async function assertAiAllowed(outletId: string, role?: string): Promise<
   if (role === "superuser") return;
   const sub = await getOrCreateSubscription(outletId);
   if (sub.status === "trial") return; // free during the 30-day trial, no add-on purchase needed yet
-  // Unlimited-entitlement plans (NEXBILL Standard's flat Rp249.000/bulan — see
-  // subscriptionPlans.unlimitedEntitlement) bundle AI in with everything else now, no separate
-  // AI Add-on purchase. This does still cost NEXBILL real per-call money (see the AI COGS &
-  // margin model referenced on subscriptionPlans.aiAddonPriceMonthly) — that cost is now
-  // absorbed into the flat plan price rather than billed per-outlet, a deliberate pricing
-  // decision, not an oversight. aiAddonActive/aiAddonPeriodEnd are left wired below for any
-  // future non-unlimited tier that still wants AI as a paid add-on.
-  if (sub.hasUnlimitedEntitlement) return;
-  // Deliberately excludes "free_forever": that fallback below checks the PLATFORM's current
-  // default plan, not this subscription's own (a free-forever sub has planId=null, no plan of its
-  // own to check) — without this exclusion, a free-forever outlet would transitively inherit
-  // whatever the platform's default plan happens to be configured with today, which is exactly the
-  // "AI Add-on tetap terpisah" boundary grantFreeForever() is supposed to keep intact.
-  if (isPaidStatus(sub.status) && sub.status !== "free_forever") {
-    const plan = await ensureDefaultPlan();
-    // Covers the narrow window right after a first payment where confirmInvoicePayment hasn't
-    // finished setting hasUnlimitedEntitlement yet — same effective allowance either way.
-    if (plan.unlimitedEntitlement) return;
-  }
+  // Paket Pro (flat per outlet) bundles AI in — the per-call AI cost is absorbed into the flat
+  // plan price, a deliberate pricing decision. Starter still buys the AI Add-on
+  // (aiAddonActive/aiAddonPeriodEnd below).
+  // Struktur harga 2026-10: AI termasuk paket Pro; Starter perlu AI Add-on. free_forever TIDAK
+  // berubah — hanya lolos lewat hasUnlimitedEntitlement lamanya, selain itu tetap perlu Add-on
+  // (lihat planIncludesAi). Paket dibaca dari langganan ini sendiri, bukan paket default platform.
+  if (planIncludesAi(sub, await getPlanById(sub.planId))) return;
 
   if (sub.aiAddonActive) {
     if (sub.aiAddonPeriodEnd && sub.aiAddonPeriodEnd > new Date().toISOString()) return;
@@ -497,7 +767,7 @@ export async function assertAiAllowed(outletId: string, role?: string): Promise<
   }
 
   throw new Error(
-    "Fitur AI gratis selama masa percobaan 30 hari. Setelah itu, AI Add-on perlu diaktifkan terpisah (di luar paket langganan reguler) di halaman Langganan untuk terus memakainya."
+    "Fitur AI gratis selama masa percobaan 30 hari dan sudah termasuk di paket NEXBILL Pro. Untuk paket Starter, aktifkan AI Add-on di halaman Langganan — atau upgrade ke Pro."
   );
 }
 
@@ -555,6 +825,10 @@ async function createInvoice(input: {
   qty: number;
   unitPrice: number;
   period?: string | null;
+  periodMonths?: number | null;
+  targetPlanId?: string | null;
+  targetBillingCycle?: BillingCycle | null;
+  targetPlanUnits?: number | null;
 }) {
   const invoiceNumber = await generateInvoiceNumber();
   const amount = round(input.qty * input.unitPrice);
@@ -570,6 +844,10 @@ async function createInvoice(input: {
       qty: input.qty,
       unitPrice: input.unitPrice,
       amount,
+      periodMonths: input.periodMonths ?? null,
+      targetPlanId: input.targetPlanId ?? null,
+      targetBillingCycle: input.targetBillingCycle ?? null,
+      targetPlanUnits: input.targetPlanUnits ?? null,
       status: "unpaid",
       dueDate: addDaysIso(new Date().toISOString(), 3),
     })
@@ -745,37 +1023,20 @@ function currentPeriodLabel(): string {
 }
 
 /**
- * Idempotently seeds the "standard" plan (Rp399.000 dicoret jadi Rp249.000/bulan,
- * 10 konsol termasuk — the pricing already agreed for the landing page) if no
- * active plan catalog exists yet. Called from scripts/seed.ts, and defensively
- * again at the top of startCheckout() so a database that never ran seed.ts
- * (e.g. an outlet provisioned some other way) still has something to check
- * out into instead of hitting the "hubungi NEXBILL" error.
+ * Memastikan katalog paket Starter & Pro ada (lihat plan-catalog.ts / pricing.ts) dan
+ * mengembalikan paket Pro — dipakai sebagai sumber harga AI Add-on dan paket bawaan. Dipanggil
+ * dari scripts/seed.ts dan secara defensif di checkout.
  */
-export async function ensureDefaultPlan() {
-  const [existing] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true)).limit(1);
-  if (existing) return existing;
-  const [row] = await db
-    .insert(subscriptionPlans)
-    .values({
-      code: "standard",
-      name: "NEXBILL Standard",
-      priceOriginal: 399000,
-      priceCurrent: 249000,
-      includedConsoles: 10,
-      extraConsolePrice: 20000,
-      smartPlugPrice: 275000,
-      setupServicePrice: 125000,
-      isActive: true,
-      sortOrder: 0,
-    })
-    .returning();
-  return row;
+export async function ensureDefaultPlan(): Promise<PlanRow> {
+  const catalog = await ensureDefaultPlans();
+  const pro = catalog.find((p) => p.code === "pro") ?? (await getPlanByCode("pro")) ?? catalog[0];
+  if (!pro) throw new Error("Paket langganan tidak ditemukan. Hubungi NEXBILL untuk mengaktifkan katalog paket.");
+  return pro;
 }
 
 /**
- * Seeds a starter storefront catalog (a couple of smart plug variants, the installation service,
- * and the extra-console add-on) into an empty catalog. Called ONLY from scripts/seed.ts.
+ * Seeds a starter storefront catalog (a couple of smart plug variants and the installation
+ * service) into an empty catalog. (Kuota unit kini bagian dari paket Starter, bukan produk Toko.) Called ONLY from scripts/seed.ts.
  *
  * Sengaja TIDAK dipanggil dari listStorefrontProducts(). Sebelum 2026-09-23 fungsi ini dipanggil
  * di awal listStorefrontProducts() "secara defensif", dan itu ternyata bug serius: penjaganya
@@ -811,13 +1072,6 @@ export async function ensureDefaultProducts() {
       price: 125000,
       sortOrder: 0,
     },
-    {
-      category: "extra_console",
-      name: "Slot Konsol Tambahan",
-      description: "Menambah kuota unit konsol/TV di luar jatah paket langganan yang sedang dipakai — per unit.",
-      price: 20000,
-      sortOrder: 0,
-    },
   ]);
 }
 
@@ -829,7 +1083,10 @@ export async function listStorefrontProducts() {
 
 export interface CartCheckoutInput {
   outletId: string;
-  planCode?: string; // defaults to the active "standard" plan
+  planCode?: string; // "starter" | "pro" — default "pro"
+  billingCycle?: BillingCycle;
+  /** Kuota unit untuk paket Starter (min 5, minimal sejumlah unit aktif). Diabaikan untuk Pro. */
+  units?: number;
   items: { productId: string; qty: number }[]; // free-form — merchant picks whatever quantity they want
   installContactName?: string;
   installContactPhone?: string;
@@ -902,7 +1159,7 @@ async function priceShippingIfNeeded(
 }
 
 /**
- * Etalase/cart checkout — the free-form successor to startCheckout() below. The subscription fee
+ * Etalase/cart checkout — the free-form successor to the old startCheckout() (removed 2026-10). The subscription fee
  * line is always included and mandatory (qty locked at 1); every other line comes from whatever
  * the merchant put in their cart, at whatever quantity they chose — no longer tied to the
  * outlet's actual rentalUnits composition (see the product decision that motivated this: cart
@@ -920,13 +1177,22 @@ async function priceShippingIfNeeded(
  */
 export async function checkoutCart(input: CartCheckoutInput) {
   const sub = await getOrCreateSubscription(input.outletId);
-  await ensureDefaultPlan();
-  const planWhere = input.planCode ? eq(subscriptionPlans.code, input.planCode) : eq(subscriptionPlans.isActive, true);
-  const [plan] = await db.select().from(subscriptionPlans).where(planWhere).limit(1);
-  if (!plan) throw new Error("Paket langganan tidak ditemukan. Hubungi NEXBILL untuk mengaktifkan katalog paket.");
+  if (sub.status === "free_forever") throw new Error("Outlet ini memiliki akses gratis selamanya — tidak perlu berlangganan.");
+  if (isPaidStatus(sub.status)) throw new Error("Langganan outlet ini sudah aktif. Gunakan Ganti Paket untuk upgrade/ubah paket.");
+  const fallback = await ensureDefaultPlan();
+  const plan = input.planCode ? await getPlanByCode(input.planCode) : fallback;
+  if (!plan || !plan.isActive) throw new Error("Paket langganan tidak ditemukan. Hubungi NEXBILL untuk mengaktifkan katalog paket.");
+  const cycle = normalizeCycle(input.billingCycle);
+  const isStarter = planTierOf(plan) === "starter";
+  const activeUnits = await countActiveUnits(input.outletId);
+  const requestedUnits = Math.floor(Number(input.units) || 0);
+  if (isStarter && requestedUnits > 0 && requestedUnits < activeUnits) {
+    throw new Error(`Outlet ini punya ${activeUnits} unit PS aktif — kuota Starter minimal ${activeUnits} unit (atau nonaktifkan unit di Rental PS dulu).`);
+  }
+  const charge = await chargeFor(sub, plan, { cycle, units: requestedUnits });
 
   const lines: CartLineItem[] = [
-    { category: "subscription", productId: null, name: `Langganan ${plan.name} — periode pertama`, qty: 1, unitPrice: plan.priceCurrent, amount: round(plan.priceCurrent) },
+    { category: "subscription", productId: null, name: `Langganan ${describeCharge(plan.name, charge)} — periode pertama`, qty: 1, unitPrice: charge.amount, amount: round(charge.amount) },
   ];
 
   let shippingCost = 0;
@@ -977,7 +1243,15 @@ export async function checkoutCart(input: CartCheckoutInput) {
 
   await db
     .update(subscriptions)
-    .set({ status: "pending_payment", planId: plan.id })
+    .set({
+      status: "pending_payment",
+      planId: plan.id,
+      billingCycle: charge.cycle,
+      planUnits: isStarter ? charge.billedUnits : 0,
+      nextPlanId: null,
+      nextBillingCycle: null,
+      nextPlanUnits: null,
+    })
     .where(eq(subscriptions.id, sub.id));
 
   const smartPlugQty = lines.filter((l) => l.category === "smart_plug").reduce((s, l) => s + l.qty, 0);
@@ -1022,7 +1296,7 @@ export interface ProductCheckoutInput {
  * subscription-fee line checkoutCart always bundles in. Deliberately usable regardless of the
  * outlet's subscription status — including trial, trial_expired, suspended, or cancelled — since
  * buying hardware has nothing to do with software access; the owner's own explicit choice was
- * "selalu bisa, termasuk saat terkunci". So this function, unlike checkoutCart and startCheckout,
+ * "selalu bisa, termasuk saat terkunci". So this function, unlike checkoutCart,
  * never reads or writes `subscriptions.status`/`planId` at all — getOrCreateSubscription() below is
  * called ONLY to obtain sub.id for the invoice's required subscriptionId foreign key.
  *
@@ -1111,123 +1385,6 @@ export async function checkoutProductOrder(input: ProductCheckoutInput) {
 
   await logEvent(input.outletId, sub.id, "checkout_started", `Toko checkout — ${invoiceNumber}, total Rp${total}`);
   return invoice;
-}
-
-export interface StartCheckoutInput {
-  outletId: string;
-  planCode?: string; // defaults to the active "standard" plan
-  wantSmartPlugInstall: boolean;
-  installContactName?: string;
-  installContactPhone?: string;
-  shippingAddress?: string;
-}
-
-/**
- * Kicks off the subscribe flow: auto-detects TV composition from the
- * outlet's own rentalUnits (never asked as a separate manual question —
- * see the design discussion), snapshots it onto the subscription, and
- * generates every invoice this checkout requires (always the subscription
- * fee; smart plug purchase + optional setup service only if any unit is
- * non-Android-TV; an extra-console addon if unit count exceeds the plan's
- * included quota). Subscription status moves to "pending_payment" — the
- * outlet stays locked out of normal operation until every invoice from this
- * checkout is paid (see confirmInvoicePayment below).
- */
-export async function startCheckout(input: StartCheckoutInput) {
-  const sub = await getOrCreateSubscription(input.outletId);
-  await ensureDefaultPlan();
-  const planWhere = input.planCode ? eq(subscriptionPlans.code, input.planCode) : eq(subscriptionPlans.isActive, true);
-  const [plan] = await db.select().from(subscriptionPlans).where(planWhere).limit(1);
-  if (!plan) throw new Error("Paket langganan tidak ditemukan. Hubungi NEXBILL untuk mengaktifkan katalog paket.");
-
-  const composition = await computeTvComposition(input.outletId);
-
-  await db
-    .update(subscriptions)
-    .set({
-      status: "pending_payment",
-      planId: plan.id,
-      androidTvUnitCount: composition.androidTv,
-      nonAndroidTvUnitCount: composition.nonAndroidTv,
-      smartPlugRequiredQty: composition.nonAndroidTv,
-    })
-    .where(eq(subscriptions.id, sub.id));
-
-  // Referral signup discount — no-ops (returns plan.priceCurrent unchanged) unless this outlet
-  // was created via a valid ?ref=CODE link and hasn't already had the discount applied. See
-  // lib/referral/service.ts.
-  const firstInvoiceUnitPrice = await applyRefereeSignupDiscount(input.outletId, plan.priceCurrent);
-  const invoices = [
-    await createInvoice({
-      outletId: input.outletId,
-      subscriptionId: sub.id,
-      type: "subscription_fee",
-      description:
-        firstInvoiceUnitPrice < plan.priceCurrent
-          ? `Langganan ${plan.name} — periode pertama (diskon referral diterapkan)`
-          : `Langganan ${plan.name} — periode pertama`,
-      qty: 1,
-      unitPrice: firstInvoiceUnitPrice,
-      period: currentPeriodLabel(),
-    }),
-  ];
-
-  // Plans with unlimitedEntitlement (NEXBILL Standard's flat Rp249.000/bulan) never bill for
-  // extra consoles, not even on this very first invoice — "unlimited" is a property of the plan
-  // the outlet chose, not something phased in only after hasUnlimitedEntitlement gets granted
-  // post-payment (that flag exists to gate ongoing feature access, not first-invoice pricing).
-  const extraConsoles = plan.unlimitedEntitlement ? 0 : Math.max(0, composition.total - plan.includedConsoles);
-  if (extraConsoles > 0) {
-    invoices.push(
-      await createInvoice({
-        outletId: input.outletId,
-        subscriptionId: sub.id,
-        type: "extra_console",
-        description: `Konsol tambahan (di luar ${plan.includedConsoles} termasuk) x${extraConsoles}`,
-        qty: extraConsoles,
-        unitPrice: plan.extraConsolePrice,
-      })
-    );
-  }
-
-  if (composition.nonAndroidTv > 0) {
-    const plugInvoice = await createInvoice({
-      outletId: input.outletId,
-      subscriptionId: sub.id,
-      type: "smart_plug_purchase",
-      description: `Smart Plug BARDI x${composition.nonAndroidTv} (unit TV analog/smart TV)`,
-      qty: composition.nonAndroidTv,
-      unitPrice: plan.smartPlugPrice,
-    });
-    invoices.push(plugInvoice);
-
-    await db.insert(smartPlugOrders).values({
-      outletId: input.outletId,
-      subscriptionInvoiceId: plugInvoice.id,
-      qty: composition.nonAndroidTv,
-      installRequested: input.wantSmartPlugInstall,
-      installStatus: input.wantSmartPlugInstall ? "requested" : "not_requested",
-      contactName: input.installContactName,
-      contactPhone: input.installContactPhone,
-      shippingAddress: input.shippingAddress,
-    });
-
-    if (input.wantSmartPlugInstall) {
-      invoices.push(
-        await createInvoice({
-          outletId: input.outletId,
-          subscriptionId: sub.id,
-          type: "setup_service",
-          description: "Jasa Setup Jarak Jauh (dipasang/disettingkan oleh vendor)",
-          qty: 1,
-          unitPrice: plan.setupServicePrice,
-        })
-      );
-    }
-  }
-
-  await logEvent(input.outletId, sub.id, "checkout_started", `${invoices.length} invoice dibuat, total Rp${invoices.reduce((s, i) => s + i.amount, 0)}`);
-  return invoices;
 }
 
 /** Initiates payment on one subscription/platform invoice — money flowing from the outlet owner TO
@@ -1405,16 +1562,44 @@ export async function applyInvoiceWebhookStatus(providerRef: string, status: "su
  * re-timestamps), and a no-op if the subscription has no plan yet or its plan doesn't have
  * unlimitedEntitlement set — so calling this unconditionally on every paid invoice is safe.
  */
-async function grantUnlimitedEntitlementIfEligible(sub: SubscriptionRow): Promise<void> {
-  if (sub.hasUnlimitedEntitlement) return;
-  if (!sub.planId) return;
-  const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, sub.planId)).limit(1);
-  if (!plan?.unlimitedEntitlement) return;
+async function grantUnlimitedEntitlementIfEligible(subIn: SubscriptionRow): Promise<void> {
+  // Struktur harga 2026-10: flag ini sekarang MENGIKUTI paket yang berjalan (Pro = true, Starter =
+  // false) — dibaca ulang dari DB karena pemanggil bisa memegang baris lama sebelum paket diganti.
+  // free_forever tidak pernah lewat sini (tidak punya invoice langganan).
+  const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, subIn.id)).limit(1);
+  if (!sub || !sub.planId || sub.status === "free_forever") return;
+  const plan = await getPlanById(sub.planId);
+  if (!plan) return;
+  const shouldHave = !!plan.unlimitedEntitlement;
+  if (sub.hasUnlimitedEntitlement === shouldHave) return;
   await db
     .update(subscriptions)
-    .set({ hasUnlimitedEntitlement: true, entitlementGrantedAt: new Date().toISOString() })
+    .set({ hasUnlimitedEntitlement: shouldHave, entitlementGrantedAt: shouldHave ? new Date().toISOString() : sub.entitlementGrantedAt })
     .where(eq(subscriptions.id, sub.id));
-  await logEvent(sub.outletId, sub.id, "unlimited_entitlement_granted", `Paket ${plan.name} — akses unlimited konsol, fitur, dan cabang aktif.`);
+  if (shouldHave) await logEvent(sub.outletId, sub.id, "unlimited_entitlement_granted", `Paket ${plan.name} — unit tak terbatas, semua fitur, dan AI aktif.`);
+}
+
+/** Terapkan paket/siklus/kuota target dari invoice yang lunas ke langganan (dan bersihkan pilihan next*). */
+async function applySelectionFromInvoice(subId: string, target: { planId?: string | null; cycle?: string | null; units?: number | null }, extendMonths: number) {
+  const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, subId)).limit(1);
+  if (!sub) return;
+  const patch: Partial<typeof subscriptions.$inferInsert> = {};
+  if (target.planId) {
+    if (target.planId !== sub.planId) {
+      const plan = await getPlanById(target.planId);
+      await logEvent(sub.outletId, sub.id, "plan_changed", `Paket berganti ke ${plan?.name ?? target.planId}`);
+    }
+    patch.planId = target.planId;
+  }
+  if (target.cycle) patch.billingCycle = normalizeCycle(target.cycle);
+  if (target.units != null) patch.planUnits = Math.max(0, Math.floor(target.units));
+  if (extendMonths > 0) {
+    // Perpanjangan reguler: next* sudah dipakai untuk invoice ini → kosongkan.
+    patch.nextPlanId = null;
+    patch.nextBillingCycle = null;
+    patch.nextPlanUnits = null;
+  }
+  if (Object.keys(patch).length) await db.update(subscriptions).set(patch).where(eq(subscriptions.id, sub.id));
 }
 
 /**
@@ -1515,42 +1700,71 @@ export async function confirmInvoicePayment(invoiceId: string) {
           inArray(subscriptionInvoices.type, ["subscription_fee", "cart_order"])
         )
       )) as { n: number }[];
-    if (unpaidCount === 0) {
+    if (Number(unpaidCount) === 0) {
       const now = new Date().toISOString();
+      // Paket/siklus/kuota sudah disimpan di langganan saat checkoutCart. Bulanan = 30 hari ke
+      // depan (sesuai alur etalase), tahunan = 12 bulan kalender.
+      const annual = normalizeCycle(sub.billingCycle) === "annual";
       await db
         .update(subscriptions)
         .set({
           status: "active",
           currentPeriodStart: now,
-          // Literally "30 hari kedepan" per the storefront checkout flow, rather than
-          // addMonthsIso's calendar-month arithmetic — full access opens for exactly 30 days.
-          currentPeriodEnd: addDaysIso(now, 30),
+          currentPeriodEnd: annual ? addMonthsIso(now, 12) : addDaysIso(now, 30),
           graceUntil: null,
         })
         .where(eq(subscriptions.id, sub.id));
-      await logEvent(invoice.outletId, sub.id, "subscription_activated", "Semua invoice checkout lunas — langganan aktif untuk 30 hari.");
+      await logEvent(invoice.outletId, sub.id, "subscription_activated", `Semua invoice checkout lunas — langganan aktif ${annual ? "12 bulan" : "30 hari"}.`);
       await grantUnlimitedEntitlementIfEligible(sub);
     }
-  } else if ((sub.status === "active" || sub.status === "grace") && invoice.type === "subscription_fee") {
-    // A renewal invoice paid — extend the period and clear any grace state.
-    const base = sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) > new Date() ? sub.currentPeriodEnd : new Date().toISOString();
-    await db
-      .update(subscriptions)
-      .set({ status: "active", currentPeriodEnd: addMonthsIso(base, 1), graceUntil: null })
-      .where(eq(subscriptions.id, sub.id));
-    await grantUnlimitedEntitlementIfEligible(sub);
-  } else if (invoice.type === "group_renewal" && invoice.billingGroupId) {
-    // One payment renews EVERY member outlet's own subscription together — not just the
-    // anchor outlet's (invoice.subscriptionId only points at the anchor, see
-    // ensureGroupRenewalInvoiceExists). Each member keeps its own currentPeriodEnd/grace state
-    // otherwise; only the ones actually due (active/grace) get extended by this payment.
-    const members = await db.select().from(subscriptions).where(eq(subscriptions.billingGroupId, invoice.billingGroupId));
-    for (const member of members) {
-      if (member.status !== "active" && member.status !== "grace") continue;
-      const base = member.currentPeriodEnd && new Date(member.currentPeriodEnd) > new Date() ? member.currentPeriodEnd : new Date().toISOString();
+  } else if ((sub.status === "active" || sub.status === "grace" || sub.status === "suspended") && invoice.type === "subscription_fee") {
+    // Invoice langganan lunas. periodMonths: null (data lama) = 1 bulan; 0 = upgrade/tambah kuota
+    // prorata (paket berubah sekarang, masa aktif tetap); selain itu perpanjangan N bulan.
+    const months = invoice.periodMonths ?? 1;
+    await applySelectionFromInvoice(sub.id, { planId: invoice.targetPlanId, cycle: invoice.targetBillingCycle, units: invoice.targetPlanUnits }, months);
+    if (months > 0) {
+      const base = sub.status !== "suspended" && sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) > new Date() ? sub.currentPeriodEnd : new Date().toISOString();
       await db
         .update(subscriptions)
-        .set({ status: "active", currentPeriodEnd: addMonthsIso(base, 1), graceUntil: null })
+        .set({
+          status: "active",
+          currentPeriodStart: sub.status === "suspended" ? new Date().toISOString() : sub.currentPeriodStart,
+          currentPeriodEnd: addMonthsIso(base, months),
+          graceUntil: null,
+        })
+        .where(eq(subscriptions.id, sub.id));
+      if (sub.status === "suspended") await logEvent(invoice.outletId, sub.id, "reactivated", `${invoice.invoiceNumber} lunas — akses dibuka kembali.`);
+    }
+    await grantUnlimitedEntitlementIfEligible(sub);
+  } else if (invoice.type === "group_renewal" && invoice.billingGroupId) {
+    // One payment renews every member outlet listed on the invoice — each by its own line
+    // (bulanan/tahunan, paket & kuota masing-masing). Invoice gabungan lama tanpa subscriptionId
+    // per baris diperlakukan seperti dulu: semua anggota active/grace diperpanjang 1 bulan.
+    let lines: GroupInvoiceLineItem[] = [];
+    try {
+      lines = JSON.parse(invoice.lineItemsJson ?? "[]") as GroupInvoiceLineItem[];
+    } catch {
+      lines = [];
+    }
+    const members = await db.select().from(subscriptions).where(eq(subscriptions.billingGroupId, invoice.billingGroupId));
+    const lineBySub = new Map(lines.filter((l) => l.subscriptionId).map((l) => [l.subscriptionId as string, l]));
+    const legacy = lineBySub.size === 0;
+    for (const member of members) {
+      const line = lineBySub.get(member.id);
+      if (!legacy && !line) continue;
+      if (member.status !== "active" && member.status !== "grace" && member.status !== "suspended") continue;
+      if (legacy && member.status === "suspended") continue;
+      const months = line?.periodMonths ?? 1;
+      if (line) await applySelectionFromInvoice(member.id, { planId: line.targetPlanId, cycle: line.targetBillingCycle, units: line.targetPlanUnits }, months);
+      const base = member.status !== "suspended" && member.currentPeriodEnd && new Date(member.currentPeriodEnd) > new Date() ? member.currentPeriodEnd : new Date().toISOString();
+      await db
+        .update(subscriptions)
+        .set({
+          status: "active",
+          currentPeriodStart: member.status === "suspended" ? new Date().toISOString() : member.currentPeriodStart,
+          currentPeriodEnd: addMonthsIso(base, Math.max(1, months)),
+          graceUntil: null,
+        })
         .where(eq(subscriptions.id, member.id));
       await logEvent(member.outletId, member.id, "invoice_paid", `${invoice.invoiceNumber} (tagihan gabungan) — diperpanjang bersama`);
       await grantUnlimitedEntitlementIfEligible(member);
@@ -1643,22 +1857,11 @@ export async function sweepGenerateRenewalInvoices() {
     const [existingUnpaid] = await db
       .select()
       .from(subscriptionInvoices)
-      .where(and(eq(subscriptionInvoices.subscriptionId, sub.id), eq(subscriptionInvoices.type, "subscription_fee"), eq(subscriptionInvoices.period, period)))
+      .where(and(eq(subscriptionInvoices.subscriptionId, sub.id), eq(subscriptionInvoices.type, "subscription_fee"), eq(subscriptionInvoices.period, period), inArray(subscriptionInvoices.status, ["unpaid", "paid"])))
       .limit(1);
     if (existingUnpaid) continue;
-    const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, sub.planId)).limit(1);
-    if (!plan) continue;
-    const invoice = await createInvoice({
-      outletId: sub.outletId,
-      subscriptionId: sub.id,
-      type: "subscription_fee",
-      description: `Langganan ${plan.name} — perpanjangan ${period}`,
-      qty: 1,
-      unitPrice: plan.priceCurrent,
-      period,
-    });
-    await logEvent(sub.outletId, sub.id, "renewal_invoice_created", `${invoice.invoiceNumber} untuk periode ${period}`);
-    created.push(invoice);
+    const invoice = await createRenewalInvoice(sub, period);
+    if (invoice) created.push(invoice);
   }
   return created;
 }

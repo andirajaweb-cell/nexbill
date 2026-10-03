@@ -38,7 +38,7 @@ export function effectiveRateIdrPerUnit(
   return null;
 }
 
-/** priceIdr / effectiveRate — e.g. Rp249.000 at an effective rate of Rp3.500/MYR ≈ MYR 71.14. */
+/** priceIdr / effectiveRate — e.g. Rp199.000 at an effective rate of Rp3.500/MYR ≈ MYR 56.86. */
 export function convertIdrToCurrency(priceIdr: number, effectiveRateIdrPerUnitValue: number): number {
   if (!effectiveRateIdrPerUnitValue || effectiveRateIdrPerUnitValue <= 0) return 0;
   return priceIdr / effectiveRateIdrPerUnitValue;
@@ -61,7 +61,7 @@ export interface BillingCurrency {
 
 /**
  * What currency an outlet should see/pay platform-billing (subscription invoices) in —
- * "biaya langganan Rp249.000 untuk Indonesia, USD/lainnya untuk mancanegara" per the pricing
+ * "biaya langganan dalam Rupiah untuk Indonesia, USD/lainnya untuk mancanegara" per the pricing
  * mechanism agreed with the user. Driven by the outlet's declared preferredLang (Settings >
  * Business & Tax, same field the support-translation feature reuses) via LANG_TO_CURRENCY_CODE
  * — "id" (or an outlet with no mapped currency) always means IDR, no conversion. Used by both

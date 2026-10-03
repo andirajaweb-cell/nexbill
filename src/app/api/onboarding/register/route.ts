@@ -10,7 +10,9 @@ import { ensureDefaultAccountMappings } from "@/lib/accounting/account-mapping";
 import { ensureOutletSlug } from "@/lib/outlets/slug";
 import { linkOwnerToOutlet } from "@/lib/outlets/membership";
 import { ensureBillingGroup, addOutletToBillingGroup } from "@/lib/subscription/billing-group";
-import { getOrCreateSubscription, computeTvComposition, ensureDefaultPlan } from "@/lib/subscription/service";
+import { getOrCreateSubscription, computeTvComposition } from "@/lib/subscription/service";
+import { ensureDefaultPlans } from "@/lib/subscription/plan-catalog";
+import { computePlanCharge, planTierOf } from "@/lib/subscription/pricing";
 import { attachReferralOnSignup } from "@/lib/referral/service";
 import { getGooglePending, GOOGLE_PENDING_COOKIE } from "@/lib/auth/google-pending";
 import { signEmailVerificationToken } from "@/lib/auth/email-verification";
@@ -25,9 +27,9 @@ import { claimSession } from "@/lib/auth/single-session";
  *
  * The TV-composition screening (android/smart/analog counts) doesn't invent new billing logic —
  * it just pre-populates rentalUnits rows so the EXISTING checkout math (computeTvComposition /
- * startCheckout in service.ts) already has real data to work with the moment the new owner opens
- * the Billing page: smart plug qty = however many non-Android-TV units exist, extra-console addon
- * = whatever's beyond the plan's included quota. No duplicated business rule here on purpose.
+ * checkoutCart in service.ts) already has real data to work with the moment the new owner opens
+ * the Billing page: smart plug qty = however many non-Android-TV units exist, and paket Starter
+ * ditagih per unit aktif (lihat lib/subscription/pricing.ts). No duplicated business rule here.
  */
 
 interface RegisterBody {
@@ -170,7 +172,7 @@ export async function POST(req: NextRequest) {
     await createUnitsForComposition(primary.id, tv);
     await getOrCreateSubscription(primary.id);
     // Referral attribution — only on the primary outlet (the one that actually gets billed the
-    // discounted first subscription_fee invoice in startCheckout); branch outlets below don't
+    // first subscription invoice); branch outlets below don't
     // separately attach even if branchCount > 1. Silently ignored for an invalid/missing code.
     await attachReferralOnSignup(primary.id, body.ref);
 
@@ -198,12 +200,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ---- Recommendation summary (mirrors startCheckout's own math, read-only here) ----
-    const plan = await ensureDefaultPlan();
+    // ---- Recommendation summary (estimasi harga paket Starter vs Pro, read-only) ----
+    const catalog = await ensureDefaultPlans();
     const composition = await computeTvComposition(primary.id);
+    const starterPlan = catalog.find((p) => planTierOf(p) === "starter");
+    const proPlan = catalog.find((p) => planTierOf(p) === "pro");
+    const starterMonthly = starterPlan ? computePlanCharge(starterPlan, { units: composition.total }).amount : null;
+    const proMonthly = proPlan ? computePlanCharge(proPlan).amount : null;
     const recommendation = {
       smartPlugQty: composition.nonAndroidTv,
-      extraConsoleQty: Math.max(0, composition.total - plan.includedConsoles),
+      totalUnits: composition.total,
+      starterMonthly,
+      proMonthly,
+      // Multi-cabang hanya ada di Pro; selain itu Starter cukup untuk mulai (bisa upgrade kapan saja).
+      recommendedPlan: branchCount > 1 ? "pro" : "starter",
       staffAccountsSuggested: employees.kasir + employees.dapur + employees.lainnya,
       employees,
       shifts,

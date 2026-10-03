@@ -90,7 +90,7 @@ export default function MarketRiskPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const unlimitedPlans = plans.filter((p) => p.unlimitedEntitlement && p.isActive);
+  const unlimitedPlans = plans.filter((p) => p.isActive);
 
   const createCurrency = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,7 +187,7 @@ export default function MarketRiskPage() {
       <div>
         <h1 className="gm-display text-2xl font-bold text-amber-300">Market Risk (Kurs Lintas Negara)</h1>
         <p className="text-sm text-neutral-500 mt-1">
-          Kelola risiko nilai tukar untuk penjualan langganan NEXBILL Standard lintas negara (MYR, USD, THB, VND, PHP) via{" "}
+          Kelola risiko nilai tukar untuk penjualan langganan NEXBILL (Starter & Pro) lintas negara (MYR, USD, THB, VND, PHP) via{" "}
           <a href="https://ipaymu.com/id/cross-border-transaction/" target="_blank" rel="noreferrer" className="underline text-amber-400/80">
             iPaymu cross-border
           </a>

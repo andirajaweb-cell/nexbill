@@ -3,7 +3,8 @@ import { db } from "@/db/client";
 import { rentalUnits } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
-import { describeError } from "@/lib/api/error";
+import { describeError, errorStatus } from "@/lib/api/error";
+import { assertUnitQuotaAvailable } from "@/lib/subscription/service";
 
 /** Same duplicate-name guard as POST /api/rental-units — see that file's comment. */
 async function nameAlreadyUsed(outletId: string, name: string, excludeId: string): Promise<boolean> {
@@ -33,10 +34,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: `Unit dengan nama "${body.name}" sudah ada — pakai nama lain supaya tidak tertukar di Live Billing Board.` }, { status: 400 });
     }
 
+    // Mengaktifkan kembali unit arsip = menambah unit aktif → cek kuota paket Starter.
+    if (body.isActive === true && !existing.isActive) {
+      await assertUnitQuotaAvailable(existing.outletId, session.role, id);
+    }
+
     const { id: _ignoreId, outletId: _ignoreOutlet, createdAt: _ignoreCreated, ...rest } = body;
     const [row] = await db.update(rentalUnits).set(rest).where(eq(rentalUnits.id, id)).returning();
     return NextResponse.json(row);
   } catch (err: unknown) {
-    return NextResponse.json({ error: describeError(err) }, { status: 500 });
+    return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 500) });
   }
 }

@@ -14,6 +14,9 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert } from "@/lib/ui/dialog";
 import { ShoppingCart, Plus, Minus, Zap, Wrench, Tv, Package, Sparkles, Share2, Timer, LayoutDashboard, FileText, Wallet, TrendingUp, Receipt } from "lucide-react";
 import { BillingFaq } from "@/components/billing/BillingFaq";
+import { PlanPicker, chargeForSelection, type CatalogPlan, type PlanSelection } from "@/components/billing/PlanPicker";
+import { planTierOf, minUnitsOf } from "@/lib/subscription/pricing";
+import "@/lib/i18n/dict-plan";
 import { BillingProfileTab } from "@/components/billing/BillingProfileTab";
 import { DepositTab } from "@/components/billing/DepositTab";
 import { InvoiceHistoryTab } from "@/components/billing/InvoiceHistoryTab";
@@ -41,9 +44,11 @@ interface SubscriptionData {
   currentPeriodEnd: string | null;
   graceUntil: string | null;
   smartPlugOwnedQty: number;
+  billingCycle?: "monthly" | "annual";
+  planUnits?: number;
 }
 
-interface PlanData {
+interface PlanData extends Partial<CatalogPlan> {
   name: string;
   priceCurrent: number;
   unlimitedEntitlement: boolean;
@@ -111,6 +116,13 @@ interface BillingResponse {
   subscription: SubscriptionData;
   plan?: PlanData;
   plans?: PlanData[];
+  planTier?: "starter" | "pro" | null;
+  nextPlan?: PlanData | null;
+  selection?: { planId: string | null; cycle: "monthly" | "annual"; units: number };
+  entitlements?: { source: string; tier: string; features: string[]; unitLimit: number | null };
+  activeUnits?: number;
+  isAdditionalOutlet?: boolean;
+  pendingUpgradeInvoice?: { id: string; amount: number; invoiceNumber: string } | null;
   isLocked: boolean;
   isPaid: boolean;
   trialDaysLeft: number;
@@ -249,6 +261,10 @@ export default function BillingPage() {
   const [busy, setBusy] = useState(false);
   const [renewBusy, setRenewBusy] = useState(false);
   const [aiAddonBusy, setAiAddonBusy] = useState(false);
+  // Pilihan paket (struktur harga 2026-10): dipakai checkout pertama & Ganti Paket.
+  const [planSel, setPlanSel] = useState<PlanSelection | null>(null);
+  const [showChangePlan, setShowChangePlan] = useState(false);
+  const [changeBusy, setChangeBusy] = useState(false);
 
   const [areaQuery, setAreaQuery] = useState("");
   const [areaResults, setAreaResults] = useState<ShippingArea[]>([]);
@@ -272,6 +288,20 @@ export default function BillingPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Isi pilihan paket awal dari data server: pilihan perpanjangan berikutnya / paket berjalan,
+  // atau Pro untuk outlet yang belum pernah berlangganan.
+  useEffect(() => {
+    if (!data || planSel) return;
+    const catalog = (data.plans ?? []) as CatalogPlan[];
+    const selPlan = catalog.find((p) => p.id === data.selection?.planId) ?? catalog.find((p) => p.code === "pro") ?? catalog[0];
+    if (!selPlan) return;
+    setPlanSel({
+      planCode: selPlan.code,
+      cycle: data.selection?.cycle ?? "monthly",
+      units: Math.max(data.selection?.units ?? 0, data.activeUnits ?? 0, minUnitsOf(selPlan)),
+    });
+  }, [data, planSel]);
 
   // --- Auto-Polling: Mengecek status pembayaran otomatis ke API jika ada tagihan Pending iPaymu ---
   // Hanya berjalan bila memang ada tagihan menunggu pembayaran non-tunai, DAN hanya selama tab
@@ -373,6 +403,9 @@ export default function BillingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          planCode: planSel?.planCode,
+          billingCycle: planSel?.cycle,
+          units: planSel?.units,
           items,
           installContactName: installName,
           installContactPhone: installPhone,
@@ -478,6 +511,27 @@ export default function BillingPage() {
     }
   };
 
+  const doChangePlan = async () => {
+    if (!planSel) return;
+    setChangeBusy(true);
+    try {
+      const res = await fetch("/api/subscription/change-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planCode: planSel.planCode, billingCycle: planSel.cycle, units: planSel.units }),
+      });
+      const out = await res.json();
+      if (!res.ok) return showAlert(out.error);
+      setShowChangePlan(false);
+      await load();
+      if (out.upgradeInvoice) showAlert(t("plan.change.upgradeInvoice", "Tagihan upgrade prorata {amount} dibuat.").replace("{amount}", money(out.upgradeInvoice.amount)));
+      else if (out.appliedNow) showAlert(t("plan.change.appliedNow", "Paket baru langsung aktif."));
+      else showAlert(t("plan.change.done", "Pilihan paket disimpan — berlaku di perpanjangan berikutnya."));
+    } finally {
+      setChangeBusy(false);
+    }
+  };
+
   const doActivateAi = async () => {
     setAiAddonBusy(true);
     try {
@@ -525,7 +579,17 @@ export default function BillingPage() {
   if (!data) return <div className="text-sm text-neutral-500">{t("billing.loading", "Memuat data langganan...")}</div>;
 
   const { subscription: sub, plan, isLocked, isPaid, trialDaysLeft, invoices, plugOrders, products, billingGroup, aiAddon } = data;
+  const catalogPlans = (data.plans ?? []) as CatalogPlan[];
   const catalogPlan = plan ?? data.plans?.[0];
+  const selected = planSel
+    ? chargeForSelection(catalogPlans, planSel, { activeUnits: data.activeUnits ?? 0, additionalOutlet: !!data.isAdditionalOutlet })
+    : { plan: null, charge: null };
+  const selectedLabel = selected.plan
+    ? `${selected.plan.name} · ${planSel?.cycle === "annual" ? t("plan.cycle.annual", "Tahunan") : t("plan.cycle.monthly", "Bulanan")}${
+        selected.charge?.pricingModel === "per_unit" ? ` · ${selected.charge.billedUnits} unit` : ""
+      }`
+    : "";
+  const planTier = data.planTier ?? (plan ? planTierOf(plan) : null);
   
   const safeInvoices = invoices ?? [];
   const unpaidInvoices = safeInvoices.filter((i) => i.status === "unpaid");
@@ -537,7 +601,7 @@ export default function BillingPage() {
   // and lets them pay EVERY unpaid invoice, product_order included).
   const unpaidSubscriptionInvoices = unpaidInvoices.filter((i) => i.type !== "product_order");
 
-  const grandTotal = (catalogPlan?.priceCurrent ?? 0) + cartTotal + (selectedRate?.price ?? 0);
+  const grandTotal = (selected.charge?.amount ?? 0) + cartTotal + (selectedRate?.price ?? 0);
 
   const daysToExpiry = sub.currentPeriodEnd && now !== null
     ? Math.ceil((new Date(sub.currentPeriodEnd).getTime() - now) / 86_400_000)
@@ -690,7 +754,7 @@ export default function BillingPage() {
         <Card className="p-4 border-cyan-400/30">
           <div className="font-semibold text-cyan-300">{t("billing.trial.title", "Masa percobaan gratis — {n} hari lagi").replace("{n}", String(trialDaysLeft))}</div>
           <p className="text-sm text-neutral-400 mt-1">
-            {t("billing.trial.body", "Selama percobaan, fitur AI (Business Assistant & Insights) gratis dipakai tanpa batas. Smart plug belum bisa dipakai (beli lewat etalase di bawah) dan kontrol TV Android dibatasi 1 unit.")}
+            {t("billing.trial.body", "Selama percobaan semua fitur Pro terbuka — termasuk akuntansi, aset, PPOB, anti-fraud, dan AI. Smart plug belum bisa dipakai (beli lewat etalase di bawah) dan kontrol TV Android dibatasi 1 unit. Setelah trial, pilih Starter atau Pro.")}
           </p>
         </Card>
       )}
@@ -699,7 +763,7 @@ export default function BillingPage() {
         <Card className="p-4 border-rose-400/30">
           <div className="font-semibold text-rose-300">{t("billing.locked.title", "Akses terbatas (read-only)")}</div>
           <p className="text-sm text-neutral-400 mt-1">
-            {sub.status === "trial_expired" && t("billing.locked.trialExpired", "Masa percobaan 30 hari sudah berakhir. Data kamu aman — selesaikan pembayaran di bawah untuk membuka akses penuh selama 30 hari ke depan.")}
+            {sub.status === "trial_expired" && t("billing.locked.trialExpired", "Masa percobaan 30 hari sudah berakhir. Data kamu aman — pilih paket Starter atau Pro di bawah dan selesaikan pembayaran untuk membuka akses kembali.")}
             {sub.status === "pending_payment" && t("billing.locked.pendingPayment", "Checkout sudah dibuat — selesaikan tagihan di bawah untuk mengaktifkan langganan.")}
             {sub.status === "suspended" && t("billing.locked.suspended", "Langganan ditangguhkan karena tagihan perpanjangan belum dibayar melewati masa tenggang.")}
             {sub.status === "cancelled" && t("billing.locked.cancelled", "Langganan sudah dibatalkan. Hubungi NEXBILL untuk mengaktifkan kembali.")}
@@ -746,14 +810,34 @@ export default function BillingPage() {
 
       {isPaid && sub.status !== "free_forever" && (
         <Card className="p-4">
-          <div className="font-semibold text-emerald-300">{t("billing.paid.planTitle", "Paket {plan}").replace("{plan}", String(plan?.name ?? ""))}</div>
-          {plan?.unlimitedEntitlement && (
+          <div className="font-semibold text-emerald-300">
+            {t("billing.paid.planTitle", "Paket {plan}").replace("{plan}", String(plan?.name ?? ""))}
+            <span className="ml-2 text-xs font-normal text-neutral-400">· {sub.billingCycle === "annual" ? t("plan.cycle.annual", "Tahunan") : t("plan.cycle.monthly", "Bulanan")}</span>
+          </div>
+          {planTier === "pro" ? (
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.consoles", "Unlimited Konsol")}</span>
+              <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("plan.feat.unlimitedUnits", "Unit PS tak terbatas")}</span>
+              <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("plan.allFeatures", "Semua fitur")}</span>
               <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.branches", "Unlimited Cabang")}</span>
-              <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.users", "Unlimited User")}</span>
               <span className="text-xs px-2 py-0.5 rounded-lg bg-violet-500/15 text-violet-300">{t("billing.unlimited.aiIncluded", "AI Termasuk")}</span>
             </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <span className="text-xs px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300">{t("plan.operationalOnly", "Fitur operasional")}</span>
+              {data.entitlements?.unitLimit != null && (
+                <span className={`text-xs px-2 py-0.5 rounded-lg ${(data.activeUnits ?? 0) >= data.entitlements.unitLimit ? "bg-amber-500/15 text-amber-300" : "bg-cyan-500/15 text-cyan-300"}`}>
+                  {t("plan.quotaUsage", "{active} / {limit} unit aktif").replace("{active}", String(data.activeUnits ?? 0)).replace("{limit}", String(data.entitlements.unitLimit))}
+                </span>
+              )}
+            </div>
+          )}
+          {data.nextPlan && data.selection && (data.nextPlan.id !== (plan as CatalogPlan | undefined)?.id || data.selection.cycle !== sub.billingCycle || (planTier === "starter" && data.selection.units !== sub.planUnits)) && (
+            <p className="text-xs text-amber-300 mt-1.5">
+              {t("plan.next", "Perpanjangan berikutnya: {plan}").replace(
+                "{plan}",
+                `${data.nextPlan.name} · ${data.selection.cycle === "annual" ? t("plan.cycle.annual", "Tahunan") : t("plan.cycle.monthly", "Bulanan")}${data.nextPlan.code === "starter" ? ` · ${data.selection.units} unit` : ""}`
+              )}
+            </p>
           )}
           <p className="text-sm text-neutral-400 mt-1">
             {t("billing.paid.periodActiveUntil", "Periode aktif sampai {date}").replace("{date}", sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString("id-ID") : "-")}
@@ -773,9 +857,30 @@ export default function BillingPage() {
             </Button>
           )}
           {plugOrders?.some((o) => o.qty > 0 && o.invoiceStatus === "paid") && (
-            <Button variant="secondary" className="mt-3" onClick={() => window.open("/api/subscription/manual", "_blank")}>
+            <Button variant="secondary" className="mt-3 mr-2" onClick={() => window.open("/api/subscription/manual", "_blank")}>
               {t("billing.paid.downloadManual", "Download Buku Manual Smart Plug")}
             </Button>
+          )}
+          {canManage && (
+            <Button variant={planTier === "starter" ? "primary" : "secondary"} className="mt-3" onClick={() => setShowChangePlan((v) => !v)}>
+              {t("plan.change.title", "Ganti Paket")}
+            </Button>
+          )}
+          {canManage && showChangePlan && planSel && (
+            <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+              <p className="text-xs text-neutral-500">{t("plan.change.subtitle", "Naik ke Pro atau tambah kuota unit langsung berlaku setelah selisih prorata dibayar.")}</p>
+              <PlanPicker
+                plans={catalogPlans}
+                value={planSel}
+                onChange={setPlanSel}
+                activeUnits={data.activeUnits ?? 0}
+                additionalOutlet={!!data.isAdditionalOutlet}
+                currentPlanCode={(plan as CatalogPlan | undefined)?.code ?? null}
+                money={money}
+                t={t}
+              />
+              <Button onClick={doChangePlan} disabled={changeBusy}>{changeBusy ? t("billing.common.processing", "Memproses...") : t("plan.change.submit", "Simpan Pilihan Paket")}</Button>
+            </div>
           )}
         </Card>
       )}
@@ -783,21 +888,22 @@ export default function BillingPage() {
       {!isPaid && canManage && unpaidSubscriptionInvoices.length === 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
-            <Card className="p-4">
-              <div className="font-semibold">{t("billing.shop.subscriptionPlan", "Langganan {plan}").replace("{plan}", String(catalogPlan?.name ?? ""))}</div>
-              {catalogPlan?.unlimitedEntitlement && (
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.consoles", "Unlimited Konsol")}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.branches", "Unlimited Cabang")}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300">{t("billing.unlimited.users", "Unlimited User")}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-lg bg-violet-500/15 text-violet-300">{t("billing.unlimited.aiIncluded", "AI Termasuk")}</span>
-                </div>
-              )}
-              <p className="text-xs text-neutral-500 mt-1">{t("billing.shop.mandatoryNote", "Wajib untuk mengaktifkan akses penuh NEXBILL — sudah otomatis masuk keranjang di samping.")}</p>
-              <div className="mt-2 text-sm flex justify-between">
-                <span className="text-neutral-400">{t("billing.shop.subscriptionFeeLabel", "Biaya langganan (periode pertama)")}</span>
-                <span className="font-semibold">{money(catalogPlan?.priceCurrent ?? 0)}</span>
+            <Card className="p-4 space-y-3">
+              <div>
+                <div className="font-semibold">{t("plan.pickFirst", "Pilih Paket")}</div>
+                <p className="text-xs text-neutral-500 mt-1">{t("billing.shop.mandatoryNote", "Pilih Starter (per unit PS, fitur operasional) atau Pro (flat per outlet, semua fitur + AI), bulanan atau tahunan — paket yang dipilih otomatis masuk keranjang di samping.")}</p>
               </div>
+              {planSel && catalogPlans.length > 0 && (
+                <PlanPicker
+                  plans={catalogPlans}
+                  value={planSel}
+                  onChange={setPlanSel}
+                  activeUnits={data.activeUnits ?? 0}
+                  additionalOutlet={!!data.isAdditionalOutlet}
+                  money={money}
+                  t={t}
+                />
+              )}
             </Card>
 
             {Object.entries(CATEGORY_LABEL_KEYS).map(([cat, meta]) => {
@@ -947,9 +1053,9 @@ export default function BillingPage() {
                 <ShoppingCart size={16} className="text-cyan-400" /> {t("billing.cart.heading", "Keranjang")}
               </div>
               <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-neutral-400">{t("billing.shop.subscriptionPlan", "Langganan {plan}").replace("{plan}", String(catalogPlan?.name ?? ""))}</span>
-                  <span>{money(catalogPlan?.priceCurrent ?? 0)}</span>
+                <div className="flex justify-between gap-2">
+                  <span className="text-neutral-400">{t("billing.shop.subscriptionPlan", "Langganan {plan}").replace("{plan}", selectedLabel)}</span>
+                  <span className="shrink-0">{money(selected.charge?.amount ?? 0)}</span>
                 </div>
                 {Object.entries(cart).filter(([, qty]) => qty > 0).map(([productId, qty]) => {
                   const p = (products ?? []).find((x) => x.id === productId);
@@ -962,7 +1068,7 @@ export default function BillingPage() {
                   );
                 })}
                 {Object.keys(cart).length === 0 && (
-                  <div className="text-xs text-neutral-600">{t("billing.cart.empty", "Belum ada item lain di keranjang — browse etalase di sebelah kiri untuk tambah produk, jasa instalasi, atau konsol tambahan.")}</div>
+                  <div className="text-xs text-neutral-600">{t("billing.cart.empty", "Belum ada item lain di keranjang — browse etalase di sebelah kiri untuk tambah smart plug atau jasa instalasi.")}</div>
                 )}
                 {hasSmartPlug && (
                   <div className="flex justify-between">
@@ -976,7 +1082,7 @@ export default function BillingPage() {
                 </div>
               </div>
               <Button className="w-full" onClick={doCheckout} disabled={busy}>{busy ? t("billing.common.processing", "Memproses...") : t("billing.cart.checkout", "Checkout")}</Button>
-              <p className="text-[11px] text-neutral-600">{t("billing.cart.footnote", "Setelah checkout, satu tagihan gabungan akan muncul untuk dibayar (Cash/QRIS/VA) — akses penuh terbuka otomatis 30 hari setelah pembayaran diterima.")}</p>
+              <p className="text-[11px] text-neutral-600">{t("billing.cart.footnote", "Setelah checkout, satu tagihan gabungan akan muncul untuk dibayar (Cash/QRIS/VA) — akses terbuka otomatis begitu pembayaran diterima: 30 hari untuk bulanan, 12 bulan untuk tahunan.")}</p>
             </Card>
           </div>
         </div>
@@ -990,7 +1096,7 @@ export default function BillingPage() {
               {aiAddon?.includedViaPlan && t("billing.ai.includedInPlan", "Sudah termasuk dalam paket langganan — tidak ada biaya tambahan, tidak perlu diaktifkan terpisah.")}
               {!aiAddon?.includedViaPlan && aiAddon?.freeViaTrial && t("billing.ai.freeTrial", "Gratis selama masa percobaan berjalan — tidak perlu diaktifkan terpisah.")}
               {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && aiAddon?.active && t("billing.ai.activeUntil", "Aktif sampai {date}.").replace("{date}", aiAddon.periodEnd ? new Date(aiAddon.periodEnd).toLocaleDateString("id-ID") : "-")}
-              {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && !aiAddon?.active && t("billing.ai.locked", "Terkunci — fitur AI berbayar terpisah dari paket langganan reguler (bukan bagian dari harga langganan), karena setiap pemakaiannya punya biaya nyata ke penyedia AI.")}
+              {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && !aiAddon?.active && t("billing.ai.locked", "Terkunci — di paket Starter, AI diaktifkan sebagai Add-on terpisah karena setiap pemakaiannya punya biaya nyata ke penyedia AI. Paket Pro sudah termasuk AI.")}
             </p>
           </div>
           <div className="text-right">
@@ -1167,14 +1273,18 @@ export default function BillingPage() {
       )}
 
       <BillingFaq
-        planName={catalogPlan?.name}
-        planPrice={catalogPlan?.priceCurrent}
-        includedConsoles={catalogPlan?.includedConsoles}
-        extraConsolePrice={catalogPlan?.extraConsolePrice}
+        starter={(() => {
+          const p = catalogPlans.find((x) => planTierOf(x) === "starter");
+          return p ? { name: p.name, pricePerUnit: p.priceCurrent, minUnits: minUnitsOf(p) } : undefined;
+        })()}
+        pro={(() => {
+          const p = catalogPlans.find((x) => planTierOf(x) === "pro");
+          return p ? { name: p.name, priceFlat: p.priceCurrent, multiOutletDiscountPct: p.multiOutletDiscountPct } : undefined;
+        })()}
+        annualMonthsCharged={catalogPlans[0]?.annualMonthsCharged}
         smartPlugPrice={catalogPlan?.smartPlugPrice}
         setupServicePrice={catalogPlan?.setupServicePrice}
         aiAddonPriceMonthly={aiAddon?.priceMonthly}
-        unlimitedEntitlement={!!catalogPlan?.unlimitedEntitlement}
       />
 
       <p className="text-center text-xs text-neutral-600">

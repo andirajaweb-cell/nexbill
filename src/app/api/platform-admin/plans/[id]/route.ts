@@ -7,7 +7,9 @@ import { describeError } from "@/lib/api/error";
 
 const EDITABLE_FIELDS = [
   "name", "priceOriginal", "priceCurrent", "includedConsoles", "extraConsolePrice",
-  "smartPlugPrice", "setupServicePrice", "isActive", "sortOrder", "unlimitedEntitlement",
+  "smartPlugPrice", "setupServicePrice", "aiAddonPriceMonthly", "isActive", "sortOrder", "unlimitedEntitlement",
+  // Struktur harga 2026-10 (lihat lib/subscription/pricing.ts).
+  "tier", "pricingModel", "minUnits", "annualMonthsCharged", "multiOutletDiscountPct",
 ] as const;
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

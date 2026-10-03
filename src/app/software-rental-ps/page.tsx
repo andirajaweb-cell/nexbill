@@ -75,18 +75,9 @@ export default function SoftwareRentalPsPage() {
         quote="Sejak pakai NEXBILL, tutup shift cuma 5 menit — dulu bisa satu jam."
         quoteAuthor="— Outlet Gaming Corner, Jakarta"
         pricing={{
-          title: "Satu harga, satu software, sembilan modul",
-          sub: "Tanpa biaya tersembunyi — satu-satunya biaya di luar langganan adalah pembelian unit Smart Plug (opsional) untuk kontrol otomatis TV/konsol.",
-          priceOld: "Rp399.000",
-          priceNow: "Rp249.000",
-          period: "/bulan",
-          feats: [
-            "Kontrol TV otomatis (android system & smart plug)",
-            "Fitur Bank Data penilaian customer (fraud)",
-            "Semua fitur — kasir, booking, laporan keuangan & Akuntansi",
-            "Update fitur baru gratis selamanya",
-          ],
-          cta: "Mulai Berlangganan",
+          title: "Satu software, dua paket",
+          sub: "Starter dihitung per unit PS untuk operasional harian; Pro flat per outlet dengan semua fitur, unit tak terbatas, dan diskon multi-cabang. Coba gratis 30 hari — satu-satunya biaya di luar langganan adalah Smart Plug (opsional).",
+          cta: "Coba Gratis 30 Hari",
         }}
         faqTitle="Pertanyaan seputar software rental PS"
         faq={FAQ}

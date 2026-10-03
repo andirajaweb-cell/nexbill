@@ -9,6 +9,7 @@ import { getCashDenominations, BALANCE_TRACKED_METHODS, CHANNEL_LABEL } from "./
 import { PAYMENT_METHOD_LABEL } from "@/lib/payments/labels";
 import { currencyForCountry } from "@/lib/currency/format";
 import { computeShiftRiskFlags } from "./fraud-detection";
+import { outletHasPlanFeature } from "@/lib/subscription/service";
 
 /** Resolves which set of physical note/coin denominations a shift's own outlet counts in — see denominations.ts's DENOMINATIONS_BY_CURRENCY doc comment. */
 async function getOutletCashDenominations(outletId: string): Promise<readonly number[]> {
@@ -474,7 +475,10 @@ export async function closeShift(
   // thresholds (Pengaturan > Preferensi). Never blocks the close itself — a cashier can always end
   // their shift; a flagged shift instead gets an approval_requests row for Owner/Manager sign-off,
   // same review mechanism already used for void/refund approvals.
-  const risk = await computeShiftRiskFlags({
+  // Kontrol anti-fraud termasuk paket Pro (struktur harga 2026-10) — paket Starter tidak
+  // menandai shift/meminta review. Trial & free_forever tetap aktif (lihat resolveEntitlements).
+  const antiFraudOn = await outletHasPlanFeature(shift.outletId, "anti_fraud").catch(() => true);
+  const risk = !antiFraudOn ? { flags: [], severity: "none" as const, sensitiveActionCount: 0 } : await computeShiftRiskFlags({
     shiftId,
     outletId: shift.outletId,
     staffUserId: shift.staffUserId,

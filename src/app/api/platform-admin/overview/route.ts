@@ -1,3 +1,4 @@
+import { computePlanCharge } from "@/lib/subscription/pricing";
 import { NextResponse } from "next/server";
 import { gte } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -38,7 +39,11 @@ export async function GET() {
       statusBreakdown[s.status] = (statusBreakdown[s.status] ?? 0) + 1;
       if (PAID_STATUSES.has(s.status) && s.planId) {
         const plan = planById.get(s.planId);
-        if (plan) mrr += plan.priceCurrent;
+        // Struktur harga 2026-10: Starter per unit, Pro flat; tahunan dihitung rata per bulan.
+        if (plan) {
+          const c = computePlanCharge(plan, { units: s.planUnits, cycle: s.billingCycle });
+          mrr += Math.round(c.amount / c.monthsGranted);
+        }
       }
     }
     // Outlets that never triggered getOrCreateSubscription() yet (e.g. provisioned but never

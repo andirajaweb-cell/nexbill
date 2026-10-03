@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { billingGroups, outlets, subscriptions, subscriptionPlans } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { canAccessOutlet } from "@/lib/outlets/membership";
+import { computePlanCharge, planTierOf } from "./pricing";
 
 /**
  * Billing-group management — grouping several outlets under one owner so they get ONE
@@ -43,6 +44,23 @@ async function loadBillingGroupSummary(billingGroupId: string): Promise<BillingG
   const planRows = planIds.length ? await db.select().from(subscriptionPlans).where(inArray(subscriptionPlans.id, planIds)) : [];
   const planById = new Map(planRows.map((p) => [p.id, p]));
 
+  // Harga per bulan per anggota (struktur 2026-10): Starter per unit, Pro flat — outlet Pro ke-2
+  // dst (dibuat lebih belakang, ada anggota Pro berbayar sebelumnya) dapat diskon multi-cabang.
+  const sorted = [...memberSubs].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  let seenPayingPro = false;
+  const priceBySub = new Map<string, number | null>();
+  for (const s of sorted) {
+    const plan = s.planId ? planById.get(s.planId) : null;
+    if (!plan || s.status === "free_forever") {
+      priceBySub.set(s.id, null);
+      continue;
+    }
+    const isPro = planTierOf(plan) === "pro";
+    const charge = computePlanCharge(plan, { units: s.planUnits, cycle: "monthly", additionalOutlet: isPro && seenPayingPro });
+    priceBySub.set(s.id, charge.monthly);
+    if (isPro && (s.status === "active" || s.status === "grace")) seenPayingPro = true;
+  }
+
   const members: BillingGroupMember[] = memberSubs.map((s) => {
     const plan = s.planId ? planById.get(s.planId) : null;
     return {
@@ -50,7 +68,7 @@ async function loadBillingGroupSummary(billingGroupId: string): Promise<BillingG
       outletName: outletNameById.get(s.outletId) ?? "Outlet",
       subscriptionStatus: s.status,
       planName: plan?.name ?? null,
-      planPrice: plan?.priceCurrent ?? null,
+      planPrice: priceBySub.get(s.id) ?? null,
     };
   });
 

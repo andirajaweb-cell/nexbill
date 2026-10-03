@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import {
+  Lock,
   LayoutDashboard,
   Gamepad2,
   CalendarClock,
@@ -42,6 +43,8 @@ import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useMobileNav } from "@/components/dashboard/MobileNav";
+import { featureForDashboardPath, type PlanFeature } from "@/lib/subscription/pricing";
+import "@/lib/i18n/dict-plan";
 
 const nav = [
   { href: "/dashboard", key: "nav.summary", icon: LayoutDashboard },
@@ -92,6 +95,15 @@ export function Sidebar() {
   // 5s poll) since the sidebar is mounted on every dashboard page, not just /dashboard/chat.
   const { data: supportThreads } = useApi<{ unread?: boolean }[]>(user ? "/api/support-chat" : null, { refreshInterval: 20000 });
   const unreadTicketCount = (supportThreads ?? []).filter((t) => t.unread).length;
+  // Gembok "PRO" untuk menu modul Pro saat outlet berpaket Starter (struktur harga 2026-10) —
+  // memakai cache SWR /api/subscription yang sama dengan SubscriptionGate/PlanFeatureGate.
+  const { data: subData } = useApi<{ entitlements?: { features: PlanFeature[] } }>(user ? "/api/subscription" : null);
+  const planFeatures = subData?.entitlements?.features ?? null;
+  const isProLocked = (href: string) => {
+    if (superuser || !planFeatures) return false;
+    const f = featureForDashboardPath(href);
+    return !!f && !planFeatures.includes(f);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -185,6 +197,11 @@ export function Sidebar() {
             {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />}
             <Icon size={16} className="shrink-0" />
             <span className="truncate flex-1">{t(key)}</span>
+            {isProLocked(href) && (
+              <span className="flex items-center gap-0.5 rounded bg-amber-500/15 px-1 py-px text-[9px] font-bold text-amber-300" title={t("planGate.title", "Fitur Paket Pro")}>
+                <Lock size={9} /> {t("sidebar.proBadge", "PRO")}
+              </span>
+            )}
             {href === "/dashboard/chat" && unreadTicketCount > 0 && (
               <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_6px_rgba(244,63,94,0.7)]">
                 {unreadTicketCount > 9 ? "9+" : unreadTicketCount}

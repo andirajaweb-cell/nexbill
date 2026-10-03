@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { subscriptionInvoices, smartPlugOrders, subscriptionPlans, notificationReads } from "@/db/schema";
-import { eq, or, desc, and } from "drizzle-orm";
+import { eq, or, desc, and, asc } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { getSubscriptionSummary, computeTvComposition, ensureDefaultPlan, listStorefrontProducts } from "@/lib/subscription/service";
 import { getBillingGroupForOutlet } from "@/lib/subscription/billing-group";
@@ -37,10 +37,10 @@ export async function GET() {
         .where(eq(smartPlugOrders.outletId, session.outletId))
     ).map((r) => ({ ...r.order, invoiceStatus: r.invoiceStatus }));
     const composition = await computeTvComposition(session.outletId);
-    const plans = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
+    const plans = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true)).orderBy(asc(subscriptionPlans.sortOrder));
     const products = await listStorefrontProducts();
     const billingGroup = billingGroupId ? await getBillingGroupForOutlet(session.outletId) : null;
-    // "biaya langganan Rp249.000 untuk Indonesia, USD/lainnya untuk mancanegara" — see
+    // "biaya langganan dalam Rupiah untuk Indonesia, USD/lainnya untuk mancanegara" — see
     // resolveBillingCurrencyForOutlet(). null code means IDR/no conversion (the common case).
     const billingCurrency = await resolveBillingCurrencyForOutlet(session.outletId);
 

@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     default: "NEXBILL — Sistem Billing All-in-One untuk Rental PlayStation",
     template: "%s | NEXBILL"
   },
-  description: "Kelola rental PlayStation Anda dalam satu sistem: kasir, kontrol TV/konsol otomatis, booking online, membership, laporan keuangan lengkap, dan AI assistant. Mulai dari Rp249.000/bulan.",
+  description: "Kelola rental PlayStation Anda dalam satu sistem: kasir, kontrol TV/konsol otomatis, booking online, membership, laporan keuangan lengkap, dan AI assistant. Paket Starter mulai Rp6.000/unit/bulan, Pro Rp199.000/outlet/bulan — coba gratis 30 hari.",
   keywords: [
     // 🇮🇩 Indonesia
     "billing PS", "software rental PlayStation", "aplikasi kasir rental PS", 
@@ -133,11 +133,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       { "@type": "Country", "name": "Vietnam" },
       { "@type": "Country", "name": "Singapore" },
     ],
+    // Struktur harga 2026-10 (lib/subscription/pricing.ts): Starter per unit PS/bulan, Pro flat per outlet/bulan.
     "offers": {
-      "@type": "Offer",
-      "price": "249000",
+      "@type": "AggregateOffer",
+      "lowPrice": "6000",
+      "highPrice": "199000",
       "priceCurrency": "IDR",
-      "billingIncrement": "P1M"
+      "offerCount": 2,
+      "offers": [
+        { "@type": "Offer", "name": "NEXBILL Starter (per unit PS / bulan, minimal 5 unit)", "price": "6000", "priceCurrency": "IDR", "billingIncrement": "P1M" },
+        { "@type": "Offer", "name": "NEXBILL Pro (per outlet / bulan)", "price": "199000", "priceCurrency": "IDR", "billingIncrement": "P1M" }
+      ]
     }
   };
 

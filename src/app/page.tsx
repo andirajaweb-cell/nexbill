@@ -11,6 +11,7 @@ import { SiteFooter } from "./site-footer";
 import { CookieConsentBanner } from "./cookie-consent-banner";
 import { LoadingScreen } from "./loading-screen";
 import { LanguageProvider, useLanguage } from "./landing-i18n";
+import { DEFAULT_PRICING } from "@/lib/subscription/pricing";
 
 // NOTE: a <Script src=".../model-viewer.min.js"> tag used to live in the JSX below, loaded
 // unconditionally on every page view even though no <model-viewer> element is ever rendered
@@ -112,10 +113,15 @@ interface PublicPlan {
   name: string;
   includedConsoles: number;
   unlimitedEntitlement: boolean;
+  tier?: string;
+  pricingModel?: string;
+  minUnits?: number;
+  annualMonthsCharged?: number;
+  multiOutletDiscountPct?: number;
   byLang: Partial<Record<string, PublicPlanPricing>>;
 }
 // Intl.NumberFormat locale per currency — chosen for correct grouping/decimal conventions and
-// symbol placement for THAT currency specifically (Rp249.000 with a period separator, $16.13 with
+// symbol placement for THAT currency specifically (Rp199.000 with a period separator, $12.06 with
 // a comma, etc.), independent of which UI language is currently selected. "fil-PH" ICU support is
 // inconsistent across browsers/Node versions, so PHP uses "en-PH" instead — same currency symbol
 // and grouping, more reliably supported.
@@ -154,7 +160,8 @@ export default function LandingPage() {
 function LandingPageInner() {
   const { t, lang } = useLanguage();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [pricingPlan, setPricingPlan] = useState<PublicPlan | null>(null);
+  const [pricingPlans, setPricingPlans] = useState<PublicPlan[] | null>(null);
+  const [pricingCycle, setPricingCycle] = useState<"monthly" | "annual">("monthly");
   const rootRef = useRef<HTMLDivElement>(null);
   const heroCanvasRef = useRef<HTMLCanvasElement>(null);
   const heroGrowVideoFrameRef = useRef<HTMLDivElement>(null);
@@ -175,13 +182,12 @@ function LandingPageInner() {
     return () => { document.documentElement.style.scrollBehavior = prev; };
   }, []);
 
-  // Live pricing for the #harga section — replaces the hardcoded "Rp249.000"/"Rp399.000" literals
-  // that used to live directly in the JSX below with whatever platform-admin actually has
-  // configured, converted into the visitor's selected language's currency. Fetched ONCE on mount
+  // Live pricing for the #harga section (paket Starter & Pro, struktur harga 2026-10) — whatever
+  // platform-admin actually has configured, converted into the visitor's selected language's currency. Fetched ONCE on mount
   // (the response already contains every supported language's numbers, pre-converted server-side
   // — see /api/public/pricing) rather than re-fetching on every language switch; the JSX below
-  // just re-picks pricingPlan.byLang[lang] whenever `lang` changes, no network round-trip needed.
-  // On any failure (network error, no active plan configured yet, etc.) pricingPlan simply stays
+  // just re-picks each plan's byLang[lang] whenever `lang` changes, no network round-trip needed.
+  // On any failure (network error, no active plan configured yet, etc.) pricingPlans simply stays
   // null and the JSX falls back to the same static Rp values that were there before this existed —
   // the pricing section can never end up blank or broken, only "not yet live-converted".
   useEffect(() => {
@@ -190,8 +196,7 @@ function LandingPageInner() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { plans?: PublicPlan[] } | null) => {
         if (cancelled) return;
-        const plan = data?.plans?.[0];
-        if (plan) setPricingPlan(plan);
+        if (data?.plans?.length) setPricingPlans(data.plans);
       })
       .catch(() => {
         // Swallow — see comment above, static fallback values already cover this.
@@ -199,7 +204,31 @@ function LandingPageInner() {
     return () => { cancelled = true; };
   }, []);
 
-  const pricingEntry: PublicPlanPricing | null = pricingPlan?.byLang?.[lang] ?? null;
+  // Starter (per unit, minimal N unit) & Pro (flat per outlet). Fallback ke DEFAULT_PRICING (IDR)
+  // kalau API belum termuat/gagal — section harga tidak pernah kosong.
+  const starterPlan = pricingPlans?.find((p) => p.tier === "starter" || p.code === "starter") ?? null;
+  const proPlan = pricingPlans?.find((p) => p.tier === "pro" || p.code === "pro") ?? null;
+  const starterEntry: PublicPlanPricing | null = starterPlan?.byLang?.[lang] ?? null;
+  const proEntry: PublicPlanPricing | null = proPlan?.byLang?.[lang] ?? null;
+  const annualMonths = proPlan?.annualMonthsCharged ?? starterPlan?.annualMonthsCharged ?? DEFAULT_PRICING.annualMonthsCharged;
+  const starterMinUnits = starterPlan?.minUnits ?? DEFAULT_PRICING.starterMinUnits;
+  const multiDiscountPct = proPlan?.multiOutletDiscountPct ?? DEFAULT_PRICING.multiOutletDiscountPct;
+  const priceView = (entry: PublicPlanPricing | null, fallbackIdr: number) => {
+    const currency = entry?.currency ?? "IDR";
+    const monthly = entry?.priceCurrent ?? fallbackIdr;
+    const original = entry?.priceOriginal ?? monthly;
+    const isAnnual = pricingCycle === "annual";
+    // Tahunan: tampilkan harga efektif per bulan (bayar N bulan untuk 12 bulan) + total per tahun.
+    const shown = isAnnual ? (monthly * annualMonths) / 12 : monthly;
+    return {
+      now: formatPlanPrice(currency, shown),
+      old: isAnnual ? formatPlanPrice(currency, monthly) : original > monthly ? formatPlanPrice(currency, original) : null,
+      yearTotal: formatPlanPrice(currency, monthly * annualMonths),
+      minMonthly: formatPlanPrice(currency, monthly * starterMinUnits),
+    };
+  };
+  const starterView = priceView(starterEntry, DEFAULT_PRICING.starterPerUnit);
+  const proView = priceView(proEntry, DEFAULT_PRICING.proFlat);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -1149,11 +1178,10 @@ function LandingPageInner() {
       </section>
 
       {/* SECTION: HARGA & ADD-ONS */}
-      {/* HARGA — satu kartu "Paket Lengkap" dengan glow gradient di latar dan trust-row metode
-          pembayaran iPaymu di bawah CTA. Kartu Smart Plug "Opsional" yang dulu terpisah (dengan
-          konektor "+") sudah digabung ke dalam kartu ini, TANPA menampilkan harga smart plug —
-          harga smart plug tetap dikontrol dari platform-admin (Plans) dan hanya muncul di alur
-          daftar/billing. Harga langganan: fallback ke literal kalau pricingEntry belum termuat. */}
+      {/* HARGA — dua paket (struktur harga 2026-10): Starter per unit PS (minimal N unit, fitur
+          operasional) dan Pro flat per outlet (semua fitur + AI), toggle bulanan/tahunan, catatan
+          diskon multi-cabang, lalu kartu info Smart Plug + trust-row metode pembayaran iPaymu.
+          Harga diambil live dari /api/public/pricing; fallback ke DEFAULT_PRICING (pricing.ts). */}
       <section id="harga" style={{ backgroundColor: 'transparent', position: 'relative', overflow: 'hidden' }}>
         <div className="harga-glow" aria-hidden="true" />
         <div className="wrap">
@@ -1163,27 +1191,72 @@ function LandingPageInner() {
             <p>{t.harga.sub}</p>
           </div>
 
-          <div className="harga-bundle">
-            <div className="price-card price-card-premium">
-              <span className="price-badge">{t.harga.badge}</span>
-              <div className="price-plan">{t.harga.plan}</div>
-              <div className="price-old">{pricingEntry ? formatPlanPrice(pricingEntry.currency, pricingEntry.priceOriginal) : "Rp399.000"}</div>
-              <div className="price-now"><span className="amount">{pricingEntry ? formatPlanPrice(pricingEntry.currency, pricingEntry.priceCurrent) : "Rp249.000"}</span><span className="period">{t.harga.period}</span></div>
+          {/* Toggle bulanan / tahunan (tahunan = bayar N bulan, aktif 12 bulan). */}
+          <div className="harga-cycle" role="tablist" aria-label={t.harga.kicker}>
+            {(["monthly", "annual"] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="tab"
+                aria-selected={pricingCycle === c}
+                className={pricingCycle === c ? "is-active" : undefined}
+                onClick={() => setPricingCycle(c)}
+              >
+                {c === "monthly" ? t.harga.monthly : t.harga.annual}
+                {c === "annual" && <span className="harga-cycle-note">{t.harga.annualNote.replace("{n}", String(annualMonths))}</span>}
+              </button>
+            ))}
+          </div>
+
+          <div className="harga-plans">
+            {/* STARTER — per unit PS, minimal N unit, fitur operasional. */}
+            <div className="price-card price-card-starter">
+              <div className="price-plan">{t.harga.starter.plan}</div>
+              <p className="price-tagline">{t.harga.starter.tagline}</p>
+              {starterView.old && <div className="price-old">{starterView.old}</div>}
+              <div className="price-now"><span className="amount">{starterView.now}</span><span className="period">{t.harga.starter.priceSuffix}</span></div>
               <div className="price-save">
-                {t.harga.save.replace(
-                  "{amount}",
-                  pricingEntry ? formatPlanPrice(pricingEntry.currency, pricingEntry.priceOriginal - pricingEntry.priceCurrent) : "Rp150.000"
-                )}
+                {pricingCycle === "annual"
+                  ? `${t.harga.annualNote.replace("{n}", String(annualMonths))}`
+                  : t.harga.starter.minNote.replace("{n}", String(starterMinUnits)).replace("{amount}", starterView.minMonthly)}
               </div>
               <ul className="price-feats">
-                {t.harga.feats.map((f, i) => (
+                {t.harga.starter.feats.map((f, i) => (
                   <li key={i}><span className="check">✓</span> {f}</li>
                 ))}
               </ul>
+              <Link href="/daftar" className="btn btn-ghost btn-block">{t.harga.starter.cta}</Link>
+            </div>
 
-              {/* Smart Plug digabung ke dalam kartu Paket Lengkap (dulu kartu "Opsional" terpisah).
-                  Harga smart plug SENGAJA tidak ditampilkan di halaman publik — cukup info fungsi &
-                  kompatibilitasnya; harga/pemesanan diurus lewat dashboard/tim support. */}
+            {/* PRO — flat per outlet, unit tak terbatas, semua fitur + AI. */}
+            <div className="price-card price-card-premium">
+              <span className="price-badge">{t.harga.pro.badge}</span>
+              <div className="price-plan">{t.harga.pro.plan}</div>
+              <p className="price-tagline">{t.harga.pro.tagline}</p>
+              {proView.old && <div className="price-old">{proView.old}</div>}
+              <div className="price-now"><span className="amount">{proView.now}</span><span className="period">{t.harga.pro.priceSuffix}</span></div>
+              <div className="price-save">
+                {pricingCycle === "annual"
+                  ? `${proView.yearTotal}${t.harga.perYear} · ${t.harga.annualNote.replace("{n}", String(annualMonths))}`
+                  : `${t.harga.annual}: ${t.harga.annualNote.replace("{n}", String(annualMonths))}`}
+              </div>
+              <ul className="price-feats">
+                {t.harga.pro.feats.map((f, i) => (
+                  <li key={i}><span className="check">✓</span> {f}</li>
+                ))}
+              </ul>
+              <Link href="/daftar" className="btn btn-primary btn-block">{t.harga.pro.cta}</Link>
+            </div>
+          </div>
+
+          <p className="harga-multi">{t.harga.multiNote.replace("{pct}", String(multiDiscountPct))}</p>
+
+          <div className="harga-bundle">
+            <div className="price-card price-card-extras">
+              <p className="harga-trial">{t.harga.trialNote}</p>
+
+              {/* Smart Plug — harga SENGAJA tidak ditampilkan di halaman publik; cukup fungsi &
+                  kompatibilitasnya. Harga/pemesanan lewat dashboard (Langganan > Toko). */}
               <div className="price-smartplug">
                 <div className="price-smartplug-head">
                   <div className="price-smartplug-photo">
@@ -1210,8 +1283,6 @@ function LandingPageInner() {
                   </div>
                 </div>
               </div>
-
-              <Link href="/daftar" className="btn btn-primary btn-block">{t.harga.cta}</Link>
 
               <div className="price-pay-trust">
                 <span className="price-pay-label">{t.harga.payLabel}</span>

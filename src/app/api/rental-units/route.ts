@@ -3,7 +3,8 @@ import { db } from "@/db/client";
 import { rentalUnits, outlets } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
-import { describeError } from "@/lib/api/error";
+import { describeError, errorStatus } from "@/lib/api/error";
+import { assertUnitQuotaAvailable } from "@/lib/subscription/service";
 import { computeMaintenanceStatus } from "@/lib/rental/maintenance";
 
 /**
@@ -49,6 +50,8 @@ export async function POST(req: NextRequest) {
     if (await nameAlreadyUsed(session.outletId, body.name)) {
       return NextResponse.json({ error: `Unit dengan nama "${body.name}" sudah ada — pakai nama lain supaya tidak tertukar di Live Billing Board.` }, { status: 400 });
     }
+    // Paket Starter dibatasi kuota unit aktif (struktur harga 2026-10).
+    await assertUnitQuotaAvailable(session.outletId, session.role);
     const [row] = await db
       .insert(rentalUnits)
       .values({
@@ -62,6 +65,6 @@ export async function POST(req: NextRequest) {
       .returning();
     return NextResponse.json(row);
   } catch (err: unknown) {
-    return NextResponse.json({ error: describeError(err) }, { status: 500 });
+    return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 500) });
   }
 }

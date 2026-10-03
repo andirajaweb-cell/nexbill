@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { refreshPermissionsCache } from "./permissions-store";
 import { isSessionCurrent } from "./single-session";
 
@@ -77,8 +77,32 @@ export async function getSession(): Promise<SessionPayload | null> {
     // an "owner" -> "superuser" auto-rewrite here, that would silently break every staffer who
     // now legitimately holds the "owner" role.
     await refreshPermissionsCache();
+    await enforcePlanFeature(session);
   }
   return session;
+}
+
+/**
+ * Kunci fitur per paket (struktur harga 2026-10). Middleware menandai request API modul Pro
+ * dengan header internal (lihat featureForApiRequest di lib/subscription/pricing.ts); di sini
+ * — satu tempat yang dilewati setiap route — paket outlet diperiksa dan PlanFeatureLockedError
+ * (status 403, pesan "upgrade ke Pro") dilempar kalau fiturnya tidak termasuk. Superuser, trial,
+ * Pro, dan free_forever selalu lolos. Import dinamis supaya session.ts tidak menarik seluruh
+ * modul langganan (dan menghindari import melingkar).
+ */
+async function enforcePlanFeature(session: SessionPayload): Promise<void> {
+  if (session.role === "superuser") return;
+  let feature: string | null = null;
+  try {
+    feature = (await headers()).get("x-nexbill-plan-feature");
+  } catch {
+    return; // di luar konteks request (skrip) — tidak ada yang perlu dikunci
+  }
+  if (!feature) return;
+  const { assertPlanFeature } = await import("@/lib/subscription/service");
+  const { ALL_PLAN_FEATURES } = await import("@/lib/subscription/pricing");
+  if (!(ALL_PLAN_FEATURES as string[]).includes(feature)) return;
+  await assertPlanFeature(session.outletId, feature as (typeof ALL_PLAN_FEATURES)[number], session.role);
 }
 
 /** Throws a plain Error (caught by the route's try/catch -> 401/403) if there's no valid session, or the role isn't in `roles`. */

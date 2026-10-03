@@ -74,18 +74,9 @@ export default function PlaystationRentalAppPage() {
         quote="Since switching to NEXBILL, closing a shift takes 5 minutes — it used to take an hour."
         quoteAuthor="— Gaming Corner Outlet, Jakarta"
         pricing={{
-          title: "One price, one app, every feature",
-          sub: "No hidden fees — the only cost beyond your subscription is an optional Smart Plug unit for automatic TV/console control.",
-          priceOld: "Rp399,000",
-          priceNow: "Rp249,000",
-          period: "/month",
-          feats: [
-            "Unlimited consoles, users, & outlets included",
-            "Every feature — POS, booking, financial reports & accounting",
-            "Initial remote setup — free, no service fee",
-            "Priority support via WhatsApp",
-          ],
-          cta: "Start Subscription",
+          title: "Two plans, one app",
+          sub: "Starter is priced per PS unit for daily operations; Pro is one flat price per outlet with every feature, unlimited units, and multi-branch discounts. Try it free for 30 days — the only extra cost is an optional Smart Plug.",
+          cta: "Start Your 30-Day Free Trial",
         }}
         faqTitle="FAQ: PlayStation rental app"
         faq={FAQ}

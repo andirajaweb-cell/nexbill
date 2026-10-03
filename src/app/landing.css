@@ -925,6 +925,24 @@
   font-size: 11px; flex-shrink: 0;
 }
 
+/* HARGA dua paket (struktur harga 2026-10): toggle bulanan/tahunan + kartu Starter & Pro. */
+.nb-landing .harga-cycle { display: flex; justify-content: center; gap: 6px; margin: 0 auto 30px; padding: 5px; width: fit-content; border: 1px solid var(--card-border); border-radius: 999px; background: rgba(255,255,255,.03); }
+.nb-landing .harga-cycle button { border: 0; background: transparent; color: var(--text-dim); font-weight: 600; font-size: 14px; padding: 8px 18px; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.nb-landing .harga-cycle button.is-active { background: linear-gradient(90deg, rgba(59,130,246,.28), rgba(168,85,247,.24)); color: #fff; }
+.nb-landing .harga-cycle-note { font-size: 11px; font-weight: 700; color: var(--green); }
+.nb-landing .harga-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; max-width: 920px; margin: 0 auto; align-items: stretch; }
+.nb-landing .harga-plans .price-card { max-width: none; display: flex; flex-direction: column; }
+.nb-landing .harga-plans .price-feats { flex: 1; }
+.nb-landing .price-card-starter { background: linear-gradient(180deg, rgba(6,182,212,.07), var(--card)); border-color: var(--card-border); box-shadow: none; }
+.nb-landing .price-tagline { color: var(--text-faint); font-size: 13.5px; margin: -12px 0 14px; }
+.nb-landing .harga-multi { text-align: center; color: var(--text-dim); font-size: 14px; margin: 22px auto 26px; max-width: 640px; }
+.nb-landing .harga-trial { color: var(--text-dim); font-size: 14px; margin: 0 0 16px; }
+.nb-landing .price-card-extras { max-width: 920px; padding: 28px 30px 22px; box-shadow: none; }
+@media (max-width: 760px) {
+  .nb-landing .harga-plans { grid-template-columns: 1fr; }
+  .nb-landing .harga-cycle button { padding: 7px 12px; font-size: 13px; }
+  .nb-landing .harga-cycle-note { display: none; }
+}
 .nb-landing .price-pay-trust { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--card-border); text-align: center; }
 .nb-landing .price-pay-label { display: block; font-size: 11.5px; color: var(--text-faint); margin-bottom: 10px; letter-spacing: .01em; }
 .nb-landing .price-pay-badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
@@ -1233,7 +1251,7 @@
   .nb-landing .intro-float-badge-value-cyan { font-size: 14.5px; }
   .nb-landing .intro-float-badge-label { font-size: 9px; }
 
-  /* "Rp249.000" at the desktop 52px display size runs wider than a phone-width price card's inner
+  /* "Rp199.000" at the desktop 52px display size runs wider than a phone-width price card's inner
      content box (the card's own padding is tuned for desktop, see .price-card-premium above),
      overflowing past the card's rounded edge instead of staying inside it. */
   .nb-landing .price-card-premium { padding: 30px 20px 22px; }

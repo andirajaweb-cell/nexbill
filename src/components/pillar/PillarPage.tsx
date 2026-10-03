@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
+import { DEFAULT_PRICING } from "@/lib/subscription/pricing";
 
 // Shared shell for NexBill's SEO pillar pages (docs/SEO-ARCHITECTURE.md §2-3). Deliberately NOT
 // built on the homepage's SiteNavbar/SiteFooter/LanguageProvider system: those default to "id" on
@@ -34,19 +35,62 @@ export interface PillarPageProps {
   features: { title: string; desc: string }[];
   quote: string;
   quoteAuthor: string;
+  // Harga paket Starter & Pro dirender dari DEFAULT_PRICING (lib/subscription/pricing.ts) —
+  // halaman pilar hanya memberi judul/sub/CTA, angka tidak ditulis ulang di tiap halaman.
   pricing: {
     title: string;
     sub: string;
-    priceOld: string;
-    priceNow: string;
-    period: string;
-    feats: string[];
     cta: string;
   };
   faqTitle: string;
   faq: { q: string; a: string }[];
   relatedTitle: string;
   related: { label: string; href: string }[];
+}
+
+const fmtRp = (lang: "id" | "en", n: number) => `Rp${n.toLocaleString(lang === "id" ? "id-ID" : "en-US")}`;
+
+/** Kartu harga Starter & Pro (struktur harga 2026-10) per bahasa halaman pilar. */
+function pillarPlans(lang: "id" | "en") {
+  const P = DEFAULT_PRICING;
+  if (lang === "id") {
+    return [
+      {
+        name: "Starter",
+        price: fmtRp(lang, P.starterPerUnit),
+        period: "/unit/bulan",
+        note: `Minimal ${P.starterMinUnits} unit (mulai ${fmtRp(lang, P.starterPerUnit * P.starterMinUnits)}/bulan) · tahunan bayar ${P.annualMonthsCharged} bulan, aktif 12 bulan`,
+        feats: ["Billing & timer sewa presisi detik", "Kasir F&B, booking online & membership", "Kontrol TV otomatis (Android TV & smart plug)", "QR pelanggan per bilik", "AI tersedia sebagai Add-on"],
+        highlight: false,
+      },
+      {
+        name: "Pro",
+        price: fmtRp(lang, P.proFlat),
+        period: "/outlet/bulan",
+        note: `Unit tak terbatas · cabang ke-2 dst hemat ${P.multiOutletDiscountPct}% · tahunan bayar ${P.annualMonthsCharged} bulan, aktif 12 bulan`,
+        feats: ["Semua fitur Starter + unit PS tak terbatas", "Akuntansi & laporan keuangan lengkap", "Manajemen aset, PPOB & rental ke rumah", "Kontrol anti-fraud shift & AI Business Assistant", "Multi-cabang & update fitur baru gratis selamanya"],
+        highlight: true,
+      },
+    ];
+  }
+  return [
+    {
+      name: "Starter",
+      price: fmtRp(lang, P.starterPerUnit),
+      period: "/unit/month",
+      note: `Minimum ${P.starterMinUnits} units (from ${fmtRp(lang, P.starterPerUnit * P.starterMinUnits)}/month) · yearly: pay ${P.annualMonthsCharged} months, get 12`,
+      feats: ["Rental billing & per-second timers", "F&B cashier, online booking & membership", "Automatic TV control (Android TV & smart plug)", "Customer QR per booth", "AI available as an add-on"],
+      highlight: false,
+    },
+    {
+      name: "Pro",
+      price: fmtRp(lang, P.proFlat),
+      period: "/outlet/month",
+      note: `Unlimited units · additional branches save ${P.multiOutletDiscountPct}% · yearly: pay ${P.annualMonthsCharged} months, get 12`,
+      feats: ["Everything in Starter + unlimited PS units", "Full accounting & financial reports", "Asset management, bill payments (PPOB) & home rental", "Shift anti-fraud controls & AI Business Assistant", "Multi-branch & free feature updates forever"],
+      highlight: true,
+    },
+  ];
 }
 
 const NAV_LABELS = {
@@ -164,28 +208,31 @@ export function PillarPage(props: PillarPageProps) {
             <h2 className="text-2xl sm:text-3xl font-bold">{props.pricing.title}</h2>
             <p className="mt-3 text-neutral-400">{props.pricing.sub}</p>
           </div>
-          <div className="mt-8 max-w-md rounded-2xl border border-cyan-400/20 bg-white/[0.03] p-6">
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm text-neutral-500 line-through">{props.pricing.priceOld}</span>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black text-white">{props.pricing.priceNow}</span>
-              <span className="text-neutral-500">{props.pricing.period}</span>
-            </div>
-            <ul className="mt-5 space-y-2">
-              {props.pricing.feats.map((f, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-neutral-300">
-                  <span className="text-cyan-400 mt-0.5">✓</span>
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/daftar"
-              className="mt-6 block text-center rounded-full bg-blue-500 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-400 transition-colors"
-            >
-              {props.pricing.cta}
-            </Link>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 max-w-3xl">
+            {pillarPlans(props.lang).map((plan) => (
+              <div key={plan.name} className={`rounded-2xl border p-6 bg-white/[0.03] ${plan.highlight ? "border-cyan-400/40" : "border-white/10"}`}>
+                <div className="text-sm font-semibold uppercase tracking-wider text-neutral-400">{plan.name}</div>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-white">{plan.price}</span>
+                  <span className="text-neutral-500">{plan.period}</span>
+                </div>
+                <p className="mt-1 text-xs text-emerald-300/90">{plan.note}</p>
+                <ul className="mt-5 space-y-2">
+                  {plan.feats.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-neutral-300">
+                      <span className="text-cyan-400 mt-0.5">✓</span>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/daftar"
+                  className={`mt-6 block text-center rounded-full px-6 py-3 text-sm font-semibold transition-colors ${plan.highlight ? "bg-blue-500 text-white hover:bg-blue-400" : "border border-white/15 text-neutral-200 hover:bg-white/5"}`}
+                >
+                  {props.pricing.cta}
+                </Link>
+              </div>
+            ))}
           </div>
         </section>
 

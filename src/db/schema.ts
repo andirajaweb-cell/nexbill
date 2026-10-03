@@ -2339,6 +2339,15 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   setupServicePrice: doublePrecision("setup_service_price").notNull().default(125000),
   aiAddonPriceMonthly: doublePrecision("ai_addon_price_monthly").notNull().default(149000),
   unlimitedEntitlement: boolean("unlimited_entitlement").notNull().default(false),
+  // Struktur harga 2026-10 (lihat lib/subscription/pricing.ts): "starter" = per unit (priceCurrent
+  // per unit/bulan, minimal minUnits unit), fitur operasional saja; "pro" = flat per outlet
+  // (priceCurrent per outlet/bulan), semua fitur. annualMonthsCharged = bulan yang ditagih untuk
+  // siklus tahunan (12 bulan aktif). multiOutletDiscountPct = diskon outlet Pro ke-2 dst di grup.
+  tier: text("tier", { enum: ["starter", "pro"] }).notNull().default("pro"),
+  pricingModel: text("pricing_model", { enum: ["per_unit", "flat"] }).notNull().default("flat"),
+  minUnits: integer("min_units").notNull().default(1),
+  annualMonthsCharged: integer("annual_months_charged").notNull().default(10),
+  multiOutletDiscountPct: integer("multi_outlet_discount_pct").notNull().default(20),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   ...timestamps,
@@ -2460,6 +2469,14 @@ export const subscriptions = pgTable(
     // uses billingGroups.depositBalance instead, since a group is billed — and should therefore be
     // topped up/spent — as one combined entity, not per member outlet.
     depositBalance: doublePrecision("deposit_balance").notNull().default(0),
+    // Struktur harga 2026-10: siklus tagihan + kuota unit yang dibayar (paket Starter per unit).
+    // next* = pilihan untuk perpanjangan berikutnya (turun paket/kurangi kuota/ganti siklus berlaku
+    // di periode berikutnya; naik paket langsung lewat tagihan prorata).
+    billingCycle: text("billing_cycle", { enum: ["monthly", "annual"] }).notNull().default("monthly"),
+    planUnits: integer("plan_units").notNull().default(0),
+    nextPlanId: text("next_plan_id").references(() => subscriptionPlans.id),
+    nextBillingCycle: text("next_billing_cycle", { enum: ["monthly", "annual"] }),
+    nextPlanUnits: integer("next_plan_units"),
     ...timestamps,
   },
   (t) => [uniqueIndex("subscriptions_outlet_idx").on(t.outletId)]
@@ -2513,6 +2530,13 @@ export const subscriptionInvoices = pgTable("subscription_invoices", {
   expiresAt: text("expires_at"),
   paidAt: text("paid_at"),
   emailSentAt: text("email_sent_at"),
+  // Struktur harga 2026-10: berapa bulan masa aktif yang ditambahkan saat invoice langganan ini
+  // lunas (null = data lama → 1 bulan; 0 = upgrade/tambah kuota prorata tanpa perpanjangan), dan
+  // paket/siklus/kuota yang diterapkan ke langganan saat lunas.
+  periodMonths: integer("period_months"),
+  targetPlanId: text("target_plan_id").references(() => subscriptionPlans.id),
+  targetBillingCycle: text("target_billing_cycle", { enum: ["monthly", "annual"] }),
+  targetPlanUnits: integer("target_plan_units"),
   ...timestamps,
 });
 

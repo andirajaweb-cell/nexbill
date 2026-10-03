@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { featureForApiRequest, PLAN_FEATURE_HEADER } from "@/lib/subscription/pricing";
 
 /**
  * Two-domain split: the marketing/landing site (nexbill.id, www.nexbill.id) and the app itself
@@ -27,6 +28,18 @@ const APP_PATH_PREFIXES = ["/dashboard", "/platform-admin", "/login", "/daftar",
 export function middleware(req: NextRequest) {
   const host = req.headers.get("host")?.split(":")[0] ?? "";
   const { pathname, search } = req.nextUrl;
+
+  // Kunci fitur per paket (struktur harga 2026-10): request API modul Pro (akuntansi, aset, PPOB,
+  // rental ke rumah, buat cabang) ditandai header internal; getSession() (lib/auth/session.ts)
+  // yang memeriksa paket outlet-nya. Header SELALU ditimpa/dihapus di sini supaya klien tidak bisa
+  // memalsukannya. Middleware ini edge — tanpa akses DB, jadi pengecekan paketnya di route.
+  if (pathname.startsWith("/api/")) {
+    const headers = new Headers(req.headers);
+    const feature = featureForApiRequest(pathname, req.method);
+    if (feature) headers.set(PLAN_FEATURE_HEADER, feature);
+    else headers.delete(PLAN_FEATURE_HEADER);
+    return NextResponse.next({ request: { headers } });
+  }
   const isKnownHost = LANDING_HOSTS.has(host) || host === DASHBOARD_HOST;
 
   if (isKnownHost) {
@@ -69,5 +82,18 @@ export const config = {
   // page route (login, daftar, the marketing homepage, etc.) — API routes and static assets are
   // excluded since they don't need this, and client-side fetch() calls already resolve against
   // whatever host actually served the page, so they never need a cross-domain redirect.
-  matcher: ["/((?!api/|_next/|.*\\..*).*)"],
+  matcher: [
+    "/((?!api/|_next/|.*\\..*).*)",
+    // Modul yang dikunci per paket — lihat featureForApiRequest di lib/subscription/pricing.ts.
+    "/api/accounting/:path*",
+    "/api/account-mappings/:path*",
+    "/api/expenses/:path*",
+    "/api/other-income/:path*",
+    "/api/cost-centers/:path*",
+    "/api/assets/:path*",
+    "/api/asset-purchases/:path*",
+    "/api/ppob/:path*",
+    "/api/home-rental/:path*",
+    "/api/outlets",
+  ],
 };
