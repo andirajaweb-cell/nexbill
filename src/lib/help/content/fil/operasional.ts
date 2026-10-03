@@ -360,6 +360,59 @@ export const OPERASIONAL: HelpCategory[] = [
     roles: "Magbukas/magsara: lahat ng staff. Magdagdag/mag-edit/magbura/mag-link ng device: Owner, Superuser, Manager, Supervisor.",
   },
   {
+    id: "qr-pelanggan",
+    group: "operasional",
+    label: "Customer QR sa Bawat Booth at Alerto ng Oras sa TV",
+    navHint: "Upa ng PS → Pamahalaan ang Unit → Customer QR",
+    summary:
+      "May QR sticker ang bawat booth. Ini-scan lang ito ng customer gamit ang phone para makita ang natitirang oras at tantiyang bill, mag-order ng pagkain/inumin, humiling ng dagdag na oras, o tawagin ang cashier — nang hindi pumupunta sa counter. Lahat ng hiling ay papasok sa panel na Mga Hiling ng Customer sa Upa ng PS at gagana lang kapag tinanggap ng cashier. Kaya ring magpakita ng Android TV ng alerto sa natitirang oras at screen na Ubos na ang Oras.",
+    subsections: [
+      {
+        title: "Paglalagay ng QR sa booth",
+        steps: [
+          "Buksan ang Upa ng PS → Pamahalaan ang Unit → pindutin ang \"Customer QR\" sa unit. Awtomatikong nagagawa ang QR.",
+          "Pindutin ang \"I-print ang sticker ng lahat ng unit\" para i-print nang sabay-sabay ang QR ng lahat ng unit, gupitin, at idikit malapit sa TV ng bawat booth.",
+          "I-set ang pahintulot sa parehong window: payagan ang F&B order mula sa phone, payagan ang hiling na dagdag na oras mula sa phone. Laging naka-on ang pagtawag sa cashier.",
+          "Kapag kinunan ng litrato at inabuso ang QR, pindutin ang \"Palitan ang QR\" — agad na hindi na gagana ang lumang sticker; i-print ang bago.",
+        ],
+      },
+      {
+        title: "Ang magagawa ng customer mula sa phone",
+        steps: [
+          "Makita ang natitirang oras ng laro (tumatakbo bawat segundo) at ang tantiyang bill. May alerto kapag 5 minuto o mas kaunti na lang.",
+          "Mag-order ng pagkain/inumin: pumili ng menu, i-set ang dami, ipadala. Galing sa data ng produkto ang presyo, hindi sa phone.",
+          "Humiling ng dagdag na oras: +30/+60/+90/+120 minuto, may tantiyang gastos.",
+          "Tawagin ang cashier: humingi ng bill, problema sa controller, kailangan ng tulong, o iba pa (may opsyonal na tala). Makikita sa phone ang status ng bawat hiling: naghihintay, tinanggap, o tinanggihan kasama ang dahilan.",
+        ],
+      },
+      {
+        title: "Pagsagot sa mga hiling (cashier)",
+        steps: [
+          "Lumalabas ang mga bagong hiling sa panel na \"Mga Hiling ng Customer (Booth QR)\" sa itaas ng Upa ng PS, may tunog.",
+          "F&B order: pindutin ang \"Tanggapin at idagdag sa bill\" — papasok ang mga item sa bill ng session at diretso sa Kitchen Display.",
+          "Dagdag na oras: pindutin ang \"Tanggapin at magdagdag ng oras\" — hahaba ang session. Tawag sa cashier: puntahan ang booth, saka pindutin ang \"Naasikaso na\".",
+          "Pindutin ang \"Tanggihan\" kapag hindi maibibigay (hal. ubos na ang menu); makikita sa phone ng customer ang dahilang ilalagay mo.",
+        ],
+      },
+      {
+        title: "Alerto sa natitirang oras at screen na Ubos na ang Oras sa TV",
+        navHint: "Setting → TV Screensaver → Alerto sa Oras at Screen na Ubos na ang Oras",
+        steps: [
+          "Para lang sa Android TV na naka-on at na-verify ang automation (NexbillAgent v1.2).",
+          "Alerto sa natitirang oras (naka-off sa default): ilang minuto bago matapos, saglit na lilipat ang TV sa malaking screen na \"NATITIRANG ORAS\" na may booth QR, saka kusang babalik sa HDMI ng PlayStation. I-set ang minuto at gaano katagal ito ipapakita.",
+          "Screen na \"UBOS NA ANG ORAS\": kapag kusang huminto ang session at hindi pa bayad ang bill, iniimbitahan ng TV ang customer na magbayad sa cashier (walang halagang ipinapakita), hanggang mabayaran o sa loob ng 15 minuto.",
+          "Isang beses kada session ipinapadala ang alerto at gagana ulit pagkatapos magdagdag ng oras.",
+        ],
+      },
+    ],
+    notes: [
+      "Hindi kailanman binabago ng hiling mula sa phone ang bill nang mag-isa — ang cashier ang nagpapasya. Hindi matatanggap ang order para sa session na tapos na; asikasuhin ito sa Cashier.",
+      "Hindi ipinapakita ng phone page ang pangalan o numero ng customer, at ginagamit nito ang wika ayon sa Bansa ng outlet.",
+      "Nakadepende ang alerto sa TV at ang awtomatikong paghinto ng session sa scheduler ng NEXBILL na tumatakbo sa server.",
+    ],
+    roles: "Kayang sumagot sa mga hiling at magpakita/mag-print ng QR ang sinumang staff na naka-log in. Pagbago ng pahintulot sa QR at setting ng alerto sa TV: Owner, Superuser, Manager.",
+  },
+  {
     id: "tv-screensaver",
     group: "operasional",
     label: "TV Screensaver (Promo Screen sa Booth)",

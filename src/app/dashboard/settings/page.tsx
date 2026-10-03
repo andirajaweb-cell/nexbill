@@ -1691,6 +1691,10 @@ interface TvSettingsData {
   nightStartHour: number;
   nightEndHour: number;
   nightDimPercent: number;
+  timeWarningEnabled?: boolean;
+  timeWarningMinutes?: number;
+  timeWarningSeconds?: number;
+  timeUpScreenEnabled?: boolean;
   hasPin: boolean;
   moduleEnabled: boolean;
 }
@@ -2009,6 +2013,35 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
           </Field>
         </div>
         <p className="text-xs text-neutral-600">Maksimal 90% — layar tidak pernah dibuat hitam total, supaya tidak dikira TV-nya mati lalu dicabut.</p>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">Peringatan Waktu &amp; Layar Waktu Habis</h2>
+        <p className="text-xs text-neutral-500">
+          Berlaku untuk TV Android yang otomatisasinya sudah aktif &amp; terverifikasi (lihat Layar Terpasang di bawah). Butuh NexbillAgent v1.2 dan penjadwal NEXBILL
+          berjalan (sama seperti penghentian sesi otomatis).
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" disabled={!canManage} checked={!!settings.timeWarningEnabled} onChange={(e) => patch({ timeWarningEnabled: e.target.checked })} />
+          <span>Tampilkan peringatan sisa waktu di TV</span>
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Berapa menit sebelum habis">
+            <input type="number" min={1} max={30} className={inputCls} disabled={!canManage || !settings.timeWarningEnabled} defaultValue={settings.timeWarningMinutes ?? 5} onBlur={(e) => patch({ timeWarningMinutes: Number(e.target.value) })} />
+          </Field>
+          <Field label="Lama tampil (detik), lalu kembali ke game">
+            <input type="number" min={4} max={20} className={inputCls} disabled={!canManage || !settings.timeWarningEnabled} defaultValue={settings.timeWarningSeconds ?? 7} onBlur={(e) => patch({ timeWarningSeconds: Number(e.target.value) })} />
+          </Field>
+        </div>
+        <p className="text-xs text-neutral-600">
+          TV berpindah sebentar ke layar besar &quot;SISA WAKTU&quot; berisi QR bilik (pelanggan bisa minta tambah waktu dari HP), lalu otomatis kembali ke HDMI PlayStation. Permainan
+          terjeda beberapa detik — karena itu fitur ini mati secara bawaan. Dikirim sekali per sesi, dan berlaku lagi setelah waktu ditambah.
+        </p>
+        <label className="flex items-center gap-2 text-sm pt-2 border-t border-neutral-800">
+          <input type="checkbox" disabled={!canManage} checked={settings.timeUpScreenEnabled ?? true} onChange={(e) => patch({ timeUpScreenEnabled: e.target.checked })} />
+          <span>Tampilkan layar &quot;WAKTU HABIS&quot; setelah sesi berakhir otomatis (tagihan belum dibayar)</span>
+        </label>
+        <p className="text-xs text-neutral-600">Tampil sampai tagihan dibayar atau 15 menit. Tanpa nominal di TV — rinciannya bisa dilihat pelanggan lewat QR bilik di HP.</p>
       </Card>
 
       <Card className="space-y-3">

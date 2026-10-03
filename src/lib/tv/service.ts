@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
-import { tvScreens, tvScreensaverSettings, rentalUnits, rentalSessions, outlets, devices } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { tvScreens, tvScreensaverSettings, rentalUnits, rentalSessions, outlets, devices, orders } from "@/db/schema";
+import { eq, and, inArray, desc } from "drizzle-orm";
+import { isTimeUpActive } from "@/lib/unit-qr/rules";
 import bcrypt from "bcryptjs";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 import {
@@ -71,6 +72,14 @@ export interface UpdateTvSettingsInput {
   nightDimPercent?: number;
   /** "" atau null = hapus PIN (kembali ke unlockMode "none"). Tidak dikirim sama sekali = biarkan apa adanya. */
   unlockPin?: string | null;
+  /** Peringatan sisa waktu di TV + layar Waktu Habis (migrasi 0028). */
+  timeWarningEnabled?: boolean;
+  timeWarningMinutes?: number;
+  timeWarningSeconds?: number;
+  timeUpScreenEnabled?: boolean;
+  /** Izin QR Pelanggan per bilik. */
+  unitQrOrderEnabled?: boolean;
+  unitQrExtendEnabled?: boolean;
 }
 
 export async function updateTvSettings(outletId: string, input: UpdateTvSettingsInput): Promise<TvSettingsRow> {
@@ -95,6 +104,12 @@ export async function updateTvSettings(outletId: string, input: UpdateTvSettings
   if (input.nightStartHour !== undefined) patch.nightStartHour = clampInt(input.nightStartHour, 0, 23, current.nightStartHour);
   if (input.nightEndHour !== undefined) patch.nightEndHour = clampInt(input.nightEndHour, 0, 23, current.nightEndHour);
   if (input.nightDimPercent !== undefined) patch.nightDimPercent = clampInt(input.nightDimPercent, 0, 90, current.nightDimPercent);
+  if (input.timeWarningEnabled !== undefined) patch.timeWarningEnabled = !!input.timeWarningEnabled;
+  if (input.timeWarningMinutes !== undefined) patch.timeWarningMinutes = clampInt(input.timeWarningMinutes, 1, 30, current.timeWarningMinutes);
+  if (input.timeWarningSeconds !== undefined) patch.timeWarningSeconds = clampInt(input.timeWarningSeconds, 4, 20, current.timeWarningSeconds);
+  if (input.timeUpScreenEnabled !== undefined) patch.timeUpScreenEnabled = !!input.timeUpScreenEnabled;
+  if (input.unitQrOrderEnabled !== undefined) patch.unitQrOrderEnabled = !!input.unitQrOrderEnabled;
+  if (input.unitQrExtendEnabled !== undefined) patch.unitQrExtendEnabled = !!input.unitQrExtendEnabled;
 
   if (input.unlockPin !== undefined) {
     const pin = typeof input.unlockPin === "string" ? input.unlockPin.trim() : "";
@@ -366,6 +381,23 @@ export async function pairTvScreen(rawCode: string): Promise<{ token: string; sc
   return { token: paired.token, screenName: paired.name, outletName: outlet?.name ?? "Outlet" };
 }
 
+/** Sesi terakhir yang SELESAI + apakah tagihannya masih terbuka — untuk layar "Waktu Habis". */
+export async function lastFinishedSessionWithBill(unitId: string) {
+  const [last] = await db
+    .select({ id: rentalSessions.id, status: rentalSessions.status, endedAt: rentalSessions.endedAt })
+    .from(rentalSessions)
+    .where(and(eq(rentalSessions.rentalUnitId, unitId), eq(rentalSessions.status, "finished")))
+    .orderBy(desc(rentalSessions.endedAt))
+    .limit(1);
+  if (!last) return { last: null, billOpen: false, billTotal: null as number | null };
+  const [bill] = await db
+    .select({ id: orders.id, status: orders.status, total: orders.total })
+    .from(orders)
+    .where(and(eq(orders.rentalSessionId, last.id), eq(orders.status, "open")))
+    .limit(1);
+  return { last, billOpen: !!bill, billTotal: bill ? bill.total : null };
+}
+
 export interface TvStateResponse {
   /**
    * false ketika feature flag TV_SCREENSAVER_ENABLED dimatikan, atau layar ini dinonaktifkan.
@@ -398,8 +430,17 @@ export interface TvStateResponse {
     accentColor: string;
     requiresPin: boolean;
     nightDimOpacity: number;
+    /** Ambang peringatan sisa waktu (menit) bila fitur peringatan TV aktif; null = mati. */
+    timeWarningMinutes: number | null;
   };
   bookingUrl: string | null;
+  /**
+   * Sesi terakhir unit ini sudah habis waktunya dan tagihannya belum dibayar → layar menampilkan
+   * "WAKTU HABIS, silakan ke kasir" (tanpa nominal — lihat batas data di atas getTvState).
+   */
+  timeUp: boolean;
+  /** Unit punya QR Pelanggan → layar peringatan/Waktu Habis menampilkan QR-nya (lihat /api/tv/qr?kind=unit). */
+  hasUnitQr: boolean;
   serverTime: string;
 }
 
@@ -470,6 +511,16 @@ export async function getTvState(token: string): Promise<TvStateResponse> {
 
   const showBookingQr = settings.showBookingQr && bookingQrOn && !!outlet?.slug;
 
+  let timeUp = false;
+  if (unit && !session && settings.timeUpScreenEnabled) {
+    try {
+      const fin = await lastFinishedSessionWithBill(unit.id);
+      timeUp = isTimeUpActive(fin.last, fin.billOpen, false, now.getTime());
+    } catch {
+      /* gagal membaca → tampilan biasa, bukan layar galat */
+    }
+  }
+
   // Aturan "hanya TV Android" juga berlaku untuk layar yang SUDAH terpasang: kalau tipe TV unitnya
   // diganti belakangan (mis. menjadi Smart TV), layar berhenti dengan alasan yang jelas alih-alih
   // terus berjalan di setup yang tidak didukung. Cukup tipe TV-nya yang dinilai — penolakan tidak
@@ -506,8 +557,11 @@ export async function getTvState(token: string): Promise<TvStateResponse> {
       accentColor: settings.accentColor,
       requiresPin: settings.unlockMode === "pin" && !!settings.unlockPinHash,
       nightDimOpacity: nightDimOpacity(settings.nightModeEnabled, settings.nightDimPercent, settings.nightStartHour, settings.nightEndHour, now),
+      timeWarningMinutes: settings.timeWarningEnabled ? settings.timeWarningMinutes : null,
     },
     bookingUrl: showBookingQr && outlet?.slug ? `/book/${outlet.slug}` : null,
+    timeUp,
+    hasUnitQr: !!unit?.customerQrToken,
     serverTime: now.toISOString(),
   };
 }

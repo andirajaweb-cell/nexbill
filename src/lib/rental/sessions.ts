@@ -352,7 +352,9 @@ export async function extendRentalSession(sessionId: string, additionalMinutes: 
 
   const [updated] = await db
     .update(rentalSessions)
-    .set({ extendedMinutes: session.extendedMinutes + additionalMinutes })
+    // tvWarningSentAt dikosongkan: waktu selesai bergeser, jadi peringatan TV berlaku lagi untuk
+    // waktu selesai yang baru (lihat runTvTimeWarning di scheduler.ts).
+    .set({ extendedMinutes: session.extendedMinutes + additionalMinutes, tvWarningSentAt: null })
     .where(eq(rentalSessions.id, sessionId))
     .returning();
   return updated;

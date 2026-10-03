@@ -360,6 +360,59 @@ export const OPERASIONAL: HelpCategory[] = [
     roles: "Menyalakan/mematikan: semua staf. Menambah/mengubah/menghapus/menghubungkan perangkat: Owner, Superuser, Manager, Supervisor.",
   },
   {
+    id: "qr-pelanggan",
+    group: "operasional",
+    label: "QR Pelanggan per Bilik & Peringatan Waktu di TV",
+    navHint: "Rental PS → Kelola Unit → QR Pelanggan",
+    summary:
+      "Setiap bilik punya stiker QR. Pelanggan cukup scan dengan HP untuk melihat sisa waktu dan perkiraan tagihan, memesan makanan/minuman, minta tambah waktu, atau memanggil kasir — tanpa harus berdiri ke kasir. Semua permintaan masuk ke panel Permintaan Pelanggan di Rental PS dan baru berlaku setelah kasir menerimanya. TV Android juga bisa menampilkan peringatan sisa waktu dan layar Waktu Habis.",
+    subsections: [
+      {
+        title: "Memasang QR di bilik",
+        steps: [
+          "Buka Rental PS → Kelola Unit → tekan \"QR Pelanggan\" pada unit. QR dibuat otomatis.",
+          "Tekan \"Cetak stiker semua unit\" untuk mencetak QR semua unit sekaligus, gunting, lalu tempel di dekat TV tiap bilik.",
+          "Atur izinnya di jendela yang sama: boleh pesan F&B dari HP, boleh minta tambah waktu dari HP. Panggil kasir selalu aktif.",
+          "Kalau QR difoto dan disalahgunakan, tekan \"Ganti QR\" — stiker lama langsung tidak berlaku, cetak yang baru.",
+        ],
+      },
+      {
+        title: "Yang bisa dilakukan pelanggan dari HP",
+        steps: [
+          "Melihat sisa waktu bermain (berjalan detik per detik) dan perkiraan tagihan berjalan. Saat sisa waktu ≤5 menit muncul peringatan.",
+          "Pesan makanan/minuman: pilih menu, atur jumlah, kirim. Harga diambil dari data produk, bukan dari HP.",
+          "Minta tambah waktu: +30/+60/+90/+120 menit, lengkap dengan perkiraan biaya.",
+          "Panggil kasir: minta bill, stik bermasalah, butuh bantuan, atau lainnya (bisa tambah catatan). Status setiap permintaan terlihat di HP: menunggu, diterima, atau ditolak beserta alasannya.",
+        ],
+      },
+      {
+        title: "Menanggapi permintaan (kasir)",
+        steps: [
+          "Permintaan baru muncul di panel \"Permintaan Pelanggan (QR Bilik)\" di bagian atas Rental PS, disertai bunyi.",
+          "Pesanan F&B: tekan \"Terima & masukkan ke bill\" — item masuk tagihan sesi dan langsung tampil di Kitchen Display.",
+          "Tambah waktu: tekan \"Terima & tambah waktu\" — durasi sesi bertambah. Panggil kasir: datangi bilik lalu tekan \"Sudah ditangani\".",
+          "Tekan \"Tolak\" bila tidak bisa dilayani (mis. menu habis); alasan yang diisi terlihat di HP pelanggan.",
+        ],
+      },
+      {
+        title: "Peringatan sisa waktu & layar Waktu Habis di TV",
+        navHint: "Pengaturan → TV Screensaver → Peringatan Waktu & Layar Waktu Habis",
+        steps: [
+          "Khusus TV Android yang otomatisasinya sudah aktif dan terverifikasi (NexbillAgent v1.2).",
+          "Peringatan sisa waktu (mati secara bawaan): beberapa menit sebelum habis, TV pindah sebentar ke layar besar \"SISA WAKTU\" berisi QR bilik, lalu kembali sendiri ke HDMI PlayStation. Atur menit dan lama tampilnya.",
+          "Layar \"WAKTU HABIS\": setelah sesi berhenti otomatis dan tagihan belum dibayar, TV menampilkan ajakan menyelesaikan pembayaran di kasir (tanpa nominal), sampai dibayar atau 15 menit.",
+          "Peringatan dikirim sekali per sesi dan berlaku lagi setelah waktu ditambah.",
+        ],
+      },
+    ],
+    notes: [
+      "Permintaan dari HP tidak pernah mengubah tagihan sendiri — kasir yang memutuskan. Pesanan yang sesinya sudah selesai tidak bisa diterima; layani langsung lewat Kasir.",
+      "Halaman HP tidak menampilkan nama atau nomor pelanggan, dan memakai bahasa sesuai Negara outlet.",
+      "Peringatan TV dan penghentian sesi otomatis bergantung pada penjadwal NEXBILL yang berjalan di server.",
+    ],
+    roles: "Semua staf yang login bisa menanggapi permintaan dan menampilkan/mencetak QR. Mengubah izin QR dan setelan peringatan TV: Owner, Superuser, Manager.",
+  },
+  {
     id: "tv-screensaver",
     group: "operasional",
     label: "TV Screensaver (Layar Promosi di Bilik)",

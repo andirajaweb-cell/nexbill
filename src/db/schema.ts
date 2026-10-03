@@ -336,6 +336,17 @@ export const tvScreensaverSettings = pgTable(
     nightStartHour: integer("night_start_hour").notNull().default(23),
     nightEndHour: integer("night_end_hour").notNull().default(6),
     nightDimPercent: integer("night_dim_percent").notNull().default(60),
+    // Peringatan sisa waktu di TV (migrasi 0028): beberapa menit sebelum sesi habis, TV bilik
+    // menampilkan layar peringatan selama timeWarningSeconds detik lalu kembali ke HDMI PlayStation.
+    // Mati secara bawaan karena memotong permainan sebentar — merchant yang memutuskan.
+    timeWarningEnabled: boolean("time_warning_enabled").notNull().default(false),
+    timeWarningMinutes: integer("time_warning_minutes").notNull().default(5),
+    timeWarningSeconds: integer("time_warning_seconds").notNull().default(7),
+    // Layar "WAKTU HABIS" di TV setelah sesi berakhir otomatis dan tagihannya belum dibayar.
+    timeUpScreenEnabled: boolean("time_up_screen_enabled").notNull().default(true),
+    // QR Pelanggan per bilik: boleh pesan F&B / minta tambah waktu dari HP (perlu persetujuan kasir).
+    unitQrOrderEnabled: boolean("unit_qr_order_enabled").notNull().default(true),
+    unitQrExtendEnabled: boolean("unit_qr_extend_enabled").notNull().default(true),
     ...timestamps,
   },
   (t) => [uniqueIndex("tv_screensaver_settings_outlet_idx").on(t.outletId)]
@@ -422,6 +433,10 @@ export const rentalUnits = pgTable("rental_units", {
   usageMinutesAtLastService: doublePrecision("usage_minutes_at_last_service").notNull().default(0),
   lastServicedAt: text("last_serviced_at"),
   maintenanceThresholdHours: integer("maintenance_threshold_hours"),
+  // QR Pelanggan (migrasi 0028): rahasia acak di stiker QR bilik → halaman /u/[token] tempat
+  // pelanggan melihat sisa waktu, memesan F&B, minta tambah waktu, dan memanggil kasir. Dibuat saat
+  // pertama dibutuhkan; bisa diganti (QR lama langsung mati) dari Rental PS › QR Pelanggan.
+  customerQrToken: text("customer_qr_token").unique(),
   ...timestamps,
 });
 
@@ -541,9 +556,37 @@ export const rentalSessions = pgTable("rental_sessions", {
   voucherId: text("voucher_id"),
   bookingId: text("booking_id"),
   shiftId: text("shift_id"),
+  // Kapan peringatan "sisa waktu" terakhir dikirim ke TV bilik (migrasi 0028) — supaya tiap sesi
+  // hanya diperingatkan sekali. Dikosongkan lagi saat waktu ditambah, jadi peringatan berlaku untuk
+  // waktu selesai yang baru.
+  tvWarningSentAt: text("tv_warning_sent_at"),
   ...timestamps,
 },
   (t) => [index("rental_sessions_outlet_started_idx").on(t.outletId, t.startedAt)]
+);
+
+/**
+ * Permintaan dari HP pelanggan lewat QR bilik (migrasi 0028): pesan F&B, minta tambah waktu, atau
+ * panggil kasir. Tidak pernah langsung mengubah tagihan — kasir yang menerima/menolak di Rental PS.
+ * payload (JSON): order_fnb → {items:[{productId,qty}]}; extend_time → {minutes}; call_staff → {reason,note}.
+ */
+export const unitCustomerRequests = pgTable(
+  "unit_customer_requests",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    rentalUnitId: text("rental_unit_id").notNull().references(() => rentalUnits.id),
+    rentalSessionId: text("rental_session_id").references(() => rentalSessions.id),
+    type: text("type", { enum: ["order_fnb", "extend_time", "call_staff"] }).notNull(),
+    payload: text("payload").notNull().default("{}"),
+    status: text("status", { enum: ["pending", "accepted", "rejected", "done"] }).notNull().default("pending"),
+    rejectReason: text("reject_reason"),
+    handledAt: text("handled_at"),
+    handledBy: text("handled_by").references(() => staffUsers.id),
+    handledByName: text("handled_by_name"),
+    ...timestamps,
+  },
+  (t) => [index("unit_customer_requests_outlet_status_idx").on(t.outletId, t.status, t.createdAt)]
 );
 
 export const sessionAccessories = pgTable("session_accessories", {

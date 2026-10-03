@@ -1,6 +1,9 @@
 import { db } from "@/db/client";
-import { bookings, outlets, rentalSessions, promos } from "@/db/schema";
-import { eq, and, inArray, isNotNull } from "drizzle-orm";
+import { bookings, outlets, rentalSessions, promos, rentalUnits, devices, tvScreensaverSettings } from "@/db/schema";
+import { eq, and, inArray, isNotNull, isNull } from "drizzle-orm";
+import { flashTimeWarning } from "@/lib/tv/automation";
+import { shouldSendTvWarning } from "@/lib/unit-qr/rules";
+import type { DeviceRecord } from "@/lib/devices/types";
 import { logAudit } from "@/lib/audit/log";
 import { hasConflict } from "./bookings";
 import { queueBookingNotification, bookingMessages, outletName, BookingNotificationType } from "./notifications";
@@ -280,6 +283,65 @@ export async function runSessionAutoStop(outletId?: string) {
 }
 
 /**
+ * Peringatan sisa waktu di TV bilik (migrasi 0028) — hanya untuk outlet yang menyalakannya di
+ * Pengaturan › TV Screensaver. Sekali per sesi (rental_sessions.tv_warning_sent_at, dikosongkan
+ * lagi saat waktu ditambah). Sesi "diklaim" lebih dulu dengan UPDATE ... WHERE tv_warning_sent_at
+ * IS NULL supaya dua poller yang berjalan bersamaan tidak mengirim peringatan ganda.
+ *
+ * Perintah ke TV dikirim BERSAMAAN (Promise.allSettled) dan masing-masing menunggu beberapa detik
+ * sebelum kembali ke HDMI, jadi sweep ini paling lama bertambah ±20 detik, tidak berlipat per unit.
+ */
+export async function runTvTimeWarning(outletId?: string) {
+  const sent: string[] = [];
+  const settingsRows = outletId
+    ? await db.select().from(tvScreensaverSettings).where(and(eq(tvScreensaverSettings.outletId, outletId), eq(tvScreensaverSettings.timeWarningEnabled, true)))
+    : await db.select().from(tvScreensaverSettings).where(eq(tvScreensaverSettings.timeWarningEnabled, true));
+  const tasks: Promise<void>[] = [];
+
+  for (const settings of settingsRows) {
+    const active = await db
+      .select()
+      .from(rentalSessions)
+      .where(and(eq(rentalSessions.outletId, settings.outletId), eq(rentalSessions.status, "running"), isNull(rentalSessions.tvWarningSentAt)));
+    if (active.length === 0) continue;
+
+    const promoIds = [...new Set(active.map((s) => s.promoId).filter((id): id is string => !!id))];
+    const promoRows = promoIds.length ? await db.select().from(promos).where(inArray(promos.id, promoIds)) : [];
+    const promoById = new Map(promoRows.map((p) => [p.id, p]));
+
+    for (const session of active) {
+      const promo = session.promoId ? promoById.get(session.promoId) : null;
+      const allowedMinutes = promo?.durationMinutes ?? session.plannedMinutes;
+      if (allowedMinutes === null || allowedMinutes === undefined || allowedMinutes <= 0) continue;
+      const elapsedMs = Math.max(0, Date.now() - new Date(session.startedAt).getTime() - session.accumulatedPauseMs);
+      const remainingSeconds = (allowedMinutes + session.extendedMinutes) * 60 - elapsedMs / 1000;
+      if (!shouldSendTvWarning(remainingSeconds, settings.timeWarningMinutes, false)) continue;
+
+      const claimed = await db
+        .update(rentalSessions)
+        .set({ tvWarningSentAt: new Date().toISOString() })
+        .where(and(eq(rentalSessions.id, session.id), isNull(rentalSessions.tvWarningSentAt)))
+        .returning({ id: rentalSessions.id });
+      if (claimed.length === 0) continue;
+
+      const [unit] = await db.select().from(rentalUnits).where(eq(rentalUnits.id, session.rentalUnitId)).limit(1);
+      if (!unit?.deviceId) continue;
+      const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
+      if (!device || (device.protocol as string) !== "android_tv_relay") continue;
+
+      tasks.push(
+        flashTimeWarning({ id: unit.id, outletId: unit.outletId, name: unit.name }, device as unknown as DeviceRecord, settings.timeWarningSeconds).then((ok) => {
+          if (ok) sent.push(session.id);
+        }),
+      );
+    }
+  }
+
+  await Promise.allSettled(tasks);
+  return sent;
+}
+
+/**
  * Runs the full sweep in order — release-then-promote-then-remind — once per poll tick. Also
  * chains the Home Rental reminder sweep (pickup H-24/H-2, due-today, repeating overdue) here
  * rather than standing up a second external poller process — both scripts/booking-scheduler.ts
@@ -291,6 +353,14 @@ export async function runBookingScheduler(outletId?: string) {
   const remindersQueued = await runReminders(outletId);
   const sessionWarningsQueued = await runSessionTimeWarning(outletId);
   const sessionsAutoStopped = await runSessionAutoStop(outletId);
+  // Setelah auto-stop: sesi yang baru saja habis tidak lagi "running", jadi tidak ikut diperingatkan.
+  let tvTimeWarnings: string[] = [];
+  try {
+    tvTimeWarnings = await runTvTimeWarning(outletId);
+  } catch (err) {
+    // Mis. migrasi 0028 belum dijalankan — jangan sampai menggagalkan sweep booking lainnya.
+    console.error("[runTvTimeWarning] gagal:", err);
+  }
   const homeRental = await runHomeRentalScheduler(outletId);
   return {
     released,
@@ -298,6 +368,7 @@ export async function runBookingScheduler(outletId?: string) {
     remindersQueued,
     sessionWarningsQueued,
     sessionsAutoStopped,
+    tvTimeWarnings,
     homeRentalPickupRemindersQueued: homeRental.pickupRemindersQueued,
     homeRentalReturnRemindersQueued: homeRental.returnRemindersQueued,
     ranAt: new Date().toISOString(),

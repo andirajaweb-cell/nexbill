@@ -55,8 +55,13 @@ interface TvState {
     accentColor: string;
     requiresPin: boolean;
     nightDimOpacity: number;
+    /** Ambang peringatan sisa waktu (menit), null = fitur peringatan mati. Bisa absen di server lama. */
+    timeWarningMinutes?: number | null;
   };
   bookingUrl: string | null;
+  /** Waktu habis & tagihan belum dibayar (server lama tidak mengirim → dianggap false). */
+  timeUp?: boolean;
+  hasUnitQr?: boolean;
   serverTime: string;
 }
 
@@ -229,6 +234,7 @@ type Mode = "screensaver" | "pin" | "panel";
 function ScreenDisplay({ token, onUnpair }: { token: string; onUnpair: () => void }) {
   const [state, setState] = useState<TvState | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [unitQrDataUrl, setUnitQrDataUrl] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [mode, setMode] = useState<Mode>("screensaver");
   const [now, setNow] = useState(() => Date.now());
@@ -284,6 +290,27 @@ function ScreenDisplay({ token, onUnpair }: { token: string; onUnpair: () => voi
       cancelled = true;
     };
   }, [state?.display.showBookingQr, qrDataUrl, token]);
+
+  /**
+   * QR Pelanggan unit ini — hanya diambil saat layar peringatan / Waktu Habis memang perlu
+   * menampilkannya, lalu disimpan (isinya tetap selama QR unit tidak diganti dari dashboard).
+   */
+  const needUnitQr = !!state && (!!state.timeUp || (state.display.timeWarningMinutes ?? null) !== null);
+  useEffect(() => {
+    if (!needUnitQr || unitQrDataUrl) return;
+    let cancelled = false;
+    fetch("/api/tv/qr?kind=unit", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.qrDataUrl) setUnitQrDataUrl(d.qrDataUrl);
+      })
+      .catch(() => {
+        /* tanpa QR, layar peringatan tetap tampil */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [needUnitQr, unitQrDataUrl, token]);
 
   /**
    * Detak satu detik untuk jam dan hitung mundur.
@@ -380,9 +407,22 @@ function ScreenDisplay({ token, onUnpair }: { token: string; onUnpair: () => voi
         state.view.status === "paused" ? new Date(state.serverTime).getTime() : now
       );
 
+  // Layar peringatan sisa waktu / Waktu Habis menggantikan screensaver biasa (bukan panel staf).
+  const warnMinutes = state.display.timeWarningMinutes ?? null;
+  const warningActive =
+    warnMinutes !== null &&
+    liveView.status === "occupied" &&
+    liveView.remainingSeconds !== null &&
+    liveView.remainingSeconds > 0 &&
+    liveView.remainingSeconds <= warnMinutes * 60;
+  const alertKind: "warning" | "timeUp" | null = state.timeUp ? "timeUp" : warningActive ? "warning" : null;
+
   return (
     <div className="relative min-h-screen bg-black overflow-hidden">
-      {mode === "screensaver" && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} />}
+      {mode === "screensaver" && alertKind && (
+        <AlertScreen kind={alertKind} state={state} liveView={liveView} unitQrDataUrl={unitQrDataUrl} driftStyle={driftStyle} />
+      )}
+      {mode === "screensaver" && !alertKind && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} />}
       {mode === "pin" && <PinPrompt token={token} accent={accent} onOk={() => setMode("panel")} onCancel={() => setMode("screensaver")} />}
       {mode === "panel" && <UnitPanel state={state} liveView={liveView} onBack={() => setMode("screensaver")} />}
 
@@ -397,6 +437,52 @@ function ScreenDisplay({ token, onUnpair }: { token: string; onUnpair: () => voi
         mereka tahu di mana melihatnya.
       */}
       {offline && <div className="fixed bottom-3 right-4 text-xs text-amber-400/70">Menyambungkan ulang...</div>}
+    </div>
+  );
+}
+
+/** ---------------- PERINGATAN SISA WAKTU & WAKTU HABIS ---------------- */
+
+/**
+ * Tampil penuh, huruf besar, kontras tinggi — dibaca dari sofa beberapa meter. Tanpa nominal
+ * tagihan (layar ini menghadap ruang publik); rinciannya ada di HP pelanggan lewat QR unit.
+ */
+function AlertScreen({
+  kind,
+  state,
+  liveView,
+  unitQrDataUrl,
+  driftStyle,
+}: {
+  kind: "warning" | "timeUp";
+  state: TvState;
+  liveView: TvUnitView;
+  unitQrDataUrl: string | null;
+  driftStyle: React.CSSProperties;
+}) {
+  const timeUp = kind === "timeUp";
+  return (
+    <div
+      className={`min-h-screen flex flex-col items-center justify-center p-10 text-center ${timeUp ? "bg-gradient-to-b from-rose-950 to-black" : "bg-gradient-to-b from-amber-950 to-black"}`}
+      style={driftStyle}
+    >
+      <div className={`text-3xl md:text-4xl font-semibold tracking-[0.3em] ${timeUp ? "text-rose-300" : "text-amber-300"}`}>{state.unitName ?? state.outletName}</div>
+      <div className={`mt-6 text-7xl md:text-9xl font-extrabold ${timeUp ? "text-rose-400" : "text-amber-400"}`}>{timeUp ? "WAKTU HABIS" : "⏰ SISA WAKTU"}</div>
+      {!timeUp && <div className="mt-4 text-8xl md:text-[10rem] font-extrabold tabular-nums leading-none">{formatDuration(liveView.remainingSeconds)}</div>}
+      <div className="mt-8 text-3xl md:text-4xl text-neutral-200 max-w-4xl">
+        {timeUp ? "Terima kasih sudah bermain! Silakan selesaikan pembayaran di kasir." : "Mau lanjut main? Tambah waktu sekarang sebelum habis."}
+      </div>
+      {unitQrDataUrl ? (
+        <div className="mt-10 flex flex-col items-center gap-3">
+          <img src={unitQrDataUrl} alt="QR unit" className="w-48 h-48 md:w-60 md:h-60 rounded-2xl bg-white p-2" />
+          <div className="text-xl md:text-2xl text-neutral-300">
+            {timeUp ? "Scan untuk lihat tagihan & panggil kasir" : "Scan untuk tambah waktu, pesan makanan, atau panggil kasir"}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-10 text-2xl text-neutral-400">Hubungi kasir untuk {timeUp ? "pembayaran" : "tambah waktu"}.</div>
+      )}
+      <div className="mt-10 text-neutral-600 text-sm md:text-base tracking-[0.25em]">{state.outletName.toUpperCase()} · NEXBILL</div>
     </div>
   );
 }

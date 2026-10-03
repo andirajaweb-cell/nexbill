@@ -360,6 +360,59 @@ export const OPERASIONAL: HelpCategory[] = [
     roles: "Menghidupkan/mematikan: semua staf. Menambah/mengubah/memadam/menghubungkan peranti: Owner, Superuser, Manager, Supervisor.",
   },
   {
+    id: "qr-pelanggan",
+    group: "operasional",
+    label: "QR Pelanggan per Bilik & Amaran Masa di TV",
+    navHint: "Sewa PS → Urus Unit → QR Pelanggan",
+    summary:
+      "Setiap bilik ada pelekat QR. Pelanggan cuma imbas dengan telefon untuk melihat baki masa dan anggaran bil, memesan makanan/minuman, minta tambah masa, atau memanggil juruwang — tanpa perlu ke kaunter. Semua permintaan masuk ke panel Permintaan Pelanggan di Sewa PS dan hanya berkuat kuasa selepas juruwang menerimanya. Android TV juga boleh memaparkan amaran baki masa dan skrin Masa Tamat.",
+    subsections: [
+      {
+        title: "Memasang QR di bilik",
+        steps: [
+          "Buka Sewa PS → Urus Unit → tekan \"QR Pelanggan\" pada unit. QR dibuat secara automatik.",
+          "Tekan \"Cetak pelekat semua unit\" untuk mencetak QR semua unit sekali gus, gunting, kemudian tampal berhampiran TV setiap bilik.",
+          "Atur kebenarannya dalam tetingkap yang sama: benarkan pesanan F&B dari telefon, benarkan minta tambah masa dari telefon. Panggil juruwang sentiasa aktif.",
+          "Jika QR difoto dan disalah guna, tekan \"Tukar QR\" — pelekat lama terus tidak sah, cetak yang baharu.",
+        ],
+      },
+      {
+        title: "Apa yang boleh dilakukan pelanggan dari telefon",
+        steps: [
+          "Melihat baki masa bermain (berjalan setiap saat) dan anggaran bil berjalan. Amaran muncul apabila baki masa ≤5 minit.",
+          "Pesan makanan/minuman: pilih menu, atur kuantiti, hantar. Harga diambil daripada data produk, bukan dari telefon.",
+          "Minta tambah masa: +30/+60/+90/+120 minit, lengkap dengan anggaran kos.",
+          "Panggil juruwang: minta bil, alat kawalan bermasalah, perlu bantuan, atau lain-lain (boleh tambah catatan). Status setiap permintaan kelihatan di telefon: menunggu, diterima, atau ditolak beserta sebabnya.",
+        ],
+      },
+      {
+        title: "Membalas permintaan (juruwang)",
+        steps: [
+          "Permintaan baharu muncul di panel \"Permintaan Pelanggan (QR Bilik)\" di bahagian atas Sewa PS, disertai bunyi.",
+          "Pesanan F&B: tekan \"Terima & masukkan ke bil\" — item masuk bil sesi dan terus dipaparkan di Paparan Dapur.",
+          "Tambah masa: tekan \"Terima & tambah masa\" — tempoh sesi bertambah. Panggil juruwang: pergi ke bilik kemudian tekan \"Sudah diuruskan\".",
+          "Tekan \"Tolak\" jika tidak dapat dilayan (cth. menu habis); sebab yang diisi kelihatan di telefon pelanggan.",
+        ],
+      },
+      {
+        title: "Amaran baki masa & skrin Masa Tamat di TV",
+        navHint: "Tetapan → TV Screensaver → Amaran Masa & Skrin Masa Tamat",
+        steps: [
+          "Khas untuk Android TV yang automasinya sudah aktif dan disahkan (NexbillAgent v1.2).",
+          "Amaran baki masa (mati secara lalai): beberapa minit sebelum tamat, TV beralih sebentar ke skrin besar \"BAKI MASA\" berserta QR bilik, kemudian kembali sendiri ke HDMI PlayStation. Atur minit dan tempoh paparannya.",
+          "Skrin \"MASA TAMAT\": selepas sesi berhenti automatik dan bil belum dibayar, TV mengajak pelanggan menyelesaikan pembayaran di juruwang (tanpa jumlah), sehingga dibayar atau 15 minit.",
+          "Amaran dihantar sekali bagi setiap sesi dan berlaku semula selepas masa ditambah.",
+        ],
+      },
+    ],
+    notes: [
+      "Permintaan dari telefon tidak pernah mengubah bil dengan sendirinya — juruwang yang memutuskan. Pesanan untuk sesi yang sudah tamat tidak boleh diterima; layan terus melalui Juruwang.",
+      "Halaman telefon tidak memaparkan nama atau nombor pelanggan, dan menggunakan bahasa mengikut Negara outlet.",
+      "Amaran TV dan penghentian sesi automatik bergantung pada penjadual NEXBILL yang berjalan di pelayan.",
+    ],
+    roles: "Semua staf yang log masuk boleh membalas permintaan dan memaparkan/mencetak QR. Mengubah kebenaran QR dan tetapan amaran TV: Owner, Superuser, Manager.",
+  },
+  {
     id: "tv-screensaver",
     group: "operasional",
     label: "TV Screensaver (Skrin Promosi di Bilik)",

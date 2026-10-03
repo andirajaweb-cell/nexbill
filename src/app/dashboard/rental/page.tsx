@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Power, Play, Square, Pause, PlayCircle, Clock, UtensilsCrossed, Plus, Minus, Settings, Pencil, Archive, RotateCcw, ArrowLeftRight, AlertTriangle, Gamepad, History, Activity, BadgeCheck, Wrench } from "lucide-react";
+import { Power, Play, Square, Pause, PlayCircle, Clock, UtensilsCrossed, Plus, Minus, Settings, Pencil, Archive, RotateCcw, ArrowLeftRight, AlertTriangle, Gamepad, History, Activity, BadgeCheck, Wrench, QrCode } from "lucide-react";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { useAuth } from "@/lib/auth/client";
@@ -25,6 +25,8 @@ import { LiveClock } from "@/components/dashboard/LiveClock";
 import "@/lib/i18n/dict-rental";
 import { scaledGain } from "@/lib/ui/notification-sound";
 import { NotificationVolumeControl } from "@/components/dashboard/NotificationVolumeControl";
+import { UnitRequestsPanel } from "./UnitRequestsPanel";
+import { UnitQrModal } from "./UnitQrModal";
 
 // recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
 const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
@@ -373,6 +375,8 @@ export default function RentalPage() {
   // that member's transaction history on the Membership page.
   const [customerMode, setCustomerMode] = useState<"non_member" | "member">("non_member");
   const [showUnitManager, setShowUnitManager] = useState(false);
+  // QR Pelanggan per unit (modal tampil/ganti/cetak) — lihat UnitQrModal.tsx.
+  const [qrUnit, setQrUnit] = useState<{ id: string; name: string } | null>(null);
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
   const [unitForm, setUnitForm] = useState<{ name: string; consoleType: string; tvType: string; hourlyRate: number; note: string; maintenanceThresholdHours: number | null }>({
     name: "", consoleType: "ps4", tvType: "smart_tv", hourlyRate: 0, note: "", maintenanceThresholdHours: null,
@@ -1073,6 +1077,10 @@ export default function RentalPage() {
         </div>
       </div>
 
+      {/* Permintaan dari HP pelanggan lewat QR bilik — berbunyi saat ada yang baru. */}
+      <UnitRequestsPanel onNewRequest={() => playAlertBeep()} onHandled={() => load()} money={rupiah} />
+      {qrUnit && <UnitQrModal unit={qrUnit} onClose={() => setQrUnit(null)} />}
+
       {showUnitManager && (
         <Card className="space-y-3">
           <h2 className="gm-heading font-semibold">{t("rental.manageUnitsHeading", "Kelola Unit PS")}</h2>
@@ -1102,6 +1110,9 @@ export default function RentalPage() {
                     <>
                       <Button variant="ghost" className="text-xs flex items-center gap-1" onClick={() => startEditUnit(unit)}>
                         <Pencil size={12} /> {t("rental.editUnit", "Edit")}
+                      </Button>
+                      <Button variant="ghost" className="text-xs flex items-center gap-1 text-cyan-300" onClick={() => setQrUnit({ id: unit.id, name: unit.name })}>
+                        <QrCode size={12} /> {t("unitQr.button", "QR Pelanggan")}
                       </Button>
                       {unit.maintenance?.isDue && (
                         <Button variant="ghost" className="text-xs flex items-center gap-1 text-emerald-400" onClick={() => markServiced(unit)}>

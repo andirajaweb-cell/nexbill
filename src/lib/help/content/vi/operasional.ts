@@ -360,6 +360,59 @@ export const OPERASIONAL: HelpCategory[] = [
     roles: "Bật/tắt: mọi nhân viên. Thêm/sửa/xóa/liên kết thiết bị: Owner, Superuser, Manager, Supervisor.",
   },
   {
+    id: "qr-pelanggan",
+    group: "operasional",
+    label: "QR khách hàng theo phòng & Cảnh báo giờ trên TV",
+    navHint: "Cho thuê PS → Quản lý máy → QR khách hàng",
+    summary:
+      "Mỗi phòng có một nhãn QR. Khách chỉ cần quét bằng điện thoại để xem thời gian còn lại và hóa đơn tạm tính, gọi đồ ăn/uống, xin thêm giờ hoặc gọi thu ngân — không cần ra quầy. Mọi yêu cầu vào khung Yêu cầu của khách trên trang Cho thuê PS và chỉ có hiệu lực khi thu ngân chấp nhận. Android TV cũng có thể hiển thị cảnh báo thời gian còn lại và màn hình Hết giờ.",
+    subsections: [
+      {
+        title: "Dán QR trong phòng",
+        steps: [
+          "Mở Cho thuê PS → Quản lý máy → bấm \"QR khách hàng\" trên máy. QR được tạo tự động.",
+          "Bấm \"In nhãn dán cho mọi máy\" để in QR của tất cả máy một lần, cắt rồi dán cạnh TV của từng phòng.",
+          "Đặt quyền trong cùng cửa sổ: cho phép gọi món từ điện thoại, cho phép xin thêm giờ từ điện thoại. Gọi thu ngân luôn bật.",
+          "Nếu QR bị chụp lại và lạm dụng, bấm \"Thay QR\" — nhãn cũ hết hiệu lực ngay; hãy in nhãn mới.",
+        ],
+      },
+      {
+        title: "Khách có thể làm gì trên điện thoại",
+        steps: [
+          "Xem thời gian chơi còn lại (chạy từng giây) và hóa đơn tạm tính. Khi còn ≤5 phút sẽ có cảnh báo.",
+          "Gọi đồ ăn/uống: chọn món, đặt số lượng, gửi. Giá lấy từ dữ liệu sản phẩm, không từ điện thoại.",
+          "Xin thêm giờ: +30/+60/+90/+120 phút, kèm chi phí ước tính.",
+          "Gọi thu ngân: xin hóa đơn, tay cầm bị lỗi, cần hỗ trợ hoặc khác (có thể thêm ghi chú). Trạng thái từng yêu cầu hiển thị trên điện thoại: đang chờ, đã nhận hoặc bị từ chối kèm lý do.",
+        ],
+      },
+      {
+        title: "Phản hồi yêu cầu (thu ngân)",
+        steps: [
+          "Yêu cầu mới xuất hiện ở khung \"Yêu cầu của khách (QR phòng)\" phía trên trang Cho thuê PS, kèm âm báo.",
+          "Đơn đồ ăn: bấm \"Nhận & thêm vào hóa đơn\" — món vào hóa đơn của phiên và hiện ngay trên Màn hình bếp.",
+          "Thêm giờ: bấm \"Nhận & thêm giờ\" — thời lượng phiên tăng lên. Gọi thu ngân: đến phòng rồi bấm \"Đã xử lý\".",
+          "Bấm \"Từ chối\" khi không thể phục vụ (vd. hết món); lý do bạn nhập sẽ hiện trên điện thoại khách.",
+        ],
+      },
+      {
+        title: "Cảnh báo thời gian còn lại & màn hình Hết giờ trên TV",
+        navHint: "Cài đặt → TV Screensaver → Cảnh báo giờ & Màn hình Hết giờ",
+        steps: [
+          "Chỉ dành cho Android TV đã bật và xác minh tự động hóa (NexbillAgent v1.2).",
+          "Cảnh báo thời gian còn lại (mặc định tắt): vài phút trước khi hết, TV chuyển nhanh sang màn hình lớn \"THỜI GIAN CÒN LẠI\" kèm QR phòng, rồi tự quay lại HDMI của PlayStation. Đặt số phút và thời gian hiển thị.",
+          "Màn hình \"HẾT GIỜ\": sau khi phiên tự dừng và hóa đơn chưa thanh toán, TV mời khách thanh toán tại quầy (không hiện số tiền), cho đến khi thanh toán hoặc trong 15 phút.",
+          "Cảnh báo được gửi một lần mỗi phiên và áp dụng lại sau khi thêm giờ.",
+        ],
+      },
+    ],
+    notes: [
+      "Yêu cầu từ điện thoại không bao giờ tự thay đổi hóa đơn — thu ngân quyết định. Đơn của phiên đã kết thúc không thể nhận; hãy phục vụ qua Thu ngân.",
+      "Trang trên điện thoại không hiện tên hay số của khách, và dùng ngôn ngữ theo Quốc gia của cửa hàng.",
+      "Cảnh báo trên TV và việc tự dừng phiên phụ thuộc vào bộ lập lịch NEXBILL chạy trên máy chủ.",
+    ],
+    roles: "Mọi nhân viên đã đăng nhập đều phản hồi yêu cầu và hiển thị/in QR được. Thay đổi quyền QR và cài đặt cảnh báo TV: Owner, Superuser, Manager.",
+  },
+  {
     id: "tv-screensaver",
     group: "operasional",
     label: "TV Screensaver (Màn hình quảng cáo trong phòng)",

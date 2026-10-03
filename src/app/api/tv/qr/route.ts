@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import qrcode from "qrcode";
 import { describeError } from "@/lib/api/error";
 import { getTvState } from "@/lib/tv/service";
+import { db } from "@/db/client";
+import { tvScreens } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { ensureUnitQrToken } from "@/lib/unit-qr/service";
 
 /**
  * PUBLIK — QR booking untuk layar ini, sebagai data-URL PNG.
@@ -22,6 +26,18 @@ export async function GET(req: NextRequest) {
     const bearer = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
     const token = bearer || (req.nextUrl.searchParams.get("token") ?? "").trim();
     if (!token) return NextResponse.json({ error: "Token layar tidak ada." }, { status: 401 });
+
+    // ?kind=unit → QR Pelanggan milik UNIT layar ini (dipakai layar peringatan & Waktu Habis), juga
+    // dibangun dari data layar sendiri, bukan dari parameter — alasan yang sama seperti QR booking.
+    if (req.nextUrl.searchParams.get("kind") === "unit") {
+      const [screen] = await db.select({ outletId: tvScreens.outletId, rentalUnitId: tvScreens.rentalUnitId }).from(tvScreens).where(eq(tvScreens.token, token)).limit(1);
+      if (!screen) return NextResponse.json({ error: "Layar ini sudah dilepas dari outlet." }, { status: 401 });
+      if (!screen.rentalUnitId) return NextResponse.json({ qrDataUrl: null, url: null });
+      const unitToken = await ensureUnitQrToken(screen.outletId, screen.rentalUnitId);
+      const unitUrl = `${req.nextUrl.origin}/u/${unitToken}`;
+      const unitQr = await qrcode.toDataURL(unitUrl, { margin: 1, scale: 8, color: { dark: "#000000", light: "#ffffff" } });
+      return NextResponse.json({ qrDataUrl: unitQr, url: unitUrl });
+    }
 
     const state = await getTvState(token);
     if (!state.bookingUrl) return NextResponse.json({ qrDataUrl: null, url: null });

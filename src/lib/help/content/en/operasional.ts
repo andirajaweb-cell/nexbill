@@ -360,6 +360,59 @@ export const OPERASIONAL: HelpCategory[] = [
     roles: "Turning on/off: all staff. Adding/editing/deleting/linking devices: Owner, Superuser, Manager, Supervisor.",
   },
   {
+    id: "qr-pelanggan",
+    group: "operasional",
+    label: "Booth Customer QR & Time Alerts on TV",
+    navHint: "PS Rental → Manage Units → Customer QR",
+    summary:
+      "Every booth gets a QR sticker. Customers scan it with their phone to see time left and the estimated bill, order food/drinks, request more time, or call the cashier — without walking to the counter. Every request lands in the Customer Requests panel on PS Rental and only takes effect once a cashier accepts it. Android TVs can also show a time-left warning and a Time's Up screen.",
+    subsections: [
+      {
+        title: "Putting the QR in the booth",
+        steps: [
+          "Open PS Rental → Manage Units → press \"Customer QR\" on a unit. The QR is created automatically.",
+          "Press \"Print stickers for all units\" to print every unit's QR at once, cut them out, and stick one next to each booth's TV.",
+          "Set the permissions in the same window: allow F&B orders from phones, allow time-extension requests from phones. Calling the cashier is always on.",
+          "If a QR is photographed and misused, press \"Replace QR\" — the old sticker stops working immediately; print the new one.",
+        ],
+      },
+      {
+        title: "What customers can do from their phone",
+        steps: [
+          "See the play time left (ticking every second) and the running estimated bill. A warning appears when 5 minutes or less are left.",
+          "Order food/drinks: pick items, set quantities, send. Prices come from the product data, never from the phone.",
+          "Request more time: +30/+60/+90/+120 minutes, with an estimated cost.",
+          "Call the cashier: request the bill, controller problem, need help, or other (with an optional note). Each request's status shows on the phone: waiting, accepted, or rejected with the reason.",
+        ],
+      },
+      {
+        title: "Responding to requests (cashier)",
+        steps: [
+          "New requests appear in the \"Customer Requests (Booth QR)\" panel at the top of PS Rental, with a sound.",
+          "F&B order: press \"Accept & add to bill\" — the items go onto the session bill and straight to the Kitchen Display.",
+          "More time: press \"Accept & add time\" — the session duration increases. Call cashier: go to the booth, then press \"Handled\".",
+          "Press \"Reject\" when it can't be served (e.g. sold out); the reason you enter shows on the customer's phone.",
+        ],
+      },
+      {
+        title: "Time-left warning & Time's Up screen on TV",
+        navHint: "Settings → TV Screensaver → Time Alerts & Time's Up Screen",
+        steps: [
+          "Only for Android TVs whose automation is active and verified (NexbillAgent v1.2).",
+          "Time-left warning (off by default): a few minutes before the end, the TV briefly switches to a big \"TIME LEFT\" screen with the booth QR, then returns to the PlayStation HDMI by itself. Set the minutes and how long it shows.",
+          "\"TIME'S UP\" screen: after a session stops automatically and the bill is unpaid, the TV invites the customer to pay at the cashier (no amounts shown), until paid or for 15 minutes.",
+          "The warning is sent once per session and applies again after time is added.",
+        ],
+      },
+    ],
+    notes: [
+      "Requests from phones never change the bill by themselves — the cashier decides. Orders for a session that has already ended can't be accepted; serve them through the Cashier instead.",
+      "The phone page never shows the customer's name or number, and uses the language of the outlet's Country.",
+      "TV warnings and automatic session stops depend on the NEXBILL scheduler running on the server.",
+    ],
+    roles: "Any logged-in staff can respond to requests and show/print QRs. Changing QR permissions and TV alert settings: Owner, Superuser, Manager.",
+  },
+  {
     id: "tv-screensaver",
     group: "operasional",
     label: "TV Screensaver (Booth Promo Screen)",

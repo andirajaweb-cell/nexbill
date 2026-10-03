@@ -139,6 +139,38 @@ export async function switchRelayTvToConsole(unit: { id: string; outletId: strin
   return `TV ${unit.name} mungkin masih menampilkan screensaver — tekan tombol Input/Source di remote dan pilih HDMI ${port}. (${result.error ?? "perintah pindah HDMI gagal"})`;
 }
 
+/**
+ * Peringatan sisa waktu (migrasi 0028): TV bilik menampilkan layar NEXBILL — yang otomatis tampil
+ * dalam mode peringatan karena sisa waktunya sudah di bawah ambang — selama `seconds` detik, lalu
+ * kembali ke HDMI PlayStation. Hanya untuk layar yang otomatisasinya aktif & terverifikasi (sama
+ * seperti buka-screensaver saat sesi selesai), jadi TV yang belum disiapkan tidak pernah disentuh.
+ *
+ * Tidak memakai perintah agent baru: dua perintah yang sudah ada (openScreensaver lalu switchHdmi)
+ * dengan jeda di antaranya — bekerja dengan NexbillAgent v1.2 yang sudah terpasang di outlet.
+ * Mengembalikan true bila kedua perintah terkirim.
+ */
+export async function flashTimeWarning(unit: { id: string; outletId: string; name: string }, device: DeviceRecord, seconds: number): Promise<boolean> {
+  const target = await findAutoSwitchTarget(unit);
+  const port = target ? validateHdmiPort(target.hdmiPort) : null;
+  if (!target || port === null) return false;
+  try {
+    const opened = await sendRelayCommand(device, "openScreensaver", { browserPackage: target.browserPackage ?? undefined });
+    if (!opened.ok) return false;
+    await new Promise((r) => setTimeout(r, Math.max(4, Math.min(20, seconds)) * 1000));
+    const back = await sendRelayCommand(device, "switchHdmi", { hdmiPort: port });
+    if (!back.ok) {
+      // Kedua kalinya dicoba sekali lagi — layar yang tertinggal di peringatan berarti pelanggan
+      // tidak bisa main padahal waktunya masih ada.
+      const retry = await sendRelayCommand(device, "switchHdmi", { hdmiPort: port });
+      return retry.ok;
+    }
+    return true;
+  } catch (err) {
+    console.error("[tv-automation] peringatan sisa waktu gagal:", err);
+    return false;
+  }
+}
+
 /** ---------------- PENGATURAN & TES (dipakai Pengaturan › TV Screensaver) ---------------- */
 
 interface ScreenContext {
