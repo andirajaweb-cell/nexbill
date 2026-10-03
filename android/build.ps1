@@ -12,10 +12,9 @@
 param(
   [ValidateSet("all", "fingerprint", "build")]
   [string]$Step = "all",
-  # Memori maksimum Gradle (MB). Bawaan Bubblewrap 1536 sering gagal di PC dengan RAM/pagefile
-  # terbatas ("Could not reserve enough space for ... object heap"). Proyek TWA cukup 1024; kalau
-  # masih gagal coba 768.
-  [int]$GradleHeapMb = 1024
+  # Memori maksimum Gradle (MB). 1536 = bawaan Bubblewrap, aman dengan JDK 64-bit (dipastikan
+  # otomatis oleh Ensure-Jdk64). Turunkan (mis. 1024) hanya kalau RAM PC sangat terbatas.
+  [int]$GradleHeapMb = 1536
 )
 
 Set-Location -Path $PSScriptRoot
@@ -42,6 +41,47 @@ function Set-GradleHeap([int]$mb) {
   $lines += "org.gradle.jvmargs=-Xmx${mb}m -Dfile.encoding=UTF-8"
   Set-Content -Path $file -Value $lines -Encoding ASCII
   Write-Host "Memori Gradle diatur ke ${mb} MB (gradle.properties)." -ForegroundColor DarkGray
+}
+
+function Test-Java64([string]$jdk) {
+  $java = Join-Path $jdk "bin\java.exe"
+  if (-not (Test-Path $java)) { return $false }
+  $v = (& $java -version 2>&1 | Out-String)
+  return ($v -match "64-Bit")
+}
+
+function Ensure-Jdk64 {
+  # Bubblewrap kadang memasang JDK 32-bit ("OpenJDK Client VM", tanpa "64-Bit"). JDK 32-bit tidak
+  # bisa memesan memori >~1 GB sehingga Gradle gagal ("Could not reserve enough space ... heap")
+  # walau RAM PC besar. Di sini dipastikan Bubblewrap memakai JDK 17 64-bit.
+  $cfgPath = Join-Path $env:USERPROFILE ".bubblewrap\config.json"
+  if (-not (Test-Path $cfgPath)) { throw "Konfigurasi Bubblewrap belum ada ($cfgPath). Jalankan dulu: .\build.ps1 (tanpa -Step) agar 'bubblewrap doctor' menyiapkannya." }
+  $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json
+  if ($cfg.jdkPath -and (Test-Java64 $cfg.jdkPath)) {
+    $env:JAVA_HOME = $cfg.jdkPath
+    Write-Host "JDK 64-bit OK: $($cfg.jdkPath)" -ForegroundColor DarkGray
+    return
+  }
+  $root = Join-Path $env:USERPROFILE ".bubblewrap\jdk-x64"
+  $existing = Get-ChildItem $root -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Java64 $_.FullName } | Select-Object -First 1
+  if (-not $existing) {
+    Write-Host "JDK yang dipakai Bubblewrap 32-bit -> mengunduh JDK 17 64-bit (+/- 190 MB, sekali saja)..." -ForegroundColor Yellow
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $zip = Join-Path $env:TEMP "temurin17-x64.zip"
+    $old = $ProgressPreference; $ProgressPreference = "SilentlyContinue"
+    Invoke-WebRequest -Uri "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse?project=jdk" -OutFile $zip -UseBasicParsing
+    $ProgressPreference = $old
+    Write-Host "Mengekstrak JDK..." -ForegroundColor Yellow
+    Expand-Archive -Path $zip -DestinationPath $root -Force
+    Remove-Item $zip -ErrorAction SilentlyContinue
+    $existing = Get-ChildItem $root -Directory | Where-Object { Test-Java64 $_.FullName } | Select-Object -First 1
+    if (-not $existing) { throw "JDK 64-bit gagal dipasang di $root." }
+  }
+  $cfg | Add-Member -NotePropertyName jdkPath -NotePropertyValue $existing.FullName -Force
+  # Tanpa BOM: Bubblewrap (Node) gagal membaca JSON yang diawali BOM.
+  [IO.File]::WriteAllText($cfgPath, ($cfg | ConvertTo-Json -Depth 5))
+  $env:JAVA_HOME = $existing.FullName
+  Write-Host "Bubblewrap sekarang memakai JDK 64-bit: $($existing.FullName)" -ForegroundColor Green
 }
 
 function Show-Fingerprint {
@@ -95,12 +135,14 @@ try {
 
   # 4) Build AAB (Play Store) + APK (uji). Bubblewrap menanyakan password keystore & key -
   #    keduanya sama dengan yang dibuat di langkah 2. Build pertama mengunduh Gradle (lama).
+  Ensure-Jdk64
   Set-GradleHeap $GradleHeapMb
-  # Hentikan daemon Gradle lama (yang mungkin dibuat dengan setelan memori lama).
-  if (Test-Path ".\gradlew.bat") { & .\gradlew.bat --stop 2>$null | Out-Null }
+  # Hentikan daemon Gradle lama (yang mungkin dibuat dengan JDK/setelan memori lama).
+  if (Test-Path ".\gradlew.bat") { cmd /c ".\gradlew.bat --stop >nul 2>&1" }
+  Write-Host "Build berjalan tanpa banyak tulisan; build pertama 5-20 menit (unduh library Android)." -ForegroundColor DarkGray
   bubblewrap build --skipPwaValidation
   if ($LASTEXITCODE -ne 0) {
-    throw "bubblewrap build gagal (kode $LASTEXITCODE). Kalau pesannya 'Could not reserve enough space ... object heap', tutup Chrome/VS Code lalu ulangi dengan: .\build.ps1 -Step build -GradleHeapMb 768"
+    throw "bubblewrap build gagal (kode $LASTEXITCODE). Pesan error Gradle tampil di atas (tidak ikut tercatat di build-log.txt) - screenshot bagian 'What went wrong'."
   }
 
   Write-Host ""
