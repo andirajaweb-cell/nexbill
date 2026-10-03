@@ -11,7 +11,11 @@
 # Panduan lengkap: README-PLAYSTORE.md
 param(
   [ValidateSet("all", "fingerprint", "build")]
-  [string]$Step = "all"
+  [string]$Step = "all",
+  # Memori maksimum Gradle (MB). Bawaan Bubblewrap 1536 sering gagal di PC dengan RAM/pagefile
+  # terbatas ("Could not reserve enough space for ... object heap"). Proyek TWA cukup 1024; kalau
+  # masih gagal coba 768.
+  [int]$GradleHeapMb = 1024
 )
 
 Set-Location -Path $PSScriptRoot
@@ -27,6 +31,17 @@ function Find-Keytool {
   $cmd = Get-Command keytool -ErrorAction SilentlyContinue
   if ($cmd) { return $cmd.Source }
   return $null
+}
+
+function Set-GradleHeap([int]$mb) {
+  # bubblewrap update membuat ulang gradle.properties dengan -Xmx1536m, jadi selalu dipasang ulang
+  # tepat sebelum build.
+  $file = Join-Path $PSScriptRoot "gradle.properties"
+  if (-not (Test-Path $file)) { return }
+  $lines = Get-Content $file | Where-Object { $_ -notmatch '^\s*org\.gradle\.jvmargs=' }
+  $lines += "org.gradle.jvmargs=-Xmx${mb}m -Dfile.encoding=UTF-8"
+  Set-Content -Path $file -Value $lines -Encoding ASCII
+  Write-Host "Memori Gradle diatur ke ${mb} MB (gradle.properties)." -ForegroundColor DarkGray
 }
 
 function Show-Fingerprint {
@@ -80,8 +95,13 @@ try {
 
   # 4) Build AAB (Play Store) + APK (uji). Bubblewrap menanyakan password keystore & key -
   #    keduanya sama dengan yang dibuat di langkah 2. Build pertama mengunduh Gradle (lama).
+  Set-GradleHeap $GradleHeapMb
+  # Hentikan daemon Gradle lama (yang mungkin dibuat dengan setelan memori lama).
+  if (Test-Path ".\gradlew.bat") { & .\gradlew.bat --stop 2>$null | Out-Null }
   bubblewrap build --skipPwaValidation
-  if ($LASTEXITCODE -ne 0) { throw "bubblewrap build gagal (kode $LASTEXITCODE). Lihat pesan di atas / build-log.txt." }
+  if ($LASTEXITCODE -ne 0) {
+    throw "bubblewrap build gagal (kode $LASTEXITCODE). Kalau pesannya 'Could not reserve enough space ... object heap', tutup Chrome/VS Code lalu ulangi dengan: .\build.ps1 -Step build -GradleHeapMb 768"
+  }
 
   Write-Host ""
   Write-Host "Selesai:" -ForegroundColor Green
