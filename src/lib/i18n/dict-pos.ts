@@ -35,4 +35,6 @@ registerDict({
   "pos.confirmCashReceived": { id: "Konfirmasi Cash Diterima", en: "Confirm Cash Received", ms: "Sahkan Tunai Diterima", th: "ยืนยันรับเงินสดแล้ว", fil: "Kumpirmahin na Natanggap ang Cash", vi: "Xác nhận đã nhận tiền mặt" },
   "pos.printReceipt": { id: "Cetak Struk", en: "Print Receipt", ms: "Cetak Resit", th: "พิมพ์ใบเสร็จ", fil: "I-print ang Resibo", vi: "In hóa đơn" },
   "pos.voucherOk": { id: "Voucher OK: -{amount}", en: "Voucher OK: -{amount}", ms: "Baucar OK: -{amount}", th: "คูปองใช้ได้: -{amount}", fil: "OK ang Voucher: -{amount}", vi: "Voucher hợp lệ: -{amount}" },
+  "pos.openOrder.hourUnit": { id: "j", en: "h", ms: "j", th: "ชม.", fil: "o", vi: "g" },
+  "pos.openOrder.minuteUnit": { id: "m", en: "m", ms: "m", th: "น.", fil: "m", vi: "p" },
 });

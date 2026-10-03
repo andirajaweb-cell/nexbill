@@ -12,6 +12,9 @@ import { showAlert } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import "@/lib/i18n/dict-pos";
+import { useAuth } from "@/lib/auth/client";
+import { buildOrderTimeLabel } from "@/lib/pos/open-order-label";
+import type { DateFormatStyle } from "@/lib/format/date";
 
 interface Product {
   id: string;
@@ -52,6 +55,11 @@ interface OpenOrder {
   source: string;
   rentalSessionId: string | null;
   createdAt: string;
+  // Diisi GET /api/orders untuk order dari Rental PS.
+  rentalUnitName?: string | null;
+  rentalCustomerName?: string | null;
+  rentalStartedAt?: string | null;
+  rentalEndedAt?: string | null;
 }
 
 
@@ -75,6 +83,9 @@ interface PosDraft {
 
 export default function PosPage() {
   const { t } = useDashboardLang();
+  const { user } = useAuth();
+  const dateStyle = (user?.dateFormat as DateFormatStyle | undefined) ?? "dmy";
+  const durationUnits = { h: t("pos.openOrder.hourUnit", "j"), m: t("pos.openOrder.minuteUnit", "m") };
   const { formatMoney: rupiah } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -350,12 +361,32 @@ export default function PosPage() {
             </div>
             <div className="space-y-2">
               {openOrders.map((o) => (
-                <div key={o.id} className="flex items-center justify-between text-sm border-b border-neutral-900 pb-2">
+                <div key={o.id} className="flex items-center justify-between gap-2 text-sm border-b border-neutral-900 pb-2">
                   {/* Checkbox "pilih untuk digabung" dan tombol "Split" dihapus bersama kedua fitur
                       itu — lihat komentar panjang di atas filteredProducts. Tiap bill sekarang
                       selalu dibayar sendiri-sendiri, sehingga satu pembayaran = satu baris di
                       Transaction Center, tanpa baris "Dibatalkan" yang menyertainya. */}
-                  <span>{o.rentalSessionId ? t("pos.orderTypeRental", "Rental") : t("pos.orderTypeFnb", "F&B")} #{o.id.slice(0, 8)} — {rupiah(o.total)}</span>
+                  {(() => {
+                    // Order dari Rental PS: tampilkan unit PS, pelanggan, tanggal, jam mulai–selesai, dan lama main.
+                    // Order F&B biasa: tanggal & jam order dibuat.
+                    const time = o.rentalSessionId
+                      ? buildOrderTimeLabel(o.rentalStartedAt ?? o.createdAt, o.rentalEndedAt, { dateStyle, units: durationUnits })
+                      : buildOrderTimeLabel(o.createdAt, null, { dateStyle, units: durationUnits });
+                    return (
+                      <div className="min-w-0">
+                        <div>
+                          {o.rentalSessionId ? t("pos.orderTypeRental", "Rental") : t("pos.orderTypeFnb", "F&B")}
+                          {o.rentalUnitName ? <span className="font-medium text-cyan-300"> · {o.rentalUnitName}</span> : null} #{o.id.slice(0, 8)} — {rupiah(o.total)}
+                        </div>
+                        {(time || o.rentalCustomerName) && (
+                          <div className="text-xs text-neutral-500 mt-0.5">
+                            {time ? `${time.date} · ${time.timeRange}${time.duration ? ` (${time.duration})` : ""}` : ""}
+                            {o.rentalCustomerName ? `${time ? " · " : ""}${o.rentalCustomerName}` : ""}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className="flex gap-1">
                     <Button variant="secondary" className="text-xs" onClick={() => payOpenOrder(o.id)} disabled={payingOrderId === o.id}>{payingOrderId === o.id ? t("pos.payBusy", "Memproses...") : t("pos.payWithMethod", "Bayar ({method})").replace("{method}", method)}</Button>
                   </div>

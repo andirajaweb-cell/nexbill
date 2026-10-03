@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { orders, orderItems, outlets, rentalSessions, products, recipes } from "@/db/schema";
+import { orders, orderItems, outlets, rentalSessions, rentalUnits, products, recipes } from "@/db/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { validateVoucher, consumeVoucher } from "@/lib/pos/vouchers";
 import { getOpenBillForSession, addItemsToBill } from "@/lib/pos/bill";
@@ -27,7 +27,39 @@ export async function GET(req: NextRequest) {
     const rows = status
       ? await db.select().from(orders).where(and(eq(orders.outletId, session.outletId), eq(orders.status, status as any))).orderBy(desc(orders.createdAt)).limit(limit)
       : await db.select().from(orders).where(eq(orders.outletId, session.outletId)).orderBy(desc(orders.createdAt)).limit(limit);
-    return NextResponse.json(rows);
+
+    // Order dari Rental PS: sertakan unit PS, nama pelanggan, dan jam mulai/selesai sesi supaya
+    // kasir tahu tagihan ini milik unit mana & kapan (daftar "Order Terbuka" di Kasir).
+    const sessionIds = [...new Set(rows.map((r) => r.rentalSessionId).filter((v): v is string => !!v))];
+    if (sessionIds.length === 0) return NextResponse.json(rows);
+    const sessRows = await db
+      .select({
+        id: rentalSessions.id,
+        startedAt: rentalSessions.startedAt,
+        endedAt: rentalSessions.endedAt,
+        customerName: rentalSessions.customerName,
+        unitName: rentalUnits.name,
+        consoleType: rentalUnits.consoleType,
+      })
+      .from(rentalSessions)
+      .leftJoin(rentalUnits, eq(rentalUnits.id, rentalSessions.rentalUnitId))
+      .where(and(eq(rentalSessions.outletId, session.outletId), inArray(rentalSessions.id, sessionIds)));
+    const byId = new Map(sessRows.map((s) => [s.id, s]));
+    return NextResponse.json(
+      rows.map((r) => {
+        const s = r.rentalSessionId ? byId.get(r.rentalSessionId) : undefined;
+        return s
+          ? {
+              ...r,
+              rentalUnitName: s.unitName,
+              rentalConsoleType: s.consoleType,
+              rentalCustomerName: s.customerName,
+              rentalStartedAt: s.startedAt,
+              rentalEndedAt: s.endedAt,
+            }
+          : r;
+      }),
+    );
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }
