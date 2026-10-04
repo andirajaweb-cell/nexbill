@@ -109,7 +109,7 @@ export const PENJUALAN: HelpCategory[] = [
       "Catat penjualan produk digital — top up e-wallet, token listrik, pulsa, bayar tagihan, transfer, tarik tunai — dalam aplikasi yang sama, dengan margin keuntungan dan biaya provider tercatat terpisah.",
     steps: [
       "Sekali di awal: tekan \"Kelola Harga Provider & Margin\" untuk mengisi biaya modal dan margin setiap produk.",
-      "Isi form transaksi: kategori, produk (harga & margin terisi otomatis), nominal, nomor tujuan/referensi, akun sumber dana, dan akun penerima.",
+      "Isi form dalam 3 kotak: (1) Nominal produk; (2) Uang keluar ke provider = harga modal + biaya admin provider, diambil dari akun yang dipilih (mis. Saldo Deposit PPOB); (3) Uang masuk dari customer = isi Harga ke customer ATAU Margin — yang lain terhitung otomatis — masuk ke akun yang dipilih (mis. Kas Utama). Baris Ringkasan menunjukkan saldo yang berkurang, yang bertambah, dan untungnya; merah bila rugi.",
       "Tarik Tunai: arah uangnya terbalik — pelanggan menerima uang tunai dari laci, saldo deposit provider yang bertambah.",
       "Salah input? Tekan Batalkan (void). Edit dan hapus permanen hanya untuk Superuser.",
       "Kartu di atas menampilkan saldo deposit PPOB dan jumlah transaksi periode ini.",

@@ -109,7 +109,7 @@ export const PENJUALAN: HelpCategory[] = [
       "Ghi nhận bán sản phẩm số — nạp ví điện tử, token điện, thẻ nạp điện thoại, thanh toán hóa đơn, chuyển tiền, rút tiền mặt — trong cùng ứng dụng, với lợi nhuận của bạn và giá vốn của nhà cung cấp được ghi riêng.",
     steps: [
       "Một lần lúc đầu: bấm \"Quản lý giá nhà cung cấp & Lợi nhuận\" để đặt giá vốn và lợi nhuận cho từng sản phẩm.",
-      "Điền biểu mẫu giao dịch: danh mục, sản phẩm (giá & lợi nhuận tự điền), số tiền, số đích/số tham chiếu, tài khoản nguồn tiền và tài khoản nhận.",
+      "Điền biểu mẫu theo 3 ô: (1) Mệnh giá sản phẩm; (2) Tiền ra trả nhà cung cấp = giá vốn + phí nhà cung cấp, lấy từ tài khoản đã chọn (vd. Số dư ký quỹ PPOB); (3) Tiền vào từ khách = nhập Giá bán cho khách HOẶC Lãi — ô còn lại tự tính — vào tài khoản đã chọn (vd. Quỹ tiền mặt chính). Dòng Tóm tắt cho thấy số dư nào giảm, số dư nào tăng và tiền lãi; màu đỏ nếu lỗ.",
       "Rút tiền mặt: dòng tiền đi ngược lại — khách nhận tiền mặt từ ngăn kéo và số dư ký quỹ nhà cung cấp tăng lên.",
       "Nhập sai? Bấm Hủy (void). Sửa và xóa vĩnh viễn chỉ dành cho Superuser.",
       "Các thẻ phía trên hiển thị số dư ký quỹ PPOB và số giao dịch trong kỳ.",

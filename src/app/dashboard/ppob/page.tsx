@@ -12,6 +12,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-ppob";
+import { PpobMoneyFlow } from "./PpobMoneyFlow";
 
 interface FeatureFlagRow { key: string; effectiveEnabled: boolean; }
 
@@ -175,7 +176,7 @@ export default function PpobPage() {
               <thead>
                 <tr className="text-left text-neutral-500 border-b border-neutral-800">
                   <th className="py-2">{t("ppob.col.time", "Waktu")}</th><th>{t("ppob.col.cashier", "Kasir")}</th><th>{t("ppob.col.category", "Kategori")}</th><th>{t("ppob.col.product", "Produk")}</th><th>{t("ppob.col.ref", "Ref")}</th>
-                  <th>{t("ppob.col.nominal", "Nominal")}</th><th>{t("ppob.col.modal", "Modal")}</th><th>{t("ppob.col.providerFee", "Biaya Provider")}</th><th>{t("ppob.col.principal", "Payable (Pokok)")}</th><th>{t("ppob.col.margin", "Admin Fee/Margin")}</th><th>{t("ppob.col.uangMasuk", "Uang Masuk")}</th><th>{t("ppob.col.account", "Akun")}</th><th>{t("ppob.col.settlement", "Settlement")}</th><th>{t("ppob.col.status", "Status")}</th><th>{t("ppob.col.action", "Aksi")}</th>
+                  <th>{t("ppob.col.nominal", "Nominal")}</th><th>{t("ppob.col.modal", "Modal")}</th><th>{t("ppob.col.providerFeeShort", "Admin Provider")}</th><th>{t("ppob.col.uangKeluar", "Uang Keluar")}</th><th>{t("ppob.col.marginProfit", "Margin (Untung)")}</th><th>{t("ppob.col.uangMasuk", "Uang Masuk")}</th><th>{t("ppob.col.account", "Akun")}</th><th>{t("ppob.col.settlement", "Settlement")}</th><th>{t("ppob.col.status", "Status")}</th><th>{t("ppob.col.action", "Aksi")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -425,8 +426,6 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
     }
   };
 
-  const uangMasuk = (Number(modal || 0) + Number(providerFee || 0) + Number(feeAdmin || 0)) || 0;
-
   const submit = async () => {
     if (!product.trim()) return showAlert(t("ppob.alertFillProductName", "Isi nama produk."));
     if (!(Number(nominal) > 0)) return showAlert(t("ppob.alertNominalPositive", "Nominal harus lebih dari 0."));
@@ -464,29 +463,19 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.providerRefPlaceholder", "Ref. Provider (opsional, mis. Trx ID dari provider)")} value={providerRef} onChange={(e) => setProviderRef(e.target.value)} />
         <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.customerNamePlaceholder", "Nama customer (opsional)")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
 
-        <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.nominalPlaceholder", "Nominal")} value={nominal} onChange={(e) => setNominal(e.target.value)} />
-        <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.entryForm.modalPlaceholder", "Modal (default = nominal)")} value={modal} onChange={(e) => setModal(e.target.value)} />
-        <input type="number" className="rounded-lg bg-amber-950/30 border border-amber-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.providerFeePlaceholder", "Biaya Provider (bagian dari Payable)")} value={providerFee} onChange={(e) => setProviderFee(e.target.value)} />
-        <input type="number" className="rounded-lg bg-emerald-950/30 border border-emerald-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.feeAdminPlaceholder", "Admin Fee/Margin (revenue NexBill)")} value={feeAdmin} onChange={(e) => setFeeAdmin(e.target.value)} />
-
-        <div className="rounded-lg bg-neutral-900 border border-neutral-800 px-2 py-1.5 text-xs text-neutral-400 flex items-center justify-between sm:col-span-2">
-          <span>{t("ppob.entryForm.uangMasukLabel", "Uang Masuk (dibebankan ke customer)")}</span><span className="font-medium text-neutral-200">{rupiah(uangMasuk)}</span>
-        </div>
-        <SearchableSelect
-          className="text-xs"
-          value={funding}
-          onChange={(v) => setFunding(v)}
-          placeholder={t("ppob.field.fundingPlaceholder", "Akun Settlement (bayar ke provider)")}
-          options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-        />
-        <SearchableSelect
-          className="text-xs"
-          value={receiving}
-          onChange={(v) => setReceiving(v)}
-          placeholder={t("ppob.field.receivingPlaceholder", "Penerima (uang masuk dari customer)")}
-          options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-        />
-        <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs sm:col-span-4" placeholder={t("ppob.field.notesPlaceholder", "Catatan (opsional)")} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+      <PpobMoneyFlow
+        category={category}
+        nominal={nominal} setNominal={setNominal}
+        modal={modal} setModal={setModal}
+        providerFee={providerFee} setProviderFee={setProviderFee}
+        margin={feeAdmin} setMargin={setFeeAdmin}
+        funding={funding} setFunding={setFunding}
+        receiving={receiving} setReceiving={setReceiving}
+        accounts={accounts}
+      />
+      <div className="grid grid-cols-1">
+        <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.notesPlaceholder", "Catatan (opsional)")} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
       <Button onClick={submit} disabled={saving}>{saving ? t("ppob.entryForm.saving", "Menyimpan...") : t("ppob.entryForm.submit", "Simpan Transaksi")}</Button>
     </Card>
@@ -513,8 +502,6 @@ function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: 
   const [notes, setNotes] = useState(tx.notes ?? "");
   const [saving, setSaving] = useState(false);
 
-  const uangMasuk = (Number(modalAmount || 0) + Number(providerFee || 0) + Number(feeAdmin || 0)) || 0;
-
   const save = async () => {
     if (!product.trim()) return showAlert(t("ppob.alertFillProductName", "Isi nama produk."));
     if (!(Number(nominal) > 0)) return showAlert(t("ppob.alertNominalPositive", "Nominal harus lebih dari 0."));
@@ -540,7 +527,7 @@ function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: 
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-lg w-full p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-lg w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="font-medium">{t("ppob.editModal.heading", "Edit Transaksi PPOB")}</h2>
           <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200 text-sm">{t("ppob.close", "Tutup")}</button>
@@ -550,27 +537,19 @@ function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: 
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs col-span-2" placeholder={t("ppob.field.productPlaceholder", "Produk")} value={product} onChange={(e) => setProduct(e.target.value)} />
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.serviceRefPlaceholderShort", "No. HP / ID Pelanggan")} value={serviceRef} onChange={(e) => setServiceRef(e.target.value)} />
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.customerNamePlaceholderShort", "Nama customer")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-          <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.nominalPlaceholder", "Nominal")} value={nominal} onChange={(e) => setNominal(e.target.value)} />
-          <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.modalPlaceholderShort", "Modal")} value={modalAmount} onChange={(e) => setModalAmount(e.target.value)} />
-          <input type="number" className="rounded-lg bg-amber-950/30 border border-amber-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.providerFeePlaceholder", "Biaya provider (beban)")} value={providerFee} onChange={(e) => setProviderFee(e.target.value)} />
-          <input type="number" className="rounded-lg bg-emerald-950/30 border border-emerald-800/50 px-2 py-1.5 text-xs" placeholder={t("ppob.field.feeAdminPlaceholder", "Margin (keuntungan)")} value={feeAdmin} onChange={(e) => setFeeAdmin(e.target.value)} />
-          <div className="rounded-lg bg-neutral-950 border border-neutral-800 px-2 py-1.5 text-xs text-neutral-400 flex items-center justify-between col-span-2">
-            <span>{t("ppob.editModal.uangMasukLabel", "Uang Masuk")}</span><span className="font-medium text-neutral-200">{rupiah(uangMasuk)}</span>
+          <div className="col-span-2">
+            <PpobMoneyFlow
+              category={tx.category}
+              nominal={nominal} setNominal={setNominal}
+              modal={modalAmount} setModal={setModalAmount}
+              providerFee={providerFee} setProviderFee={setProviderFee}
+              margin={feeAdmin} setMargin={setFeeAdmin}
+              funding={funding} setFunding={setFunding}
+              receiving={receiving} setReceiving={setReceiving}
+              accounts={accounts}
+              stacked
+            />
           </div>
-          <SearchableSelect
-            className="text-xs"
-            value={funding}
-            onChange={(v) => setFunding(v)}
-            placeholder={t("ppob.field.fundingPlaceholder", "Sumber Modal (keluar)")}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-          />
-          <SearchableSelect
-            className="text-xs"
-            value={receiving}
-            onChange={(v) => setReceiving(v)}
-            placeholder={t("ppob.field.receivingPlaceholder", "Penerima (uang masuk)")}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-          />
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs col-span-2" placeholder={t("ppob.field.notesPlaceholderShort", "Catatan")} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
         <Button onClick={save} disabled={saving} className="w-full">{saving ? t("ppob.entryForm.saving", "Menyimpan...") : t("ppob.editModal.submit", "Simpan Koreksi")}</Button>

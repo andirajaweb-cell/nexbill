@@ -109,7 +109,7 @@ export const PENJUALAN: HelpCategory[] = [
       "Itala ang benta ng digital na produkto — top-up ng e-wallet, electricity token, load, bayad sa bill, transfer, cash withdrawal — sa parehong app, na hiwalay na naitatala ang tubo mo at ang gastos sa provider.",
     steps: [
       "Minsan sa simula: pindutin ang \"Pamahalaan ang Presyo ng Provider at Margin\" para i-set ang gastos at margin ng bawat produkto.",
-      "Punan ang form ng transaksyon: kategorya, produkto (awtomatikong napupunan ang presyo at margin), halaga, numero ng destinasyon/reference, account na pinagmulan ng pondo, at account na tatanggap.",
+      "Punan ang form sa 3 kahon: (1) Halaga ng produkto; (2) Palabas na pera sa provider = puhunan + admin fee ng provider, kinuha sa napiling account (hal. PPOB Deposit Balance); (3) Papasok na pera mula sa customer = ilagay ang Presyo sa customer O ang Margin — awtomatikong makukuwenta ang isa — papasok sa napiling account (hal. Main Cash). Ipinapakita ng Buod kung aling balanse ang bumaba, alin ang tumaas, at ang kita; pula kapag lugi.",
       "Cash Withdrawal: pabaligtad ang daloy ng pera — tatanggap ang customer ng cash mula sa drawer at tataas ang deposit balance sa provider.",
       "Mali ang input? Pindutin ang Kanselahin (void). Ang pag-edit at permanenteng pagbura ay Superuser lang.",
       "Ipinapakita ng mga card sa itaas ang PPOB deposit balance at bilang ng transaksyon sa period na ito.",

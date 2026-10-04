@@ -109,7 +109,7 @@ export const PENJUALAN: HelpCategory[] = [
       "Record digital product sales — e-wallet top-ups, electricity tokens, phone credit, bill payments, transfers, cash withdrawals — in the same app, with your profit margin and the provider's cost recorded separately.",
     steps: [
       "Once at the start: press \"Manage Provider Prices & Margins\" to set the cost and margin of each product.",
-      "Fill in the transaction form: category, product (price & margin filled automatically), amount, destination/reference number, source-of-funds account, and receiving account.",
+      "Fill in the form in 3 boxes: (1) Product amount; (2) Money out to the provider = cost price + provider admin fee, taken from the chosen account (e.g. PPOB Deposit Balance); (3) Money in from the customer = enter the Price to customer OR the Margin — the other is calculated — into the chosen account (e.g. Main Cash). The Summary line shows which balance goes down, which goes up, and the profit; red if it's a loss.",
       "Cash Withdrawal: the money flows the other way — the customer receives cash from the drawer and the provider deposit balance increases.",
       "Entered it wrong? Press Cancel (void). Editing and permanent delete are Superuser only.",
       "The cards at the top show the PPOB deposit balance and this period's transaction count.",

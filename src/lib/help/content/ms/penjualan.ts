@@ -109,7 +109,7 @@ export const PENJUALAN: HelpCategory[] = [
       "Rekod jualan produk digital — tambah nilai e-wallet, token elektrik, kredit telefon, bayar bil, pindahan, pengeluaran tunai — dalam aplikasi yang sama, dengan margin keuntungan dan kos pembekal direkod berasingan.",
     steps: [
       "Sekali di awal: tekan \"Urus Harga Pembekal & Margin\" untuk mengisi kos dan margin setiap produk.",
-      "Isi borang transaksi: kategori, produk (harga & margin terisi automatik), nominal, nombor tujuan/rujukan, akaun sumber dana, dan akaun penerima.",
+      "Isi borang dalam 3 kotak: (1) Nominal produk; (2) Wang keluar kepada pembekal = harga modal + fi admin pembekal, diambil daripada akaun dipilih (cth. Baki Deposit PPOB); (3) Wang masuk daripada pelanggan = isi Harga kepada pelanggan ATAU Margin — yang lain dikira automatik — masuk ke akaun dipilih (cth. Tunai Utama). Baris Ringkasan menunjukkan baki yang berkurang, yang bertambah, dan untungnya; merah jika rugi.",
       "Pengeluaran Tunai: arah wangnya terbalik — pelanggan menerima wang tunai dari laci, baki deposit pembekal yang bertambah.",
       "Tersalah input? Tekan Batal (void). Edit dan padam kekal hanya untuk Superuser.",
       "Kad di atas memaparkan baki deposit PPOB dan bilangan transaksi tempoh ini.",
