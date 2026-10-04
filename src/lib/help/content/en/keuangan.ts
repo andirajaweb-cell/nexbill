@@ -21,7 +21,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Receivables (AR) & Payables (AP)",
         steps: [
           "Receivables: unpaid customer bills, grouped by age (not yet due, 1–30, 31–60, >60 days). Press \"Receive Payment\" when a customer pays.",
-          "Payables: supplier bills, expenses recorded as payables, and asset purchase payables. Press Pay and choose the cash/bank account.",
+          "Payables: supplier bills, expenses recorded as payables, and asset purchase payables. Press Pay and choose the cash/bank account. A payable expense only appears here once approved; ones still awaiting approval are listed separately below the table (not yet counted as payables).",
         ],
       },
       {

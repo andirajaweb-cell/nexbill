@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
-import { listPeriods, closePeriod } from "@/lib/accounting/periods";
+import { listPeriods, closePeriod, findUnpostedExpensesInPeriod } from "@/lib/accounting/periods";
 import { describeError } from "@/lib/api/error";
 
 /** Lists every period row an outlet has ever touched (closed, or closed-then-reopened) — a period never appearing here is implicitly still open. */
@@ -32,6 +32,18 @@ export async function POST(req: NextRequest) {
     const period = String(body.period ?? "");
     if (!/^\d{4}-\d{2}$/.test(period)) {
       return NextResponse.json({ error: 'Format periode harus "YYYY-MM", mis. "2026-08".' }, { status: 400 });
+    }
+
+    // Peringatkan dulu bila masih ada expense bulan itu yang belum di-approve — setelah ditutup,
+    // approve-nya akan dijurnal dengan tanggal hari ini (bulan lain). force=true untuk tetap menutup.
+    if (!body.force) {
+      const unposted = await findUnpostedExpensesInPeriod(session.outletId, period);
+      if (unposted.length) {
+        return NextResponse.json(
+          { code: "unposted_expenses", error: "Masih ada expense di periode ini yang belum di-approve.", items: unposted, total: unposted.reduce((s, r) => s + r.total, 0) },
+          { status: 409 }
+        );
+      }
     }
 
     const row = await closePeriod(session.outletId, period, session.sub, body.note || undefined);

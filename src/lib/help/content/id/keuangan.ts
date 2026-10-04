@@ -21,7 +21,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Piutang (AR) & Hutang (AP)",
         steps: [
           "Piutang: tagihan pelanggan yang belum lunas, dikelompokkan menurut lamanya (belum jatuh tempo, 1–30, 31–60, >60 hari). Tekan \"Terima Bayar\" saat pelanggan melunasi.",
-          "Hutang: tagihan supplier, pengeluaran yang dicatat hutang, dan hutang pembelian aset. Tekan Bayar, pilih akun kas/bank.",
+          "Hutang: tagihan supplier, pengeluaran yang dicatat hutang, dan hutang pembelian aset. Tekan Bayar, pilih akun kas/bank. Expense hutang baru masuk ke sini setelah di-approve; yang masih menunggu approval tampil terpisah di bawah tabel (belum dihitung sebagai hutang).",
         ],
       },
       {

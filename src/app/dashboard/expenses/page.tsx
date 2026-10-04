@@ -17,6 +17,7 @@ import { outletDateYmd } from "@/lib/time/outlet-time";
 import { EMPTY_EXPENSE_FILTER, expenseTotal, expenseYears, filterExpenses, isFilterActive, type ExpenseLike, type ExpenseListFilter } from "@/lib/expenses/list-filter";
 import { ExpenseFilterBar } from "./ExpenseFilterBar";
 import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
+import { formatPeriodLabel } from "@/lib/accounting/closing-split";
 import "@/lib/i18n/dict-expenses";
 import "@/lib/i18n/dict-coa";
 
@@ -152,7 +153,7 @@ function DashboardTab({ outletId }: { outletId: string }) {
 }
 
 function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; role: StaffRole; staffUserId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const statusLabel = (s: string) => {
     const entry = STATUS_LABEL_KEY[s];
     return entry ? t(entry.key, entry.fallback) : s;
@@ -225,10 +226,14 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
     }
   });
 
+  // Bulan yang sudah ditutup (Tutup Periode) — approve expense bertanggal di bulan itu akan
+  // dibukukan dengan tanggal hari ini (postAndAdvance), jadi pemilik diberi tahu SEBELUM approve.
+  const [closedPeriods, setClosedPeriods] = useState<Set<string>>(new Set());
   const load = () => {
     const qs = statusFilter ? `&status=${statusFilter}` : "";
     fetchJsonObject(`/api/expenses?outletId=${outletId}${qs}`).then((d) => d && setBundle(d));
     fetchJsonArray(`/api/cash-bank-accounts?outletId=${outletId}`).then(setCashBankAccounts);
+    fetchJsonArray(`/api/accounting/periods`).then((rows: any[]) => setClosedPeriods(new Set(rows.filter((r) => r.status === "closed").map((r) => r.period))));
   };
   useEffect(() => { load(); }, [outletId, statusFilter]);
 
@@ -346,6 +351,21 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
       if (!res.ok) return showAlert(data.error ?? "Gagal memproses. Coba lagi.");
       load();
     });
+
+  const approve = async (e: any) => {
+    if (proses.sibuk(`row:${e.id}`)) return;
+    const period = String(e.expenseDate ?? "").slice(0, 7);
+    if (period && closedPeriods.has(period)) {
+      const ok = await showConfirm(
+        t("expenses.confirmApproveClosedPeriod", "Periode {period} sudah ditutup. Jika di-approve sekarang, {no} dibukukan dengan tanggal hari ini, jadi biayanya masuk Laba Rugi bulan berjalan — bukan {period}.\n\nAgar tetap masuk {period}: buka kembali periode di Accounting → Tutup Periode, approve, lalu tutup lagi.\n\nLanjutkan approve dengan tanggal hari ini?")
+          .replaceAll("{period}", formatPeriodLabel(period, lang))
+          .replace("{no}", e.expenseNumber),
+        { title: t("expenses.confirmApproveClosedPeriodTitle", "Periode sudah ditutup"), confirmLabel: t("expenses.action.approve", "Approve") }
+      );
+      if (!ok) return;
+    }
+    act(e.id, "approve");
+  };
 
   /** Alasan wajib — dulu prompt() bawaan browser (tidak sesuai tema, dan "Cancel" bisa lolos dengan alasan kosong). */
   const minta = async (id: string, action: "cancel" | "reject" | "void", pesan: string, judul: string) => {
@@ -719,7 +739,26 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                 <td className="text-xs">{accountName(e.accountId)}</td>
                 <td className="text-xs max-w-[200px] truncate" title={e.description}>{e.description || e.category}</td>
                 <td>{rupiah(e.amount + (e.taxAmount ?? 0))}</td>
-                <td><Badge status={STATUS_BADGE[e.status]}>{statusLabel(e.status)}</Badge></td>
+                <td>
+                  <Badge status={STATUS_BADGE[e.status]}>{statusLabel(e.status)}</Badge>
+                  {/* Penanda hutang: tanpa ini pemilik tidak bisa membedakan expense "Belum dibayar (hutang)"
+                      dari yang dibayar langsung, lalu bingung kenapa tidak muncul di Accounting → Hutang (AP)
+                      (yang hanya memuat hutang yang SUDAH di-approve). */}
+                  {e.recordAsPayable && (
+                    <div
+                      className={`mt-1 text-[10px] ${e.status === "approved" ? "text-amber-300" : e.status === "paid" ? "text-neutral-500" : "text-neutral-400"}`}
+                      title={t("expenses.payableTagHint", "Dicatat sebagai hutang. Masuk Accounting → Hutang (AP) setelah di-approve, dan keluar dari sana setelah dibayar.")}
+                    >
+                      {e.status === "approved"
+                        ? t("expenses.payableTagOpen", "Hutang · belum dibayar")
+                        : e.status === "paid"
+                          ? t("expenses.payableTagPaid", "Hutang · lunas")
+                          : ["draft", "pending_approval"].includes(e.status)
+                            ? t("expenses.payableTagPending", "Hutang · masuk AP setelah approve")
+                            : t("expenses.payableTag", "Hutang")}
+                    </div>
+                  )}
+                </td>
                 <td className="text-xs">{staffName(e.staffUserId)}</td>
                 <td className="text-right space-y-1">
                   <div className="flex flex-col items-end gap-1">
@@ -738,7 +777,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                     )}
                     {e.status === "pending_approval" && canApprove && (
                       <>
-                        <Button className="text-xs px-2 py-1" disabled={proses.sibuk(`row:${e.id}`)} onClick={() => act(e.id, "approve")}>{t("expenses.action.approve", "Approve")}</Button>
+                        <Button className="text-xs px-2 py-1" disabled={proses.sibuk(`row:${e.id}`)} onClick={() => approve(e)}>{t("expenses.action.approve", "Approve")}</Button>
                         <Button
                           variant="ghost"
                           className="text-xs px-2 py-1 text-red-400"

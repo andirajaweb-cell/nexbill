@@ -25,6 +25,7 @@ import { coaAccountName } from "@/lib/accounting/coa-data";
 import { useCurrency } from "@/lib/currency/client";
 import "@/lib/i18n/dict-accounting";
 import "@/lib/i18n/dict-coa";
+import "@/lib/i18n/dict-expenses";
 
 // Formerly a hardcoded `const rupiah = (n) => \`Rp${...toLocaleString("id-ID")}\`` — every account
 // balance on this page (Trial Balance, P&L, Neraca, Arus Kas, Piutang/Hutang, Jurnal, Saldo Awal)
@@ -1343,6 +1344,36 @@ function PayablesTab({ outletId }: { outletId: string }) {
           </tbody>
         </table>
       </Card>
+
+      {data.awaitingApproval?.length > 0 && (
+        <Card className="border-amber-500/30">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+            <h2 className="font-medium text-amber-300">
+              {t("accounting.payables.awaitingHeading", "Menunggu Approval — belum menjadi hutang ({count} · {amount})").replace("{count}", String(data.awaitingApproval.length)).replace("{amount}", rupiah(data.awaitingApprovalTotal))}
+            </h2>
+            <a href="/dashboard/expenses" className="text-xs text-cyan-400 hover:underline">{t("accounting.payables.awaitingOpenExpenses", "Buka Expense Management →")}</a>
+          </div>
+          <p className="text-[11px] text-neutral-500 mb-2">{t("accounting.payables.awaitingExplainer", "Expense \"Belum dibayar (hutang)\" ini belum di-approve, jadi belum dijurnal dan belum dihitung di total hutang maupun Neraca. Setelah di-approve, otomatis pindah ke daftar hutang di atas dan bisa dibayar dari sini.")}</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-neutral-500 border-b border-neutral-800">
+                <th className="py-2">{t("accounting.payables.table.reference", "Referensi")}</th><th>{t("accounting.payables.table.payee", "Payee")}</th><th>{t("accounting.payables.awaitingDate", "Tanggal")}</th><th>{t("accounting.payables.awaitingAmount", "Nominal")}</th><th>{t("accounting.payables.awaitingStatus", "Status")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.awaitingApproval.map((r: any) => (
+                <tr key={r.id} className="border-b border-neutral-900">
+                  <td className="py-2 text-xs font-mono">{r.reference}</td>
+                  <td className="text-xs">{r.payee}{r.description ? <span className="text-neutral-500"> — {r.description}</span> : null}</td>
+                  <td className="text-xs">{new Date(r.expenseDate).toLocaleDateString("id-ID")}</td>
+                  <td className="text-xs">{rupiah(r.amount)}</td>
+                  <td className="text-xs text-amber-300">{r.status === "draft" ? t("accounting.payables.awaitingDraft", "Draft") : t("accounting.payables.awaitingPending", "Menunggu approval")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
     </div>
   );
 }
@@ -2185,6 +2216,7 @@ function CashFlowTab({ outletId }: { outletId: string }) {
 /** Task #62 — close/reopen accounting periods (month granularity) so postJournal rejects any new posting dated inside a closed one. */
 function PeriodLockTab() {
   const { t } = useDashboardLang();
+  const { formatMoney: rupiah } = useCurrency();
   const { user } = useAuth();
   const role = (user?.role ?? "cashier") as any;
   const canClose = hasPermission(role, "close_period");
@@ -2214,12 +2246,31 @@ function PeriodLockTab() {
     if (!ok) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/accounting/periods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period: monthInput, note: note || undefined }),
-      });
-      const data = await res.json();
+      const post = (force: boolean) =>
+        fetch("/api/accounting/periods", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ period: monthInput, note: note || undefined, force }),
+        });
+      let res = await post(false);
+      let data = await res.json();
+      if (res.status === 409 && data.code === "unposted_expenses") {
+        const list = (data.items as any[])
+          .slice(0, 10)
+          .map((r) => `• ${r.expenseNumber} — ${r.description || r.category} · ${rupiah(r.total)} (${r.status === "draft" ? "Draft" : t("accounting.payables.awaitingPending", "Menunggu approval")}${r.recordAsPayable ? `, ${t("expenses.payableTag", "Hutang")}` : ""})`)
+          .join("\n");
+        const force = await showConfirm(
+          t("accounting.periodLock.unpostedWarning", "Masih ada {n} expense bertanggal {period} yang belum di-approve ({amount}):\n\n{list}\n\nKalau periode ditutup sekarang, expense ini nanti dibukukan dengan tanggal hari approve (bulan lain), sehingga Laba Rugi {period} kurang biaya. Sebaiknya approve/reject dulu di Expense Management.\n\nTetap tutup periode?")
+            .replace("{n}", String(data.items.length))
+            .replaceAll("{period}", monthLabel(monthInput))
+            .replace("{amount}", rupiah(data.total))
+            .replace("{list}", list),
+          { tone: "danger", title: t("accounting.periodLock.unpostedTitle", "Ada expense belum di-approve"), confirmLabel: t("accounting.periodLock.closeAnyway", "Tetap Tutup") }
+        );
+        if (!force) return;
+        res = await post(true);
+        data = await res.json();
+      }
       if (!res.ok) return showAlert(data.error);
       setNote("");
       load();

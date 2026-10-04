@@ -21,7 +21,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Belum Terima (AR) & Belum Bayar (AP)",
         steps: [
           "Belum Terima: bil pelanggan yang belum lunas, dikumpulkan mengikut tempoh (belum matang, 1–30, 31–60, >60 hari). Tekan \"Terima Bayaran\" apabila pelanggan melunaskan.",
-          "Belum Bayar: bil pembekal, perbelanjaan yang direkod sebagai hutang, dan hutang belian aset. Tekan Bayar, pilih akaun tunai/bank.",
+          "Belum Bayar: bil pembekal, perbelanjaan yang direkod sebagai hutang, dan hutang belian aset. Tekan Bayar, pilih akaun tunai/bank. Perbelanjaan hutang hanya masuk ke sini selepas diluluskan; yang masih menunggu kelulusan dipaparkan berasingan di bawah jadual (belum dikira sebagai hutang).",
         ],
       },
       {

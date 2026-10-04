@@ -1,6 +1,6 @@
 import { db, type DbOrTx } from "@/db/client";
-import { accountingPeriods } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { accountingPeriods, expenses } from "@/db/schema";
+import { eq, and, desc, inArray, like } from "drizzle-orm";
 
 /**
  * Task #62 — Accounting Period Locking: "accounting period yang sudah ditutup tidak boleh
@@ -82,4 +82,18 @@ export async function reopenPeriod(outletId: string, period: string, staffUserId
     .where(eq(accountingPeriods.id, existing.id))
     .returning();
   return updated;
+}
+
+/**
+ * Expense bertanggal di dalam `period` yang belum dibukukan (draft / menunggu approval). Bila
+ * periodenya ditutup lebih dulu, approve berikutnya terpaksa dijurnal dengan tanggal hari ini
+ * (lihat postAndAdvance di expense.ts) — biayanya pindah bulan dan Laba Rugi bulan yang ditutup
+ * jadi terlalu besar. Dipakai untuk memperingatkan sebelum Tutup Periode.
+ */
+export async function findUnpostedExpensesInPeriod(outletId: string, period: string) {
+  const rows = await db
+    .select({ id: expenses.id, expenseNumber: expenses.expenseNumber, description: expenses.description, category: expenses.category, amount: expenses.amount, taxAmount: expenses.taxAmount, status: expenses.status, recordAsPayable: expenses.recordAsPayable })
+    .from(expenses)
+    .where(and(eq(expenses.outletId, outletId), inArray(expenses.status, ["draft", "pending_approval"]), like(expenses.expenseDate, `${period}-%`)));
+  return rows.map((r) => ({ ...r, total: Math.round((r.amount + (r.taxAmount ?? 0)) * 100) / 100 }));
 }

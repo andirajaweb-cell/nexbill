@@ -112,6 +112,18 @@ export async function computeAccountsReceivable(outletId: string) {
   };
 }
 
+/** Expense hutang yang masih draft / menunggu approval — belum dijurnal, belum masuk total hutang. */
+export interface AwaitingApprovalPayable {
+  id: string;
+  reference: string;
+  payee: string;
+  description: string | null;
+  amount: number;
+  status: "draft" | "pending_approval";
+  expenseDate: string;
+  dueDate: string | null;
+}
+
 export interface PayableRow {
   type: "purchase_invoice" | "expense" | "asset_purchase";
   id: string;
@@ -142,12 +154,18 @@ export async function computeAccountsPayable(outletId: string): Promise<{
   detail: PayableRow[];
   byPayee: { payee: string; outstanding: number; count: number }[];
   agingBuckets: Record<AgingBucket, number>;
+  awaitingApproval: AwaitingApprovalPayable[];
+  awaitingApprovalTotal: number;
 }> {
-  const [invoices, supplierRows, payableExpenses, assetPurchaseRows] = await Promise.all([
+  const [invoices, supplierRows, payableExpenses, assetPurchaseRows, unapprovedPayables] = await Promise.all([
     db.select().from(purchaseInvoices).where(and(eq(purchaseInvoices.outletId, outletId), ne(purchaseInvoices.status, "paid"))),
     db.select().from(suppliers).where(eq(suppliers.outletId, outletId)),
     db.select().from(expenses).where(and(eq(expenses.outletId, outletId), eq(expenses.recordAsPayable, true), eq(expenses.status, "approved"))),
     db.select().from(assetPurchases).where(and(eq(assetPurchases.outletId, outletId), notInArray(assetPurchases.status, ["paid", "cancelled"]))),
+    // Expense "Belum dibayar (hutang)" yang BELUM di-approve: belum ada jurnal, jadi belum menjadi
+    // hutang di pembukuan (dan tidak dijumlahkan di total). Tetap ditampilkan terpisah supaya
+    // pemilik tidak bingung melihatnya di Daftar Expense tapi tidak di sini.
+    db.select().from(expenses).where(and(eq(expenses.outletId, outletId), eq(expenses.recordAsPayable, true), inArray(expenses.status, ["draft", "pending_approval"]))),
   ]);
   const supplierName = new Map(supplierRows.map((s) => [s.id, s.name]));
 
@@ -218,11 +236,26 @@ export async function computeAccountsPayable(outletId: string): Promise<{
   }
   const byPayee = Array.from(byPayeeMap.values()).sort((a, b) => b.outstanding - a.outstanding);
 
+  const awaitingApproval: AwaitingApprovalPayable[] = unapprovedPayables
+    .map((e) => ({
+      id: e.id,
+      reference: e.expenseNumber,
+      payee: e.payeeName || e.category,
+      description: e.description,
+      amount: round(e.amount + (e.taxAmount ?? 0)),
+      status: e.status as "draft" | "pending_approval",
+      expenseDate: e.expenseDate,
+      dueDate: e.dueDate,
+    }))
+    .sort((a, b) => a.expenseDate.localeCompare(b.expenseDate));
+
   return {
     totalOutstanding: round(detail.reduce((s, r) => s + r.amount, 0)),
     count: detail.length,
     detail,
     byPayee,
     agingBuckets,
+    awaitingApproval,
+    awaitingApprovalTotal: round(awaitingApproval.reduce((s, r) => s + r.amount, 0)),
   };
 }

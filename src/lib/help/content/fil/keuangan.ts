@@ -21,7 +21,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Receivable (AR) at Payable (AP)",
         steps: [
           "Receivable: mga bill ng customer na hindi pa bayad, naka-grupo ayon sa tagal (hindi pa due, 1–30, 31–60, >60 araw). Pindutin ang \"Tanggapin ang Bayad\" kapag nagbayad ang customer.",
-          "Payable: mga bill ng supplier, gastos na naitala bilang payable, at payable sa pagbili ng asset. Pindutin ang Magbayad at piliin ang cash/bank account.",
+          "Payable: mga bill ng supplier, gastos na naitala bilang payable, at payable sa pagbili ng asset. Pindutin ang Magbayad at piliin ang cash/bank account. Lalabas lang dito ang expense na utang kapag na-approve na; ang mga naghihintay pa ng approval ay nakalista nang hiwalay sa ilalim ng table (hindi pa bilang utang).",
         ],
       },
       {

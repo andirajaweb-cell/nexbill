@@ -21,7 +21,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Phải thu (AR) & Phải trả (AP)",
         steps: [
           "Phải thu: hóa đơn khách chưa trả, nhóm theo tuổi nợ (chưa đến hạn, 1–30, 31–60, >60 ngày). Bấm \"Nhận thanh toán\" khi khách trả.",
-          "Phải trả: hóa đơn nhà cung cấp, khoản chi ghi nợ và nợ mua tài sản. Bấm Thanh toán, chọn tài khoản tiền mặt/ngân hàng.",
+          "Phải trả: hóa đơn nhà cung cấp, khoản chi ghi nợ và nợ mua tài sản. Bấm Thanh toán, chọn tài khoản tiền mặt/ngân hàng. Chi phí ghi nợ chỉ xuất hiện ở đây sau khi được duyệt; các khoản còn chờ duyệt được liệt kê riêng bên dưới bảng (chưa tính là công nợ).",
         ],
       },
       {

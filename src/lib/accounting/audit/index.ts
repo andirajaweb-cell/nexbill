@@ -30,6 +30,8 @@ export * from "./prudence";
 export * from "./mapping";
 import { checkAccountMappings } from "./mapping";
 import { auditCashBankAccounts } from "./cash-accounts";
+import { auditPayablesLedger } from "./payables";
+export * from "./payables";
 export * from "./cash-accounts";
 
 /*
@@ -55,6 +57,7 @@ export type AuditCode =
   | "cost_missing"
   | "negative_stock"
   | "supplier_overpaid"
+  | "payables_ledger"
   | "shift_reviews"
   | "unclosed_periods"
   | "income_tax";
@@ -84,7 +87,7 @@ const rp = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
 const cap = <T,>(xs: T[]) => xs.slice(0, 100);
 
 export async function runAccountingAudit(outletId: string): Promise<AuditCheck[]> {
-  const [dups, unbalanced, revived, links, gaps, cash, overpaid, contra, inventory, aged, noCost, reviews, periods, tax, mapping, isolation, cashBank] = await Promise.all([
+  const [dups, unbalanced, revived, links, gaps, cash, overpaid, contra, inventory, aged, noCost, reviews, periods, tax, mapping, isolation, cashBank, payablesLedger] = await Promise.all([
     findDuplicateJournals(outletId),
     findUnbalancedJournals(outletId),
     findRevivedChains(outletId),
@@ -102,6 +105,7 @@ export async function runAccountingAudit(outletId: string): Promise<AuditCheck[]
     checkAccountMappings(outletId),
     findIsolationBreaches(outletId),
     auditCashBankAccounts(outletId),
+    auditPayablesLedger(outletId),
   ]);
 
   const checks: AuditCheck[] = [];
@@ -328,6 +332,22 @@ export async function runAccountingAudit(outletId: string): Promise<AuditCheck[]
     count: overpaid.length,
     items: overpaid.map((o) => ({ label: o.invoice_number ?? o.id.slice(0, 8), detail: `nilai ${rp(o.amount)} · dibayar ${rp(o.paid)} (${o.payment_count}×)`, amount: o.paid - o.amount })),
     action: overpaid.length ? { label: "Hutang (AP)", href: "/dashboard/accounting" } : undefined,
+  });
+
+  const payGaps = payablesLedger.filter((r) => Math.abs(r.diff) >= 1);
+  checks.push({
+    code: "payables_ledger",
+    group: "integritas",
+    title: "Hutang (AP) cocok dengan Buku Besar",
+    why: "Saldo akun hutang (2111 Hutang Supplier, 2163 Hutang Expense/Aset) harus sama dengan total dokumen di tab Hutang (AP) — invoice supplier, expense \"Belum dibayar (hutang)\" yang sudah di-approve, dan pembelian aset. Selisih positif = ada hutang di pembukuan tanpa dokumen yang bisa dibayar (biasanya saldo awal/jurnal manual ke akun hutang); selisih negatif = dokumen yang jurnalnya hilang. Expense yang masih menunggu approval belum menjadi hutang dan tidak dihitung di kedua sisi.",
+    status: payGaps.length ? "warning" : "ok",
+    summary: payGaps.length
+      ? payGaps.map((r) => `${r.code}: buku besar ${rp(r.ledger)} vs dokumen ${rp(r.documents)} (selisih ${rp(r.diff)})`).join(" · ")
+      : `Cocok — ${payablesLedger.map((r) => `${r.code} ${rp(r.ledger)}`).join(" · ") || "tidak ada hutang"}.`,
+    count: payGaps.length,
+    amount: payGaps.reduce((s, r) => s + Math.abs(r.diff), 0),
+    items: payGaps.map((r) => ({ label: `${r.code} ${r.name}`, detail: `buku besar ${rp(r.ledger)} · dokumen di tab Hutang ${rp(r.documents)}`, amount: r.diff })),
+    action: payGaps.length ? { label: "Hutang (AP) / Neraca Saldo", href: "/dashboard/accounting" } : undefined,
   });
 
   checks.push({
