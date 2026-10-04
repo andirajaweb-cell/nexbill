@@ -111,6 +111,21 @@ Pastikan: tidak ada bilah alamat, login jalan, Kasir & Rental PS normal, dan cet
   Permintaan dipantau di Platform Admin → Hapus Akun (Privasi); purge otomatis 30 hari.
 - **Kebijakan privasi**: `https://nexbill.id/kebijakan-privasi`.
 
+## Notifikasi push (sesi habis, QR pelanggan, booking, QRIS, shift, stok)
+
+1. Buat kunci VAPID sekali di PC: `node scripts/generate-vapid-keys.mjs` (dari folder `pos-rental-ps`).
+2. Masukkan ketiga nilainya ke Vercel → Environment Variables (Production): `VAPID_PUBLIC_KEY`,
+   `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. Jangan commit `VAPID_PRIVATE_KEY`. Redeploy.
+3. Jalankan migrasi `supabase/migrations/0031_push_notifications.sql`.
+4. `twa-manifest.json` sudah `"enableNotifications": true` — **build ulang lengkap** supaya izin
+   notifikasi Android ikut masuk: `powershell -ExecutionPolicy Bypass -File .\build.ps1` (tanpa
+   `-Step`; keystore lama dipakai ulang). Kalau AAB sebelumnya sudah pernah diunggah ke Play Console,
+   naikkan dulu `appVersionCode` (mis. 1 → 2).
+5. Di HP: Pengaturan → Akun Saya → **Aktifkan Notifikasi di Perangkat Ini** → izinkan → **Kirim
+   Notifikasi Uji**. Setiap HP/akun mengaktifkan sendiri dan bisa memilih jenis notifikasinya.
+6. Notifikasi sesi hampir habis & stok menipis dikirim oleh scheduler booking (`npm run scheduler`
+   / cron ke `/api/bookings/scheduler/run`) — pastikan tetap berjalan.
+
 ## Update aplikasi
 
 - Fitur/tampilan baru → cukup deploy web. Tidak perlu apa-apa di Play Store.

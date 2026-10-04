@@ -9,6 +9,8 @@ import { eq, and, sql, ne } from "drizzle-orm";
 import { postSalesJournal, postReceivableSettlement, postDepositJournal } from "@/lib/accounting/postings";
 import { applyLoyaltyAndSpending } from "@/lib/membership/loyalty";
 import { resyncIfReceivableStale } from "@/lib/accounting/reconciliation-resync";
+import { runAfterResponse } from "@/lib/push/defer";
+import { notifyPaymentReceived } from "@/lib/push/triggers";
 
 // Partial, not Record<PaymentMethod, PaymentGateway>: several PaymentMethod keys (the outlet-
 // facing ipaymu_qris/va_*/dana/shopeepay/alfamart/indomaret channels — see the comment below)
@@ -367,6 +369,8 @@ export async function markPaymentByProviderRef(providerRef: string, status: "suc
     .returning();
 
   if (status === "success" && updated) {
+    // Push ke HP staf: pembayaran non-tunai dikonfirmasi gateway (QRIS/VA/e-wallet).
+    runAfterResponse(() => notifyPaymentReceived(updated));
     if (updated.kind === "deposit") {
       try {
         await postDepositJournal(updated.id);

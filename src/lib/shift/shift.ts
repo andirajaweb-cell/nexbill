@@ -10,6 +10,8 @@ import { PAYMENT_METHOD_LABEL } from "@/lib/payments/labels";
 import { currencyForCountry } from "@/lib/currency/format";
 import { computeShiftRiskFlags } from "./fraud-detection";
 import { outletHasPlanFeature } from "@/lib/subscription/service";
+import { runAfterResponse } from "@/lib/push/defer";
+import { notifyShiftClosed } from "@/lib/push/triggers";
 
 /** Resolves which set of physical note/coin denominations a shift's own outlet counts in — see denominations.ts's DENOMINATIONS_BY_CURRENCY doc comment. */
 async function getOutletCashDenominations(outletId: string): Promise<readonly number[]> {
@@ -539,6 +541,19 @@ export async function closeShift(
   }
 
   const incomeByMethod = await computeIncomeByMethod(shiftId);
+
+  // Push ke HP pimpinan: ringkasan omzet shift + peringatan anti-fraud bila ditandai.
+  runAfterResponse(() =>
+    notifyShiftClosed({
+      outletId: shift.outletId,
+      shiftId,
+      staffUserId: shift.staffUserId,
+      variance,
+      ordersCount: shiftOrders.length,
+      incomeTotal: incomeByMethod.reduce((sum, r) => sum + r.amount, 0),
+      riskFlags: risk.flags,
+    })
+  );
 
   return {
     shift: updated,

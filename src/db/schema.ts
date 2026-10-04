@@ -157,6 +157,8 @@ export const staffUsers = pgTable("staff_users", {
   activeSessionAt: text("active_session_at"),
   activeSessionDevice: text("active_session_device"),
   activeSessionIp: text("active_session_ip"),
+  // Kategori notifikasi push yang dipilih pengguna (JSON array); null = bawaan peran. Lihat lib/push/rules.ts.
+  pushCategoriesJson: text("push_categories_json"),
   // Email verification module — see lib/auth/email-verification.ts (token) and
   // /api/auth/verify-email + /api/auth/resend-verification (routes). Defaults to TRUE
   // deliberately, not false: this column's default is what every pre-existing account gets
@@ -560,6 +562,8 @@ export const rentalSessions = pgTable("rental_sessions", {
   // hanya diperingatkan sekali. Dikosongkan lagi saat waktu ditambah, jadi peringatan berlaku untuk
   // waktu selesai yang baru.
   tvWarningSentAt: text("tv_warning_sent_at"),
+  // Notifikasi push "sisa waktu" ke HP staf sudah dikirim (dikosongkan lagi saat waktu ditambah).
+  pushWarningSentAt: text("push_warning_sent_at"),
   ...timestamps,
 },
   (t) => [index("rental_sessions_outlet_started_idx").on(t.outletId, t.startedAt)]
@@ -636,6 +640,8 @@ export const products = pgTable(
     costPrice: doublePrecision("cost_price").default(0),
     stockQty: integer("stock_qty").notNull().default(0),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
+    // Push "stok menipis" sudah dikirim; dikosongkan otomatis begitu stok naik lagi di atas ambang.
+    lowStockNotifiedAt: text("low_stock_notified_at"),
     preferredSupplierId: text("preferred_supplier_id").references(() => suppliers.id),
     unit: text("unit").notNull().default("pcs"),
     isActive: boolean("is_active").notNull().default(true),
@@ -3076,5 +3082,23 @@ export const accountDeletionRequests = pgTable("account_deletion_requests", {
   purgedAt: text("purged_at"),
   cancelledAt: text("cancelled_at"),
   handledBy: text("handled_by"),
+  ...timestamps,
+});
+
+/**
+ * Langganan Web Push per perangkat (HP / aplikasi Android / browser) milik akun staf. Satu akun
+ * bisa punya beberapa perangkat. endpoint unik (diberikan browser). Lihat lib/push/service.ts.
+ */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: id(),
+  staffUserId: text("staff_user_id").notNull().references(() => staffUsers.id),
+  outletId: text("outlet_id").references(() => outlets.id),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  isAndroidApp: boolean("is_android_app").notNull().default(false),
+  failureCount: integer("failure_count").notNull().default(0),
+  lastSuccessAt: text("last_success_at"),
   ...timestamps,
 });

@@ -15,6 +15,7 @@ import { revokeSession } from "@/lib/auth/single-session";
 import { sendEmail, accountDeletionCodeEmail, accountDeletionConfirmedEmail } from "@/lib/notifications/email";
 import { deleteFromSupabaseStorageByPublicUrl } from "@/lib/storage/supabase-storage";
 import { ANONYMIZE_PLAN, OUTLET_PII_COLS } from "./plan";
+import { removeAllSubscriptionsFor } from "@/lib/push/service";
 import {
   generateDeletionCode,
   hashDeletionCode,
@@ -181,6 +182,7 @@ export async function confirmAccountDeletion(session: { sub: string; role: strin
   if (toDeactivate.length) {
     await db.update(staffUsers).set({ isActive: false }).where(inArray(staffUsers.id, toDeactivate));
     for (const id of toDeactivate) await revokeSession(id);
+    await removeAllSubscriptionsFor(toDeactivate);
   }
 
   const [owner] = await db.select().from(staffUsers).where(eq(staffUsers.id, request.requestedByStaffUserId)).limit(1);

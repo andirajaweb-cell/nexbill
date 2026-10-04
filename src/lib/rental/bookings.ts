@@ -5,6 +5,8 @@ import { startRentalSession } from "./sessions";
 import { nomorBerikutnya } from "@/lib/db/nomor-urut";
 import { logAudit } from "@/lib/audit/log";
 import { queueBookingNotification, bookingMessages, outletName } from "./notifications";
+import { runAfterResponse } from "@/lib/push/defer";
+import { notifyNewBooking } from "@/lib/push/triggers";
 
 export interface CreateBookingInput {
   outletId: string;
@@ -216,6 +218,7 @@ export async function createBooking(input: CreateBookingInput) {
         bookingId: row.id, outletId: input.outletId, type: "confirmation", phone: row.phone,
         message: bookingMessages.waitlisted(row.bookingCode, name, input.scheduledStart, row.waitlistPosition ?? 1),
       });
+      runAfterResponse(() => notifyNewBooking(row, true));
     }
     return { booking: row, waitlisted: true };
   }
@@ -250,6 +253,8 @@ export async function createBooking(input: CreateBookingInput) {
       ? bookingMessages.confirmation(row.bookingCode, name, input.scheduledStart)
       : bookingMessages.pendingReview(row.bookingCode, name, input.scheduledStart);
     await queueBookingNotification({ bookingId: row.id, outletId: input.outletId, type: "confirmation", phone: row.phone, message });
+    // Push ke HP staf: booking online/WhatsApp masuk (bukan input kasir sendiri).
+    runAfterResponse(() => notifyNewBooking(row, false));
   }
   return { booking: row, waitlisted: false };
 }

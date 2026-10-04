@@ -113,6 +113,11 @@ export default function PrivacyPolicyPage() {
             <li>Cookie sesi login dan preferensi (lihat <Link href="/kebijakan-cookie" className="text-cyan-400 hover:underline">Kebijakan Cookie</Link>).</li>
             <li>Penyimpanan lokal di perangkat Anda (tidak dikirim ke server kami): pilihan bahasa, lebar kertas &amp; printer, dan ID printer Bluetooth yang dipasangkan.</li>
             <li>Log server standar (waktu, alamat IP, halaman yang diakses, pesan error) untuk keamanan dan perbaikan gangguan.</li>
+            <li>
+              Bila Anda mengaktifkan notifikasi di HP: alamat langganan push perangkat (dibuat oleh browser/Android) dan pilihan jenis
+              notifikasi. Isi notifikasi berupa ringkasan kejadian outlet (mis. sesi hampir habis, booking baru) dan dikirim melalui layanan
+              push Google/browser. Notifikasi bisa dimatikan kapan saja di Pengaturan → Akun Saya atau pengaturan HP.
+            </li>
           </ul>
 
           <p className="font-medium text-neutral-300 pt-2">F. Informasi usaha dari sumber publik</p>
@@ -150,6 +155,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Anthropic</strong> — penyedia model AI untuk fitur AI Business Assistant (hanya saat fitur dipakai).</li>
             <li><strong>Google</strong> — login dengan Google, serta Google Maps untuk informasi usaha publik (bagian 3F).</li>
             <li><strong>Meta (Instagram/WhatsApp)</strong> — bila Anda berkomunikasi dengan kami melalui kanal tersebut.</li>
+            <li><strong>Layanan push Google / browser</strong> — mengantarkan notifikasi ke HP bila Anda mengaktifkannya.</li>
           </ul>
           <p>
             Kami juga dapat mengungkapkan data bila diwajibkan oleh hukum atau perintah instansi berwenang, atau untuk melindungi hak,
@@ -240,6 +246,10 @@ export default function PrivacyPolicyPage() {
             <li>
               <strong>Bluetooth / Perangkat di sekitar</strong> — hanya dipakai saat Anda memilih dan mencetak ke printer struk Bluetooth.
               Kami tidak memindai atau menyimpan daftar perangkat Bluetooth di server; ID printer yang dipilih disimpan di perangkat Anda saja.
+            </li>
+            <li>
+              <strong>Notifikasi</strong> — hanya bila Anda mengaktifkannya, untuk pemberitahuan operasional outlet (sesi, permintaan
+              pelanggan, booking, pembayaran, stok, shift). Bisa dimatikan kapan saja.
             </li>
             <li>Kami tidak mengumpulkan lokasi GPS, kontak, atau isi galeri perangkat Anda. Foto hanya diunggah bila Anda memilih file sendiri.</li>
             <li>

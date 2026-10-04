@@ -103,6 +103,7 @@ export const SISTEM: HelpCategory[] = [
         steps: [
           "Palitan ang sarili mong login email at password (hindi bababa sa 8 character ang password).",
           "Ang mga account na ginawa gamit ang Google ay puwedeng mag-set ng password para makapag-log in din gamit ang email at password.",
+          "Notifications sa phone: pindutin ang \"I-on ang Notifications sa Device na Ito\" sa bawat phone na gamit, payagan ang notifications, saka piliin ang mga uri (patapos na session, customer QR request, booking, QRIS payment, risky na shift, paubos na stock, buod ng shift). Gamitin ang \"Magpadala ng Test Notification\" para tingnan.",
           "Owner: ang card na \"Burahin ang Account at Data\" ay nagbubura ng account at data ng outlet — pindutin ang \"Ipadala ang Confirmation Code\", ilagay ang code mula sa email, i-type ang HAPUS. Agad na idi-deactivate ang account at outlet; buburahin ang personal data sa loob ng 30 araw.",
         ],
       },

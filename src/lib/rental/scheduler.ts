@@ -9,6 +9,7 @@ import { hasConflict } from "./bookings";
 import { queueBookingNotification, bookingMessages, outletName, BookingNotificationType } from "./notifications";
 import { runHomeRentalScheduler } from "@/lib/home-rental/scheduler";
 import { stopRentalSession } from "./sessions";
+import { notifySessionsAutoStopped, runSessionEndingPush, runLowStockPush } from "@/lib/push/triggers";
 
 /**
  * Background sweep for the Reservation Engine — auto-release, waitlist
@@ -353,6 +354,10 @@ export async function runBookingScheduler(outletId?: string) {
   const remindersQueued = await runReminders(outletId);
   const sessionWarningsQueued = await runSessionTimeWarning(outletId);
   const sessionsAutoStopped = await runSessionAutoStop(outletId);
+  // Notifikasi push ke HP staf (lib/push/triggers.ts) — tidak pernah melempar.
+  await notifySessionsAutoStopped(sessionsAutoStopped);
+  const pushSessionWarnings = await runSessionEndingPush(outletId);
+  const pushLowStock = await runLowStockPush(outletId);
   // Setelah auto-stop: sesi yang baru saja habis tidak lagi "running", jadi tidak ikut diperingatkan.
   let tvTimeWarnings: string[] = [];
   try {
@@ -369,6 +374,8 @@ export async function runBookingScheduler(outletId?: string) {
     sessionWarningsQueued,
     sessionsAutoStopped,
     tvTimeWarnings,
+    pushSessionWarnings,
+    pushLowStock,
     homeRentalPickupRemindersQueued: homeRental.pickupRemindersQueued,
     homeRentalReturnRemindersQueued: homeRental.returnRemindersQueued,
     ranAt: new Date().toISOString(),

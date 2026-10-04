@@ -12,7 +12,7 @@
   "navigationDividerColor": "#050810",
   "navigationDividerColorDark": "#050810",
   "backgroundColor": "#050810",
-  "enableNotifications": false,
+  "enableNotifications": true,
   "startUrl": "/dashboard?source=twa",
   "iconUrl": "https://dashboard.nexbill.id/icons/icon-512.png",
   "maskableIconUrl": "https://dashboard.nexbill.id/icons/maskable-512.png",
@@ -24,15 +24,32 @@
   "appVersionName": "1.0.0",
   "appVersionCode": 1,
   "shortcuts": [
-    { "name": "Rental PS", "shortName": "Rental", "url": "/dashboard/rental", "chosenIconUrl": "https://dashboard.nexbill.id/icons/icon-192.png" },
-    { "name": "Kasir", "shortName": "Kasir", "url": "/dashboard/pos", "chosenIconUrl": "https://dashboard.nexbill.id/icons/icon-192.png" },
-    { "name": "Transaksi", "shortName": "Transaksi", "url": "/dashboard/transactions", "chosenIconUrl": "https://dashboard.nexbill.id/icons/icon-192.png" }
+    {
+      "name": "Rental PS",
+      "shortName": "Rental",
+      "url": "/dashboard/rental",
+      "chosenIconUrl": "https://dashboard.nexbill.id/icons/icon-192.png"
+    },
+    {
+      "name": "Kasir",
+      "shortName": "Kasir",
+      "url": "/dashboard/pos",
+      "chosenIconUrl": "https://dashboard.nexbill.id/icons/icon-192.png"
+    },
+    {
+      "name": "Transaksi",
+      "shortName": "Transaksi",
+      "url": "/dashboard/transactions",
+      "chosenIconUrl": "https://dashboard.nexbill.id/icons/icon-192.png"
+    }
   ],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://dashboard.nexbill.id/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {},
-  "alphaDependencies": { "enabled": false },
+  "alphaDependencies": {
+    "enabled": false
+  },
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,

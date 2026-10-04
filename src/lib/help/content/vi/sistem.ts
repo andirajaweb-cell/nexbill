@@ -103,6 +103,7 @@ export const SISTEM: HelpCategory[] = [
         steps: [
           "Đổi email đăng nhập và mật khẩu của chính bạn (mật khẩu tối thiểu 8 ký tự).",
           "Tài khoản tạo bằng Google có thể đặt mật khẩu để đăng nhập thêm bằng email & mật khẩu.",
+          "Thông báo trên điện thoại: bấm \"Bật thông báo trên thiết bị này\" trên mọi điện thoại đang dùng, cho phép thông báo rồi chọn loại (phiên sắp hết, yêu cầu QR của khách, đặt chỗ, thanh toán QRIS, ca rủi ro, sắp hết hàng, tóm tắt ca). Dùng \"Gửi thông báo thử\" để kiểm tra.",
           "Owner: thẻ \"Xóa tài khoản & dữ liệu\" xóa tài khoản cùng dữ liệu cơ sở — bấm \"Gửi mã xác nhận\", nhập mã trong email, gõ HAPUS. Tài khoản & cơ sở bị vô hiệu hóa ngay; dữ liệu cá nhân bị xóa trong vòng 30 ngày.",
         ],
       },
