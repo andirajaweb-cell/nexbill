@@ -1,4 +1,7 @@
 "use client";
+import { CameraScanner } from "@/components/scanner/CameraScanner";
+import { ScanLine } from "lucide-react";
+import "@/lib/i18n/dict-scanner";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -374,6 +377,7 @@ export default function RentalPage() {
   // member (customers.memberNumber) instead of typing a name — once matched, a link surfaces to
   // that member's transaction history on the Membership page.
   const [customerMode, setCustomerMode] = useState<"non_member" | "member">("non_member");
+  const [memberScanOpen, setMemberScanOpen] = useState(false);
   const [showUnitManager, setShowUnitManager] = useState(false);
   // QR Pelanggan per unit (modal tampil/ganti/cetak) — lihat UnitQrModal.tsx.
   const [qrUnit, setQrUnit] = useState<{ id: string; name: string } | null>(null);
@@ -1741,17 +1745,51 @@ export default function RentalPage() {
                       }}
                     />
                   ) : (
-                    <input
-                      className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm"
-                      placeholder={t("rental.memberCodePlaceholder", "Ketik kode member (No. Anggota)")}
-                      value={selectedCustomerId ? customerName : customerQuery}
-                      disabled={!!selectedCustomerId}
-                      onChange={(e) => {
-                        setCustomerQuery(e.target.value);
-                        setSelectedCustomerId(null);
-                      }}
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                        placeholder={t("rental.memberCodePlaceholder", "Ketik kode member (No. Anggota)")}
+                        value={selectedCustomerId ? customerName : customerQuery}
+                        disabled={!!selectedCustomerId}
+                        onChange={(e) => {
+                          setCustomerQuery(e.target.value);
+                          setSelectedCustomerId(null);
+                        }}
+                      />
+                      {!selectedCustomerId && (
+                        <button
+                          type="button"
+                          onClick={() => setMemberScanOpen(true)}
+                          className="shrink-0 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20"
+                          title={t("scanner.button", "Scan kamera")}
+                        >
+                          <ScanLine size={15} />
+                        </button>
+                      )}
+                    </div>
                   )}
+                  <CameraScanner
+                    open={memberScanOpen}
+                    onClose={() => setMemberScanOpen(false)}
+                    mode="single"
+                    hint={t("scanner.hintMember", "Arahkan kamera ke QR atau barcode kartu member.")}
+                    onCode={async (code) => {
+                      // QR kartu member berisi No. Anggota (lihat Membership → detail member).
+                      const rows = await fetchJsonArray<CustomerRow>(`/api/customers?search=${encodeURIComponent(code)}`);
+                      const match = rows.find((c) => (c.memberNumber ?? "").toLowerCase() === code.toLowerCase());
+                      setCustomerMode("member");
+                      if (match) {
+                        setSelectedCustomerId(match.id);
+                        setCustomerName(match.name || "");
+                        setCustomerQuery("");
+                        setCustomerResults([]);
+                      } else {
+                        setSelectedCustomerId(null);
+                        setCustomerQuery(code);
+                        showAlert(t("scanner.memberNotFound", "Member dengan kode {code} tidak ditemukan.").replace("{code}", code));
+                      }
+                    }}
+                  />
 
                   {selectedCustomerId ? (
                     <div className="space-y-1">

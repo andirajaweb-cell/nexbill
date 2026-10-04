@@ -216,6 +216,7 @@ export const OPERASIONAL: HelpCategory[] = [
         title: "Selling products",
         steps: [
           "Click a product in the list (grouped by category), or type the name/scan the barcode in the search box. If only one product matches, press Enter and it goes straight into the cart.",
+          "No scanner device? Press \"Camera scan\" next to the search box and point the phone/laptop camera at the barcode — the product goes straight into the cart, several in a row. Member cards: scan their QR in Rental PS (Member mode) — the QR is in Membership → member details.",
           "Set quantities with the +/- buttons in the cart.",
           "Optional: enter a Discount, enter a voucher code (press Check), tick Tax/Service Charge.",
           "Choose the payment method and press Pay.",

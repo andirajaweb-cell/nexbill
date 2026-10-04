@@ -216,6 +216,7 @@ export const OPERASIONAL: HelpCategory[] = [
         title: "Bán sản phẩm",
         steps: [
           "Bấm vào sản phẩm trong danh sách (nhóm theo danh mục), hoặc gõ tên/quét mã vạch trong ô tìm kiếm. Nếu chỉ một sản phẩm khớp, bấm Enter là vào giỏ ngay.",
+          "Không có máy quét? Bấm \"Quét camera\" cạnh ô tìm kiếm rồi hướng camera điện thoại/laptop vào mã vạch — sản phẩm vào giỏ ngay, quét liên tiếp được. Thẻ thành viên: quét QR trong Rental PS (chế độ Thành viên) — QR nằm ở Thành viên → chi tiết thành viên.",
           "Đặt số lượng bằng nút +/- trong giỏ.",
           "Tùy chọn: nhập Giảm giá, nhập mã voucher (bấm Kiểm tra), đánh dấu Thuế/Phí dịch vụ.",
           "Chọn phương thức thanh toán và bấm Thanh toán.",

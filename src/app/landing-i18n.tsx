@@ -64,6 +64,8 @@ export interface LandingCopy {
   // item here is a real, already-shipped NEXBILL feature, framed generically against "kebanyakan
   // software billing rental PS" rather than any specific named product.
   gap: { kicker: string; title: string; sub: string; items: Feature[] };
+  // "Kasir tanpa PC" (2026-10): HP Android + printer Bluetooth + notifikasi + scan kamera.
+  mobile: { kicker: string; title: string; sub: string; items: Feature[]; note: string; cta: string };
   // Struktur harga 2026-10 (lihat src/lib/subscription/pricing.ts): dua kartu Starter (per unit,
   // minimal N unit) & Pro (flat per outlet), toggle bulanan/tahunan. Angka harga TIDAK ditulis di
   // sini — diambil live dari /api/public/pricing (fallback ke DEFAULT_PRICING di page.tsx).
@@ -171,6 +173,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Kontrol Internal Anti-Fraud", desc: "Pemindahan kas antar pos wajib approval atasan, deteksi pola shift berisiko otomatis, dan skor kepercayaan pelanggan berbasis riwayat — bukan sekadar catatan transaksi tanpa lapisan pengawasan." },
         { title: "Satu Sistem untuk Banyak Model Bisnis", desc: "Sewa konsol, sewa alat/barang (home rental), sampai jual makanan/minuman digabung jadi satu tagihan dan satu laporan — tidak perlu tempel-tempel aplikasi kasir terpisah untuk tiap lini bisnis." },
       ],
+    },
+    mobile: {
+      kicker: "Kasir tanpa PC", title: "Cukup HP Android — outlet langsung jalan",
+      sub: "Tidak perlu beli komputer kasir. Buka NEXBILL di HP Android, sambungkan printer thermal Bluetooth, dan semua operasional harian berjalan dari genggaman.",
+      items: [
+        { title: "HP jadi mesin kasir", desc: "Mulai/stop sesi rental, kasir F&B, booking, member, dan tutup shift langsung dari HP. Scan barcode produk dan QR kartu member pakai kamera HP." },
+        { title: "Struk Bluetooth sekali ketuk", desc: "Cetak struk ke printer thermal 58/80mm lewat Bluetooth tanpa dialog print. Printer Bluetooth Classic juga bisa lewat aplikasi RawBT." },
+        { title: "Kontrol TV dari HP", desc: "TV dengan smart plug WiFi menyala/mati otomatis dari HP. Untuk Android TV dipakai Relay Agent di perangkat outlet." },
+        { title: "Notifikasi walau aplikasi ditutup", desc: "Sesi hampir habis, pesanan dari QR pelanggan, booking online, pembayaran QRIS, dan ringkasan tutup shift langsung muncul di HP." },
+      ],
+      note: "Komputer tetap bisa dipakai kapan saja — data sama, real-time di semua perangkat.",
+      cta: "Coba gratis 30 hari",
     },
     harga: {
       kicker: "Harga", title: "Bayar sesuai skala outlet Anda",
@@ -339,6 +353,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "One System for Multiple Business Lines", desc: "Console rental, equipment rental, and food & drink sales combine into a single bill and a single report — no need to stitch together separate POS apps for each line of business." },
       ],
     },
+    mobile: {
+      kicker: "Cashier without a PC", title: "Just an Android phone — your outlet is ready",
+      sub: "No need to buy a cashier computer. Open NEXBILL on an Android phone, pair a Bluetooth thermal printer, and run daily operations from your hand.",
+      items: [
+        { title: "Your phone is the cashier", desc: "Start/stop rental sessions, F&B cashier, bookings, members, and shift close right from the phone. Scan product barcodes and member-card QR codes with the phone camera." },
+        { title: "One-tap Bluetooth receipts", desc: "Print receipts to 58/80mm thermal printers over Bluetooth with no print dialog. Bluetooth Classic printers also work via the RawBT app." },
+        { title: "Control TVs from your phone", desc: "TVs on WiFi smart plugs switch on/off automatically from the phone. Android TVs use the Relay Agent on an outlet device." },
+        { title: "Alerts even when the app is closed", desc: "Sessions ending, customer QR orders, online bookings, QRIS payments, and shift summaries show up on your phone." },
+      ],
+      note: "A computer still works any time — same data, real-time on every device.",
+      cta: "Try free for 30 days",
+    },
     harga: {
       kicker: "Pricing", title: "Pay for the size of your outlet",
       sub: "Start with Starter, priced per PS unit for daily operations, or go Pro — one flat price per outlet with every feature. Try it free for 30 days with all Pro features unlocked.",
@@ -505,6 +531,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Kawalan Dalaman Anti-Penipuan", desc: "Pemindahan tunai antara akaun wajib kelulusan pengurus, syif berisiko dikesan automatik, dan pelanggan diberi skor kepercayaan berdasarkan sejarah — bukan sekadar log transaksi tanpa lapisan pengawasan." },
         { title: "Satu Sistem untuk Pelbagai Lini Perniagaan", desc: "Sewa konsol, sewa peralatan (home rental), dan jualan makanan/minuman digabung jadi satu bil dan satu laporan — tidak perlu guna app kaunter jualan berasingan untuk setiap lini perniagaan." },
       ],
+    },
+    mobile: {
+      kicker: "Juruwang tanpa PC", title: "Cukup telefon Android — outlet terus beroperasi",
+      sub: "Tidak perlu membeli komputer juruwang. Buka NEXBILL di telefon Android, sambungkan pencetak terma Bluetooth, dan semua operasi harian berjalan dari genggaman.",
+      items: [
+        { title: "Telefon jadi mesin juruwang", desc: "Mula/henti sesi sewa, juruwang F&B, tempahan, ahli dan tutup syif terus dari telefon. Imbas kod bar produk dan QR kad ahli dengan kamera telefon." },
+        { title: "Resit Bluetooth sekali ketik", desc: "Cetak resit ke pencetak terma 58/80mm melalui Bluetooth tanpa dialog cetak. Pencetak Bluetooth Classic juga boleh melalui aplikasi RawBT." },
+        { title: "Kawal TV dari telefon", desc: "TV dengan palam pintar WiFi hidup/mati automatik dari telefon. Untuk Android TV, Relay Agent digunakan pada peranti outlet." },
+        { title: "Pemberitahuan walaupun aplikasi ditutup", desc: "Sesi hampir tamat, pesanan QR pelanggan, tempahan dalam talian, bayaran QRIS dan ringkasan syif terus muncul di telefon." },
+      ],
+      note: "Komputer masih boleh digunakan bila-bila masa — data sama, masa nyata di semua peranti.",
+      cta: "Cuba percuma 30 hari",
     },
     harga: {
       kicker: "Harga", title: "Bayar ikut saiz outlet anda",
@@ -676,6 +714,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "ระบบเดียวสำหรับหลายประเภทธุรกิจ", desc: "เช่าคอนโซล เช่าอุปกรณ์ (home rental) และขายอาหาร/เครื่องดื่ม รวมเป็นบิลเดียวและรายงานเดียว — ไม่ต้องใช้แอปแคชเชียร์แยกสำหรับแต่ละธุรกิจ" },
       ],
     },
+    mobile: {
+      kicker: "แคชเชียร์ไม่ต้องมี PC", title: "แค่มือถือ Android — ร้านพร้อมใช้งาน",
+      sub: "ไม่ต้องซื้อคอมพิวเตอร์แคชเชียร์ เปิด NEXBILL บนมือถือ Android จับคู่เครื่องพิมพ์ความร้อนบลูทูธ แล้วบริหารงานประจำวันได้จากมือถือ",
+      items: [
+        { title: "มือถือคือเครื่องแคชเชียร์", desc: "เริ่ม/หยุดเซสชันเช่า แคชเชียร์อาหาร การจอง สมาชิก และปิดกะได้จากมือถือ สแกนบาร์โค้ดสินค้าและ QR บัตรสมาชิกด้วยกล้องมือถือ" },
+        { title: "ใบเสร็จบลูทูธแตะครั้งเดียว", desc: "พิมพ์ใบเสร็จไปยังเครื่องพิมพ์ความร้อน 58/80 มม. ผ่านบลูทูธโดยไม่ต้องเปิดหน้าต่างพิมพ์ เครื่องพิมพ์บลูทูธแบบ Classic ใช้ผ่านแอป RawBT ได้" },
+        { title: "ควบคุมทีวีจากมือถือ", desc: "ทีวีที่ต่อสมาร์ทปลั๊ก WiFi เปิด/ปิดอัตโนมัติจากมือถือ สำหรับ Android TV ใช้ Relay Agent บนอุปกรณ์ในร้าน" },
+        { title: "แจ้งเตือนแม้ปิดแอป", desc: "เซสชันใกล้หมด คำสั่งจาก QR ลูกค้า การจองออนไลน์ การชำระ QRIS และสรุปกะ แสดงบนมือถือทันที" },
+      ],
+      note: "ยังใช้คอมพิวเตอร์ได้ทุกเมื่อ — ข้อมูลเดียวกัน อัปเดตแบบเรียลไทม์ทุกอุปกรณ์",
+      cta: "ทดลองใช้ฟรี 30 วัน",
+    },
     harga: {
       kicker: "ราคา", title: "จ่ายตามขนาดร้านของคุณ",
       sub: "เริ่มต้นด้วย Starter คิดตามจำนวนเครื่อง PS สำหรับงานประจำวัน หรือเลือก Pro ราคาเดียวต่อสาขาพร้อมทุกฟีเจอร์ ทดลองใช้ฟรี 30 วันโดยเปิดทุกฟีเจอร์ Pro",
@@ -846,6 +896,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Một Hệ Thống Cho Nhiều Mô Hình Kinh Doanh", desc: "Cho thuê máy chơi game, cho thuê thiết bị (home rental), và bán đồ ăn/thức uống gộp thành một hóa đơn và một báo cáo duy nhất — không cần ghép nhiều ứng dụng thu ngân riêng lẻ cho từng mảng kinh doanh." },
       ],
     },
+    mobile: {
+      kicker: "Thu ngân không cần PC", title: "Chỉ cần điện thoại Android — cửa hàng sẵn sàng",
+      sub: "Không cần mua máy tính thu ngân. Mở NEXBILL trên điện thoại Android, ghép máy in nhiệt Bluetooth và vận hành hằng ngày ngay trong tay.",
+      items: [
+        { title: "Điện thoại là máy thu ngân", desc: "Bắt đầu/dừng phiên thuê, thu ngân F&B, đặt chỗ, thành viên và đóng ca ngay trên điện thoại. Quét mã vạch sản phẩm và QR thẻ thành viên bằng camera." },
+        { title: "In hóa đơn Bluetooth một chạm", desc: "In hóa đơn ra máy in nhiệt 58/80mm qua Bluetooth không cần hộp thoại in. Máy in Bluetooth Classic dùng được qua ứng dụng RawBT." },
+        { title: "Điều khiển TV từ điện thoại", desc: "TV gắn ổ cắm thông minh WiFi tự bật/tắt từ điện thoại. Android TV dùng Relay Agent trên thiết bị tại cửa hàng." },
+        { title: "Thông báo kể cả khi đóng ứng dụng", desc: "Phiên sắp hết, gọi món từ QR của khách, đặt chỗ online, thanh toán QRIS và tóm tắt ca hiện ngay trên điện thoại." },
+      ],
+      note: "Vẫn dùng máy tính bất cứ lúc nào — cùng dữ liệu, cập nhật thời gian thực trên mọi thiết bị.",
+      cta: "Dùng thử miễn phí 30 ngày",
+    },
     harga: {
       kicker: "Bảng giá", title: "Trả theo quy mô cửa hàng của bạn",
       sub: "Bắt đầu với Starter tính theo từng máy PS cho vận hành hằng ngày, hoặc chọn Pro một giá cố định mỗi cơ sở với mọi tính năng. Dùng thử miễn phí 30 ngày với toàn bộ tính năng Pro.",
@@ -1015,6 +1077,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Built-In na Anti-Fraud Control", desc: "Kailangan ng approval ng manager ang paglipat ng cash sa pagitan ng mga account, awtomatikong na-fla-flag ang mga risky na shift, at may trust score ang customer batay sa history nila — hindi lang basic na transaction log na walang oversight." },
         { title: "Iisang Sistema para sa Maraming Uri ng Negosyo", desc: "Pagpapaupa ng konsola, pagpapaupa ng gamit (home rental), at pagbebenta ng pagkain/inumin ay pinagsasama sa iisang bill at iisang report — hindi na kailangan ng hiwalay na POS app para sa bawat linya ng negosyo." },
       ],
+    },
+    mobile: {
+      kicker: "Cashier na walang PC", title: "Android phone lang — handa na ang outlet",
+      sub: "Hindi na kailangang bumili ng cashier computer. Buksan ang NEXBILL sa Android phone, i-pair ang Bluetooth thermal printer, at patakbuhin ang araw-araw na operasyon mula sa kamay mo.",
+      items: [
+        { title: "Ang phone ang cashier", desc: "Simulan/itigil ang rental session, F&B cashier, booking, member, at pagsara ng shift mula sa phone. I-scan ang barcode ng produkto at QR ng member card gamit ang camera." },
+        { title: "Bluetooth na resibo sa isang tap", desc: "Mag-print ng resibo sa 58/80mm thermal printer sa Bluetooth nang walang print dialog. Gumagana rin ang Bluetooth Classic printer sa RawBT app." },
+        { title: "Kontrolin ang TV mula sa phone", desc: "Awtomatikong nag-o-on/off mula sa phone ang mga TV na may WiFi smart plug. Para sa Android TV, ginagamit ang Relay Agent sa device ng outlet." },
+        { title: "Notification kahit sarado ang app", desc: "Patapos na session, order mula sa customer QR, online booking, QRIS payment, at buod ng shift ay lumalabas agad sa phone." },
+      ],
+      note: "Puwede pa ring gumamit ng computer anumang oras — parehong data, real-time sa lahat ng device.",
+      cta: "Subukan nang libre sa 30 araw",
     },
     harga: {
       kicker: "Presyo", title: "Magbayad ayon sa laki ng outlet mo",

@@ -2,6 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { MemberQrCard } from "@/components/scanner/MemberQrCard";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
@@ -214,6 +215,7 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
               <div className="text-xs text-neutral-500">{detail.customer.phone}</div>
               {detail.tier && <MembershipStatusBadge tier={detail.tier} expiresAt={detail.customer.membershipExpiresAt} />}
             </div>
+            {detail.customer.memberNumber && <MemberQrCard memberNumber={detail.customer.memberNumber} name={detail.customer.name} />}
             {/*
               Keuntungan tier yang sedang dipegang customer ditampilkan langsung di sini, bukan
               hanya di tab Membership Tier. Di sinilah kasir berdiri saat member bertanya "saya

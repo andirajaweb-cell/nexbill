@@ -1,5 +1,8 @@
 "use client";
 import { PrintReceiptButton } from "@/components/printer/PrintReceiptButton";
+import { CameraScanner } from "@/components/scanner/CameraScanner";
+import { ScanLine } from "lucide-react";
+import "@/lib/i18n/dict-scanner";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -324,6 +327,7 @@ export default function PosPage() {
    * if the search just narrows down to one item, add that one too so typing
    * a code by hand and hitting Enter works the same way.
    */
+  const [scanOpen, setScanOpen] = useState(false);
   const onSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -349,7 +353,7 @@ export default function PosPage() {
           <p className="text-sm text-neutral-500">{t("pos.subtitle", "Makanan & minuman. Sewa perangkat dikelola di Home Rental / halaman Rental, bukan di sini.")}</p>
         </div>
 
-        <div>
+        <div className="flex gap-2">
           <input
             ref={searchRef}
             className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2.5 sm:py-2 text-sm"
@@ -358,7 +362,29 @@ export default function PosPage() {
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={onSearchKeyDown}
           />
+          {/* Scan barcode pakai kamera HP/laptop (tanpa alat scanner) — components/scanner. */}
+          <button
+            type="button"
+            onClick={() => setScanOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 text-sm text-cyan-200 hover:bg-cyan-500/20"
+            title={t("scanner.button", "Scan kamera")}
+          >
+            <ScanLine size={16} /> <span className="hidden sm:inline">{t("scanner.button", "Scan kamera")}</span>
+          </button>
         </div>
+        <CameraScanner
+          open={scanOpen}
+          onClose={() => setScanOpen(false)}
+          mode="continuous"
+          hint={t("scanner.hintProduct", "Arahkan kamera ke barcode produk.")}
+          onCode={(code) => {
+            const q = code.toLowerCase();
+            const exact = products.find((p) => (p.barcode && p.barcode.toLowerCase() === q) || (p.sku && p.sku.toLowerCase() === q));
+            if (!exact) return t("scanner.notFound", "Kode {code} tidak ditemukan di produk.").replace("{code}", code);
+            addToCart(exact);
+            return t("scanner.added", "Ditambahkan: {name}").replace("{name}", exact.name);
+          }}
+        />
 
         {openOrders.length > 0 && (
           <Card>

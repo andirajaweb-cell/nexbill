@@ -216,6 +216,7 @@ export const OPERASIONAL: HelpCategory[] = [
         title: "Pagbebenta ng produkto",
         steps: [
           "I-click ang produkto sa listahan (naka-grupo ayon sa kategorya), o i-type ang pangalan/i-scan ang barcode sa search box. Kung iisa lang ang tugmang produkto, pindutin ang Enter at direkta itong papasok sa cart.",
+          "Walang scanner? Pindutin ang \"Camera scan\" sa tabi ng search box at itutok ang camera ng phone/laptop sa barcode — direktang papasok sa cart ang produkto, puwedeng sunod-sunod. Member card: i-scan ang QR nito sa Rental PS (Member mode) — nasa Membership → detalye ng member ang QR.",
           "I-set ang dami gamit ang +/- button sa cart.",
           "Opsyonal: maglagay ng Discount, maglagay ng voucher code (pindutin ang Suriin), i-tick ang Buwis/Service Charge.",
           "Piliin ang paraan ng pagbabayad at pindutin ang Magbayad.",

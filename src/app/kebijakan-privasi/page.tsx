@@ -251,6 +251,10 @@ export default function PrivacyPolicyPage() {
               <strong>Notifikasi</strong> — hanya bila Anda mengaktifkannya, untuk pemberitahuan operasional outlet (sesi, permintaan
               pelanggan, booking, pembayaran, stok, shift). Bisa dimatikan kapan saja.
             </li>
+            <li>
+              <strong>Kamera</strong> — hanya saat Anda menekan &quot;Scan kamera&quot; untuk membaca barcode produk atau QR kartu member.
+              Gambar kamera diproses di perangkat Anda dan tidak dikirim maupun disimpan; hanya teks kode hasil scan yang dipakai.
+            </li>
             <li>Kami tidak mengumpulkan lokasi GPS, kontak, atau isi galeri perangkat Anda. Foto hanya diunggah bila Anda memilih file sendiri.</li>
             <li>
               NEXBILL adalah alat usaha untuk pengguna dewasa dan <strong>tidak ditujukan untuk anak di bawah 18 tahun</strong>. Kami tidak
@@ -297,7 +301,7 @@ export default function PrivacyPolicyPage() {
               Account owners can delete their account and data in the app (Settings → Akun Saya → Hapus Akun &amp; Data, confirmed
               with a code sent to the owner email) or by emailing {CONTACT_EMAIL} (subject &quot;Permintaan Hapus Akun NEXBILL&quot;) or
               via WhatsApp {CONTACT_WA} (see nexbill.id/hapus-akun); data is deleted or anonymised within 30 days except records we must keep
-              by law. The Android app uses Bluetooth only to print receipts to a printer you select, and does not collect location,
+              by law. The Android app uses Bluetooth only to print receipts to a printer you select and the camera only to read barcodes/QR codes on your device (no images are uploaded), and does not collect location,
               contacts, or photos you did not choose to upload. The service is not intended for children under 18.
             </p>
           </div>

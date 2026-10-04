@@ -1177,6 +1177,34 @@ function LandingPageInner() {
         </div>
       </section>
 
+      {/* SECTION: KASIR TANPA PC — HP Android + printer Bluetooth + notifikasi push + scan kamera.
+          Klaim dijaga akurat: kontrol TV tanpa PC hanya lewat smart plug WiFi; Android TV tetap
+          memakai Relay Agent di perangkat outlet (disebut di kartu ketiga). */}
+      <section id="kasir-tanpa-pc" style={{ backgroundColor: 'transparent' }}>
+        <div className="wrap">
+          <div className="section-head">
+            <div className="kicker">{t.mobile.kicker}</div>
+            <h2>{t.mobile.title}</h2>
+            <p>{t.mobile.sub}</p>
+          </div>
+          <div className="feat-grid">
+            {t.mobile.items.map((g, i) => (
+              <div className="feat-card" key={i} style={{ backdropFilter: 'blur(10px)', backgroundColor: 'rgba(13, 21, 38, 0.5)' }}>
+                <div className="feat-icon floating-3d-asset" style={{ boxShadow: 'inset 0 4px 6px rgba(255,255,255,0.1), 0 10px 15px -3px rgba(34, 211, 238, 0.3)' }}>
+                  {["📱", "🧾", "📺", "🔔"][i] ?? "✓"}
+                </div>
+                <h3>{g.title}</h3>
+                <p>{g.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '14px', marginTop: '22px' }}>{t.mobile.note}</p>
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+            <Link href="/daftar" className="btn btn-primary">{t.mobile.cta}</Link>
+          </div>
+        </div>
+      </section>
+
       {/* SECTION: HARGA & ADD-ONS */}
       {/* HARGA — dua paket (struktur harga 2026-10): Starter per unit PS (minimal N unit, fitur
           operasional) dan Pro flat per outlet (semua fitur + AI), toggle bulanan/tahunan, catatan

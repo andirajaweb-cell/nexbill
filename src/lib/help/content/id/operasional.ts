@@ -216,6 +216,7 @@ export const OPERASIONAL: HelpCategory[] = [
         title: "Menjual produk",
         steps: [
           "Klik produk di daftar (dikelompokkan per kategori), atau ketik nama/scan barcode di kotak pencarian. Kalau hanya satu produk yang cocok, tekan Enter dan produk langsung masuk keranjang.",
+          "Tanpa alat scanner? Tekan tombol \"Scan kamera\" di sebelah kotak pencarian lalu arahkan kamera HP/laptop ke barcode — produk langsung masuk keranjang, bisa beberapa berturut-turut. Kartu member: scan QR-nya di Rental PS (mode Member) — QR ada di Membership → detail member.",
           "Atur jumlah dengan tombol +/- di keranjang.",
           "Opsional: isi Diskon, masukkan kode voucher (tekan Cek), centang Pajak/Service Charge.",
           "Pilih metode pembayaran lalu tekan Bayar.",

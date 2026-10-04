@@ -216,6 +216,7 @@ export const OPERASIONAL: HelpCategory[] = [
         title: "Menjual produk",
         steps: [
           "Klik produk dalam senarai (dikumpulkan mengikut kategori), atau taip nama/imbas kod bar di kotak carian. Jika hanya satu produk yang sepadan, tekan Enter dan produk terus masuk troli.",
+          "Tiada alat pengimbas? Tekan \"Imbas kamera\" di sebelah kotak carian dan halakan kamera telefon/komputer riba ke kod bar — produk terus masuk ke troli, boleh beberapa berturut-turut. Kad ahli: imbas QR-nya di Rental PS (mod Ahli) — QR ada di Keahlian → butiran ahli.",
           "Tetapkan kuantiti dengan butang +/- di troli.",
           "Pilihan: isi Diskaun, masukkan kod baucar (tekan Semak), tandakan Cukai/Caj Perkhidmatan.",
           "Pilih kaedah pembayaran lalu tekan Bayar.",
