@@ -12,7 +12,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Báo cáo hay mở nhất",
         steps: [
           "Báo cáo kết quả kinh doanh: chọn kỳ → xem tổng doanh thu, lợi nhuận gộp và lợi nhuận ròng, kèm chi tiết theo loại doanh thu và chi phí. Bật \"So sánh nhiều kỳ\" để so 2–4 tháng cạnh nhau.",
-          "Bảng cân đối kế toán: tình hình tài sản (tiền mặt, ngân hàng, tồn kho, tài sản cố định), nợ phải trả và vốn chủ sở hữu tại một ngày. Để trống ngày để xem hôm nay.",
+          "Bảng cân đối kế toán: tình hình tài sản (tiền mặt, ngân hàng, tồn kho, tài sản cố định), nợ phải trả và vốn chủ sở hữu tại cuối kỳ đã chọn — Hôm nay, Tuần này, Tháng này, Năm nay hoặc Tùy chọn/một ngày cụ thể. Lợi nhuận của các tháng đã khóa sổ hiển thị là Lợi nhuận giữ lại (kỳ đã khóa); chỉ lợi nhuận sau đó hiển thị là Lợi nhuận kỳ hiện tại. Lợi nhuận của kỳ đã chọn hiển thị bên dưới để tham khảo.",
           "Lưu chuyển tiền tệ: tiền thực sự vào và ra trong kỳ, theo danh mục và theo ngày.",
           "Mọi báo cáo đều tải được về Excel/PDF, và mỗi con số đều bấm được để xem các giao dịch tạo nên nó.",
         ],

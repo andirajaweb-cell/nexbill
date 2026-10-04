@@ -8,6 +8,7 @@ import { translate } from "@/lib/i18n/registry";
 import "@/lib/i18n/dict-accounting";
 import "@/lib/i18n/dict-coa";
 import "@/lib/i18n/dict-report-export";
+import { balanceSheetProfitLabels } from "@/lib/accounting/closing-split";
 
 const PAGE_MARGIN = 40;
 const PAGE_WIDTH = 595.28; // A4 portrait, points
@@ -186,6 +187,12 @@ export async function buildBalanceSheetPdf(meta: ReportMeta, bs: any): Promise<B
   const doc = newDoc();
   let y = drawLetterhead(doc, meta);
   const t = (key: string, fallback: string) => translate(meta.lang, key, fallback);
+  // Laba dipecah menurut Tutup Periode (lihat closing-split.ts): laba ditahan periode tertutup + laba berjalan.
+  const profitLabels = balanceSheetProfitLabels(bs, meta.lang, t);
+  const profitRows: [string, number][] = [
+    ...(profitLabels.retained ? [[profitLabels.retained, bs.retainedEarningsClosed ?? 0] as [string, number]] : []),
+    [profitLabels.current, bs.currentPeriodNetProfit],
+  ];
   const cols: Col[] = [{ label: t("accounting.trialBalance.table.account", "Akun"), width: 380 }, { label: t("report.export.amountColumn", "Jumlah"), width: 135, align: "right" }];
 
   doc.font("Helvetica-Bold").fontSize(11).text(t("accounting.bs.assetsHeading", "Aset"), PAGE_MARGIN, y);
@@ -199,7 +206,7 @@ export async function buildBalanceSheetPdf(meta: ReportMeta, bs: any): Promise<B
   const liabEquityRows = [
     ...bs.liabilities.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]),
     ...bs.equity.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]),
-    [t("accounting.bs.currentPeriodProfit", "Laba Berjalan (belum ditutup)"), bs.currentPeriodNetProfit],
+    ...profitRows,
   ];
   y = drawTable(doc, y, cols, liabEquityRows, {
     currency: meta.currency,

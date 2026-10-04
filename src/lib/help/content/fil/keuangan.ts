@@ -12,7 +12,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Mga report na pinakamadalas buksan",
         steps: [
           "Income Statement: pumili ng period → tingnan ang kabuuang kita, gross profit, at net profit, kasama ang breakdown ayon sa uri ng kita at gastos. I-on ang \"Ikumpara ang Maraming Period\" para ikumpara ang 2–4 na buwan nang magkatabi.",
-          "Balance Sheet: ang posisyon ng ari-arian (cash, bangko, stock, asset), utang, at kapital sa isang petsa. Iwanang blangko ang petsa para sa ngayon.",
+          "Balance Sheet: ang posisyon ng ari-arian (cash, bangko, stock, asset), utang, at kapital sa dulo ng napiling period — Ngayon, Ngayong Linggo, Ngayong Buwan, Ngayong Taon, o Custom/isang petsa. Ang kita ng mga saradong buwan ay ipinapakita bilang Retained Earnings (saradong period); ang kita lang pagkatapos nito ang ipinapakita bilang Kita ng Kasalukuyang Period. Ang kita ng napiling period ay nasa ibaba bilang impormasyon.",
           "Cash Flow: perang talagang pumasok at lumabas sa period, ayon sa kategorya at ayon sa araw.",
           "Lahat ng report ay mada-download sa Excel/PDF, at bawat numero ay puwedeng i-click para makita ang mga transaksyong bumubuo rito.",
         ],

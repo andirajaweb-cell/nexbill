@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       const pl = await computeProfitLoss(outletId, from, to);
       buffer = format === "xlsx" ? buildProfitLossXlsx(meta, pl) : await buildProfitLossPdf(meta, pl);
     } else if (type === "balance-sheet") {
-      const bs = await computeBalanceSheet(outletId, to);
+      const bs = await computeBalanceSheet(outletId, to, { from });
       buffer = format === "xlsx" ? buildBalanceSheetXlsx(meta, bs) : await buildBalanceSheetPdf(meta, bs);
     } else {
       const cf = await computeCashFlow(outletId, from, to);

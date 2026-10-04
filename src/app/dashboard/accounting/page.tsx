@@ -11,6 +11,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PeriodBar, PeriodPreset, resolvePeriodPreset, describePeriod } from "@/components/reports/PeriodPicker";
+import { balanceSheetProfitLabels, formatPeriodLabel } from "@/lib/accounting/closing-split";
 import { AuditTab } from "./AuditTab";
 import { CalkTab } from "./CalkTab";
 import { TabGuide, WorkflowGuide } from "./TabGuide";
@@ -1978,20 +1979,29 @@ function ReconciliationTab({ outletId }: { outletId: string }) {
 }
 
 function BalanceSheetTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [bs, setBs] = useState<any>(null);
-  const [asOf, setAsOf] = useState("");
+  // Neraca = posisi kumulatif per tanggal akhir periode terpilih (harian/mingguan/bulanan/custom).
+  // Tanggal akhir dipotong ke akhir hari ini (Neraca tidak bisa "per 31 Oktober" saat masih 4 Oktober);
+  // awal periode dipakai untuk info "Laba (rugi) periode terpilih".
+  const period = usePeriodState("this_month");
+  const endOfToday = (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.toISOString(); })();
+  const asOfIso = period.to ? (period.to < endOfToday ? period.to : endOfToday) : undefined;
+  const periodFromIso = period.from || undefined;
   // Drill-down target for the audit-trail modal below (shared with ProfitLossTab's
   // AccountLedgerModal) — a Neraca account's balance is cumulative-to-date (from=undefined,
   // to=asOf), not period-scoped like P&L, since a balance sheet is a snapshot, not a flow.
   const [drillDown, setDrillDown] = useState<{ accountId: string; code: string; name: string; balance: number } | null>(null);
-  const asOfIso = asOf ? new Date(asOf).toISOString() : undefined;
   useEffect(() => {
-    const qs = new URLSearchParams({ outletId, ...(asOfIso ? { asOf: asOfIso } : {}) });
+    const qs = new URLSearchParams({ outletId, ...(asOfIso ? { asOf: asOfIso } : {}), ...(periodFromIso ? { from: periodFromIso } : {}) });
     fetchJsonObject(`/api/accounting/balance-sheet?${qs}`).then(setBs);
-  }, [outletId, asOfIso]);
+  }, [outletId, asOfIso, periodFromIso]);
   if (!bs) return null;
+
+  const asOfLabel = new Date(asOfIso ?? Date.now()).toLocaleDateString(lang === "en" ? "en-US" : lang === "ms" ? "ms-MY" : lang === "th" ? "th-TH" : lang === "fil" ? "fil-PH" : lang === "vi" ? "vi-VN" : "id-ID", { day: "numeric", month: "long", year: "numeric" });
+  const profitLabels = balanceSheetProfitLabels(bs, lang, t);
+  const closedLabel = bs.closedThroughPeriod ? formatPeriodLabel(bs.closedThroughPeriod, lang) : "";
 
   const openDrillDown = (r: any) => setDrillDown({ accountId: r.accountId, code: r.code, name: coaAccountName(t, r), balance: r.balance });
   const rowClass = "w-full flex justify-between text-sm py-1 text-left rounded hover:bg-neutral-800/60 transition-colors";
@@ -1999,8 +2009,22 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Field label={t("accounting.bs.fieldAsOf", "Per Tanggal (kosongkan untuk hari ini)")}><input type="date" className={inputClsSm} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></Field>
-        <DownloadButtons outletId={outletId} reportType="balance-sheet" to={asOfIso} />
+        <PeriodBar preset={period.preset} setPreset={period.setPreset} customFrom={period.customFrom} setCustomFrom={period.setCustomFrom} customTo={period.customTo} setCustomTo={period.setCustomTo} />
+        <DownloadButtons outletId={outletId} reportType="balance-sheet" from={periodFromIso} to={asOfIso} />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="font-medium text-neutral-300">{t("accounting.bs.positionAsOf", "Posisi per {date}").replace("{date}", asOfLabel)}</span>
+        <span className="text-neutral-500">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, asOfIso ?? period.to)}</span>
+      </div>
+      <div className={`rounded-lg border px-3 py-2 text-xs ${bs.asOfPeriodClosed ? "border-emerald-700/60 bg-emerald-500/10 text-emerald-300" : bs.closedThroughPeriod ? "border-sky-700/60 bg-sky-500/10 text-sky-300" : "border-neutral-700 bg-neutral-800/40 text-neutral-400"}`}>
+        {bs.asOfPeriodClosed
+          ? `🔒 ${t("accounting.bs.statusAsOfClosed", "Periode {period} sudah ditutup — angka Neraca per tanggal ini terkunci.").replace("{period}", closedLabel)}`
+          : bs.closedThroughPeriod
+            ? t("accounting.bs.statusClosedThrough", "Periode tertutup s/d {period}. Laba sampai bulan itu disajikan sebagai Laba Ditahan; yang belum ditutup hanya laba setelahnya.").replace("{period}", closedLabel)
+            : t("accounting.bs.statusNoneClosed", "Belum ada periode yang ditutup — seluruh laba masih tercatat sebagai Laba Periode Berjalan. Tutup bulan yang sudah final di tab Tutup Periode.")}
+        {bs.openPeriodGaps?.length > 0 && (
+          <div className="mt-1 text-amber-300">⚠ {t("accounting.bs.openGaps", "Bulan sebelumnya masih terbuka: {list}. Labanya sudah ikut di Laba Ditahan, tapi sebaiknya ditutup juga agar angkanya tidak bisa berubah.").replace("{list}", bs.openPeriodGaps.map((g: string) => formatPeriodLabel(g, lang)).join(", "))}</div>
+        )}
       </div>
       <p className="text-[11px] text-neutral-600">{t("accounting.bs.drillDownHint", "Klik baris mana pun untuk melihat transaksi/jurnal yang menyusun angka itu (audit trail).")}</p>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -2028,13 +2052,22 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
             <span>{rupiah(r.balance)}</span>
           </button>
         ))}
-        <div className="flex justify-between text-sm py-1"><span>{t("accounting.bs.currentPeriodProfit", "Laba Berjalan (belum ditutup)")}</span><span>{rupiah(bs.currentPeriodNetProfit)}</span></div>
+        {profitLabels.retained && (
+          <div className="flex justify-between text-sm py-1"><span>🔒 {profitLabels.retained}</span><span>{rupiah(bs.retainedEarningsClosed)}</span></div>
+        )}
+        <div className="flex justify-between text-sm py-1"><span>{profitLabels.current}</span><span>{rupiah(bs.currentPeriodNetProfit)}</span></div>
         <div className="flex justify-between text-sm py-2 border-t border-neutral-800 font-semibold mt-2">
           <span>{t("accounting.bs.totalLiabilitiesEquity", "Total Liabilitas + Ekuitas")}</span><span>{rupiah(bs.totalLiabilities + bs.totalEquityWithRetainedEarnings)}</span>
         </div>
         <div className={`text-xs mt-1 ${bs.balances ? "text-emerald-400" : "text-red-400"}`}>{bs.balances ? t("accounting.bs.balanced", "Neraca balance ✓") : t("accounting.bs.notBalanced", "TIDAK BALANCE — periksa jurnal")}</div>
       </Card>
     </div>
+      {bs.periodNetProfit !== null && bs.periodNetProfit !== undefined && (
+        <Card>
+          <div className="flex justify-between text-sm"><span>{t("accounting.bs.periodProfit", "Laba (rugi) periode terpilih")} — {describePeriod(period.preset, period.from, asOfIso ?? period.to)}</span><span className={`font-semibold ${bs.periodNetProfit < 0 ? "text-red-400" : "text-emerald-400"}`}>{rupiah(bs.periodNetProfit)}</span></div>
+          <p className="text-[11px] text-neutral-600 mt-1">{t("accounting.bs.periodProfitNote", "Informasi saja — sudah termasuk dalam laba di Neraca, tidak dijumlahkan lagi.")}</p>
+        </Card>
+      )}
 
       {drillDown && (
         <AccountLedgerModal
@@ -2045,7 +2078,7 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
           balance={drillDown.balance}
           from={undefined}
           to={asOfIso}
-          periodLabel={`${t("accounting.bs.asOfPrefix", "Per Tanggal:")} ${asOf ? new Date(asOf).toLocaleDateString("id-ID") : t("accounting.bs.asOfToday", "Hari Ini")}`}
+          periodLabel={`${t("accounting.bs.asOfPrefix", "Per Tanggal:")} ${asOfLabel}`}
           totalLabel={t("accounting.bs.drillDownTotal", "Total (sesuai Neraca)")}
           onClose={() => setDrillDown(null)}
         />

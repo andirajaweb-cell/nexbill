@@ -8,7 +8,8 @@ export async function GET(req: NextRequest) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
     const asOf = req.nextUrl.searchParams.get("asOf") ?? undefined;
-    const result = await computeBalanceSheet(session.outletId, asOf);
+    const from = req.nextUrl.searchParams.get("from") ?? undefined;
+    const result = await computeBalanceSheet(session.outletId, asOf, { from });
     return NextResponse.json(result);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });

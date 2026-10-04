@@ -12,7 +12,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Laporan yang paling sering dibuka",
         steps: [
           "Laba Rugi: pilih periode → lihat total pendapatan, laba kotor, dan laba bersih, beserta rincian per jenis pendapatan dan beban. Aktifkan \"Bandingkan Multi-Periode\" untuk membandingkan 2–4 bulan berdampingan.",
-          "Neraca: posisi harta (kas, rekening, stok, aset), hutang, dan modal pada satu tanggal. Kosongkan tanggal untuk hari ini.",
+          "Neraca: posisi harta (kas, rekening, stok, aset), hutang, dan modal per akhir periode yang dipilih — Hari Ini, Minggu Ini, Bulan Ini, Tahun Ini, atau Custom/tanggal tertentu. Laba bulan yang sudah ditutup tampil sebagai Laba Ditahan (periode tertutup); hanya laba setelahnya yang tampil sebagai Laba Periode Berjalan. Laba periode terpilih ditampilkan di bawahnya sebagai informasi.",
           "Arus Kas: uang yang benar-benar masuk dan keluar dalam periode, per kategori dan per hari.",
           "Semua laporan bisa diunduh ke Excel/PDF dan setiap angkanya bisa diklik untuk melihat transaksi penyusunnya.",
         ],

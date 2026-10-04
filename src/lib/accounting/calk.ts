@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { fixedAssets, outlets } from "@/db/schema";
 import { computeBalanceSheet, computeProfitLoss, type TrialBalanceTreeRow } from "./reports";
 import { checkIncomeTax } from "./audit/prudence";
+import { balanceSheetProfitLabels } from "@/lib/accounting/closing-split";
 
 /**
  * Catatan atas Laporan Keuangan (CALK) — wajib menurut SAK EMKM (bersama Laporan Posisi Keuangan
@@ -62,7 +63,12 @@ export async function buildCalk(outletId: string, from?: string, to?: string): P
   const tax = await checkIncomeTax(outletId);
 
   const equityGroups = groupTree(bs.equityTree);
-  equityGroups.push({ code: "—", name: "Laba (rugi) berjalan belum ditutup ke ekuitas", total: bs.currentPeriodNetProfit, lines: [{ code: "—", name: "Laba (rugi) sampai tanggal laporan", amount: bs.currentPeriodNetProfit }] });
+  // Dipecah menurut Tutup Periode (closing-split.ts): laba periode tertutup = laba ditahan.
+  const profitLabels = balanceSheetProfitLabels(bs, "id", (_k, f) => f);
+  if (profitLabels.retained) {
+    equityGroups.push({ code: "—", name: "Laba ditahan (periode yang sudah ditutup)", total: bs.retainedEarningsClosed, lines: [{ code: "—", name: profitLabels.retained, amount: bs.retainedEarningsClosed }] });
+  }
+  equityGroups.push({ code: "—", name: "Laba (rugi) berjalan belum ditutup ke ekuitas", total: bs.currentPeriodNetProfit, lines: [{ code: "—", name: profitLabels.current, amount: bs.currentPeriodNetProfit }] });
 
   return {
     entity: {

@@ -7,6 +7,7 @@ import { translate } from "@/lib/i18n/registry";
 import "@/lib/i18n/dict-accounting";
 import "@/lib/i18n/dict-coa";
 import "@/lib/i18n/dict-report-export";
+import { balanceSheetProfitLabels } from "@/lib/accounting/closing-split";
 
 /** Letterhead rows shared by every exported report sheet: company name, address, report title, period, generated-at. Excel embedding of the actual logo image isn't supported by the community `xlsx` (SheetJS) build used here — the PDF export carries the visual logo instead. */
 function letterheadRows(meta: ReportMeta): (string | number)[][] {
@@ -89,6 +90,12 @@ export function buildProfitLossXlsx(meta: ReportMeta, pl: any): Buffer {
 
 export function buildBalanceSheetXlsx(meta: ReportMeta, bs: any): Buffer {
   const t = (key: string, fallback: string) => translate(meta.lang, key, fallback);
+  // Laba dipecah menurut Tutup Periode (lihat closing-split.ts): laba ditahan periode tertutup + laba berjalan.
+  const profitLabels = balanceSheetProfitLabels(bs, meta.lang, t);
+  const profitRows: [string, number][] = [
+    ...(profitLabels.retained ? [[profitLabels.retained, bs.retainedEarningsClosed ?? 0] as [string, number]] : []),
+    [profitLabels.current, bs.currentPeriodNetProfit],
+  ];
   const header = [t("accounting.trialBalance.table.account", "Akun"), t("report.export.amountColumn", "Jumlah")];
   const assetRows = bs.assets.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]);
   const liabRows = bs.liabilities.filter((r: any) => r.balance !== 0).map((r: any) => [coaAccountNameForLang(meta.lang, r), r.balance]);
@@ -108,7 +115,7 @@ export function buildBalanceSheetXlsx(meta: ReportMeta, bs: any): Buffer {
     [t("accounting.type.equity", "Ekuitas")],
     header,
     ...equityRows,
-    [t("accounting.bs.currentPeriodProfit", "Laba Berjalan (belum ditutup)"), bs.currentPeriodNetProfit],
+    ...profitRows,
     [t("accounting.bs.totalLiabilitiesEquity", "Total Liabilitas + Ekuitas"), bs.totalLiabilities + bs.totalEquityWithRetainedEarnings],
     [],
     [t("report.export.status", "Status"), bs.balances ? t("accounting.bs.balanced", "Neraca Balance") : t("accounting.bs.notBalanced", "TIDAK BALANCE — periksa jurnal")],

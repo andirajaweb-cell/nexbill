@@ -12,7 +12,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "The most-used reports",
         steps: [
           "Income Statement: choose a period → see total revenue, gross profit, and net profit, with a breakdown by revenue and expense type. Turn on \"Compare Multiple Periods\" to compare 2–4 months side by side.",
-          "Balance Sheet: the position of assets (cash, bank, stock, fixed assets), liabilities, and equity on one date. Leave the date empty for today.",
+          "Balance Sheet: the position of assets (cash, bank, stock, fixed assets), liabilities, and equity at the end of the chosen period — Today, This Week, This Month, This Year, or Custom/a specific date. Profit from closed months is shown as Retained Earnings (closed periods); only profit after that is shown as Current Period Profit. The selected period's profit is shown below for information.",
           "Cash Flow: money actually coming in and going out during the period, by category and by day.",
           "All reports can be downloaded to Excel/PDF, and every figure can be clicked to see the transactions behind it.",
         ],

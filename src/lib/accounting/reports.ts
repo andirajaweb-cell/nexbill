@@ -1,5 +1,6 @@
 import { db } from "@/db/client";
-import { accounts, journalLines, journalEntries, products } from "@/db/schema";
+import { accounts, journalLines, journalEntries, products, accountingPeriods } from "@/db/schema";
+import { resolveClosedThrough, splitRetainedEarnings } from "./closing-split";
 import { eq, and, gte, lte, sql, inArray, desc } from "drizzle-orm";
 
 export interface TrialBalanceRow {
@@ -329,7 +330,12 @@ export async function computeProfitLoss(outletId: string, from?: string, to?: st
   };
 }
 
-export async function computeBalanceSheet(outletId: string, asOf?: string) {
+/**
+ * @param asOf tanggal posisi (inklusif, ISO). Kosong = sekarang.
+ * @param opts.from awal periode terpilih (harian/mingguan/bulanan/custom) — hanya untuk informasi
+ *   "Laba (rugi) periode terpilih"; Neraca sendiri tetap posisi kumulatif per asOf.
+ */
+export async function computeBalanceSheet(outletId: string, asOf?: string, opts: { from?: string } = {}) {
   const trialBalance = await computeTrialBalance(outletId, undefined, asOf);
 
   // Sorted by code (see the same note in computeProfitLoss) so line order always matches the COA.
@@ -342,8 +348,27 @@ export async function computeBalanceSheet(outletId: string, asOf?: string) {
   const liabilitiesTree = flattenTrialBalanceTree(liabilities, false);
   const equityTree = flattenTrialBalanceTree(equity, false);
 
-  // Retained earnings = cumulative net profit not yet closed to equity (computed live, not requiring period-close).
+  // Laba kumulatif yang belum dipindah ke akun ekuitas (dihitung langsung). Dipecah menurut Tutup
+  // Periode: laba s/d akhir periode tertutup terakhir = "Laba Ditahan (periode tertutup)", sisanya
+  // = "Laba Periode Berjalan (belum ditutup)". Total tidak berubah — lihat closing-split.ts.
   const pl = await computeProfitLoss(outletId, undefined, asOf);
+  const asOfIso = asOf ?? new Date().toISOString();
+  const closedRows = await db
+    .select({ period: accountingPeriods.period })
+    .from(accountingPeriods)
+    .where(and(eq(accountingPeriods.outletId, outletId), eq(accountingPeriods.status, "closed")));
+  let firstActivityPeriod: string | null = null;
+  if (closedRows.length) {
+    const [first] = await db
+      .select({ d: sql<string | null>`min(${journalEntries.entryDate})` })
+      .from(journalEntries)
+      .where(eq(journalEntries.outletId, outletId));
+    firstActivityPeriod = first?.d ? String(first.d).slice(0, 7) : null;
+  }
+  const closing = resolveClosedThrough(closedRows.map((r) => r.period), asOfIso, firstActivityPeriod);
+  const closedNetProfit = closing.closedEnd ? (await computeProfitLoss(outletId, undefined, closing.closedEnd)).netProfit : null;
+  const { retainedEarningsClosed, currentPeriodNetProfit } = splitRetainedEarnings(pl.netProfit, closedNetProfit);
+  const periodNetProfit = opts.from ? (await computeProfitLoss(outletId, opts.from, asOf)).netProfit : null;
 
   const totalAssets = assets.reduce((s, r) => s + r.balance, 0);
   const totalLiabilities = liabilities.reduce((s, r) => s + r.balance, 0);
@@ -361,7 +386,19 @@ export async function computeBalanceSheet(outletId: string, asOf?: string) {
     totalAssets,
     totalLiabilities,
     totalEquityBooked,
-    currentPeriodNetProfit: pl.netProfit,
+    /** Laba kumulatif s/d asOf = retainedEarningsClosed + currentPeriodNetProfit. */
+    cumulativeNetProfit: pl.netProfit,
+    /** Laba s/d akhir periode tertutup terakhir (0 bila belum ada periode tertutup). */
+    retainedEarningsClosed,
+    /** Laba setelah periode tertutup terakhir — yang benar-benar "belum ditutup". */
+    currentPeriodNetProfit,
+    closedThroughPeriod: closing.closedThrough,
+    currentPeriodFrom: closing.currentFrom,
+    asOfPeriodClosed: closing.asOfPeriodClosed,
+    openPeriodGaps: closing.openGaps,
+    periodFrom: opts.from ?? null,
+    /** Laba (rugi) periode terpilih (from → asOf), informasi saja — tidak masuk total. */
+    periodNetProfit,
     totalEquityWithRetainedEarnings,
     balances: Math.abs(totalAssets - (totalLiabilities + totalEquityWithRetainedEarnings)) < 1,
   };

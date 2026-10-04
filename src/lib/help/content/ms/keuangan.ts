@@ -12,7 +12,7 @@ export const KEUANGAN: HelpCategory[] = [
         title: "Laporan yang paling kerap dibuka",
         steps: [
           "Penyata Untung Rugi: pilih tempoh → lihat jumlah pendapatan, untung kasar, dan untung bersih, beserta pecahan mengikut jenis pendapatan dan belanja. Aktifkan \"Bandingkan Pelbagai Tempoh\" untuk membandingkan 2–4 bulan bersebelahan.",
-          "Kunci Kira-kira: kedudukan harta (tunai, akaun bank, stok, aset), liabiliti, dan modal pada satu tarikh. Biarkan tarikh kosong untuk hari ini.",
+          "Kunci Kira-kira: kedudukan harta (tunai, akaun bank, stok, aset), liabiliti, dan modal pada akhir tempoh yang dipilih — Hari Ini, Minggu Ini, Bulan Ini, Tahun Ini, atau Custom/tarikh tertentu. Untung bulan yang sudah ditutup dipaparkan sebagai Untung Tertahan (tempoh ditutup); hanya untung selepasnya dipaparkan sebagai Untung Tempoh Semasa. Untung tempoh dipilih dipaparkan di bawah sebagai makluman.",
           "Aliran Tunai: wang yang benar-benar masuk dan keluar dalam tempoh itu, mengikut kategori dan mengikut hari.",
           "Semua laporan boleh dimuat turun ke Excel/PDF dan setiap angka boleh diklik untuk melihat transaksi di sebaliknya.",
         ],
