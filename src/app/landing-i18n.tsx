@@ -78,7 +78,7 @@ export interface LandingCopy {
     compatNeedLabel: string; compatNeedText: string; compatSkipLabel: string; compatSkipText: string;
   };
   faq: { kicker: string; headline: string; sub: string; items: Faq[] };
-  footer: { alamatLabel: string; teleponLabel: string; emailLabel: string; copyright: string; refundLabel: string; termsLabel: string };
+  footer: { alamatLabel: string; teleponLabel: string; emailLabel: string; copyright: string; refundLabel: string; termsLabel: string; privacyLabel: string };
   cookieBanner: { message: string; accept: string; decline: string; policyLinkLabel: string };
   about: {
     heroTitle: string; heroLede: string; stats: Stat[];
@@ -226,7 +226,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { q: "Apakah ada kontrak jangka panjang atau biaya tersembunyi?", a: "Tidak ada kontrak jangka panjang dan tidak ada biaya tersembunyi. Harga paket jelas di atas — Starter per unit PS atau Pro per outlet — dan Anda bisa naik/turun paket atau berhenti berlangganan kapan saja." },
       ],
     },
-    footer: { alamatLabel: "Alamat:", teleponLabel: "Telepon:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Semua hak dilindungi.", refundLabel: "Kebijakan Refund", termsLabel: "Syarat & Ketentuan" },
+    footer: { alamatLabel: "Alamat:", teleponLabel: "Telepon:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Semua hak dilindungi.", refundLabel: "Kebijakan Refund", termsLabel: "Syarat & Ketentuan", privacyLabel: "Kebijakan Privasi" },
     cookieBanner: {
       message: "Kami menggunakan cookie untuk meningkatkan pengalaman Anda di situs ini dan menganalisis traffic. Dengan melanjutkan, Anda menyetujui penggunaan cookie sesuai Kebijakan Cookie kami.",
       accept: "Terima",
@@ -393,7 +393,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { q: "Is there a long-term contract or any hidden fees?", a: "No long-term contract and no hidden fees. Plan prices are listed above — Starter per PS unit or Pro per outlet — and you can upgrade, downgrade, or cancel anytime." },
       ],
     },
-    footer: { alamatLabel: "Address:", teleponLabel: "Phone:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. All rights reserved.", refundLabel: "Refund Policy", termsLabel: "Terms & Conditions" },
+    footer: { alamatLabel: "Address:", teleponLabel: "Phone:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. All rights reserved.", refundLabel: "Refund Policy", termsLabel: "Terms & Conditions", privacyLabel: "Privacy Policy" },
     cookieBanner: {
       message: "We use cookies to improve your experience on this site and analyze traffic. By continuing, you agree to our use of cookies per our Cookie Policy.",
       accept: "Accept",
@@ -560,7 +560,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { q: "Adakah kontrak jangka panjang atau bayaran tersembunyi?", a: "Tiada kontrak jangka panjang dan tiada bayaran tersembunyi. Harga pelan tertera di atas — Starter setiap unit PS atau Pro setiap outlet — dan anda boleh naik/turun pelan atau berhenti melanggan bila-bila masa." },
       ],
     },
-    footer: { alamatLabel: "Alamat:", teleponLabel: "Telefon:", emailLabel: "E-mel:", copyright: "© 2026 NEXBILL Billing System. Hak cipta terpelihara.", refundLabel: "Dasar Bayaran Balik", termsLabel: "Terma & Syarat" },
+    footer: { alamatLabel: "Alamat:", teleponLabel: "Telefon:", emailLabel: "E-mel:", copyright: "© 2026 NEXBILL Billing System. Hak cipta terpelihara.", refundLabel: "Dasar Bayaran Balik", termsLabel: "Terma & Syarat", privacyLabel: "Dasar Privasi" },
     cookieBanner: {
       message: "Kami menggunakan kuki untuk meningkatkan pengalaman anda di laman ini dan menganalisis trafik. Dengan meneruskan, anda bersetuju dengan penggunaan kuki mengikut Dasar Kuki kami.",
       accept: "Terima",
@@ -730,7 +730,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { q: "มีสัญญาผูกมัดระยะยาวหรือค่าใช้จ่ายแอบแฝงหรือไม่?", a: "ไม่มีสัญญาผูกมัดระยะยาวและไม่มีค่าใช้จ่ายแอบแฝง ราคาแพ็กเกจแสดงไว้ด้านบน — Starter คิดต่อเครื่อง PS หรือ Pro คิดต่อสาขา — และคุณอัปเกรด ลดแพ็กเกจ หรือยกเลิกได้ทุกเมื่อ" },
       ],
     },
-    footer: { alamatLabel: "ที่อยู่:", teleponLabel: "โทรศัพท์:", emailLabel: "อีเมล:", copyright: "© 2026 NEXBILL Billing System สงวนลิขสิทธิ์", refundLabel: "นโยบายการคืนเงิน", termsLabel: "ข้อกำหนดและเงื่อนไข" },
+    footer: { alamatLabel: "ที่อยู่:", teleponLabel: "โทรศัพท์:", emailLabel: "อีเมล:", copyright: "© 2026 NEXBILL Billing System สงวนลิขสิทธิ์", refundLabel: "นโยบายการคืนเงิน", termsLabel: "ข้อกำหนดและเงื่อนไข", privacyLabel: "นโยบายความเป็นส่วนตัว" },
     cookieBanner: {
       message: "เราใช้คุกกี้เพื่อปรับปรุงประสบการณ์ของคุณบนเว็บไซต์นี้และวิเคราะห์การเข้าชม การใช้งานต่อถือว่าคุณยอมรับการใช้คุกกี้ตามนโยบายคุกกี้ของเรา",
       accept: "ยอมรับ",
@@ -900,7 +900,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { q: "Có hợp đồng dài hạn hay phí ẩn nào không?", a: "Không có hợp đồng dài hạn và không có phí ẩn. Giá các gói được ghi rõ ở trên — Starter theo từng máy PS hoặc Pro theo từng cơ sở — và bạn có thể nâng, hạ gói hoặc hủy bất cứ lúc nào." },
       ],
     },
-    footer: { alamatLabel: "Địa chỉ:", teleponLabel: "Điện thoại:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Bảo lưu mọi quyền.", refundLabel: "Chính sách hoàn tiền", termsLabel: "Điều khoản & Điều kiện" },
+    footer: { alamatLabel: "Địa chỉ:", teleponLabel: "Điện thoại:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Bảo lưu mọi quyền.", refundLabel: "Chính sách hoàn tiền", termsLabel: "Điều khoản & Điều kiện", privacyLabel: "Chính sách quyền riêng tư" },
     cookieBanner: {
       message: "Chúng tôi sử dụng cookie để cải thiện trải nghiệm của bạn trên trang web này và phân tích lưu lượng truy cập. Tiếp tục sử dụng nghĩa là bạn đồng ý với việc sử dụng cookie theo Chính sách Cookie của chúng tôi.",
       accept: "Chấp nhận",
@@ -1070,7 +1070,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { q: "May long-term contract ba o anumang nakatagong bayad?", a: "Walang long-term contract at walang nakatagong bayad. Nakalista sa itaas ang presyo ng plano — Starter kada PS unit o Pro kada outlet — at puwede kang mag-upgrade, mag-downgrade, o mag-cancel anumang oras." },
       ],
     },
-    footer: { alamatLabel: "Address:", teleponLabel: "Telepono:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Nakalaan ang lahat ng karapatan.", refundLabel: "Patakaran sa Refund", termsLabel: "Mga Tuntunin at Kundisyon" },
+    footer: { alamatLabel: "Address:", teleponLabel: "Telepono:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Nakalaan ang lahat ng karapatan.", refundLabel: "Patakaran sa Refund", termsLabel: "Mga Tuntunin at Kundisyon", privacyLabel: "Patakaran sa Privacy" },
     cookieBanner: {
       message: "Gumagamit kami ng cookies para mapahusay ang karanasan mo sa site na ito at suriin ang traffic. Sa pagpapatuloy, sumasang-ayon ka sa paggamit namin ng cookies ayon sa aming Patakaran sa Cookie.",
       accept: "Tanggapin",

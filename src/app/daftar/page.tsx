@@ -604,6 +604,18 @@ function DaftarPageInner() {
           )}
         </div>
 
+        <p className="text-center text-[11px] text-neutral-600">
+          Dengan mendaftar, Anda menyetujui{" "}
+          <a href="/syarat-ketentuan" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
+            Syarat &amp; Ketentuan
+          </a>{" "}
+          dan{" "}
+          <a href="/kebijakan-privasi" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
+            Kebijakan Privasi
+          </a>{" "}
+          NEXBILL.
+        </p>
+
         <p className="text-center text-xs text-neutral-600">
           Sudah punya akun?{" "}
           <a href="/login" className="text-cyan-400 hover:underline">

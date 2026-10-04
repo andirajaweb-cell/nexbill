@@ -94,7 +94,7 @@ Pastikan: tidak ada bilah alamat, login jalan, Kasir & Rental PS normal, dan cet
    - Deskripsi singkat (≤ 80 karakter): `Billing rental PS, kasir F&B, kontrol TV & struk Bluetooth dalam satu aplikasi.`
    - Hindari memakai merek "PlayStation"/logo Sony di nama, ikon, dan grafis — pakai "rental PS / konsol game" supaya tidak dianggap meniru merek.
 5. **Konten aplikasi**:
-   - Kebijakan privasi: wajib URL publik. Saat ini ada `/syarat-ketentuan`, `/kebijakan-cookie`, `/kebijakan-refund` — **belum ada halaman kebijakan privasi khusus**; buat dulu (mis. `/kebijakan-privasi`).
+   - Kebijakan privasi: `https://nexbill.id/kebijakan-privasi` (sudah tersedia; bagian 9 = cara hapus akun, bisa dipakai juga untuk URL penghapusan akun di formulir Keamanan Data).
    - Akses aplikasi: sediakan **akun demo** (email + password outlet uji) untuk peninjau Google, karena semua fitur di balik login.
    - Keamanan data: aplikasi mengumpulkan nama/email/no. HP akun staf & pelanggan, data transaksi & pembayaran, foto yang diunggah; data dienkripsi saat dikirim (HTTPS); pengguna bisa minta hapus akun. Tidak ada iklan.
    - Rating konten & target pengguna: 18+ (alat bisnis), tidak ditujukan untuk anak.

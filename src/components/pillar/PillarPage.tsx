@@ -128,6 +128,7 @@ export function PillarFooter({ lang }: { lang: "id" | "en" }) {
         <div className="flex items-center gap-4">
           <Link href="/kebijakan-cookie" className="hover:text-cyan-400 transition-colors">Cookie</Link>
           <Link href="/syarat-ketentuan" className="hover:text-cyan-400 transition-colors">Terms</Link>
+          <Link href="/kebijakan-privasi" className="hover:text-cyan-400 transition-colors">Privacy</Link>
           <span>© 2026 NEXBILL</span>
         </div>
       </div>

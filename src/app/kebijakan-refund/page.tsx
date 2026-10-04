@@ -159,6 +159,9 @@ export default function RefundPolicyPage() {
           <Link href="/dashboard/billing" className="text-xs text-cyan-400 hover:underline">
             ← Kembali ke Halaman Langganan
           </Link>
+          <Link href="/kebijakan-privasi" className="text-xs text-cyan-400 hover:underline">
+            Kebijakan Privasi →
+          </Link>
           <Link href="/syarat-ketentuan" className="text-xs text-cyan-400 hover:underline">
             Syarat &amp; Ketentuan →
           </Link>

@@ -93,7 +93,9 @@ export default function TermsPage() {
             NEXBILL bertindak sebagai penyedia layanan pemrosesan data tersebut, bukan pemiliknya, dan tidak akan menjual data Outlet ke
             pihak ketiga. Outlet dapat mengekspor datanya sendiri lewat fitur laporan yang tersedia di dashboard. Bila langganan berakhir
             atau akun ditangguhkan, data tetap disimpan (tidak langsung dihapus) untuk jangka waktu wajar guna memudahkan aktivasi ulang,
-            sebelum akhirnya dapat dihapus permanen sesuai kebijakan retensi NEXBILL.
+            sebelum akhirnya dapat dihapus permanen sesuai kebijakan retensi NEXBILL. Rincian data yang diproses, pihak ketiga, hak
+            Anda, dan cara menghapus akun ada di{" "}
+            <Link href="/kebijakan-privasi" className="text-cyan-400 hover:underline">Kebijakan Privasi</Link>.
           </p>
         </Section>
 
@@ -172,6 +174,9 @@ export default function TermsPage() {
         <div className="pt-4 border-t border-white/10 flex flex-wrap gap-x-4 gap-y-1">
           <Link href="/dashboard/billing" className="text-xs text-cyan-400 hover:underline">
             ← Kembali ke Halaman Langganan
+          </Link>
+          <Link href="/kebijakan-privasi" className="text-xs text-cyan-400 hover:underline">
+            Kebijakan Privasi →
           </Link>
           <Link href="/kebijakan-refund" className="text-xs text-cyan-400 hover:underline">
             Kebijakan Refund &amp; Pembatalan →

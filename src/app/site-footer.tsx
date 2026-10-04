@@ -34,6 +34,7 @@ export function SiteFooter() {
           <Link href="/kebijakan-cookie">{t.cookieBanner.policyLinkLabel}</Link>
           <Link href="/kebijakan-refund">{t.footer.refundLabel}</Link>
           <Link href="/syarat-ketentuan">{t.footer.termsLabel}</Link>
+          <Link href="/kebijakan-privasi">{t.footer.privacyLabel}</Link>
         </div>
         <div className="copyright" style={{ width: "100%", textAlign: "center", marginTop: "32px" }}>
           {t.footer.copyright}

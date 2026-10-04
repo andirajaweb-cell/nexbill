@@ -92,6 +92,9 @@ export default function CookiePolicyPage() {
           <Link href="/syarat-ketentuan" className="text-xs text-cyan-400 hover:underline">
             Syarat &amp; Ketentuan →
           </Link>
+          <Link href="/kebijakan-privasi" className="text-xs text-cyan-400 hover:underline">
+            Kebijakan Privasi →
+          </Link>
           <Link href="/kebijakan-refund" className="text-xs text-cyan-400 hover:underline">
             Kebijakan Refund &amp; Pembatalan →
           </Link>
