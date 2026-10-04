@@ -1,4 +1,6 @@
 "use client";
+import { useIsAndroidApp } from "@/lib/app-mode";
+import "@/lib/i18n/dict-app-mode";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/client";
@@ -38,6 +40,7 @@ export function GracePaymentReminderPopup() {
   const { data, mutate } = useApi<SubscriptionSnapshot>(user && user.role !== "superuser" ? "/api/subscription" : null);
   const [dismissing, setDismissing] = useState<"later" | "pay" | null>(null);
   const [hiddenLocally, setHiddenLocally] = useState(false);
+  const isAndroidApp = useIsAndroidApp();
 
   const sub = data?.subscription;
   const shouldShow = !!sub && sub.status === "grace" && !!data?.graceReminderKey && !data?.graceReminderDismissedToday && !hiddenLocally;
@@ -81,15 +84,23 @@ export function GracePaymentReminderPopup() {
             {daysLeft !== null && daysLeft > 0
               ? t("gracePay.daysLeft", "Kamu masih punya masa tenggang {n} hari lagi sebelum akses NEXBILL dikunci sepenuhnya.").replace("{n}", String(daysLeft))
               : t("gracePay.expiringSoon", "Masa tenggang akan segera habis — akses NEXBILL bisa dikunci sepenuhnya kapan saja.")}{" "}
-            {t("gracePay.resolveHint", "Selesaikan pembayaran kapan saja di halaman Langganan supaya akses tidak terganggu.")}
+            {isAndroidApp ? t("appMode.managedNote", "Langganan dikelola melalui akun NEXBILL Anda.") : t("gracePay.resolveHint", "Selesaikan pembayaran kapan saja di halaman Langganan supaya akses tidak terganggu.")}
           </p>
           <div className="flex items-center justify-end gap-2 pt-1">
-            <Button variant="ghost" onClick={() => dismiss("later")} disabled={dismissing !== null}>
-              {dismissing === "later" ? "..." : t("gracePay.later", "Nanti Dulu")}
-            </Button>
-            <Button onClick={() => dismiss("pay")} disabled={dismissing !== null}>
-              {dismissing === "pay" ? "..." : t("gracePay.payNow", "Bayar Sekarang")}
-            </Button>
+            {isAndroidApp ? (
+              <Button onClick={() => dismiss("later")} disabled={dismissing !== null}>
+                {dismissing === "later" ? "..." : t("appMode.ok", "Mengerti")}
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" onClick={() => dismiss("later")} disabled={dismissing !== null}>
+                  {dismissing === "later" ? "..." : t("gracePay.later", "Nanti Dulu")}
+                </Button>
+                <Button onClick={() => dismiss("pay")} disabled={dismissing !== null}>
+                  {dismissing === "pay" ? "..." : t("gracePay.payNow", "Bayar Sekarang")}
+                </Button>
+              </>
+            )}
           </div>
           <p className="text-[11px] text-neutral-600">{t("gracePay.footerNote", "Pengingat ini muncul sekali sehari selama tagihan belum lunas. Data outlet-mu tetap aman.")}</p>
         </div>

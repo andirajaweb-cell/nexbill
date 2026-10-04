@@ -195,18 +195,24 @@ export default function PrivacyPolicyPage() {
         </Section>
 
         <Section id="hapus-akun" title="9. Menghapus Akun &amp; Data">
-          <p>Owner dapat meminta penghapusan akun beserta data outlet kapan saja:</p>
+          <p>Owner dapat menghapus akun beserta data outlet kapan saja, dengan salah satu cara berikut:</p>
           <ol className="list-decimal pl-5 space-y-1">
             <li>
-              Kirim permintaan dari <strong>email yang terdaftar</strong> sebagai Owner ke <a href={`mailto:${CONTACT_EMAIL}?subject=Permintaan%20Hapus%20Akun%20NEXBILL`} className="text-cyan-400 hover:underline">{CONTACT_EMAIL}</a>{" "}
-              dengan subjek <em>&quot;Permintaan Hapus Akun NEXBILL&quot;</em>, atau hubungi WhatsApp {CONTACT_WA}. Sebutkan nama outlet.
+              <strong>Langsung di aplikasi/dashboard:</strong> buka <em>Pengaturan → Akun Saya → Hapus Akun &amp; Data</em>, tekan{" "}
+              <em>Kirim Kode Konfirmasi</em>, lalu masukkan kode 6 digit yang dikirim ke email Owner dan ketik <em>HAPUS</em>.
             </li>
-            <li>Kami memverifikasi bahwa permintaan berasal dari pemilik akun (misalnya kode konfirmasi ke email terdaftar).</li>
             <li>
-              Akun dinonaktifkan segera setelah terverifikasi, lalu data dihapus sesuai bagian 8. Kami dapat mengirimkan ekspor data Anda
-              terlebih dahulu bila diminta.
+              <strong>Lewat email atau WhatsApp</strong> (misalnya bila tidak bisa masuk lagi): kirim permintaan dari email yang terdaftar
+              sebagai Owner ke <a href={`mailto:${CONTACT_EMAIL}?subject=Permintaan%20Hapus%20Akun%20NEXBILL`} className="text-cyan-400 hover:underline">{CONTACT_EMAIL}</a>{" "}
+              dengan subjek <em>&quot;Permintaan Hapus Akun NEXBILL&quot;</em>, atau hubungi WhatsApp {CONTACT_WA}. Sebutkan nama outlet; kami
+              memverifikasi bahwa permintaan berasal dari pemilik akun (misalnya kode konfirmasi ke email terdaftar).
             </li>
           </ol>
+          <p>
+            Setelah dikonfirmasi, akun Owner, akun staf outlet, dan outlet langsung dinonaktifkan, langganan dihentikan, lalu data pribadi
+            dihapus atau dianonimkan sesuai bagian 8. Kami dapat mengirimkan ekspor data Anda terlebih dahulu bila diminta. Panduan singkat
+            juga tersedia di <Link href="/hapus-akun" className="text-cyan-400 hover:underline">nexbill.id/hapus-akun</Link>.
+          </p>
           <p>
             Staf (bukan Owner) dapat dihapus aksesnya oleh Owner melalui menu Staf &amp; Hak Akses. Pelanggan outlet yang ingin datanya
             dihapus dapat menghubungi outlet terkait atau kami.
@@ -278,8 +284,9 @@ export default function PrivacyPolicyPage() {
               process data outside Indonesia. Data is encrypted in transit and isolated per outlet.
             </p>
             <p>
-              Account owners can request deletion of their account and data by emailing {CONTACT_EMAIL} (subject &quot;Permintaan Hapus
-              Akun NEXBILL&quot;) or via WhatsApp {CONTACT_WA}; data is deleted or anonymised within 30 days except records we must keep
+              Account owners can delete their account and data in the app (Settings → Akun Saya → Hapus Akun &amp; Data, confirmed
+              with a code sent to the owner email) or by emailing {CONTACT_EMAIL} (subject &quot;Permintaan Hapus Akun NEXBILL&quot;) or
+              via WhatsApp {CONTACT_WA} (see nexbill.id/hapus-akun); data is deleted or anonymised within 30 days except records we must keep
               by law. The Android app uses Bluetooth only to print receipts to a printer you select, and does not collect location,
               contacts, or photos you did not choose to upload. The service is not intended for children under 18.
             </p>

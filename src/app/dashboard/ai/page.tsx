@@ -1,4 +1,6 @@
 "use client";
+import { useIsAndroidApp } from "@/lib/app-mode";
+import "@/lib/i18n/dict-app-mode";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
@@ -22,6 +24,7 @@ interface AiSubscriptionGate {
 export default function AiPage() {
   const { user } = useAuth();
   const { t } = useDashboardLang();
+  const isAndroidApp = useIsAndroidApp();
   const [tab, setTab] = useState<Tab>("assistant");
   const [outletId, setOutletId] = useState<string | null>(null);
   const [aiGate, setAiGate] = useState<AiSubscriptionGate | null>(null);
@@ -74,12 +77,18 @@ export default function AiPage() {
       ) : paymentGateLoading ? null : user && roleAllowed && !paymentAllowed ? (
         <Card className="p-4 border-amber-500/30 space-y-2">
           <div className="font-semibold text-amber-300">{t("ai.paywallTitle", "AI Add-on Belum Aktif")}</div>
-          <p className="text-sm text-neutral-500">
-            {t("ai.paywallBody", "AI Business Intelligence adalah produk berbayar terpisah — gratis selama masa percobaan, setelah itu perlu AI Add-on aktif (atau paket unlimited) di halaman Langganan.")}
-          </p>
-          <Link href="/dashboard/billing">
-            <Button className="mt-1">{t("ai.paywallCta", "Aktifkan AI Add-on")}</Button>
-          </Link>
+          {isAndroidApp ? (
+            <p className="text-sm text-neutral-500">{t("appMode.aiNote", "AI Business Intelligence termasuk paket Pro atau AI Add-on. Paket dikelola melalui akun NEXBILL Anda.")}</p>
+          ) : (
+            <>
+              <p className="text-sm text-neutral-500">
+                {t("ai.paywallBody", "AI Business Intelligence adalah produk berbayar terpisah — gratis selama masa percobaan, setelah itu perlu AI Add-on aktif (atau paket unlimited) di halaman Langganan.")}
+              </p>
+              <Link href="/dashboard/billing">
+                <Button className="mt-1">{t("ai.paywallCta", "Aktifkan AI Add-on")}</Button>
+              </Link>
+            </>
+          )}
         </Card>
       ) : (
         <>

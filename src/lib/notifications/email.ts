@@ -133,3 +133,33 @@ export function invoicePaidEmail(outletName: string, invoiceNumber: string, amou
     ),
   };
 }
+
+/** Kode konfirmasi permintaan hapus akun (Kebijakan Privasi bagian 9). */
+export function accountDeletionCodeEmail(name: string, code: string, outletNames: string, ttlMinutes: number) {
+  return {
+    subject: `Kode konfirmasi hapus akun NEXBILL: ${code}`,
+    html: wrapTemplate(
+      "Konfirmasi Hapus Akun",
+      `<p>Halo ${name},</p>
+       <p>Ada permintaan untuk <b>menghapus akun NEXBILL</b> beserta data outlet: <b>${outletNames}</b>.</p>
+       <p>Masukkan kode berikut di halaman Pengaturan → Akun Saya untuk melanjutkan (berlaku ${ttlMinutes} menit):</p>
+       <p style="font-size:28px;font-weight:bold;letter-spacing:6px;margin:16px 0">${code}</p>
+       <p>Setelah dikonfirmasi, akun dan outlet langsung dinonaktifkan, lalu data pribadi dihapus atau dianonimkan paling lambat 30 hari kemudian. Catatan transaksi dan invoice yang wajib disimpan menurut hukum tetap disimpan tanpa identitas.</p>
+       <p style="font-size:12px;color:#888">Kalau kamu tidak meminta ini, abaikan email ini dan segera ganti password akunmu — tidak ada yang dihapus tanpa kode di atas.</p>`
+    ),
+  };
+}
+
+/** Pemberitahuan bahwa penghapusan akun sudah dikonfirmasi dan dijadwalkan. */
+export function accountDeletionConfirmedEmail(name: string, outletNames: string, purgeDate: string) {
+  return {
+    subject: "Permintaan hapus akun NEXBILL dikonfirmasi",
+    html: wrapTemplate(
+      "Akun Dinonaktifkan",
+      `<p>Halo ${name},</p>
+       <p>Akun NEXBILL kamu dan outlet <b>${outletNames}</b> sudah dinonaktifkan sesuai permintaan.</p>
+       <p>Data pribadi akan dihapus atau dianonimkan paling lambat <b>${purgeDate}</b>. Kalau ini keliru dan ingin membatalkan, balas email ini atau hubungi WhatsApp +62 8557 3333 20 sebelum tanggal tersebut.</p>
+       <p style="font-size:12px;color:#888">Terima kasih sudah memakai NEXBILL.</p>`
+    ),
+  };
+}

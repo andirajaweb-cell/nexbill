@@ -100,6 +100,17 @@ Pastikan: tidak ada bilah alamat, login jalan, Kasir & Rental PS normal, dan cet
    - Rating konten & target pengguna: 18+ (alat bisnis), tidak ditujukan untuk anak.
 6. Setelah 14 hari uji tertutup → **Ajukan akses produksi** di Dasbor.
 
+## Aturan Google Play yang sudah ditangani
+
+- **Pembayaran layanan digital**: saat dibuka dari aplikasi Android, NEXBILL masuk "mode aplikasi"
+  (`src/lib/app-mode.ts`) — tombol checkout/perpanjang/ganti paket langganan, AI Add-on, top up saldo
+  deposit, dan instruksi bayar tagihan langganan disembunyikan, diganti kalimat netral tanpa tautan.
+  Toko (smart plug, barang fisik) tetap bisa dibeli. Di browser biasa semuanya tetap normal.
+- **Penghapusan akun**: di aplikasi lewat Pengaturan → Akun Saya → Hapus Akun & Data (kode email +
+  ketik HAPUS). URL untuk formulir Keamanan Data: `https://nexbill.id/hapus-akun`.
+  Permintaan dipantau di Platform Admin → Hapus Akun (Privasi); purge otomatis 30 hari.
+- **Kebijakan privasi**: `https://nexbill.id/kebijakan-privasi`.
+
 ## Update aplikasi
 
 - Fitur/tampilan baru → cukup deploy web. Tidak perlu apa-apa di Play Store.

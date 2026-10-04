@@ -44,6 +44,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/kebijakan-cookie", priority: 0.3, changeFrequency: "yearly" },
     { path: "/kebijakan-refund", priority: 0.3, changeFrequency: "yearly" },
     { path: "/kebijakan-privasi", priority: 0.3, changeFrequency: "yearly" },
+    { path: "/hapus-akun", priority: 0.2, changeFrequency: "yearly" },
   ];
 
   return routes.map((route) => ({

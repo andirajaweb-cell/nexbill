@@ -103,6 +103,7 @@ export const SISTEM: HelpCategory[] = [
         steps: [
           "Ganti email login dan password akunmu sendiri (password minimal 8 karakter).",
           "Akun yang dibuat lewat Google bisa membuat password supaya juga bisa login dengan email & password.",
+          "Owner: kartu \"Hapus Akun & Data\" menghapus akun beserta data outlet — tekan \"Kirim Kode Konfirmasi\", masukkan kode dari email, ketik HAPUS. Akun & outlet langsung nonaktif, data pribadi dihapus paling lambat 30 hari.",
         ],
       },
     ],

@@ -103,6 +103,7 @@ export const SISTEM: HelpCategory[] = [
         steps: [
           "Tukar e-mel log masuk dan kata laluan anda sendiri (kata laluan sekurang-kurangnya 8 aksara).",
           "Akaun yang dibuat dengan Google boleh menetapkan kata laluan supaya juga boleh log masuk dengan e-mel & kata laluan.",
+          "Owner: kad \"Padam Akaun & Data\" memadam akaun serta data outlet — tekan \"Hantar Kod Pengesahan\", masukkan kod daripada e-mel, taip HAPUS. Akaun & outlet terus dinyahaktifkan; data peribadi dipadam selewat-lewatnya 30 hari.",
         ],
       },
     ],

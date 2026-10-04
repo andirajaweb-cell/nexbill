@@ -25,6 +25,7 @@ import {
   logEvent,
 } from "../src/lib/subscription/service";
 import { sendEmail, trialReminderEmail, trialExpiredPaymentInfoEmail } from "../src/lib/notifications/email";
+import { sweepDueAccountDeletions } from "../src/lib/account-deletion/service";
 
 const POLL_INTERVAL_MS = 60 * 60 * 1000; // 1 hour — trial/renewal windows are day-granularity, no need to poll faster
 const BILLING_URL = `${process.env.APP_BASE_URL ?? "http://localhost:3000"}/dashboard/billing`;
@@ -64,6 +65,10 @@ async function tick() {
     // per-request self-heal in applyLifecycleTransitions already covers outlets someone is
     // actively viewing; this table-wide sweep is the backstop for everyone else.
     const staleInvoices = await sweepExpireStaleUnpaidInvoices();
+
+    // 6) Penghapusan akun yang sudah lewat 30 hari sejak dikonfirmasi Owner (Kebijakan Privasi bagian 8).
+    const purgedAccounts = await sweepDueAccountDeletions();
+    if (purgedAccounts) console.log(`[subscription-scheduler] ${ranAt} — ${purgedAccounts} permintaan hapus akun diproses (data dianonimkan).`);
 
     if (remindersDue.length || expired.length || renewals.length || transitions.length || staleInvoices.length) {
       console.log(

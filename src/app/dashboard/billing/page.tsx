@@ -17,6 +17,8 @@ import { BillingFaq } from "@/components/billing/BillingFaq";
 import { PlanPicker, chargeForSelection, type CatalogPlan, type PlanSelection } from "@/components/billing/PlanPicker";
 import { planTierOf, minUnitsOf } from "@/lib/subscription/pricing";
 import "@/lib/i18n/dict-plan";
+import { useIsAndroidApp } from "@/lib/app-mode";
+import "@/lib/i18n/dict-app-mode";
 import { BillingProfileTab } from "@/components/billing/BillingProfileTab";
 import { DepositTab } from "@/components/billing/DepositTab";
 import { InvoiceHistoryTab } from "@/components/billing/InvoiceHistoryTab";
@@ -265,6 +267,9 @@ export default function BillingPage() {
   const [planSel, setPlanSel] = useState<PlanSelection | null>(null);
   const [showChangePlan, setShowChangePlan] = useState(false);
   const [changeBusy, setChangeBusy] = useState(false);
+  // Aplikasi Android (Play Store): pembayaran layanan digital (langganan, AI Add-on, saldo deposit)
+  // disembunyikan sesuai aturan Google Play — lihat lib/app-mode.ts. Toko (barang fisik) tetap ada.
+  const isAndroidApp = useIsAndroidApp();
 
   const [areaQuery, setAreaQuery] = useState("");
   const [areaResults, setAreaResults] = useState<ShippingArea[]>([]);
@@ -607,7 +612,7 @@ export default function BillingPage() {
     ? Math.ceil((new Date(sub.currentPeriodEnd).getTime() - now) / 86_400_000)
     : null;
 
-  const canRenewNow = (sub.status === "active" || sub.status === "grace") && unpaidSubscriptionInvoices.length === 0;
+  const canRenewNow = !isAndroidApp && (sub.status === "active" || sub.status === "grace") && unpaidSubscriptionInvoices.length === 0;
   
   const grouped = (products ?? []).reduce<Record<string, ProductData[]>>((acc, p) => {
     if (!acc[p.category]) acc[p.category] = [];
@@ -634,7 +639,7 @@ export default function BillingPage() {
           { id: "deposit", label: t("billing.tab.deposit", "Saldo Deposit"), Icon: Wallet },
           { id: "invoices", label: t("billing.tab.invoices", "Riwayat Faktur"), Icon: Receipt },
           { id: "usage", label: t("billing.tab.usage", "Pertumbuhan Data"), Icon: TrendingUp },
-        ] as const).map(({ id, label, Icon }) => (
+        ] as const).filter(({ id }) => !(isAndroidApp && id === "deposit")).map(({ id, label, Icon }) => (
           <button
             key={id}
             type="button"
@@ -861,12 +866,13 @@ export default function BillingPage() {
               {t("billing.paid.downloadManual", "Download Buku Manual Smart Plug")}
             </Button>
           )}
-          {canManage && (
+          {isAndroidApp && <p className="text-xs text-neutral-500 mt-3">{t("appMode.managedNote", "Langganan dikelola melalui akun NEXBILL Anda.")}</p>}
+          {canManage && !isAndroidApp && (
             <Button variant={planTier === "starter" ? "primary" : "secondary"} className="mt-3" onClick={() => setShowChangePlan((v) => !v)}>
               {t("plan.change.title", "Ganti Paket")}
             </Button>
           )}
-          {canManage && showChangePlan && planSel && (
+          {canManage && !isAndroidApp && showChangePlan && planSel && (
             <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
               <p className="text-xs text-neutral-500">{t("plan.change.subtitle", "Naik ke Pro atau tambah kuota unit langsung berlaku setelah selisih prorata dibayar.")}</p>
               <PlanPicker
@@ -885,7 +891,13 @@ export default function BillingPage() {
         </Card>
       )}
 
-      {!isPaid && canManage && unpaidSubscriptionInvoices.length === 0 && (
+      {isAndroidApp && !isPaid && !isSuperuser && sub.status !== "free_forever" && (
+        <Card className="p-4">
+          <p className="text-sm text-neutral-400">{t("appMode.managedNote", "Langganan dikelola melalui akun NEXBILL Anda.")}</p>
+        </Card>
+      )}
+
+      {!isAndroidApp && !isPaid && canManage && unpaidSubscriptionInvoices.length === 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
             <Card className="p-4 space-y-3">
@@ -1103,7 +1115,7 @@ export default function BillingPage() {
             {aiAddon?.includedViaPlan && (
               <span className="inline-block text-xs px-2 py-1 rounded-lg bg-violet-500/15 text-violet-300">{t("billing.ai.includedBadge", "Termasuk")}</span>
             )}
-            {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && (
+            {!isAndroidApp && !aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && (
               <>
                 <div className="text-sm font-semibold text-violet-300 mb-1">{money(aiAddon?.priceMonthly ?? 0)}{t("billing.ai.perMonthSuffix", "/bulan")}</div>
                 <Button variant={aiAddon?.active ? "secondary" : "primary"} onClick={doActivateAi} disabled={aiAddonBusy}>
@@ -1154,7 +1166,11 @@ export default function BillingPage() {
                         cross-border card button stays separate because it is a different iPaymu
                         product (international card acceptance) and only applies to outlets billed
                         in a foreign currency. */}
-                    {canManage && (!inv.method || isExpired) && (
+                    {/* Aplikasi Android: hanya pesanan Toko (barang fisik) yang boleh dibayar di sini. */}
+                    {isAndroidApp && inv.type !== "product_order" && (
+                      <span className="text-[11px] text-neutral-500 max-w-[220px] text-right">{t("appMode.managedNote", "Langganan dikelola melalui akun NEXBILL Anda.")}</span>
+                    )}
+                    {canManage && (!isAndroidApp || inv.type === "product_order") && (!inv.method || isExpired) && (
                       <div className="flex gap-2 flex-wrap justify-end">
                         <Button onClick={() => doPay(inv.id, "ipaymu_hosted")}>
                           {t("billing.invoices.payNow", "Bayar Sekarang")}
@@ -1168,7 +1184,7 @@ export default function BillingPage() {
                     )}
                     
                     {/* Jika metode SUDAH dipilih & belum kedaluwarsa */}
-                    {canManage && inv.method && !isExpired && (
+                    {canManage && (!isAndroidApp || inv.type === "product_order") && inv.method && !isExpired && (
                       <div className="flex gap-2 flex-wrap justify-end items-center">
                         
                         {/* Menampilkan Jangka Waktu Pembayaran (Countdown) jika expiresAt tersedia */}
@@ -1213,7 +1229,7 @@ export default function BillingPage() {
                   </div>
                 )}
 
-                {!isExpired && inv.method?.startsWith("va_") && inv.vaNumber && (
+                {!isExpired && (!isAndroidApp || inv.type === "product_order") && inv.method?.startsWith("va_") && inv.vaNumber && (
                   <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm flex items-center justify-between flex-wrap gap-2 mt-2">
                     <div>
                       <div className="text-xs text-neutral-500">{t("billing.invoices.vaTransferTo", "Transfer ke Virtual Account {bank}").replace("{bank}", VA_BANK_NAME[inv.vaBankCode ?? ""] ?? inv.vaBankCode)}</div>
@@ -1223,7 +1239,7 @@ export default function BillingPage() {
                   </div>
                 )}
 
-                {!isExpired && inv.method === "qris" && inv.qrImageUrl && (
+                {!isExpired && (!isAndroidApp || inv.type === "product_order") && inv.method === "qris" && inv.qrImageUrl && (
                   <div className="flex flex-col gap-2 mt-2">
                     <img src={inv.qrImageUrl} alt={t("billing.invoices.qrAlt", "QR pembayaran langganan")} className="w-32 h-32 rounded-lg border border-white/10 bg-white" />
                     <span className="text-xs text-neutral-500">{t("billing.invoices.qrisNote", "Silakan scan kode QRIS ini. Sistem akan mengecek otomatis.")}</span>

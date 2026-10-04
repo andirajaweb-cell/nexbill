@@ -1,4 +1,6 @@
 "use client";
+import { useIsAndroidApp } from "@/lib/app-mode";
+import "@/lib/i18n/dict-app-mode";
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/client";
@@ -63,6 +65,8 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   // self-heal in getOrCreateSubscription), but a call already in flight or freshly resolved
   // within the dedupingInterval is reused instead of firing a brand new request.
   const { data, mutate } = useApi<{ isLocked: boolean; subscription: { status: string } }>("/api/subscription");
+  // Aplikasi Android (Play Store): tanpa tombol bayar — lihat lib/app-mode.ts.
+  const isAndroidApp = useIsAndroidApp();
   useEffect(() => {
     mutate();
   }, [pathname, mutate]);
@@ -91,9 +95,13 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
         {outletName && <p className="text-[11px] text-neutral-500 uppercase tracking-wide">{outletName}</p>}
         <h1 className="text-xl font-bold text-rose-300 gm-display">{copy.title}</h1>
         <p className="text-sm text-neutral-400">{copy.body}</p>
-        <Button className="w-full" onClick={() => router.push("/dashboard/billing")}>
-          {t("subGate.renewNow", "Perpanjang / Bayar Sekarang")}
-        </Button>
+        {isAndroidApp ? (
+          <p className="text-sm text-neutral-300">{t("appMode.lockedNote", "Akses outlet ini sedang tidak aktif. Langganan dikelola melalui akun NEXBILL Anda.")}</p>
+        ) : (
+          <Button className="w-full" onClick={() => router.push("/dashboard/billing")}>
+            {t("subGate.renewNow", "Perpanjang / Bayar Sekarang")}
+          </Button>
+        )}
         <p className="text-[11px] text-neutral-600">{t("subGate.footerNote", "Data outlet-mu aman dan tidak hilang — semua fitur terbuka otomatis begitu pembayaran diterima.")}</p>
       </div>
     </div>

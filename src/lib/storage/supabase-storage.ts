@@ -51,3 +51,22 @@ export async function uploadToSupabaseStorage(bucket: string, filename: string, 
   const { data } = admin.storage.from(bucket).getPublicUrl(filename);
   return data.publicUrl;
 }
+
+/**
+ * Hapus file dari Supabase Storage berdasarkan URL publiknya (…/storage/v1/object/public/<bucket>/<path>).
+ * Dipakai saat penghapusan akun (foto identitas, logo, dll.). URL yang bukan milik Supabase
+ * Storage diabaikan; kegagalan tidak dilempar (dikembalikan false) supaya proses hapus data lain
+ * tetap berjalan.
+ */
+export async function deleteFromSupabaseStorageByPublicUrl(url: string | null | undefined): Promise<boolean> {
+  if (!url) return false;
+  const m = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+?)(?:\?.*)?$/);
+  if (!m) return false;
+  try {
+    const admin = getAdminClient();
+    const { error } = await admin.storage.from(m[1]).remove([decodeURIComponent(m[2])]);
+    return !error;
+  } catch {
+    return false;
+  }
+}

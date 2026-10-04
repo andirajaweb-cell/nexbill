@@ -22,6 +22,7 @@ import { formatDate } from "@/lib/format/date";
 import "@/lib/i18n/dict-settings";
 import "@/lib/i18n/dict-plan";
 import { TuyaAccountsCard } from "./TuyaAccountsCard";
+import { DeleteAccountCard } from "./DeleteAccountCard";
 
 const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "Banner Iklan", "TV Screensaver", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
 type Tab = (typeof TABS)[number];
@@ -2568,6 +2569,8 @@ function MyAccountTab() {
           </Button>
         </form>
       </Card>
+
+      <DeleteAccountCard />
     </div>
   );
 }

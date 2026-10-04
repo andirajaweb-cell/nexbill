@@ -1,4 +1,6 @@
 "use client";
+import { useIsAndroidApp } from "@/lib/app-mode";
+import "@/lib/i18n/dict-app-mode";
 import { usePathname, useRouter } from "next/navigation";
 import { Crown } from "lucide-react";
 import { useAuth } from "@/lib/auth/client";
@@ -23,6 +25,7 @@ export function PlanFeatureGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data } = useApi<{ entitlements?: { features: PlanFeature[] }; isLocked?: boolean }>(user ? "/api/subscription" : null);
 
+  const isAndroidApp = useIsAndroidApp();
   const feature = pathname ? featureForDashboardPath(pathname) : null;
   if (!feature || user?.role === "superuser") return <>{children}</>;
   const features = data?.entitlements?.features;
@@ -37,10 +40,16 @@ export function PlanFeatureGate({ children }: { children: React.ReactNode }) {
           <Crown size={24} className="text-amber-300" />
         </div>
         <h1 className="text-xl font-bold text-amber-200 gm-display">{t("planGate.title", "Fitur Paket Pro")}</h1>
-        <p className="text-sm text-neutral-400">{t("planGate.body", "{feature} termasuk paket NEXBILL Pro.").replace("{feature}", featureLabel)}</p>
-        <Button className="w-full" onClick={() => router.push("/dashboard/billing")}>
-          {t("planGate.upgrade", "Lihat Paket & Upgrade")}
-        </Button>
+        {isAndroidApp ? (
+          <p className="text-sm text-neutral-400">{t("appMode.proFeatureNote", "{feature} termasuk paket NEXBILL Pro.").replace("{feature}", featureLabel)}</p>
+        ) : (
+          <>
+            <p className="text-sm text-neutral-400">{t("planGate.body", "{feature} termasuk paket NEXBILL Pro.").replace("{feature}", featureLabel)}</p>
+            <Button className="w-full" onClick={() => router.push("/dashboard/billing")}>
+              {t("planGate.upgrade", "Lihat Paket & Upgrade")}
+            </Button>
+          </>
+        )}
         <p className="text-[11px] text-neutral-600">{t("planGate.dataSafe", "Data penjualan tetap tercatat — semuanya langsung terbuka begitu upgrade.")}</p>
       </div>
     </div>

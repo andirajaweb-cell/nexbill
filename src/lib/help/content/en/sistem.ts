@@ -103,6 +103,7 @@ export const SISTEM: HelpCategory[] = [
         steps: [
           "Change your own login email and password (password at least 8 characters).",
           "Accounts created with Google can set a password so they can also log in with email & password.",
+          "Owner: the \"Delete Account & Data\" card deletes the account and outlet data — press \"Send Confirmation Code\", enter the code from your email, type HAPUS. The account and outlets are deactivated immediately; personal data is deleted within 30 days.",
         ],
       },
     ],

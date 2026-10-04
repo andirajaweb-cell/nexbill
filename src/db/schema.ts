@@ -3048,3 +3048,33 @@ export const platformWaOutbox = pgTable(
   },
   (t) => [index("platform_wa_outbox_status_idx").on(t.status, t.createdAt), index("platform_wa_outbox_lead_idx").on(t.leadId)]
 );
+
+/**
+ * Permintaan hapus akun & data outlet (Kebijakan Privasi bagian 9, syarat Google Play). Alur:
+ * pending_verification (kode 6 digit dikirim ke email Owner) → confirmed (akun & outlet langsung
+ * dinonaktifkan, dijadwalkan purge 30 hari) → purged (data pribadi dihapus/dianonimkan; catatan
+ * transaksi & invoice tetap disimpan tanpa identitas karena kewajiban hukum). cancelled = dibatalkan
+ * sebelum purge (oleh Owner sebelum konfirmasi, atau oleh platform-admin yang mengaktifkan ulang).
+ * Lihat src/lib/account-deletion/service.ts.
+ */
+export const accountDeletionRequests = pgTable("account_deletion_requests", {
+  id: id(),
+  requestedByStaffUserId: text("requested_by_staff_user_id").notNull().references(() => staffUsers.id),
+  email: text("email").notNull(),
+  outletIdsJson: text("outlet_ids_json").notNull().default("[]"),
+  outletNames: text("outlet_names"),
+  // Akun staf yang dinonaktifkan saat konfirmasi — supaya pembatalan oleh platform-admin hanya
+  // mengaktifkan ulang yang kami nonaktifkan, bukan staf yang memang sudah dinonaktifkan Owner.
+  deactivatedStaffIdsJson: text("deactivated_staff_ids_json").notNull().default("[]"),
+  reason: text("reason"),
+  status: text("status", { enum: ["pending_verification", "confirmed", "purged", "cancelled"] }).notNull().default("pending_verification"),
+  codeHash: text("code_hash"),
+  codeExpiresAt: text("code_expires_at"),
+  attempts: integer("attempts").notNull().default(0),
+  confirmedAt: text("confirmed_at"),
+  scheduledPurgeAt: text("scheduled_purge_at"),
+  purgedAt: text("purged_at"),
+  cancelledAt: text("cancelled_at"),
+  handledBy: text("handled_by"),
+  ...timestamps,
+});

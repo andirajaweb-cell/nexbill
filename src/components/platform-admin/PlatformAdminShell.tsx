@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
+  UserX,
   BookOpen,
   Calculator,
   CreditCard,
@@ -51,6 +52,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/platform-admin/announcements", label: "Pengumuman", icon: Megaphone },
       { href: "/platform-admin/support", label: "Customer Service", icon: LifeBuoy },
       { href: "/platform-admin/marketplace-disputes", label: "Sengketa Marketplace", icon: Scale },
+      { href: "/platform-admin/account-deletions", label: "Hapus Akun (Privasi)", icon: UserX },
     ],
   },
   {

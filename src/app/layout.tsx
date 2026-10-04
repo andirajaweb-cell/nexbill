@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Orbitron, Rajdhani, Inter, Geist } from "next/font/google";
 import { DialogHost } from "@/components/DialogHost";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
+import { AppModeDetector } from "@/components/pwa/AppModeDetector";
 import { PsCursorSystem } from "@/components/PsCursorSystem";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -189,6 +190,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <DialogHost />
         <ServiceWorkerRegister />
+        <AppModeDetector />
         <PsCursorSystem />
       </body>
     </html>
