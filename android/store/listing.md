@@ -8,9 +8,9 @@ Hindari kata "PlayStation"/logo Sony di nama, ikon, dan grafis (merek pihak lain
 
 ## Bahasa Indonesia (default)
 
-**Nama aplikasi** (24 karakter)
+**Nama aplikasi** (26 karakter — sudah dipakai saat Create app; ganti ke `NEXBILL - Billing Rental PS/PC` setelah fitur rental PC rilis)
 ```
-NEXBILL: Kasir Rental PS
+NEXBILL: Billing Rental PS
 ```
 
 **Deskripsi singkat** (≤ 80)
