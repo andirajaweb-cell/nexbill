@@ -290,6 +290,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Isi wang yang ditinggalkan di laci untuk syif seterusnya; bakinya dianggap diserahkan kepada pemilik/peti besi.",
           "Tambah catatan jika ada perbezaan yang sudah diketahui, kemudian tekan Tutup Syif.",
           "Ringkasan Tutup Syif memaparkan: Modal Awal, Wang Masuk, Wang Keluar, Jangkaan Tunai (yang sepatutnya ada), kiraan anda, dan Perbezaan. Merah = kurang, kuning = lebih.",
+          "Sejarah Syif boleh ditapis Mengikut Hari, Mengikut Bulan (lalai: bulan ini), atau Mengikut Tahun — gerak dengan butang ‹ › — serta penapis kakitangan dan status (masih dibuka, ada perbezaan, ditanda anti-penipuan). Ringkasan di atas jadual menjumlahkan syif, perbezaan tunai dan bukan tunai mengikut penapis.",
         ],
       },
       {

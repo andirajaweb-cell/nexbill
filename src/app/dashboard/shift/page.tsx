@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, HelpCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -15,6 +15,24 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { useOutletFormat } from "@/lib/format/client";
 import "@/lib/i18n/dict-shift";
+import { filterShifts, summarizeShifts, shiftYears, defaultFilterValue, type ShiftPeriodMode, type ShiftHistoryFilter } from "@/lib/shift/history-filter";
+
+/** Geser nilai filter satu langkah (hari/bulan/tahun) untuk tombol ‹ ›. */
+function stepPeriod(mode: ShiftPeriodMode, value: string, dir: 1 | -1): string {
+  if (!value) return value;
+  if (mode === "year") return String(Number(value) + dir);
+  if (mode === "month") {
+    const [y, m] = value.split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + dir, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  }
+  if (mode === "day") {
+    const [y, m, d] = value.split("-").map(Number);
+    const x = new Date(Date.UTC(y, m - 1, d + dir));
+    return x.toISOString().slice(0, 10);
+  }
+  return value;
+}
 
 /**
  * Shared over/under (lebih/kurang) labeling for shift cash & non-cash
@@ -86,6 +104,16 @@ export default function ShiftPage() {
   const [outletId, setOutletId] = useState<string | null>(null);
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
+  // Filter Riwayat Shift (hari / bulan / tahun + karyawan + status) — di sisi klien atas daftar yang sudah dimuat.
+  const [historyFilter, setHistoryFilter] = useState<ShiftHistoryFilter>(() => ({ mode: "month", value: defaultFilterValue("month"), staffUserId: "", status: "all" }));
+  const filteredHistory = useMemo(() => filterShifts(history, historyFilter), [history, historyFilter]);
+  const historySummary = useMemo(() => summarizeShifts(filteredHistory), [filteredHistory]);
+  const historyStaff = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of history) if (s.staffUserId) m.set(s.staffUserId, s.staffName ?? "-");
+    return [...m].sort((a, b) => a[1].localeCompare(b[1], "id"));
+  }, [history]);
+  const setPeriodMode = (mode: ShiftPeriodMode) => setHistoryFilter((f) => ({ ...f, mode, value: defaultFilterValue(mode) }));
   const [openingCash, setOpeningCash] = useState(0);
   // Cash pools (Kas Toko, Kas Besar, Kas Kecil, Saldo Deposit Virtual, dll — see lib/cash/deposits.ts)
   // with their live trial-balance-derived balance, used both for the "Modal Awal" quick-fill below
@@ -716,10 +744,69 @@ export default function ShiftPage() {
         <p className="text-xs text-neutral-500 mb-2">
           {t("shift.historyDescPrefix", "Setiap pergantian shift otomatis dicek selisih kas (fisik vs ekspektasi sistem) dan selisih saldo channel non-tunai — ditandai")} <span className="text-red-400">{t("shift.historyDescRedLabel", 'merah "Kurang"')}</span> {t("shift.historyDescMiddle", "untuk kekurangan dan")} <span className="text-amber-400">{t("shift.historyDescAmberLabel", 'kuning "Lebih"')}</span> {t("shift.historyDescSuffix", "untuk kelebihan, supaya keduanya sama-sama kelihatan, bukan cuma yang kurang.")}
         </p>
+        <div className="mb-3 space-y-2 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {(["all", "day", "month", "year"] as ShiftPeriodMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setPeriodMode(m)}
+                className={`rounded-full border px-3 py-1 text-xs transition ${historyFilter.mode === m ? "border-emerald-500 bg-emerald-500/15 text-emerald-400" : "border-neutral-700 text-neutral-400 hover:text-neutral-200"}`}
+              >
+                {m === "all" ? t("shift.filter.all", "Semua") : m === "day" ? t("shift.filter.day", "Per Hari") : m === "month" ? t("shift.filter.month", "Per Bulan") : t("shift.filter.year", "Per Tahun")}
+              </button>
+            ))}
+            {historyFilter.mode !== "all" && (
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => setHistoryFilter((f) => ({ ...f, value: stepPeriod(f.mode, f.value, -1) }))} className="rounded-lg border border-neutral-700 p-1 hover:bg-neutral-800" aria-label={t("shift.filter.prev", "Sebelumnya")}><ChevronLeft size={14} /></button>
+                {historyFilter.mode === "day" && (
+                  <input type="date" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={historyFilter.value} onChange={(e) => e.target.value && setHistoryFilter((f) => ({ ...f, value: e.target.value }))} />
+                )}
+                {historyFilter.mode === "month" && (
+                  <input type="month" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={historyFilter.value} onChange={(e) => e.target.value && setHistoryFilter((f) => ({ ...f, value: e.target.value }))} />
+                )}
+                {historyFilter.mode === "year" && (
+                  <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={historyFilter.value} onChange={(e) => setHistoryFilter((f) => ({ ...f, value: e.target.value }))}>
+                    {[...new Set([historyFilter.value, ...shiftYears(history)])].sort().reverse().map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                )}
+                <button type="button" onClick={() => setHistoryFilter((f) => ({ ...f, value: stepPeriod(f.mode, f.value, 1) }))} className="rounded-lg border border-neutral-700 p-1 hover:bg-neutral-800" aria-label={t("shift.filter.next", "Berikutnya")}><ChevronRight size={14} /></button>
+                {historyFilter.value !== defaultFilterValue(historyFilter.mode) && (
+                  <button type="button" onClick={() => setHistoryFilter((f) => ({ ...f, value: defaultFilterValue(f.mode) }))} className="ml-1 text-xs text-cyan-400 hover:underline">
+                    {historyFilter.mode === "day" ? t("shift.filter.today", "Hari ini") : historyFilter.mode === "month" ? t("shift.filter.thisMonth", "Bulan ini") : t("shift.filter.thisYear", "Tahun ini")}
+                  </button>
+                )}
+              </div>
+            )}
+            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs sm:ml-auto" value={historyFilter.staffUserId ?? ""} onChange={(e) => setHistoryFilter((f) => ({ ...f, staffUserId: e.target.value }))}>
+              <option value="">{t("shift.filter.allStaff", "Semua karyawan")}</option>
+              {historyStaff.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={historyFilter.status ?? "all"} onChange={(e) => setHistoryFilter((f) => ({ ...f, status: e.target.value as ShiftHistoryFilter["status"] }))}>
+              <option value="all">{t("shift.filter.allStatus", "Semua status")}</option>
+              <option value="open">{t("shift.filter.statusOpen", "Masih buka")}</option>
+              <option value="closed">{t("shift.filter.statusClosed", "Sudah tutup")}</option>
+              <option value="variance">{t("shift.filter.statusVariance", "Ada selisih")}</option>
+              <option value="flagged">{t("shift.filter.statusFlagged", "Ditandai anti-fraud")}</option>
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
+            <span>{t("shift.filter.summaryCount", "{n} shift ({open} masih buka)").replace("{n}", String(historySummary.count)).replace("{open}", String(historySummary.openCount))}</span>
+            <span>
+              {t("shift.filter.summaryCash", "Selisih kas bersih")}: <span className={varianceBadge(historySummary.cashVariance, t, rupiah).className}>{rupiah(historySummary.cashVariance)}</span>
+              {historySummary.shortage < 0 && <span className="text-red-400"> · {t("shift.filter.summaryShortage", "total kurang {amount}").replace("{amount}", rupiah(historySummary.shortage))}</span>}
+            </span>
+            <span>{t("shift.filter.summaryNonCash", "Selisih non-tunai")}: <span className={varianceBadge(historySummary.nonCashVariance, t, rupiah).className}>{rupiah(historySummary.nonCashVariance)}</span></span>
+            {historySummary.flaggedCount > 0 && <span className="text-amber-400">🚩 {t("shift.fraud.flaggedCount", "{count} ditandai").replace("{count}", String(historySummary.flaggedCount))}</span>}
+          </div>
+        </div>
         <table className="w-full text-sm">
           <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("shift.colOpen", "Buka")}</th><th>{t("shift.colClose", "Tutup")}</th><th>{t("shift.colStaff", "Karyawan")}</th><th>{t("shift.colOpeningCapital", "Modal")}</th><th title={t("shift.expectedCashHint", "Uang yang SEHARUSNYA ada di laci menurut catatan transaksi sistem (modal awal + uang masuk − uang keluar) — bukan hasil hitungan fisikmu.")}>{t("shift.colExpected", "Ekspektasi")}</th><th title={t("shift.colActualCashHint", "Total uang tunai hasil hitungan fisik saat tutup shift")}>{t("shift.colActual", "Aktual")}</th><th title={t("shift.cashVarianceHint", "Selisih = uang hasil hitungan fisikmu dikurangi Ekspektasi Kas. Negatif berarti uang di laci kurang dari seharusnya; positif berarti lebih.")}>{t("shift.cashVarianceLabel", "Selisih Kas")}</th><th title={t("shift.colNonCashVarianceHint", "Total selisih (aktual vs ekspektasi) untuk semua channel non-tunai seperti GoPay/DANA/PPOB pada shift ini")}>{t("shift.colNonCashVariance", "Selisih Non-Tunai")}</th><th title={t("shift.colFraudHint", "Ditandai otomatis kalau selisih atau jumlah void/refund/hapus pada shift ini melebihi ambang batas di Pengaturan > Preferensi")}>{t("shift.colFraud", "Anti-Fraud")}</th><th></th></tr></thead>
           <tbody>
-            {history.map((s) => {
+            {filteredHistory.length === 0 && (
+              <tr><td colSpan={10} className="py-6 text-center text-sm text-neutral-500">{history.length === 0 ? t("shift.filter.noShifts", "Belum ada shift tercatat.") : t("shift.filter.noMatch", "Tidak ada shift pada periode/filter ini.")}</td></tr>
+            )}
+            {filteredHistory.map((s) => {
               const cashV = varianceBadge(s.variance, t, rupiah);
               const nonCashV = varianceBadge(s.nonCashVarianceTotal, t, rupiah);
               const riskFlags: { code: string; label: string; severity: "warn" | "high" }[] = (() => {

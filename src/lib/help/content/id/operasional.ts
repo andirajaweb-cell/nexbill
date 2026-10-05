@@ -290,6 +290,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Isi uang yang ditinggal di laci untuk shift berikutnya; sisanya dianggap diserahkan ke owner/brankas.",
           "Tambahkan catatan bila ada selisih yang sudah diketahui, lalu tekan Tutup Shift.",
           "Ringkasan Tutup Shift menampilkan: Modal Awal, Uang Masuk, Uang Keluar, Ekspektasi Kas (yang seharusnya ada), hasil hitunganmu, dan Selisih. Merah = kurang, kuning = lebih.",
+          "Riwayat Shift bisa difilter Per Hari, Per Bulan (bawaan: bulan ini), atau Per Tahun — geser dengan tombol ‹ › — ditambah filter karyawan dan status (masih buka, ada selisih, ditandai anti-fraud). Ringkasan di atas tabel menjumlahkan shift, selisih kas, dan selisih non-tunai sesuai filter.",
         ],
       },
       {

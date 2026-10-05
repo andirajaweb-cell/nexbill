@@ -290,6 +290,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Enter the cash left in the drawer for the next shift; the rest is treated as handed to the owner/safe.",
           "Add a note if there's a known difference, then press Close Shift.",
           "The Shift Closing Summary shows: Starting Cash, Cash In, Cash Out, Expected Cash (what should be there), your count, and the Difference. Red = short, yellow = over.",
+          "Shift History can be filtered By Day, By Month (default: this month), or By Year — step through with ‹ › — plus staff and status filters (still open, with variance, flagged by anti-fraud). The summary above the table totals shifts, cash variance, and non-cash variance for the filter.",
         ],
       },
       {

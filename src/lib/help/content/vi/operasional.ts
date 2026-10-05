@@ -290,6 +290,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Nhập số tiền để lại trong ngăn kéo cho ca sau; phần còn lại được coi là đã giao cho chủ/két.",
           "Thêm ghi chú nếu biết có chênh lệch, rồi bấm Đóng ca.",
           "Tóm tắt đóng ca hiển thị: Tiền đầu ca, Tiền vào, Tiền ra, Tiền dự kiến (số lẽ ra phải có), số bạn đếm và Chênh lệch. Đỏ = thiếu, vàng = thừa.",
+          "Lịch sử ca có thể lọc Theo ngày, Theo tháng (mặc định: tháng này) hoặc Theo năm — chuyển bằng nút ‹ › — cùng bộ lọc nhân viên và trạng thái (đang mở, có chênh lệch, bị gắn cờ chống gian lận). Phần tóm tắt phía trên bảng cộng số ca, chênh lệch tiền mặt và phi tiền mặt theo bộ lọc.",
         ],
       },
       {

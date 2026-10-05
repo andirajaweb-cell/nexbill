@@ -290,6 +290,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Ilagay ang cash na maiiwan sa drawer para sa susunod na shift; ituturing na naibigay sa may-ari/safe ang natitira.",
           "Magdagdag ng tala kung may alam na diperensya, saka pindutin ang Isara ang Shift.",
           "Ipinapakita ng Buod ng Pagsasara ng Shift: Panimulang Cash, Cash na Pumasok, Cash na Lumabas, Inaasahang Cash (dapat nandoon), ang bilang mo, at ang Diperensya. Pula = kulang, dilaw = sobra.",
+          "Ang Shift History ay puwedeng i-filter Bawat Araw, Bawat Buwan (default: ngayong buwan), o Bawat Taon — lumipat gamit ang ‹ › — kasama ang filter ng staff at status (bukas pa, may diperensya, na-flag ng anti-fraud). Ang buod sa itaas ng table ay nagsusuma ng shift, diperensya ng cash, at non-cash ayon sa filter.",
         ],
       },
       {
