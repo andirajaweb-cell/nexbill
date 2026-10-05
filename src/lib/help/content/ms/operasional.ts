@@ -177,6 +177,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Pilih unit tertentu, atau \"Mana-mana unit\" + jenis konsol.",
           "Isi masa mula dan tamat, pilihan wang pendahuluan (DP) dan catatan, kemudian tekan \"Buat Tempahan\".",
           "Jika jadual bertembung, tempahan automatik masuk Senarai Menunggu dan kedudukannya dipaparkan.",
+          "Peta Tempahan (paparan lalai): satu baris setiap unit, jam 08.00 hingga 08.00 esok, garis merah = sekarang. Warna blok = status. Klik blok untuk butiran & tindakan; klik ruang kosong untuk mengisi borang tempahan pada unit & masa itu.",
         ],
       },
       {
@@ -186,6 +187,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Kongsikan pautannya di WhatsApp, Instagram, atau Google Maps. Pelanggan melihat unit yang kosong, memilih masa, dan mendapat kod tempahan.",
           "Tetapkan jeda antara tempahan, had masa daftar masuk (tempahan yang tidak hadir dilepaskan automatik), dan tempoh minimum menempah sebelum masa bermain.",
           "Sepanduk promosi di halaman tempahan diatur di Tetapan → Sepanduk Iklan.",
+          "Sebaik pelanggan menempah dalam talian atau melalui WhatsApp, pop-up \"Tempahan baru masuk!\" muncul di mana-mana halaman papan pemuka (dengan bunyi): Sahkan, Lihat di Peta Tempahan, atau WhatsApp pelanggan.",
         ],
       },
       {

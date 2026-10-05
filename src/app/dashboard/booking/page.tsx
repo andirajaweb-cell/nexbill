@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { CalendarRange, List, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -8,6 +9,8 @@ import { useAuth } from "@/lib/auth/client";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-booking";
+import { BookingMap, toLocalYmd } from "./BookingMap";
+import { OPEN_BOOKING_EVENT, BOOKINGS_CHANGED_EVENT } from "@/lib/rental/booking-events";
 
 interface Booking {
   id: string;
@@ -26,7 +29,13 @@ interface Booking {
   source: "kasir" | "online" | "whatsapp";
 }
 
-interface RentalUnit { id: string; name: string; consoleType: string }
+interface RentalUnit { id: string; name: string; consoleType: string; isActive?: boolean }
+
+/** Date → nilai input datetime-local (waktu lokal browser). */
+function toLocalInput(d: Date) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 const rupiah = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
 const STATUS_BADGE: Record<string, string> = {
@@ -68,11 +77,50 @@ export default function BookingPage() {
   const [qrFor, setQrFor] = useState<{ bookingCode: string; qrDataUrl: string } | null>(null);
   const [transferFor, setTransferFor] = useState<{ id: string; unitId: string } | null>(null);
 
+  const [view, setView] = useState<"map" | "list">("map");
+  const [mapDate, setMapDate] = useState(() => toLocalYmd(new Date()));
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+
   const load = () => {
     fetchJsonArray("/api/bookings").then(setBookings);
     fetchJsonArray("/api/rental-units").then(setUnits);
   };
   useEffect(() => { load(); }, []);
+
+  // Dibuka dari pop-up "Booking Baru" (?b=<id> atau event saat sudah di halaman ini).
+  useEffect(() => {
+    const fromQuery = new URLSearchParams(window.location.search).get("b");
+    if (fromQuery) setDetailId(fromQuery);
+    const onOpen = (e: Event) => { setDetailId((e as CustomEvent<string>).detail); load(); };
+    const onChanged = () => load();
+    window.addEventListener(OPEN_BOOKING_EVENT, onOpen);
+    window.addEventListener(BOOKINGS_CHANGED_EVENT, onChanged);
+    return () => { window.removeEventListener(OPEN_BOOKING_EVENT, onOpen); window.removeEventListener(BOOKINGS_CHANGED_EVENT, onChanged); };
+  }, []);
+  const detail = detailId ? bookings.find((b) => b.id === detailId) ?? null : null;
+  // Panel QR / Pindah Unit tampil di atas halaman — tutup modal detail supaya panelnya terlihat.
+  useEffect(() => {
+    if (!qrFor && !transferFor) return;
+    setDetailId(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [qrFor, transferFor]);
+  // Pindahkan map ke tanggal booking yang dibuka supaya bloknya kelihatan.
+  useEffect(() => {
+    if (!detail) return;
+    const s = new Date(detail.scheduledStart);
+    const day = s.getHours() < 8 ? new Date(s.getFullYear(), s.getMonth(), s.getDate() - 1) : s;
+    setMapDate(toLocalYmd(day));
+  }, [detail?.id]);
+
+  /** Klik slot kosong di map → isi form Booking Baru dengan unit & jam itu (durasi awal 1 jam). */
+  const onSlotClick = (unitId: string | null, consoleType: string | null, start: Date) => {
+    const end = new Date(start.getTime() + 3600_000);
+    setForm((f) => ({ ...f, rentalUnitId: unitId ?? "", consoleType: unitId ? f.consoleType : consoleType ?? "any", scheduledStart: toLocalInput(start), scheduledEnd: toLocalInput(end) }));
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => nameRef.current?.focus(), 350);
+  };
 
   const submit = async () => {
     if (!form.scheduledStart || !form.scheduledEnd) return showAlert(t("booking.alertFillSchedule", "Isi jadwal mulai & selesai."));
@@ -135,6 +183,40 @@ export default function BookingPage() {
     setTransferFor(null);
   };
 
+  const renderActions = (b: Booking) => (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Badge status={STATUS_BADGE[b.status] ?? "unknown"}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
+      {(b.status === "pending" || b.status === "waitlisted") && (
+        <Button variant="secondary" className="text-xs" onClick={() => action(b.id, "confirm")}>{t("booking.confirmButton", "Konfirmasi")}</Button>
+      )}
+      {(b.status === "confirmed" || b.status === "pending") && (
+        <Button className="text-xs" onClick={() => action(b.id, "check-in")}>{t("booking.checkInButton", "Check-in")}</Button>
+      )}
+      {b.bookingCode && ["pending", "confirmed"].includes(b.status) && (
+        <Button variant="ghost" className="text-xs" onClick={() => showQr(b.id)}>{t("booking.qrButton", "QR")}</Button>
+      )}
+      {["pending", "confirmed"].includes(b.status) && (
+        <Button variant="ghost" className="text-xs" onClick={() => setTransferFor({ id: b.id, unitId: "" })}>{t("booking.transferUnitTitle", "Pindah Unit")}</Button>
+      )}
+      {!["completed", "cancelled", "checked_in", "no_show", "expired"].includes(b.status) && (
+        <>
+          <Button variant="ghost" className="text-xs" onClick={() => action(b.id, "no-show")}>{t("booking.noShowButton", "No-show")}</Button>
+          <Button variant="ghost" className="text-xs text-red-400" onClick={async () => {
+              // Dulu: menekan "Cancel" di prompt bawaan browser TETAP membatalkan booking (tanpa alasan).
+              const r = await showPrompt(t("booking.cancelBookingPrompt", "Alasan pembatalan?"), { tone: "danger", multiline: true, confirmLabel: t("booking.cancelButton", "Batal"), cancelLabel: t("booking.keepBooking", "Jangan batalkan") });
+              if (r === null) return;
+              action(b.id, "cancel", { reason: r || undefined });
+            }}>{t("booking.cancelButton", "Batal")}</Button>
+        </>
+      )}
+      {b.status === "no_show" && isAdmin && (
+        <Button variant="ghost" className="text-xs text-amber-400" onClick={async () => { if (await showConfirm(t("booking.undoNoShowConfirm", "Batalkan status no-show untuk booking {code}? Status akan kembali ke \"Confirmed\".").replace("{code}", b.bookingCode ?? ""))) action(b.id, "undo-no-show"); }}>
+          {t("booking.undoNoShowButton", "Batalkan No-show")}
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -150,10 +232,11 @@ export default function BookingPage() {
         <Button onClick={lookupAndCheckIn}>{t("booking.lookupButton", "Cari & Check-in")}</Button>
       </Card>
 
+      <div ref={formRef}>
       <Card>
         <h2 className="font-medium mb-3">{t("booking.newBookingTitle", "Booking Baru")}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("booking.customerNamePlaceholder", "Nama pelanggan")}
+          <input ref={nameRef} className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("booking.customerNamePlaceholder", "Nama pelanggan")}
             value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("booking.phonePlaceholder", "No. HP")}
             value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -178,6 +261,7 @@ export default function BookingPage() {
         </div>
         <Button className="mt-2" onClick={submit}>{t("booking.createButton", "Buat Booking")}</Button>
       </Card>
+      </div>
 
       {qrFor && (
         <Card className="space-y-2 border-emerald-500/40 text-center">
@@ -202,7 +286,64 @@ export default function BookingPage() {
         </Card>
       )}
 
-      <div className="space-y-2">
+      <div className="flex items-center gap-1 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1 w-fit">
+        <button type="button" onClick={() => setView("map")} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm ${view === "map" ? "bg-cyan-500/15 text-cyan-300" : "text-neutral-400 hover:text-neutral-200"}`}>
+          <CalendarRange size={15} /> {t("booking.map.tabMap", "Map Booking")}
+        </button>
+        <button type="button" onClick={() => setView("list")} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm ${view === "list" ? "bg-cyan-500/15 text-cyan-300" : "text-neutral-400 hover:text-neutral-200"}`}>
+          <List size={15} /> {t("booking.map.tabList", "Daftar")}
+        </button>
+      </div>
+
+      {view === "map" && (
+        <Card>
+          <BookingMap
+            bookings={bookings}
+            units={units}
+            date={mapDate}
+            setDate={setMapDate}
+            statusLabel={(st) => STATUS_LABEL[st] ?? st}
+            onSlotClick={onSlotClick}
+            onBookingClick={(b) => setDetailId(b.id)}
+          />
+        </Card>
+      )}
+
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setDetailId(null)}>
+          <div className="w-full max-w-md rounded-xl border border-neutral-800 bg-neutral-900 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-mono text-emerald-400 text-sm">{detail.bookingCode ?? "—"}</div>
+                <div className="font-semibold">{detail.customerName || t("booking.noName", "Tanpa nama")}</div>
+                <div className="text-xs text-neutral-400">{detail.phone}</div>
+              </div>
+              <button type="button" onClick={() => setDetailId(null)} className="rounded-lg p-1 text-neutral-400 hover:bg-neutral-800" aria-label={t("booking.closeButton", "Tutup")}><X size={16} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg bg-neutral-800/60 p-2">
+                <div className="text-neutral-500">{t("booking.map.detailUnit", "Unit")}</div>
+                <div className="font-medium">{units.find((u) => u.id === detail.rentalUnitId)?.name ?? (detail.consoleType && detail.consoleType !== "any" ? `${t("booking.map.anyUnitOf", "Unit apa saja")} · ${detail.consoleType.toUpperCase()}` : t("booking.anyConsoleOption", "Konsol apa saja"))}</div>
+              </div>
+              <div className="rounded-lg bg-neutral-800/60 p-2">
+                <div className="text-neutral-500">{t("booking.map.detailSource", "Sumber")}</div>
+                <div className="font-medium">{SOURCE_LABEL[detail.source] ?? detail.source}</div>
+              </div>
+              <div className="rounded-lg bg-neutral-800/60 p-2 col-span-2">
+                <div className="text-neutral-500">{t("booking.map.detailSchedule", "Jadwal")}</div>
+                <div className="font-medium">{new Date(detail.scheduledStart).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} — {new Date(detail.scheduledEnd).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>
+              </div>
+              {detail.dpAmount > 0 && (
+                <div className="rounded-lg bg-neutral-800/60 p-2 col-span-2"><span className="text-neutral-500">DP</span> <span className="font-medium">{rupiah(detail.dpAmount)}</span></div>
+              )}
+              {detail.notes && <div className="rounded-lg bg-neutral-800/60 p-2 col-span-2 text-neutral-300">{detail.notes}</div>}
+            </div>
+            {renderActions(detail)}
+          </div>
+        </div>
+      )}
+
+      <div className={`space-y-2 ${view === "list" ? "" : "hidden"}`}>
         {bookings.map((b) => (
           <Card key={b.id} className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -218,37 +359,7 @@ export default function BookingPage() {
                 {b.cancelReason && ` · ${b.cancelReason}`}
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge status={STATUS_BADGE[b.status] ?? "unknown"}>{STATUS_LABEL[b.status] ?? b.status}</Badge>
-              {(b.status === "pending" || b.status === "waitlisted") && (
-                <Button variant="secondary" className="text-xs" onClick={() => action(b.id, "confirm")}>{t("booking.confirmButton", "Konfirmasi")}</Button>
-              )}
-              {(b.status === "confirmed" || b.status === "pending") && (
-                <Button className="text-xs" onClick={() => action(b.id, "check-in")}>{t("booking.checkInButton", "Check-in")}</Button>
-              )}
-              {b.bookingCode && ["pending", "confirmed"].includes(b.status) && (
-                <Button variant="ghost" className="text-xs" onClick={() => showQr(b.id)}>{t("booking.qrButton", "QR")}</Button>
-              )}
-              {["pending", "confirmed"].includes(b.status) && (
-                <Button variant="ghost" className="text-xs" onClick={() => setTransferFor({ id: b.id, unitId: "" })}>{t("booking.transferUnitTitle", "Pindah Unit")}</Button>
-              )}
-              {!["completed", "cancelled", "checked_in", "no_show", "expired"].includes(b.status) && (
-                <>
-                  <Button variant="ghost" className="text-xs" onClick={() => action(b.id, "no-show")}>{t("booking.noShowButton", "No-show")}</Button>
-                  <Button variant="ghost" className="text-xs text-red-400" onClick={async () => {
-                      // Dulu: menekan "Cancel" di prompt bawaan browser TETAP membatalkan booking (tanpa alasan).
-                      const r = await showPrompt(t("booking.cancelBookingPrompt", "Alasan pembatalan?"), { tone: "danger", multiline: true, confirmLabel: t("booking.cancelButton", "Batal"), cancelLabel: t("booking.keepBooking", "Jangan batalkan") });
-                      if (r === null) return;
-                      action(b.id, "cancel", { reason: r || undefined });
-                    }}>{t("booking.cancelButton", "Batal")}</Button>
-                </>
-              )}
-              {b.status === "no_show" && isAdmin && (
-                <Button variant="ghost" className="text-xs text-amber-400" onClick={async () => { if (await showConfirm(t("booking.undoNoShowConfirm", "Batalkan status no-show untuk booking {code}? Status akan kembali ke \"Confirmed\".").replace("{code}", b.bookingCode ?? ""))) action(b.id, "undo-no-show"); }}>
-                  {t("booking.undoNoShowButton", "Batalkan No-show")}
-                </Button>
-              )}
-            </div>
+            {renderActions(b)}
           </Card>
         ))}
         {bookings.length === 0 && <p className="text-sm text-neutral-500">{t("booking.emptyState", "Belum ada booking.")}</p>}

@@ -177,6 +177,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Pilih unit tertentu, atau \"Unit apa saja\" + jenis konsol.",
           "Isi jam mulai dan selesai, opsional uang muka (DP) dan catatan, lalu tekan \"Buat Booking\".",
           "Kalau jadwal bentrok, booking otomatis masuk Waiting List dan posisinya ditampilkan.",
+          "Map Booking (tampilan bawaan): satu baris per unit, jam dari 08.00 sampai 08.00 besok, garis merah = sekarang. Warna blok = status. Klik blok untuk detail & aksi; klik bagian kosong untuk langsung mengisi form booking di unit & jam itu.",
         ],
       },
       {
@@ -186,6 +187,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Bagikan tautannya di WhatsApp, Instagram, atau Google Maps. Pelanggan melihat unit yang kosong, memilih jam, dan mendapat kode booking.",
           "Atur jeda antar-booking, batas waktu check-in (booking yang tidak datang dilepas otomatis), dan batas minimal waktu pesan sebelum jam main.",
           "Banner promosi di halaman booking diatur di Pengaturan → Banner Iklan.",
+          "Begitu pelanggan booking online atau lewat WhatsApp, pop-up \"Booking baru masuk!\" muncul di halaman dashboard mana pun (dengan bunyi): Konfirmasi, Lihat di Map Booking, atau chat WA pelanggan.",
         ],
       },
       {

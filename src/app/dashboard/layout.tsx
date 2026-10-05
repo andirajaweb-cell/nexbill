@@ -6,6 +6,7 @@ import { SubscriptionGate } from "@/components/dashboard/SubscriptionGate";
 import { PlanFeatureGate } from "@/components/dashboard/PlanFeatureGate";
 import { AnnouncementPopup } from "@/components/dashboard/AnnouncementPopup";
 import { GracePaymentReminderPopup } from "@/components/dashboard/GracePaymentReminderPopup";
+import { NewBookingPopup } from "@/components/dashboard/NewBookingPopup";
 import { EmailVerificationBanner } from "@/components/dashboard/EmailVerificationBanner";
 import { DashboardFooter } from "@/components/dashboard/DashboardFooter";
 import { DashboardLangProvider } from "@/lib/i18n/dashboard-lang";
@@ -25,6 +26,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <script dangerouslySetInnerHTML={{ __html: ANTI_FLASH_SCRIPT }} />
           <AnnouncementPopup />
           <GracePaymentReminderPopup />
+          <NewBookingPopup />
           <MobileNavProvider>
           <div className="flex min-h-screen min-h-[100dvh]">
             <Sidebar />

@@ -177,6 +177,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Pumili ng partikular na unit, o \"Kahit anong unit\" + uri ng console.",
           "Ilagay ang oras ng simula at pagtatapos, opsyonal na down payment (DP) at tala, saka pindutin ang \"Gumawa ng Reservation\".",
           "Kung nagbabanggaan ang oras, awtomatikong mapupunta ang reservation sa Waiting List at ipapakita ang puwesto nito.",
+          "Booking Map (default na view): isang row bawat unit, oras mula 08:00 hanggang 08:00 kinabukasan, pulang linya = ngayon. Kulay ng block = status. I-click ang block para sa detalye at aksyon; i-click ang bakanteng bahagi para punan ang booking form sa unit at oras na iyon.",
         ],
       },
       {
@@ -186,6 +187,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "I-share ang link sa WhatsApp, Instagram, o Google Maps. Makikita ng customer ang mga bakanteng unit, pipili ng oras, at makakakuha ng booking code.",
           "I-set ang pagitan ng mga reservation, ang deadline ng check-in (awtomatikong pinapakawalan ang mga no-show), at ang pinakamaikling oras bago maglaro na puwede pang mag-book.",
           "Ang mga promo banner sa booking page ay sine-set sa Setting → Mga Ad Banner.",
+          "Kapag nag-book ang customer online o sa WhatsApp, lalabas ang pop-up na \"May bagong booking!\" sa kahit anong page ng dashboard (may tunog): Kumpirmahin, Tingnan sa Booking Map, o i-WhatsApp ang customer.",
         ],
       },
       {

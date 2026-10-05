@@ -177,6 +177,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Chọn máy cụ thể, hoặc \"Máy bất kỳ\" + loại console.",
           "Nhập giờ bắt đầu và kết thúc, tiền cọc (DP) và ghi chú (tùy chọn), rồi bấm \"Tạo đặt chỗ\".",
           "Nếu trùng giờ, lượt đặt tự động vào Danh sách chờ và hiển thị vị trí xếp hàng.",
+          "Sơ đồ đặt chỗ (mặc định): mỗi máy một dòng, giờ từ 08:00 đến 08:00 hôm sau, vạch đỏ = hiện tại. Màu khối = trạng thái. Nhấp khối để xem chi tiết & thao tác; nhấp chỗ trống để điền form đặt chỗ với máy và giờ đó.",
         ],
       },
       {
@@ -186,6 +187,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Chia sẻ đường dẫn trên WhatsApp, Instagram hoặc Google Maps. Khách thấy máy trống, chọn giờ và nhận mã đặt chỗ.",
           "Đặt khoảng cách giữa các lượt đặt, hạn nhận phòng (khách không đến sẽ tự được nhả chỗ) và thời gian tối thiểu trước giờ chơi được phép đặt.",
           "Banner khuyến mãi trên trang đặt chỗ đặt tại Cài đặt → Banner quảng cáo.",
+          "Ngay khi khách đặt online hoặc qua WhatsApp, cửa sổ \"Có lượt đặt mới!\" hiện ở bất kỳ trang dashboard nào (kèm âm báo): Xác nhận, Xem trên sơ đồ, hoặc nhắn WhatsApp cho khách.",
         ],
       },
       {

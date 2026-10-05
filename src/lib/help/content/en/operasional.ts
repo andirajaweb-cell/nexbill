@@ -177,6 +177,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Choose a specific unit, or \"Any unit\" + console type.",
           "Enter the start and end time, optional down payment (DP) and note, then press \"Create Booking\".",
           "If the time clashes, the booking automatically goes to the Waiting List and its position is shown.",
+          "Booking Map (default view): one row per unit, hours from 08:00 to 08:00 next day, red line = now. Block colour = status. Click a block for details & actions; click an empty spot to fill the booking form with that unit and time.",
         ],
       },
       {
@@ -186,6 +187,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Share the link on WhatsApp, Instagram, or Google Maps. Customers see free units, pick a time, and get a booking code.",
           "Set the gap between bookings, the check-in deadline (no-shows are released automatically), and the minimum time before play that booking is allowed.",
           "Promo banners on the booking page are set in Settings → Ad Banners.",
+          "As soon as a customer books online or via WhatsApp, a \"New booking received!\" pop-up appears on any dashboard page (with a sound): Confirm, View on Booking Map, or WhatsApp the customer.",
         ],
       },
       {
