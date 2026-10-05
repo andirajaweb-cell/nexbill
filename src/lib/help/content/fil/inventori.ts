@@ -12,6 +12,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Produkto",
         steps: [
           "Magdagdag nang mano-mano: pangalan, kategorya, presyo ng benta, Cost Price, panimulang stock, unit, minimum na stock, at pangunahing supplier (opsyonal).",
+          "Barcode: ilagay kapag nagdadagdag/nag-e-edit ng produkto — i-type, i-scan gamit ang USB/Bluetooth scanner, o i-tap ang camera icon para mag-scan mula sa phone/laptop. Isang barcode para sa isang aktibong produkto lang. Ang parehong barcode ay agad nababasa sa Cashier. Ang Camera scan button sa itaas ng listahan ay naghahanap ng produkto ayon sa barcode; kung hindi pa nakarehistro, ilalagay ang barcode sa form na Magdagdag ng Bagong Produkto. May scan button din sa Recipe/BOM, Supplier Purchase, at Purchase Order para pumili ng produkto.",
           "Magdagdag ng marami nang sabay: i-download ang Excel template, punan, saka i-upload. Ang mga row na may SKU na mayroon na ay mag-a-update sa produktong iyon (hindi nagbabago ang stock sa upload).",
           "Ang mga kategorya ng produkto at unit (pcs, gramo, atbp.) ay sine-set sa Setting → Kategorya ng Produkto at Setting → Unit.",
           "Pagbago ng stock nang walang pagbili (sira, nawala, maling bilang): gamitin ang Stock Adjustment — Dagdagan, Bawasan (dahilang Diperensya o Sira/Waste), o I-set sa partikular na dami.",
@@ -60,6 +61,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Stock Count (pisikal na pagbilang)",
         steps: [
           "Bilangin ang stock sa estante/bodega at ilagay ang resulta katabi ng numero ng sistema — agad makikita ang diperensya. I-save bilang draft.",
+          "I-scan para bilangin: i-tap ang \"I-scan para bilangin\" (camera) o i-scan sa search box — bawat scan ay +1 sa bilang ng produktong iyon. Puwede pa ring itama nang manu-mano.",
           "Buksan ang draft para suriin ang diperensya kada produkto.",
           "Pindutin ang Ilapat ang Adjustment: itinatala ang sobra bilang adjustment, ang kulang bilang waste. Hindi ito mailalapat nang dalawang beses.",
         ],

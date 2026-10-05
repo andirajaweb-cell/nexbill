@@ -6,6 +6,8 @@ import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 import { recordOpeningStock } from "@/lib/accounting/inventory-postings";
 import { lockEntity } from "@/lib/accounting/journal";
+import { normalizeBarcode } from "@/lib/inventory/barcode";
+import { assertBarcodeAvailable, DuplicateBarcodeError } from "@/lib/inventory/barcode-server";
 
 export async function GET() {
   try {
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
     const body = await req.json();
     const { outletId: _ignoredOutlet, ...rest } = body;
-    const name = typeof rest.name === "string" ? rest.name.trim().replace(/s+/g, " ") : "";
+    const name = typeof rest.name === "string" ? rest.name.trim().replace(/\s+/g, " ") : "";
     if (!name) return NextResponse.json({ error: "Nama produk wajib diisi." }, { status: 400 });
     // Product + its Stok Awal movement + opening Persediaan journal commit together.
     //
@@ -43,13 +45,16 @@ export async function POST(req: NextRequest) {
         .where(and(eq(products.outletId, session.outletId), eq(products.isActive, true), sql`lower(${products.name}) = lower(${name})`))
         .limit(1);
       if (existing) throw new DuplicateProductError(name);
-      const [created] = await tx.insert(products).values({ ...rest, name, outletId: session.outletId }).returning();
+      const barcode = normalizeBarcode(rest.barcode);
+      await assertBarcodeAvailable(session.outletId, barcode, undefined, tx);
+      const sku = typeof rest.sku === "string" ? rest.sku.trim() || null : rest.sku ?? null;
+      const [created] = await tx.insert(products).values({ ...rest, name, barcode, sku, outletId: session.outletId }).returning();
       await recordOpeningStock(session.outletId, [created], session.sub, tx);
       return created;
     });
     return NextResponse.json(row);
   } catch (err: unknown) {
-    return NextResponse.json({ error: describeError(err) }, { status: err instanceof DuplicateProductError ? 409 : 400 });
+    return NextResponse.json({ error: describeError(err) }, { status: err instanceof DuplicateProductError || err instanceof DuplicateBarcodeError ? 409 : 400 });
   }
 }
 

@@ -16,6 +16,8 @@ import { getCostMethod } from "@/lib/inventory/costing";
 import { requireOwnedRow } from "@/lib/auth/scope";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError, errorStatus } from "@/lib/api/error";
+import { normalizeBarcode } from "@/lib/inventory/barcode";
+import { assertBarcodeAvailable, DuplicateBarcodeError } from "@/lib/inventory/barcode-server";
 
 /**
  * Every table with a real FK to products.id — a product can only be hard-deleted once none of
@@ -57,10 +59,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         );
       }
     }
+    if (body.barcode !== undefined) {
+      body.barcode = normalizeBarcode(body.barcode);
+      await assertBarcodeAvailable(current.outletId, body.barcode, id);
+    } else if (body.isActive === true && current.isActive === false) {
+      // Mengaktifkan lagi produk lama yang barcodenya sudah dipakai produk lain → tolak juga.
+      await assertBarcodeAvailable(current.outletId, current.barcode, id);
+    }
+    if (typeof body.sku === "string") body.sku = body.sku.trim() || null;
     const [row] = await db.update(products).set(body).where(eq(products.id, id)).returning();
     return NextResponse.json(row);
   } catch (err: unknown) {
-    return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });
+    return NextResponse.json({ error: describeError(err) }, { status: err instanceof DuplicateBarcodeError ? 409 : errorStatus(err, 400) });
   }
 }
 

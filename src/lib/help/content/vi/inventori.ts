@@ -12,6 +12,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Sản phẩm",
         steps: [
           "Thêm thủ công: tên, danh mục, giá bán, Giá vốn, tồn đầu, đơn vị, tồn tối thiểu và nhà cung cấp chính (tùy chọn).",
+          "Mã vạch: nhập khi thêm/sửa sản phẩm — gõ tay, quét bằng máy quét USB/Bluetooth, hoặc chạm biểu tượng camera để quét bằng điện thoại/laptop. Mỗi mã vạch chỉ dành cho một sản phẩm đang hoạt động. Cùng mã vạch được đọc ngay ở Thu ngân. Nút Quét camera phía trên danh sách tìm sản phẩm theo mã vạch; nếu chưa đăng ký, mã vạch được điền vào form Thêm sản phẩm mới. Nút quét cũng có ở Công thức/BOM, Mua hàng NCC và Đơn đặt hàng để chọn sản phẩm.",
           "Thêm nhiều cùng lúc: tải mẫu Excel, điền, rồi tải lên. Dòng có SKU đã tồn tại sẽ cập nhật sản phẩm đó (tồn kho không đổi qua tải lên).",
           "Danh mục sản phẩm và đơn vị (cái, gram, v.v.) đặt tại Cài đặt → Danh mục sản phẩm và Cài đặt → Đơn vị.",
           "Đổi tồn kho mà không qua mua hàng (hư, mất, đếm sai): dùng Điều chỉnh tồn kho — Thêm, Giảm (lý do Chênh lệch hoặc Hư/Hao hụt), hoặc Đặt về một số lượng cụ thể.",
@@ -60,6 +61,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Kiểm kê (đếm thực tế)",
         steps: [
           "Đếm hàng trên kệ/trong kho và nhập kết quả cạnh số của hệ thống — chênh lệch hiện ngay. Lưu dưới dạng nháp.",
+          "Quét để đếm: chạm \"Quét để đếm\" (camera) hoặc quét vào ô tìm kiếm — mỗi lần quét cộng 1 cho sản phẩm đó. Vẫn có thể sửa số thủ công.",
           "Mở bản nháp để xem chênh lệch từng sản phẩm.",
           "Bấm Áp dụng điều chỉnh: thừa được ghi là điều chỉnh, thiếu được ghi là hao hụt. Không thể áp dụng hai lần.",
         ],

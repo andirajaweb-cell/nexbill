@@ -12,6 +12,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Produk",
         steps: [
           "Tambah manual: nama, kategori, harga jual, Harga Modal, stok awal, satuan, stok minimum, dan supplier utama (opsional).",
+          "Barcode: isi saat menambah/edit produk — ketik, tembak dengan scanner USB/Bluetooth, atau tekan ikon kamera untuk scan dari HP/laptop. Satu barcode hanya untuk satu produk aktif. Barcode yang sama langsung terbaca di Kasir. Tombol Scan kamera di atas daftar produk mencari produk dari barcodenya; kalau belum terdaftar, barcode diisikan ke form Tambah Produk Baru. Tombol scan juga ada di Resep/BOM, Belanja Supplier, dan Purchase Order untuk memilih produk.",
           "Tambah banyak sekaligus: unduh template Excel, isi, lalu upload. Baris dengan SKU yang sudah ada akan memperbarui produk itu (stok tidak ikut berubah lewat upload).",
           "Kategori produk dan satuan (pcs, gram, dll) diatur di Pengaturan → Kategori Produk dan Pengaturan → Satuan.",
           "Mengubah stok tanpa pembelian (rusak, hilang, salah hitung): pakai Penyesuaian Barang — Tambah, Kurangi (alasan Selisih atau Rusak/Waste), atau Set ke jumlah tertentu.",
@@ -60,6 +61,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Stock Opname (hitung stok fisik)",
         steps: [
           "Hitung stok di rak/gudang, isi hasilnya di samping angka sistem — selisih langsung terlihat. Simpan sebagai draf.",
+          "Scan untuk hitung: tekan \"Scan untuk hitung\" (kamera) atau tembak scanner ke kotak cari — setiap scan menambah hitungan produk itu 1. Angka tetap bisa dikoreksi manual.",
           "Buka draf untuk memeriksa selisih per produk.",
           "Tekan Terapkan Penyesuaian: kelebihan dicatat sebagai penyesuaian, kekurangan sebagai waste. Tidak bisa diterapkan dua kali.",
         ],

@@ -18,12 +18,25 @@ import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
 import { CostMethodCard, FifoLayerList, type CostMethodInfo } from "./CostMethodCard";
 import { outletDateYmd } from "@/lib/time/outlet-time";
+import { BarcodeField } from "@/components/scanner/BarcodeField";
+import { ProductScanButton } from "@/components/scanner/ProductScanButton";
+import { findBarcodeConflict, normalizeBarcode } from "@/lib/inventory/barcode";
+import "@/lib/i18n/dict-scanner";
+
+/** Label opsi produk di pemilih + teks cari barcode/SKU (scanner USB yang mengetik ke kotak cari ikut cocok). */
+const productOption = (p: { id: string; name: string; barcode?: string | null; sku?: string | null }, label?: string) => ({
+  value: p.id,
+  label: label ?? p.name,
+  searchText: [p.barcode, p.sku].filter(Boolean).join(" "),
+});
 
 interface Product {
   id: string; name: string; category: string; price: number; costPrice: number;
   stockQty: number; lowStockThreshold: number; unit: string; isActive: boolean;
   preferredSupplierId: string | null;
   sendToKitchen: boolean | null;
+  barcode?: string | null;
+  sku?: string | null;
 }
 
 interface SupplierOption { id: string; name: string; archivedAt?: string | null }
@@ -134,14 +147,20 @@ function ProductTab({ outletId }: { outletId: string }) {
   // null in the DB), matching the exact fallback lib/kitchen/routing.ts uses when actually routing
   // an order item. See that module's doc comment for the full resolution order.
   const [recipeProductIds, setRecipeProductIds] = useState<Set<string>>(new Set());
-  const [form, setForm] = useState({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
+  const [form, setForm] = useState({ name: "", barcode: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
+  const addFormRef = useRef<HTMLDivElement>(null);
+  const addNameRef = useRef<HTMLInputElement>(null);
+  const barcodeWarning = (code: string, excludeId?: string) => {
+    const hit = findBarcodeConflict(products, normalizeBarcode(code), excludeId);
+    return hit ? t("inventory.barcode.inUse", "Barcode ini sudah dipakai \"{name}\".").replace("{name}", hit.name) : null;
+  };
   const [editingId, setEditingId] = useState<string | null>(null);
   // Metode harga modal + lapisan FIFO (lib/inventory/costing.ts) — kolom Modal menampilkannya.
   const [costInfo, setCostInfo] = useState<CostMethodInfo | null>(null);
   const [layersFor, setLayersFor] = useState<string | null>(null);
   const isFifo = costInfo?.method === "fifo";
   const layersOf = (productId: string) => (costInfo?.layers ?? []).filter((l) => l.productId === productId);
-  const [editForm, setEditForm] = useState<{ name: string; category: string; price: number; costPrice: number; unit: string; lowStockThreshold: number; preferredSupplierId: string; sendToKitchen: boolean } | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; barcode: string; category: string; price: number; costPrice: number; unit: string; lowStockThreshold: number; preferredSupplierId: string; sendToKitchen: boolean } | null>(null);
 
   // "Penyesuaian Barang" — replaces the old costed Restock shortcut. Pure quantity tool (no
   // harga beli input): Tambah Unit / Kurangi Unit / Set ke Jumlah Tertentu, all posted via
@@ -181,7 +200,9 @@ function ProductTab({ outletId }: { outletId: string }) {
       if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
       if (words.length === 0) return true;
       const name = p.name.toLowerCase();
-      return words.every((w) => name.includes(w));
+      if (words.length === 1 && ((p.barcode && p.barcode.toLowerCase() === words[0]) || (p.sku && p.sku.toLowerCase() === words[0]))) return true;
+      const codes = `${p.barcode ?? ""} ${p.sku ?? ""}`.toLowerCase();
+      return words.every((w) => name.includes(w) || codes.includes(w));
     });
     return [...filtered].sort((a, b) => {
       switch (sortBy) {
@@ -199,16 +220,18 @@ function ProductTab({ outletId }: { outletId: string }) {
   const addProduct = () =>
     proses.jalankan("add-product", async () => {
       if (!form.name.trim()) return showAlert(t("inventory.product.nameRequired", "Nama produk wajib diisi."));
+      const conflict = barcodeWarning(form.barcode);
+      if (conflict) return showAlert(conflict);
       try {
         const res = await fetch("/api/products", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, preferredSupplierId: form.preferredSupplierId || null, outletId: await getOutletId() }),
+          body: JSON.stringify({ ...form, barcode: normalizeBarcode(form.barcode), preferredSupplierId: form.preferredSupplierId || null, outletId: await getOutletId() }),
         });
         const data = await res.json().catch(() => ({}));
         // Form stays filled on failure so nothing has to be retyped.
         if (!res.ok) return showAlert(data.error ?? t("inventory.product.addFailed", "Gagal menambah produk."));
-        setForm({ name: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: units[0]?.code ?? "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
+        setForm({ name: "", barcode: "", category: "food", price: 0, costPrice: 0, stockQty: 0, unit: units[0]?.code ?? "pcs", lowStockThreshold: 5, preferredSupplierId: "", sendToKitchen: true });
         await load();
       } catch (err) {
         showAlert(t("inventory.product.addNetworkError", "Gagal menghubungi server: {pesan}").replace("{pesan}", err instanceof Error ? err.message : String(err)));
@@ -262,6 +285,7 @@ function ProductTab({ outletId }: { outletId: string }) {
     setEditingId(p.id);
     setEditForm({
       name: p.name,
+      barcode: p.barcode ?? "",
       category: p.category,
       price: p.price,
       costPrice: p.costPrice,
@@ -280,10 +304,12 @@ function ProductTab({ outletId }: { outletId: string }) {
   const saveEdit = async (id: string) => {
     if (!editForm) return;
     if (!editForm.name.trim()) return showAlert(t("inventory.product.nameRequired", "Nama produk wajib diisi."));
+    const conflict = barcodeWarning(editForm.barcode, id);
+    if (conflict) return showAlert(conflict);
     const res = await fetch(`/api/products/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editForm, preferredSupplierId: editForm.preferredSupplierId || null }),
+      body: JSON.stringify({ ...editForm, barcode: normalizeBarcode(editForm.barcode), preferredSupplierId: editForm.preferredSupplierId || null }),
     });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
@@ -340,10 +366,12 @@ function ProductTab({ outletId }: { outletId: string }) {
       )}
       <ImportProductsCard outletId={outletId} onImported={load} />
 
+      <div ref={addFormRef}>
       <Card>
         <h2 className="font-medium mb-3">{t("inventory.product.addNew", "Tambah Produk Baru")}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <input className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.product.namePlaceholder", "Nama produk")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input ref={addNameRef} className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.product.namePlaceholder", "Nama produk")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <BarcodeField className="col-span-2" value={form.barcode} onChange={(v) => setForm({ ...form, barcode: v })} placeholder={t("inventory.barcode.placeholder", "Barcode (opsional — scan / ketik)")} warning={barcodeWarning(form.barcode)} />
           <CategorySelect categories={categories.filter((c) => c.isActive)} value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
           <UnitSelect units={units} value={form.unit} onChange={(v) => setForm({ ...form, unit: v })} className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.product.sellPricePlaceholder", "Harga jual")} value={form.price || ""} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
@@ -366,14 +394,26 @@ function ProductTab({ outletId }: { outletId: string }) {
           {t("inventory.product.unitSettingsPrefix", "Satuan bisa diatur di ")}<a href="/dashboard/settings" className="text-emerald-400 underline">{t("inventory.product.unitSettingsLinkLabel", "Pengaturan > Satuan")}</a>{t("inventory.product.categorySettingsMiddle", ", kategori bisa diatur di ")}<a href="/dashboard/settings" className="text-emerald-400 underline">{t("inventory.product.categorySettingsLinkLabel", "Pengaturan > Kategori Produk")}</a>{t("inventory.product.unitSettingsSuffix", ". Harga modal produk resep (F&B olahan) diatur lewat tab Resep/BOM, bukan di sini. Supplier utama dipakai untuk auto-buat draft Purchase Order saat stok mencapai minimum (lihat tab Purchase Order).")}
         </p>
       </Card>
+      </div>
 
       <Card>
         <div className="flex flex-col sm:flex-row gap-2 mb-3">
           <input
             className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
-            placeholder={t("inventory.product.searchPlaceholder", "Cari nama produk...")}
+            placeholder={t("inventory.barcode.searchPlaceholder", "Cari nama produk, barcode, atau SKU...")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+          />
+          <ProductScanButton
+            products={products}
+            onFound={(p) => { setSearch(p.barcode ?? p.sku ?? p.name); setCategoryFilter("all"); }}
+            onNotFound={(code) => {
+              // Barcode belum terdaftar → langsung siapkan produk baru dengan barcode ini.
+              setForm((f) => ({ ...f, barcode: code }));
+              addFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              setTimeout(() => addNameRef.current?.focus(), 350);
+              showAlert(t("inventory.barcode.notRegistered", "Barcode {code} belum terdaftar. Barcode sudah diisikan di form Tambah Produk Baru — lengkapi nama & harganya, atau pasang barcode ini ke produk yang sudah ada lewat Edit.").replace("{code}", code));
+            }}
           />
           <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
             <option value="all">{t("inventory.product.filterAllCategories", "Semua Kategori")}</option>
@@ -400,6 +440,9 @@ function ProductTab({ outletId }: { outletId: string }) {
                   <td className="py-2">
                     {p.name}
                     {p.isActive === false && <span className="text-xs text-rose-400 ml-2">{t("inventory.product.inactiveTag", "(nonaktif)")}</span>}
+                    {(p.barcode || p.sku) && (
+                      <div className="font-mono text-[10px] text-neutral-500">{p.barcode ? `▮ ${p.barcode}` : ""}{p.barcode && p.sku ? " · " : ""}{p.sku ? `SKU ${p.sku}` : ""}</div>
+                    )}
                   </td>
                   <td className="capitalize text-neutral-400">
                     {categoryLabel(categories, p.category)}
@@ -461,6 +504,10 @@ function ProductTab({ outletId }: { outletId: string }) {
                     <td colSpan={7} className="py-3">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <div className="col-span-2"><label className="text-xs text-neutral-500">{t("inventory.product.editForm.name", "Nama Produk")}</label><input className={smallInputCls} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
+                        <div className="col-span-2">
+                          <label className="text-xs text-neutral-500">{t("inventory.barcode.label", "Barcode")}</label>
+                          <BarcodeField value={editForm.barcode} onChange={(v) => setEditForm({ ...editForm, barcode: v })} inputClassName={`flex-1 min-w-0 ${smallInputCls}`} warning={barcodeWarning(editForm.barcode, p.id)} />
+                        </div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.category", "Kategori")}</label><CategorySelect categories={categories.filter((c) => c.isActive)} value={editForm.category} onChange={(v) => setEditForm({ ...editForm, category: v })} className={smallInputCls} /></div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.sellPrice", "Harga Jual")}</label><input type="number" className={smallInputCls} value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
                         <div>
@@ -814,13 +861,16 @@ function RecipeTab({ outletId }: { outletId: string }) {
             <UnitSelect units={units} value={newProductUnit} onChange={setNewProductUnit} className="col-span-3 sm:col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
           </div>
         ) : (
-          <SearchableSelect
-            className="w-full"
-            value={existingProductId}
-            onChange={setExistingProductId}
-            placeholder={t("inventory.recipe.chooseExistingOption", "Pilih produk food (belum punya resep)")}
-            options={foodProductsNoRecipe.map((p) => ({ value: p.id, label: p.name }))}
-          />
+          <div className="flex gap-1">
+            <SearchableSelect
+              className="flex-1 min-w-0"
+              value={existingProductId}
+              onChange={setExistingProductId}
+              placeholder={t("inventory.recipe.chooseExistingOption", "Pilih produk food (belum punya resep)")}
+              options={foodProductsNoRecipe.map((p) => productOption(p))}
+            />
+            <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={foodProductsNoRecipe} onFound={(p) => setExistingProductId(p.id)} />
+          </div>
         )}
 
         <div className="grid grid-cols-2 gap-2">
@@ -832,13 +882,16 @@ function RecipeTab({ outletId }: { outletId: string }) {
           <div className="text-xs text-neutral-500">{t("inventory.recipe.ingredientsLabel", "Bahan Baku")}</div>
           {rows.map((row, i) => (
             <div key={i} className="grid grid-cols-8 gap-2 items-center">
-              <SearchableSelect
-                className="col-span-8 sm:col-span-4"
-                value={row.ingredientProductId}
-                onChange={(v) => updateRow(setRows, i, { ingredientProductId: v })}
-                placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
-                options={ingredientOptions.map((p) => ({ value: p.id, label: p.name }))}
-              />
+              <div className="col-span-8 sm:col-span-4 flex gap-1">
+                <SearchableSelect
+                  className="flex-1 min-w-0"
+                  value={row.ingredientProductId}
+                  onChange={(v) => updateRow(setRows, i, { ingredientProductId: v })}
+                  placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
+                  options={ingredientOptions.map((p) => productOption(p))}
+                />
+                <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={ingredientOptions} onFound={(p) => updateRow(setRows, i, { ingredientProductId: p.id })} />
+              </div>
               <input type="number" className="col-span-3 sm:col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" placeholder={t("inventory.recipe.qtyPerYieldPlaceholder", "Qty per yield")} value={row.qtyPerYield || ""} onChange={(e) => updateRow(setRows, i, { qtyPerYield: Number(e.target.value) })} />
               <UnitSelect units={units} value={row.unit} onChange={(v) => updateRow(setRows, i, { unit: v })} className="col-span-3 sm:col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" />
               <button className="col-span-2 sm:col-span-1 text-xs text-red-400" onClick={() => removeRow(setRows, i)}>{t("inventory.action.removeRow", "Hapus")}</button>
@@ -859,13 +912,16 @@ function RecipeTab({ outletId }: { outletId: string }) {
                 <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm" placeholder={t("inventory.recipe.yieldPlaceholder", "Yield (porsi per batch resep)")} value={editYieldQty} onChange={(e) => setEditYieldQty(Number(e.target.value))} />
                 {editRows.map((row, i) => (
                   <div key={i} className="grid grid-cols-8 gap-2 items-center">
-                    <SearchableSelect
-                      className="col-span-8 sm:col-span-4"
-                      value={row.ingredientProductId}
-                      onChange={(v) => updateRow(setEditRows, i, { ingredientProductId: v })}
-                      placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
-                      options={ingredientOptions.map((p) => ({ value: p.id, label: p.name }))}
-                    />
+                    <div className="col-span-8 sm:col-span-4 flex gap-1">
+                      <SearchableSelect
+                        className="flex-1 min-w-0"
+                        value={row.ingredientProductId}
+                        onChange={(v) => updateRow(setEditRows, i, { ingredientProductId: v })}
+                        placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
+                        options={ingredientOptions.map((p) => productOption(p))}
+                      />
+                      <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={ingredientOptions} onFound={(p) => updateRow(setEditRows, i, { ingredientProductId: p.id })} />
+                    </div>
                     <input type="number" className="col-span-3 sm:col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={row.qtyPerYield || ""} onChange={(e) => updateRow(setEditRows, i, { qtyPerYield: Number(e.target.value) })} />
                     <UnitSelect units={units} value={row.unit} onChange={(v) => updateRow(setEditRows, i, { unit: v })} className="col-span-3 sm:col-span-1 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" />
                     <button className="col-span-2 sm:col-span-1 text-xs text-red-400" onClick={() => removeRow(setEditRows, i)}>X</button>
@@ -1215,13 +1271,16 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
         {suppliers.length === 0 && <div className="text-xs text-amber-400">{t("inventory.supplierPurchase.noSupplierHint", 'Belum ada supplier — tambah dulu di tab "Supplier".')}</div>}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <SearchableSelect
-            className="col-span-2"
-            value={itemForm.productId}
-            onChange={(v) => setItemForm({ ...itemForm, productId: v })}
-            placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
-            options={resaleProducts.map((p) => ({ value: p.id, label: p.name }))}
-          />
+          <div className="col-span-2 flex gap-1">
+            <SearchableSelect
+              className="flex-1 min-w-0"
+              value={itemForm.productId}
+              onChange={(v) => setItemForm({ ...itemForm, productId: v })}
+              placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
+              options={resaleProducts.map((p) => productOption(p))}
+            />
+            <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={resaleProducts} onFound={(p) => setItemForm((f) => ({ ...f, productId: p.id, unitCost: f.unitCost || p.costPrice || 0 }))} />
+          </div>
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.placeholder.qty", "Qty")} value={itemForm.qty} onChange={(e) => setItemForm({ ...itemForm, qty: Number(e.target.value) })} />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.placeholder.unitCost", "Harga beli/unit")} value={itemForm.unitCost || ""} onChange={(e) => setItemForm({ ...itemForm, unitCost: Number(e.target.value) })} />
         </div>
@@ -1369,13 +1428,16 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
           <p className="text-neutral-500">{t("inventory.supplierPurchase.editHint", "Ubah item/qty/harga di bawah lalu simpan — stok, HPP, dan jurnal lama akan otomatis dikoreksi.")}</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <SearchableSelect
-              className="col-span-2"
-              value={editItemForm.productId}
-              onChange={(v) => setEditItemForm({ ...editItemForm, productId: v })}
-              placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
-              options={resaleProducts.map((p) => ({ value: p.id, label: p.name }))}
-            />
+            <div className="col-span-2 flex gap-1">
+              <SearchableSelect
+                className="flex-1 min-w-0"
+                value={editItemForm.productId}
+                onChange={(v) => setEditItemForm({ ...editItemForm, productId: v })}
+                placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
+                options={resaleProducts.map((p) => productOption(p))}
+              />
+              <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={resaleProducts} onFound={(p) => setEditItemForm((f) => ({ ...f, productId: p.id, unitCost: f.unitCost || p.costPrice || 0 }))} />
+            </div>
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2" placeholder={t("inventory.placeholder.qty", "Qty")} value={editItemForm.qty} onChange={(e) => setEditItemForm({ ...editItemForm, qty: Number(e.target.value) })} />
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2" placeholder={t("inventory.placeholder.unitCost", "Harga beli/unit")} value={editItemForm.unitCost || ""} onChange={(e) => setEditItemForm({ ...editItemForm, unitCost: Number(e.target.value) })} />
           </div>
@@ -1569,13 +1631,16 @@ function PurchaseOrderTab({ outletId }: { outletId: string }) {
           {selectableSuppliers(suppliers, form.supplierId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <SearchableSelect
-            className="col-span-2"
-            value={form.productId}
-            onChange={(v) => setForm({ ...form, productId: v })}
-            placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
-            options={products.map((p) => ({ value: p.id, label: p.name }))}
-          />
+          <div className="col-span-2 flex gap-1">
+            <SearchableSelect
+              className="flex-1 min-w-0"
+              value={form.productId}
+              onChange={(v) => setForm({ ...form, productId: v })}
+              placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
+              options={products.map((p) => productOption(p))}
+            />
+            <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={products} onFound={(p) => quickAddToCart(p)} />
+          </div>
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.placeholder.qty", "Qty")} value={form.qty} onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })} />
           <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("inventory.placeholder.unitCost", "Harga beli/unit")} value={form.unitCost || ""} onChange={(e) => setForm({ ...form, unitCost: Number(e.target.value) })} />
         </div>
@@ -1615,6 +1680,24 @@ function StockOpnameTab({ outletId }: { outletId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [opnameSearch, setOpnameSearch] = useState("");
+  const [lastScanned, setLastScanned] = useState<string | null>(null);
+  // Scan = hitung 1 barang. Pakai ref supaya scan beruntun cepat tidak kehilangan hitungan.
+  const countsRef = useRef<Record<string, number>>({});
+  countsRef.current = counts;
+  const countOne = (p: Product) => {
+    const next = (countsRef.current[p.id] ?? 0) + 1;
+    countsRef.current = { ...countsRef.current, [p.id]: next };
+    setCounts(countsRef.current);
+    setLastScanned(p.id);
+    return t("inventory.barcode.opnameCounted", "{name}: {n} dihitung").replace("{name}", p.name).replace("{n}", String(next));
+  };
+  const opnameWords = opnameSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const visibleOpnameProducts = products.filter((p) => {
+    if (!opnameWords.length) return true;
+    const hay = `${p.name} ${p.barcode ?? ""} ${p.sku ?? ""}`.toLowerCase();
+    return opnameWords.every((w) => hay.includes(w));
+  });
 
   const load = () => fetchJsonArray(`/api/stock-opnames?outletId=${outletId}`).then(setOpnames);
   useEffect(() => {
@@ -1644,12 +1727,35 @@ function StockOpnameTab({ outletId }: { outletId: string }) {
     <div className="space-y-4">
       <Card>
         <h2 className="font-medium mb-3">{t("inventory.opname.title", "Hitung Stok Fisik")}</h2>
+        <div className="flex flex-col sm:flex-row gap-2 mb-2">
+          <input
+            className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+            placeholder={t("inventory.barcode.searchPlaceholder", "Cari nama produk, barcode, atau SKU...")}
+            value={opnameSearch}
+            onChange={(e) => setOpnameSearch(e.target.value)}
+            onKeyDown={(e) => {
+              // Scanner USB/Bluetooth: kode + Enter = hitung 1 barang, lalu kotak cari dikosongkan lagi.
+              if (e.key !== "Enter") return;
+              const code = normalizeBarcode(opnameSearch);
+              const hit = code ? products.find((p) => (p.barcode && p.barcode.toLowerCase() === code.toLowerCase()) || (p.sku && p.sku.toLowerCase() === code.toLowerCase())) : null;
+              if (hit) { e.preventDefault(); countOne(hit); setOpnameSearch(""); }
+            }}
+          />
+          <ProductScanButton
+            products={products}
+            mode="continuous"
+            label={t("inventory.barcode.opnameScanButton", "Scan untuk hitung")}
+            hint={t("inventory.barcode.opnameScanHint", "Scan setiap barang satu per satu — tiap scan menambah hitungan 1. Angka masih bisa dikoreksi manual.")}
+            onFound={(p) => countOne(p)}
+          />
+        </div>
+        <p className="text-[11px] text-neutral-500 mb-2">{t("inventory.barcode.opnameHelp", "Tiap scan barcode (kamera atau scanner) = +1 pada hitungan produk itu. Produk yang tidak di-scan dan tidak diisi tidak ikut diopname.")}</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {products.map((p) => {
+          {visibleOpnameProducts.map((p) => {
             const counted = counts[p.id];
             const diff = counted !== undefined && !Number.isNaN(counted) ? counted - p.stockQty : null;
             return (
-              <div key={p.id} className="flex items-center justify-between text-sm gap-2">
+              <div key={p.id} className={`flex items-center justify-between text-sm gap-2 rounded-md ${lastScanned === p.id ? "ring-1 ring-cyan-400/60 bg-cyan-500/5" : ""}`}>
                 <span className="min-w-0">
                   {p.name} <span className="text-neutral-500">{t("inventory.opname.systemQtyLabel", "(sistem: {qty})").replace("{qty}", String(p.stockQty))}</span>
                   {diff !== null && diff !== 0 && (

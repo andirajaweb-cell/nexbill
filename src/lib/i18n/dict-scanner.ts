@@ -17,4 +17,10 @@ registerDict({
   "member.qrTitle": { id: "QR Kartu Member", en: "Member Card QR", ms: "QR Kad Ahli", th: "QR บัตรสมาชิก", fil: "QR ng Member Card", vi: "QR thẻ thành viên" },
   "member.qrHint": { id: "Cetak atau kirim ke pelanggan — kasir cukup scan QR ini di Rental PS.", en: "Print it or send it to the customer — the cashier just scans this QR in Rental PS.", ms: "Cetak atau hantar kepada pelanggan — juruwang hanya perlu imbas QR ini di Rental PS.", th: "พิมพ์หรือส่งให้ลูกค้า — แคชเชียร์แค่สแกน QR นี้ในหน้า Rental PS", fil: "I-print o ipadala sa customer — i-scan lang ng cashier ang QR na ito sa Rental PS.", vi: "In hoặc gửi cho khách — thu ngân chỉ cần quét QR này trong Rental PS." },
   "member.qrDownload": { id: "Unduh QR", en: "Download QR", ms: "Muat turun QR", th: "ดาวน์โหลด QR", fil: "I-download ang QR", vi: "Tải QR" },
+
+  // --- Barcode produk di Inventory ---
+  "scanner.barcodePlaceholder": { id: "Barcode (scan / ketik)", en: "Barcode (scan / type)", ms: "Kod bar (imbas / taip)", th: "บาร์โค้ด (สแกน / พิมพ์)", fil: "Barcode (i-scan / i-type)", vi: "Mã vạch (quét / nhập)" },
+  "scanner.scanBarcodeButton": { id: "Scan barcode dengan kamera", en: "Scan barcode with camera", ms: "Imbas kod bar dengan kamera", th: "สแกนบาร์โค้ดด้วยกล้อง", fil: "I-scan ang barcode gamit ang camera", vi: "Quét mã vạch bằng camera" },
+  "scanner.hintBarcodeField": { id: "Arahkan kamera ke barcode di kemasan produk.", en: "Point the camera at the barcode on the product packaging.", ms: "Halakan kamera ke kod bar pada pembungkusan produk.", th: "เล็งกล้องไปที่บาร์โค้ดบนบรรจุภัณฑ์", fil: "Itutok ang camera sa barcode ng produkto.", vi: "Hướng camera vào mã vạch trên bao bì." },
+  "scanner.found": { id: "Ditemukan: {name}", en: "Found: {name}", ms: "Dijumpai: {name}", th: "พบ: {name}", fil: "Nakita: {name}", vi: "Đã tìm thấy: {name}" },
 });

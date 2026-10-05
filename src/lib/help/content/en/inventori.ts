@@ -12,6 +12,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Products",
         steps: [
           "Add manually: name, category, selling price, Cost Price, starting stock, unit, minimum stock, and main supplier (optional).",
+          "Barcode: fill it in when adding/editing a product — type it, shoot it with a USB/Bluetooth scanner, or tap the camera icon to scan from a phone/laptop. One barcode belongs to one active product only. The same barcode is read straight away at the Cashier. The Camera scan button above the product list finds a product by its barcode; if it isn't registered yet, the barcode is filled into the Add New Product form. Scan buttons are also in Recipe/BOM, Supplier Purchases, and Purchase Orders to pick a product.",
           "Add many at once: download the Excel template, fill it in, then upload. Rows with an existing SKU update that product (stock doesn't change via upload).",
           "Product categories and units (pcs, gram, etc.) are set in Settings → Product Categories and Settings → Units.",
           "Changing stock without a purchase (damaged, lost, miscounted): use Stock Adjustment — Add, Reduce (reason Difference or Damaged/Waste), or Set to a specific quantity.",
@@ -60,6 +61,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Stock Count (physical count)",
         steps: [
           "Count the stock on the shelf/in storage and enter the results next to the system figure — differences show immediately. Save as a draft.",
+          "Scan to count: tap \"Scan to count\" (camera) or shoot a scanner into the search box — every scan adds 1 to that product's count. Numbers can still be corrected manually.",
           "Open the draft to review the difference per product.",
           "Press Apply Adjustment: surpluses are recorded as adjustments, shortages as waste. It can't be applied twice.",
         ],

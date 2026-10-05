@@ -12,6 +12,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Produk",
         steps: [
           "Tambah manual: nama, kategori, harga jual, Harga Kos, stok awal, unit, stok minimum, dan pembekal utama (pilihan).",
+          "Kod bar: isi semasa menambah/mengedit produk — taip, tembak dengan pengimbas USB/Bluetooth, atau tekan ikon kamera untuk imbas dari telefon/laptop. Satu kod bar hanya untuk satu produk aktif. Kod bar yang sama terus dibaca di Juruwang. Butang Imbas kamera di atas senarai produk mencari produk melalui kod barnya; jika belum didaftarkan, kod bar diisi ke borang Tambah Produk Baru. Butang imbas juga ada di Resipi/BOM, Belian Pembekal, dan Pesanan Belian untuk memilih produk.",
           "Tambah banyak sekali gus: muat turun templat Excel, isi, kemudian muat naik. Baris dengan SKU yang sudah ada akan mengemas kini produk itu (stok tidak berubah melalui muat naik).",
           "Kategori produk dan unit (pcs, gram, dll.) diatur di Tetapan → Kategori Produk dan Tetapan → Unit.",
           "Mengubah stok tanpa belian (rosak, hilang, salah kira): gunakan Pelarasan Barang — Tambah, Kurangkan (sebab Perbezaan atau Rosak/Waste), atau Tetapkan ke jumlah tertentu.",
@@ -60,6 +61,7 @@ export const INVENTORI: HelpCategory[] = [
         title: "Stock Opname (kira stok fizikal)",
         steps: [
           "Kira stok di rak/stor, isi hasilnya di sebelah angka sistem — perbezaan terus kelihatan. Simpan sebagai draf.",
+          "Imbas untuk kira: tekan \"Imbas untuk kira\" (kamera) atau tembak pengimbas ke kotak carian — setiap imbasan menambah kiraan produk itu 1. Angka masih boleh dibetulkan secara manual.",
           "Buka draf untuk menyemak perbezaan bagi setiap produk.",
           "Tekan Terapkan Pelarasan: lebihan direkod sebagai pelarasan, kekurangan sebagai waste. Tidak boleh diterapkan dua kali.",
         ],
