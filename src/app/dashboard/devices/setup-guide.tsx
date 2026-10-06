@@ -6,6 +6,8 @@ import { useDashboardLang, type LangCode } from "@/lib/i18n/dashboard-lang";
 import { showAlert } from "@/lib/ui/dialog";
 import { setPsCursorLoading } from "@/lib/ui/ps-cursor";
 import "@/lib/i18n/dict-devices-guide";
+import { Monitor, Smartphone } from "lucide-react";
+import { AndroidRelayGuide } from "./android-relay-guide";
 
 /**
  * NexbillAgent v1.2 (2026-09-24): SATU zip untuk semua bahasa. Agent v1.2 memuat enam bahasa dalam
@@ -53,6 +55,8 @@ export function DeviceSetupGuide() {
   const { t, lang } = useDashboardLang();
   const [open, setOpen] = useState<SectionKey | null>("tv");
   const [requesting, setRequesting] = useState(false);
+  // Relay Agent bisa dipasang di PC Windows (NexbillAgent.exe) atau di HP Android (Termux).
+  const [tvPlatform, setTvPlatform] = useState<"pc" | "android">("pc");
 
   // Fully automatic since the /api/devices/relay-agent-token-request endpoint shipped — no
   // platform-admin action needed, the token is minted and delivered into a support ticket
@@ -150,6 +154,27 @@ export function DeviceSetupGuide() {
 
                 {s.key === "tv" && (
                   <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-1 rounded-xl border border-neutral-800 bg-white/[0.02] p-1 w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setTvPlatform("pc")}
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${tvPlatform === "pc" ? "bg-cyan-500/15 text-cyan-300" : "text-neutral-400 hover:text-neutral-200"}`}
+                      >
+                        <Monitor size={14} /> {t("devices.guide.android.tabPc", "Pakai PC Windows")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTvPlatform("android")}
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${tvPlatform === "android" ? "bg-cyan-500/15 text-cyan-300" : "text-neutral-400 hover:text-neutral-200"}`}
+                      >
+                        <Smartphone size={14} /> {t("devices.guide.android.tabAndroid", "Pakai HP Android (tanpa PC)")}
+                      </button>
+                    </div>
+
+                    {tvPlatform === "android" ? (
+                      <AndroidRelayGuide onRequestToken={requestToken} requesting={requesting} />
+                    ) : (
+                    <>
                     <p>
                       {t(
                         "devices.guide.tv.intro",
@@ -237,6 +262,8 @@ export function DeviceSetupGuide() {
                         )}
                       </p>
                     </div>
+                    </>
+                    )}
                   </div>
                 )}
               </div>

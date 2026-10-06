@@ -340,6 +340,16 @@ export const OPERASIONAL: HelpCategory[] = [
         ],
       },
       {
+        title: "Android TV qua điện thoại Android (không cần PC)",
+        steps: [
+          "Không có máy tính? Điện thoại Android 7+ có thể làm Relay Agent. Dùng một điện thoại riêng luôn ở cửa hàng, luôn cắm sạc và cùng WiFi với TV.",
+          "Tại Điều khiển thiết bị → Hướng dẫn thiết lập thiết bị → TV, chọn tab \"Dùng điện thoại Android (không cần PC)\" và làm theo 7 bước: yêu cầu token, cài Termux và Termux:Boot từ F-Droid, sao chép một lệnh vào Termux, chọn ngôn ngữ và dán token.",
+          "Kết nối từng TV bằng lệnh nexbill-tv kèm IP TV, rồi chọn Cho phép trên màn hình TV.",
+          "Đặt pin của Termux ở chế độ \"Không hạn chế\" và khóa Termux trong danh sách ứng dụng gần đây để điện thoại không tắt nó.",
+          "Nếu agent ngoại tuyến: mở Termux và gõ nexbill. Cập nhật agent: gõ nexbill-update.",
+        ],
+      },
+      {
         title: "Ổ cắm thông minh",
         steps: [
           "Ổ cắm thông minh chính hãng NEXBILL: nhập số sê-ri in trên nhãn ở mục \"Nhận ổ cắm thông minh NEXBILL\" — không cần thiết lập gì thêm.",

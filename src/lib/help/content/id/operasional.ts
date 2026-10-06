@@ -340,6 +340,16 @@ export const OPERASIONAL: HelpCategory[] = [
         ],
       },
       {
+        title: "Android TV lewat HP Android (tanpa PC)",
+        steps: [
+          "Tidak punya PC? HP Android 7+ bisa menjadi Relay Agent. Pakai HP khusus yang selalu di outlet, selalu dicas, dan di WiFi yang sama dengan TV.",
+          "Di Kontrol Perangkat → Panduan Setup Perangkat → TV, pilih tab \"Pakai HP Android (tanpa PC)\" dan ikuti 7 langkahnya: minta token, pasang Termux & Termux:Boot dari F-Droid, salin satu perintah ke Termux, pilih bahasa & tempel token.",
+          "Sambungkan tiap TV dengan perintah nexbill-tv diikuti IP TV, lalu pilih Izinkan di layar TV.",
+          "Atur baterai Termux ke \"Tidak dibatasi\" dan kunci Termux di daftar aplikasi terbaru supaya tidak dimatikan HP.",
+          "Kalau agent offline: buka Termux, ketik nexbill. Memperbarui agent: ketik nexbill-update.",
+        ],
+      },
+      {
         title: "Smart plug",
         steps: [
           "Smart plug resmi NEXBILL: isi nomor seri yang tertera di label di bagian \"Klaim Smart Plug NEXBILL\" — tidak perlu pengaturan lain.",

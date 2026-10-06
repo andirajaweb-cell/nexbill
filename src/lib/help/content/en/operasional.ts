@@ -340,6 +340,16 @@ export const OPERASIONAL: HelpCategory[] = [
         ],
       },
       {
+        title: "Android TV via an Android phone (no PC)",
+        steps: [
+          "No PC? An Android 7+ phone can be the Relay Agent. Use a dedicated phone that always stays at the outlet, always charging, on the same WiFi as the TVs.",
+          "In Device Control → Device Setup Guide → TV, choose the \"Use an Android phone (no PC)\" tab and follow its 7 steps: request a token, install Termux & Termux:Boot from F-Droid, copy one command into Termux, choose a language & paste the token.",
+          "Connect each TV with the command nexbill-tv followed by the TV's IP, then choose Allow on the TV screen.",
+          "Set Termux's battery to \"Unrestricted\" and lock Termux in the recent-apps list so the phone doesn't kill it.",
+          "If the agent is offline: open Termux and type nexbill. To update the agent: type nexbill-update.",
+        ],
+      },
+      {
         title: "Smart plugs",
         steps: [
           "Official NEXBILL smart plug: enter the serial number printed on the label in the \"Claim NEXBILL Smart Plug\" section — no other setup needed.",

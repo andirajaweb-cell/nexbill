@@ -340,6 +340,16 @@ export const OPERASIONAL: HelpCategory[] = [
         ],
       },
       {
+        title: "Android TV melalui telefon Android (tanpa PC)",
+        steps: [
+          "Tiada PC? Telefon Android 7+ boleh menjadi Relay Agent. Gunakan telefon khas yang sentiasa di outlet, sentiasa dicas dan pada WiFi yang sama dengan TV.",
+          "Di Kawalan Peranti → Panduan Persediaan Peranti → TV, pilih tab \"Guna telefon Android (tanpa PC)\" dan ikuti 7 langkahnya: minta token, pasang Termux & Termux:Boot daripada F-Droid, salin satu arahan ke Termux, pilih bahasa & tampal token.",
+          "Sambungkan setiap TV dengan arahan nexbill-tv diikuti IP TV, kemudian pilih Benarkan pada skrin TV.",
+          "Tetapkan bateri Termux kepada \"Tanpa had\" dan kunci Termux dalam senarai aplikasi terkini supaya tidak dimatikan telefon.",
+          "Jika agen offline: buka Termux dan taip nexbill. Untuk mengemas kini agen: taip nexbill-update.",
+        ],
+      },
+      {
         title: "Smart plug",
         steps: [
           "Smart plug rasmi NEXBILL: isi nombor siri yang tertera pada label di bahagian \"Tuntut Smart Plug NEXBILL\" — tiada tetapan lain diperlukan.",
