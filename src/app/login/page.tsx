@@ -38,6 +38,8 @@ interface Copy {
   forgotHint: string;
   forgotLink: string;
   footerNote: string;
+  developedBy: string;
+  developerAnchor: string;
 }
 
 const COPY: Record<LangCode, Copy> = {
@@ -69,6 +71,8 @@ const COPY: Record<LangCode, Copy> = {
     forgotHint: "Lupa password?",
     forgotLink: "Reset di sini",
     footerNote: "Sistem billing all-in-one untuk rental PlayStation.",
+    developedBy: "Dikembangkan oleh",
+    developerAnchor: "Digitrajasa — Jasa Pembuatan Website & Aplikasi Custom",
   },
   en: {
     langName: "English",
@@ -98,6 +102,8 @@ const COPY: Record<LangCode, Copy> = {
     forgotHint: "Forgot your password?",
     forgotLink: "Reset it here",
     footerNote: "The all-in-one billing system for PlayStation rentals.",
+    developedBy: "Developed by",
+    developerAnchor: "Digitrajasa — Custom Website & App Development",
   },
   ms: {
     langName: "Bahasa Malaysia",
@@ -127,6 +133,8 @@ const COPY: Record<LangCode, Copy> = {
     forgotHint: "Lupa kata laluan?",
     forgotLink: "Tetapkan semula di sini",
     footerNote: "Sistem pengebilan lengkap untuk sewaan PlayStation.",
+    developedBy: "Dibangunkan oleh",
+    developerAnchor: "Digitrajasa — Pembangunan Laman Web & Aplikasi Tersuai",
   },
   th: {
     langName: "ภาษาไทย",
@@ -156,6 +164,8 @@ const COPY: Record<LangCode, Copy> = {
     forgotHint: "ลืมรหัสผ่าน?",
     forgotLink: "รีเซ็ตที่นี่",
     footerNote: "ระบบเรียกเก็บเงินครบวงจรสำหรับร้านเช่าเพลย์สเตชัน",
+    developedBy: "พัฒนาโดย",
+    developerAnchor: "Digitrajasa — รับพัฒนาเว็บไซต์และแอปตามสั่ง",
   },
   fil: {
     langName: "Filipino",
@@ -185,6 +195,8 @@ const COPY: Record<LangCode, Copy> = {
     forgotHint: "Nakalimutan ang password?",
     forgotLink: "I-reset dito",
     footerNote: "Ang all-in-one na billing system para sa PS rental.",
+    developedBy: "Ginawa ng",
+    developerAnchor: "Digitrajasa — Custom Website at App Development",
   },
   vi: {
     langName: "Tiếng Việt",
@@ -214,6 +226,8 @@ const COPY: Record<LangCode, Copy> = {
     forgotHint: "Quên mật khẩu?",
     forgotLink: "Đặt lại tại đây",
     footerNote: "Hệ thống tính tiền trọn gói cho dịch vụ cho thuê PlayStation.",
+    developedBy: "Phát triển bởi",
+    developerAnchor: "Digitrajasa — Thiết kế website & ứng dụng theo yêu cầu",
   },
 };
 
@@ -535,6 +549,20 @@ function LoginForm() {
         </div>
 
         <p className="text-center text-[11px] text-neutral-600 mt-6">{t.footerNote}</p>
+        {/* Backlink ke situs pengembang (dofollow, sengaja tanpa rel="nofollow"/"sponsored").
+            Href memakai URL final (www) supaya tidak lewat redirect. */}
+        <p className="text-center text-[11px] text-neutral-600 mt-1">
+          {t.developedBy}{" "}
+          <a
+            href="https://www.digitrajasa.web.id"
+            target="_blank"
+            rel="noopener"
+            title={t.developerAnchor}
+            className="text-cyan-500 hover:text-cyan-400 underline underline-offset-2"
+          >
+            {t.developerAnchor}
+          </a>
+        </p>
       </div>
     </div>
   );

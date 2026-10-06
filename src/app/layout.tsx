@@ -168,6 +168,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     "sameAs": [
       "https://digitrajasa.web.id",
     ],
+    // NEXBILL adalah produk Digitrajasa — dihubungkan di structured data juga, bukan hanya link footer.
+    "parentOrganization": {
+      "@type": "Organization",
+      "name": "Digitrajasa",
+      "url": "https://www.digitrajasa.web.id",
+    },
   };
 
   return (
