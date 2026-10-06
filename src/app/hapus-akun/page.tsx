@@ -9,10 +9,11 @@ import { Breadcrumb } from "@/components/seo/Breadcrumb";
 const EMAIL = "sales@nexbill.id";
 const WA = "+62 8557 3333 20";
 const WA_LINK = "https://wa.me/6285573333320?text=" + encodeURIComponent("Halo NEXBILL, saya ingin menghapus akun dan data outlet saya. Nama outlet: ");
+const WA_DATA_LINK = "https://wa.me/6285573333320?text=" + encodeURIComponent("Halo NEXBILL, saya ingin menghapus sebagian data (akun tetap dipakai). Nama outlet: ... Data yang ingin dihapus: ");
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
   return (
-    <section className="space-y-2">
+    <section id={id} className="space-y-2 scroll-mt-6">
       <h2 className="text-base font-semibold text-cyan-300">{title}</h2>
       <div className="text-sm text-neutral-400 leading-relaxed space-y-2">{children}</div>
     </section>
@@ -63,6 +64,30 @@ export default function HapusAkunPage() {
             </li>
             <li>Ingin membatalkan? Hubungi {EMAIL} atau WhatsApp {WA} sebelum 30 hari berakhir.</li>
           </ul>
+        </Section>
+
+        {/* URL ini (…/hapus-akun#hapus-data) diisi di Play Console → Data safety → "request that their
+            data is deleted" — penghapusan sebagian data TANPA menghapus akun. */}
+        <Section id="hapus-data" title="Hapus sebagian data tanpa menghapus akun">
+          <p>Anda bisa meminta sebagian data dihapus sementara akun NEXBILL tetap dipakai:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong>Langsung di aplikasi (Owner/Manager):</strong> hapus atau nonaktifkan data pelanggan &amp; member, akun staf, produk,
+              foto/banner/logo, serta perangkat (TV, smart plug) dari menu masing-masing.
+            </li>
+            <li>
+              <strong>Lewat permintaan:</strong> kirim email ke{" "}
+              <a href={`mailto:${EMAIL}?subject=Permintaan%20Hapus%20Data%20NEXBILL`} className="text-cyan-400 hover:underline">{EMAIL}</a>{" "}
+              dengan subjek <em>&quot;Permintaan Hapus Data NEXBILL&quot;</em>, atau{" "}
+              <a href={WA_DATA_LINK} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">WhatsApp {WA}</a>. Sebutkan
+              nama outlet dan data yang ingin dihapus (mis. data pelanggan tertentu, foto identitas penyewa Rental ke Rumah, riwayat login,
+              rekening bank referral, NPWP). Kami memverifikasi pemilik akun lewat email terdaftar sebelum memproses.
+            </li>
+          </ul>
+          <p>
+            Permintaan diproses paling lambat <strong>30 hari</strong>. Catatan transaksi, laporan keuangan, dan invoice yang wajib disimpan
+            menurut hukum tidak dihapus, tetapi identitas pribadi di dalamnya dianonimkan bila memungkinkan.
+          </p>
         </Section>
 
         <Section title="Staf dan pelanggan outlet">
