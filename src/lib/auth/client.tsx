@@ -28,6 +28,8 @@ export interface AuthUser {
   // to true server-side (schema.ts's own default) whenever it can't be read for some reason, so
   // an undefined/missing value here should never be treated as "unverified" by UI code.
   emailVerified?: boolean;
+  /** Akun demo publik (kredensial di landing page) — lihat lib/auth/demo-account.ts. */
+  isDemo?: boolean;
   permissions?: string[];
   // Every outlet this account can switch into (always includes the home/current one — see
   // GET /api/auth/me). Length 1 for the common single-outlet case; the TopBar outlet

@@ -6,6 +6,9 @@ import bcrypt from "bcryptjs";
 import { signSessionToken, readSessionCookie, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
 import { claimSession, SessionConflictError } from "@/lib/auth/single-session";
 import { describeError } from "@/lib/api/error";
+import { isDemoEmail, visitorKey, DEMO_LOGIN_ACTION } from "@/lib/auth/demo-account";
+import { describeDevice } from "@/lib/auth/single-session";
+import { logAudit } from "@/lib/audit/log";
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,6 +46,21 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       if (err instanceof SessionConflictError) return NextResponse.json({ error: err.message, code: "SESSION_ACTIVE_ELSEWHERE" }, { status: 409 });
       throw err;
+    }
+
+    // Statistik akun demo publik (Platform Admin → Akun Demo). IP tidak disimpan mentah — hanya hash
+    // pendek IP+perangkat untuk menghitung pengunjung unik.
+    if (isDemoEmail(user.email)) {
+      const ua = req.headers.get("user-agent");
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+      await logAudit({
+        outletId: user.outletId,
+        staffUserId: user.id,
+        action: DEMO_LOGIN_ACTION,
+        entityType: "staff_user",
+        entityId: user.id,
+        after: { visitor: await visitorKey(ip, ua), device: describeDevice(ua), country: req.headers.get("x-vercel-ip-country") ?? null, source: req.headers.get("referer") ?? null },
+      });
     }
 
     const token = signSessionToken({ sub: user.id, outletId: user.outletId, role: user.role, name: user.name, email: user.email, sid });

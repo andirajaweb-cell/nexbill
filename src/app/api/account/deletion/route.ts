@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { describeError, errorStatus } from "@/lib/api/error";
 import { getDeletionStatus, requestAccountDeletion, cancelPendingDeletion } from "@/lib/account-deletion/service";
+import { isDemoEmail, DemoAccountError } from "@/lib/auth/demo-account";
 
 /**
  * Hapus akun & data outlet (Pengaturan → Akun Saya). GET = status, POST = minta kode konfirmasi
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    if (isDemoEmail(session.email)) return NextResponse.json({ error: new DemoAccountError("Hapus akun").message }, { status: 403 });
     const body = await req.json().catch(() => ({}));
     const result = await requestAccountDeletion(session, typeof body.reason === "string" ? body.reason : undefined);
     return NextResponse.json(result);
@@ -35,6 +37,7 @@ export async function DELETE() {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    if (isDemoEmail(session.email)) return NextResponse.json({ error: new DemoAccountError("Hapus akun").message }, { status: 403 });
     await cancelPendingDeletion(session);
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

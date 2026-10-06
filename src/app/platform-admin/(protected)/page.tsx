@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
+import { DemoAccessCard } from "./DemoAccessCard";
 import { Building2, Wallet, TrendingUp, AlertTriangle, Users, Database, ExternalLink } from "lucide-react";
 
 // Supabase's own dashboard, not ours — Database Size, Egress, Cached Egress, and File Storage
@@ -69,6 +70,8 @@ export default function PlatformOverviewPage() {
         <StatCard label="Tagihan Belum Lunas" value={data ? `${data.unpaidCount} (${rupiah(data.unpaidTotal)})` : "—"} icon={AlertTriangle} accent="#fbbf24" />
         <StatCard label="Active User (30 hari)" value={data ? String(data.activeUsers30d) : "—"} icon={Users} accent="#f472b6" />
       </div>
+
+      <DemoAccessCard />
 
       <Card>
         <div className="flex items-start justify-between gap-4 flex-wrap">

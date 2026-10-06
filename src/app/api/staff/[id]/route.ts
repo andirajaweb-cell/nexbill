@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit/log";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { isDemoEmail, DemoAccountError } from "@/lib/auth/demo-account";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,6 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!before || before.outletId !== session.outletId) {
       return NextResponse.json({ error: "Staf tidak ditemukan." }, { status: 404 });
     }
+    if (isDemoEmail(before.email)) return NextResponse.json({ error: new DemoAccountError("Mengubah akun demo").message }, { status: 403 });
     // "superuser" is reserved — never assignable through this outlet-facing endpoint, not even by
     // an existing superuser/owner promoting someone else. A no-op (row already superuser, role
     // left unset or set to the same value) and demoting a superuser to something else are both

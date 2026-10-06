@@ -12,6 +12,7 @@ import { CookieConsentBanner } from "./cookie-consent-banner";
 import { LoadingScreen } from "./loading-screen";
 import { LanguageProvider, useLanguage } from "./landing-i18n";
 import { DEFAULT_PRICING } from "@/lib/subscription/pricing";
+import { DEMO_PUBLIC_EMAIL, DEMO_PUBLIC_PASSWORD } from "@/lib/demo-public";
 
 // NOTE: a <Script src=".../model-viewer.min.js"> tag used to live in the JSX below, loaded
 // unconditionally on every page view even though no <model-viewer> element is ever rendered
@@ -930,6 +931,7 @@ function LandingPageInner() {
               <div className="hero-ctas">
                 <Link href="/daftar" className="btn btn-primary">{t.intro.ctaPrimary}</Link>
                 <a href="#fitur" className="btn btn-ghost" style={{ backdropFilter: 'blur(8px)' }}>{t.intro.ctaGhost}</a>
+                <a href="#coba-demo" className="btn btn-ghost" style={{ backdropFilter: 'blur(8px)' }}>{t.demo.kicker}</a>
               </div>
               <p className="hero-note" style={{ color: '#cbd5e1' }}>{t.intro.note}</p>
 
@@ -1205,6 +1207,25 @@ function LandingPageInner() {
         </div>
       </section>
 
+      {/* SECTION: COBA DEMO — kredensial akun demo publik (lib/demo-public.ts). Akun ini dilindungi di
+          server (lib/auth/demo-account.ts) dan setiap login dihitung di Platform Admin. */}
+      <section id="coba-demo" style={{ backgroundColor: 'transparent' }}>
+        <div className="wrap">
+          <div className="section-head">
+            <div className="kicker">{t.demo.kicker}</div>
+            <h2>{t.demo.title}</h2>
+            <p>{t.demo.sub}</p>
+          </div>
+          <div className="feat-card" style={{ maxWidth: '520px', margin: '0 auto', display: 'grid', gap: '12px', backdropFilter: 'blur(10px)', backgroundColor: 'rgba(13, 21, 38, 0.6)' }}>
+            <DemoCredential label={t.demo.emailLabel} value={DEMO_PUBLIC_EMAIL} copyLabel={t.demo.copy} copiedLabel={t.demo.copied} />
+            <DemoCredential label={t.demo.passwordLabel} value={DEMO_PUBLIC_PASSWORD} copyLabel={t.demo.copy} copiedLabel={t.demo.copied} />
+            <Link href="/login?demo=1" className="btn btn-primary btn-block">{t.demo.cta}</Link>
+            <p style={{ fontSize: '12.5px', color: 'var(--text-dim)', textAlign: 'center', margin: 0 }}>{t.demo.note}</p>
+            <Link href="/daftar" style={{ fontSize: '13px', color: '#22d3ee', textAlign: 'center' }}>{t.demo.signup} →</Link>
+          </div>
+        </div>
+      </section>
+
       {/* SECTION: HARGA & ADD-ONS */}
       {/* HARGA — dua paket (struktur harga 2026-10): Starter per unit PS (minimal N unit, fitur
           operasional) dan Pro flat per outlet (semua fitur + AI), toggle bulanan/tahunan, catatan
@@ -1392,6 +1413,24 @@ function LandingPageInner() {
           and layout.tsx stays a server component. See cookie-consent-banner.tsx for the
           accept/decline persistence logic. */}
       <CookieConsentBanner />
+    </div>
+  );
+}
+
+/** Satu baris kredensial demo dengan tombol salin (section "Coba Demo"). */
+function DemoCredential({ label, value, copyLabel, copiedLabel }: { label: string; value: string; copyLabel: string; copiedLabel: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '10px 14px', background: 'rgba(5, 9, 20, 0.55)' }}>
+      <span style={{ fontSize: '12px', color: 'var(--text-dim)', minWidth: '72px' }}>{label}</span>
+      <code style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: '#e0f2fe', wordBreak: 'break-all' }}>{value}</code>
+      <button
+        type="button"
+        onClick={() => { navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); }}
+        style={{ fontSize: '12px', color: copied ? '#34d399' : '#22d3ee', border: '1px solid rgba(34,211,238,0.35)', borderRadius: '8px', padding: '4px 10px', background: 'transparent', cursor: 'pointer' }}
+      >
+        {copied ? copiedLabel : copyLabel}
+      </button>
     </div>
   );
 }

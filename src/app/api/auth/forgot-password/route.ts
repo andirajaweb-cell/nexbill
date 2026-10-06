@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { signPasswordResetToken } from "@/lib/auth/password-reset";
 import { sendEmail, forgotPasswordEmail } from "@/lib/notifications/email";
 import { describeError } from "@/lib/api/error";
+import { isDemoEmail, DemoAccountError } from "@/lib/auth/demo-account";
 
 const GENERIC_OK = { ok: true, message: "Kalau email tersebut terdaftar, link reset password sudah dikirim." };
 
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
     // reveals anything, and only to whoever actually controls that inbox.
     const [user] = await db.select().from(staffUsers).where(eq(staffUsers.email, String(email).toLowerCase().trim())).limit(1);
     if (!user || !user.isActive) return NextResponse.json(GENERIC_OK);
+    // Akun demo publik: tidak ada reset password (siapa pun bisa memintanya, dan email reset hanya
+    // menghabiskan kuota pengiriman). Jawaban tetap generik.
+    if (isDemoEmail(user.email)) return NextResponse.json(GENERIC_OK);
 
     const token = signPasswordResetToken(user.id, user.passwordHash);
     const baseUrl = process.env.APP_BASE_URL || req.nextUrl.origin;

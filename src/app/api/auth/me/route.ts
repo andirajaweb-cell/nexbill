@@ -6,6 +6,7 @@ import { getSession, inspectSession } from "@/lib/auth/session";
 import { ALL_PERMISSIONS, hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { getAccessibleOutlets } from "@/lib/outlets/membership";
 import { describeError } from "@/lib/api/error";
+import { isDemoEmail } from "@/lib/auth/demo-account";
 
 /**
  * This is the single most load-bearing route in the app — useAuth() calls it on every page
@@ -63,6 +64,8 @@ export async function GET() {
       decimalPlaces: outletRow?.decimalPlaces ?? 0,
       dateFormat: outletRow?.dateFormat ?? "dmy",
       emailVerified: staffRow?.emailVerified ?? true,
+      // Akun demo publik (lib/auth/demo-account.ts) — dashboard menampilkan banner & menyembunyikan aksi akun.
+      isDemo: isDemoEmail(session.email),
       permissions,
       linkedOutlets,
     });

@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { verifyPasswordResetToken, fingerprintPasswordHash } from "@/lib/auth/password-reset";
 import { describeError } from "@/lib/api/error";
 import { revokeSession } from "@/lib/auth/single-session";
+import { isDemoEmail, DemoAccountError } from "@/lib/auth/demo-account";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
 
     const [user] = await db.select().from(staffUsers).where(eq(staffUsers.id, payload.sub)).limit(1);
     if (!user || !user.isActive) return NextResponse.json({ error: "Akun tidak ditemukan atau nonaktif." }, { status: 404 });
+    if (isDemoEmail(user.email)) return NextResponse.json({ error: new DemoAccountError("Reset password").message }, { status: 403 });
 
     // fingerprint mismatch = this exact link was already redeemed (passwordHash has since
     // changed), or a newer reset link was requested and used after this one was issued — see

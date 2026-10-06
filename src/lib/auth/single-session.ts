@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { outlets, staffUsers } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { isDemoEmail } from "./demo-account";
 
 /**
  * Satu akun = satu perangkat/browser aktif.
@@ -67,10 +68,21 @@ export async function claimSession(
   const sid = crypto.randomUUID();
   const now = new Date().toISOString();
   const [row] = await db
-    .select({ sid: staffUsers.activeSessionId, at: staffUsers.activeSessionAt, device: staffUsers.activeSessionDevice })
+    .select({ sid: staffUsers.activeSessionId, at: staffUsers.activeSessionAt, device: staffUsers.activeSessionDevice, email: staffUsers.email })
     .from(staffUsers)
     .where(eq(staffUsers.id, user.id))
     .limit(1);
+  // Akun demo publik (lib/auth/demo-account.ts): banyak pengunjung login bersamaan. Semua memakai
+  // sid yang sama, jadi login baru tidak menggugurkan sesi pengunjung lain dan tidak ada penolakan.
+  if (isDemoEmail(row?.email)) {
+    const shared = row?.sid ?? sid;
+    await db
+      .update(staffUsers)
+      .set({ activeSessionId: shared, activeSessionAt: now, activeSessionDevice: "Akun demo (banyak perangkat)", activeSessionIp: null })
+      .where(eq(staffUsers.id, user.id));
+    cache.delete(user.id);
+    return shared;
+  }
   if (
     user.role !== "superuser" &&
     row?.sid &&
@@ -91,6 +103,9 @@ export async function claimSession(
 /** Logout: bebaskan akun hanya bila sid yang keluar memang sesi yang berlaku. */
 export async function releaseSession(userId: string, sid: string | undefined) {
   if (!sid) return;
+  // Logout satu pengunjung akun demo tidak boleh mengeluarkan pengunjung lain (sid dipakai bersama).
+  const [u] = await db.select({ email: staffUsers.email }).from(staffUsers).where(eq(staffUsers.id, userId)).limit(1);
+  if (isDemoEmail(u?.email)) return;
   await db
     .update(staffUsers)
     .set({ activeSessionId: null, activeSessionAt: null, activeSessionDevice: null, activeSessionIp: null })

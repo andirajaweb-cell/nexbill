@@ -6,6 +6,7 @@ import Link from "next/link";
 import { showAlert } from "@/lib/ui/dialog";
 import { createClient } from "@/lib/client";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { DEMO_PUBLIC_EMAIL, DEMO_PUBLIC_PASSWORD } from "@/lib/demo-public";
 
 type LangCode = "id" | "en" | "ms" | "th" | "fil" | "vi";
 
@@ -249,6 +250,17 @@ function LoginForm() {
   const [lang, setLang] = useState<LangCode>("id");
   const [langOpen, setLangOpen] = useState(false);
   const t = COPY[lang];
+
+  // /login?demo=1 (tombol "Masuk ke Demo" di landing page): isi otomatis kredensial akun demo
+  // publik — lihat lib/demo-public.ts. Tidak dikirim otomatis; pengunjung tetap menekan Masuk.
+  useEffect(() => {
+    if (params.get("demo") !== "1") return;
+    setEmail(DEMO_PUBLIC_EMAIL);
+    setPassword(DEMO_PUBLIC_PASSWORD);
+    setEmailUnlocked(true);
+    setPasswordUnlocked(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(LANG_STORAGE_KEY) as LangCode | null;

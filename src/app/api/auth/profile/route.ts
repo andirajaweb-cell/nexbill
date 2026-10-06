@@ -4,6 +4,7 @@ import { staffUsers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getSession, signSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { isDemoEmail, DemoAccountError } from "@/lib/auth/demo-account";
 
 /**
  * Self-service "Akun Saya" tab on /dashboard/settings — lets a logged-in staffer edit their own
@@ -18,6 +19,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    if (isDemoEmail(session.email)) return NextResponse.json({ error: new DemoAccountError("Ubah profil").message }, { status: 403 });
 
     const { name } = await req.json();
     const trimmed = String(name ?? "").trim();

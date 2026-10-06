@@ -301,4 +301,8 @@ registerDict({
     fil: "Ligtas at hindi nawawala ang data ng outlet mo — awtomatikong mabubuksan ang lahat ng feature sa sandaling matanggap ang bayad.",
     vi: "Dữ liệu chi nhánh của bạn an toàn và không bị mất — mọi tính năng sẽ tự động mở khóa ngay khi nhận được thanh toán.",
   },
+
+  // --- Akun demo publik ---
+  "demo.banner": { id: "Anda memakai AKUN DEMO publik — dipakai bersama banyak orang. Jangan masukkan data asli; data bisa berubah atau direset sewaktu-waktu. Password & data akun tidak bisa diubah.", en: "You're using the public DEMO ACCOUNT — shared by many people. Don't enter real data; data may change or be reset at any time. Password & account details can't be changed.", ms: "Anda menggunakan AKAUN DEMO awam — dikongsi ramai orang. Jangan masukkan data sebenar; data boleh berubah atau ditetapkan semula bila-bila masa. Kata laluan & butiran akaun tidak boleh diubah.", th: "คุณกำลังใช้บัญชีเดโมสาธารณะ — ใช้ร่วมกับหลายคน อย่าใส่ข้อมูลจริง ข้อมูลอาจเปลี่ยนหรือถูกรีเซ็ตได้ตลอดเวลา เปลี่ยนรหัสผ่านและข้อมูลบัญชีไม่ได้", fil: "Gumagamit ka ng pampublikong DEMO ACCOUNT — ginagamit ng maraming tao. Huwag maglagay ng totoong data; maaaring magbago o ma-reset ang data anumang oras. Hindi mababago ang password at detalye ng account.", vi: "Bạn đang dùng TÀI KHOẢN DEMO công khai — nhiều người dùng chung. Đừng nhập dữ liệu thật; dữ liệu có thể thay đổi hoặc bị đặt lại bất cứ lúc nào. Không thể đổi mật khẩu & thông tin tài khoản." },
+  "demo.bannerCta": { id: "Daftar gratis", en: "Sign up free", ms: "Daftar percuma", th: "สมัครฟรี", fil: "Mag-sign up nang libre", vi: "Đăng ký miễn phí" },
 });

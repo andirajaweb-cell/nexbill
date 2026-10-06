@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { isDemoEmail, DemoAccountError } from "@/lib/auth/demo-account";
 
 /**
  * Self-service "Akun Saya" tab on /dashboard/settings — a logged-in staffer changing their own
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    if (isDemoEmail(session.email)) return NextResponse.json({ error: new DemoAccountError("Ganti password").message }, { status: 403 });
 
     const { currentPassword, newPassword } = await req.json();
     if (!newPassword) return NextResponse.json({ error: "Password baru wajib diisi." }, { status: 400 });

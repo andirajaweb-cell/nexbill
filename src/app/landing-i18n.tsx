@@ -66,6 +66,8 @@ export interface LandingCopy {
   gap: { kicker: string; title: string; sub: string; items: Feature[] };
   // "Kasir tanpa PC" (2026-10): HP Android + printer Bluetooth + notifikasi + scan kamera.
   mobile: { kicker: string; title: string; sub: string; items: Feature[]; note: string; cta: string };
+  // "Coba Demo" (2026-10): kredensial akun demo publik — lihat src/lib/demo-public.ts.
+  demo: { kicker: string; title: string; sub: string; emailLabel: string; passwordLabel: string; cta: string; copy: string; copied: string; note: string; signup: string };
   // Struktur harga 2026-10 (lihat src/lib/subscription/pricing.ts): dua kartu Starter (per unit,
   // minimal N unit) & Pro (flat per outlet), toggle bulanan/tahunan. Angka harga TIDAK ditulis di
   // sini — diambil live dari /api/public/pricing (fallback ke DEFAULT_PRICING di page.tsx).
@@ -173,6 +175,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Kontrol Internal Anti-Fraud", desc: "Pemindahan kas antar pos wajib approval atasan, deteksi pola shift berisiko otomatis, dan skor kepercayaan pelanggan berbasis riwayat — bukan sekadar catatan transaksi tanpa lapisan pengawasan." },
         { title: "Satu Sistem untuk Banyak Model Bisnis", desc: "Sewa konsol, sewa alat/barang (home rental), sampai jual makanan/minuman digabung jadi satu tagihan dan satu laporan — tidak perlu tempel-tempel aplikasi kasir terpisah untuk tiap lini bisnis." },
       ],
+    },
+    demo: {
+      kicker: "Coba Demo",
+      title: "Coba NEXBILL sekarang, tanpa daftar",
+      sub: "Masuk dengan akun demo dan jelajahi semua fitur: billing rental PS, kasir, booking, laporan, sampai akuntansi.",
+      emailLabel: "Email",
+      passwordLabel: "Password",
+      cta: "Masuk ke Demo",
+      copy: "Salin",
+      copied: "Tersalin",
+      note: "Akun demo dipakai bersama banyak orang — jangan masukkan data asli. Data dapat direset sewaktu-waktu.",
+      signup: "Atau daftar gratis untuk outlet Anda",
     },
     mobile: {
       kicker: "Kasir tanpa PC", title: "Cukup HP Android — outlet langsung jalan",
@@ -353,6 +367,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "One System for Multiple Business Lines", desc: "Console rental, equipment rental, and food & drink sales combine into a single bill and a single report — no need to stitch together separate POS apps for each line of business." },
       ],
     },
+    demo: {
+      kicker: "Try the Demo",
+      title: "Try NEXBILL now — no sign-up",
+      sub: "Log in with the demo account and explore every feature: PS rental billing, cashier, booking, reports, all the way to accounting.",
+      emailLabel: "Email",
+      passwordLabel: "Password",
+      cta: "Open the Demo",
+      copy: "Copy",
+      copied: "Copied",
+      note: "The demo account is shared by many people — don't enter real data. Data may be reset at any time.",
+      signup: "Or sign up free for your outlet",
+    },
     mobile: {
       kicker: "Cashier without a PC", title: "Just an Android phone — your outlet is ready",
       sub: "No need to buy a cashier computer. Open NEXBILL on an Android phone, pair a Bluetooth thermal printer, and run daily operations from your hand.",
@@ -531,6 +557,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Kawalan Dalaman Anti-Penipuan", desc: "Pemindahan tunai antara akaun wajib kelulusan pengurus, syif berisiko dikesan automatik, dan pelanggan diberi skor kepercayaan berdasarkan sejarah — bukan sekadar log transaksi tanpa lapisan pengawasan." },
         { title: "Satu Sistem untuk Pelbagai Lini Perniagaan", desc: "Sewa konsol, sewa peralatan (home rental), dan jualan makanan/minuman digabung jadi satu bil dan satu laporan — tidak perlu guna app kaunter jualan berasingan untuk setiap lini perniagaan." },
       ],
+    },
+    demo: {
+      kicker: "Cuba Demo",
+      title: "Cuba NEXBILL sekarang, tanpa daftar",
+      sub: "Log masuk dengan akaun demo dan terokai semua ciri: bil sewa PS, juruwang, tempahan, laporan, hingga perakaunan.",
+      emailLabel: "E-mel",
+      passwordLabel: "Kata laluan",
+      cta: "Masuk ke Demo",
+      copy: "Salin",
+      copied: "Disalin",
+      note: "Akaun demo dikongsi ramai orang — jangan masukkan data sebenar. Data boleh ditetapkan semula bila-bila masa.",
+      signup: "Atau daftar percuma untuk outlet anda",
     },
     mobile: {
       kicker: "Juruwang tanpa PC", title: "Cukup telefon Android — outlet terus beroperasi",
@@ -714,6 +752,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "ระบบเดียวสำหรับหลายประเภทธุรกิจ", desc: "เช่าคอนโซล เช่าอุปกรณ์ (home rental) และขายอาหาร/เครื่องดื่ม รวมเป็นบิลเดียวและรายงานเดียว — ไม่ต้องใช้แอปแคชเชียร์แยกสำหรับแต่ละธุรกิจ" },
       ],
     },
+    demo: {
+      kicker: "ทดลองเดโม",
+      title: "ลองใช้ NEXBILL ได้เลย ไม่ต้องสมัคร",
+      sub: "เข้าสู่ระบบด้วยบัญชีเดโมและสำรวจทุกฟีเจอร์: บิลลิ่งร้านเช่า PS แคชเชียร์ การจอง รายงาน จนถึงบัญชี",
+      emailLabel: "อีเมล",
+      passwordLabel: "รหัสผ่าน",
+      cta: "เข้าสู่เดโม",
+      copy: "คัดลอก",
+      copied: "คัดลอกแล้ว",
+      note: "บัญชีเดโมใช้ร่วมกันหลายคน — อย่าใส่ข้อมูลจริง ข้อมูลอาจถูกรีเซ็ตได้ตลอดเวลา",
+      signup: "หรือสมัครฟรีสำหรับร้านของคุณ",
+    },
     mobile: {
       kicker: "แคชเชียร์ไม่ต้องมี PC", title: "แค่มือถือ Android — ร้านพร้อมใช้งาน",
       sub: "ไม่ต้องซื้อคอมพิวเตอร์แคชเชียร์ เปิด NEXBILL บนมือถือ Android จับคู่เครื่องพิมพ์ความร้อนบลูทูธ แล้วบริหารงานประจำวันได้จากมือถือ",
@@ -896,6 +946,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Một Hệ Thống Cho Nhiều Mô Hình Kinh Doanh", desc: "Cho thuê máy chơi game, cho thuê thiết bị (home rental), và bán đồ ăn/thức uống gộp thành một hóa đơn và một báo cáo duy nhất — không cần ghép nhiều ứng dụng thu ngân riêng lẻ cho từng mảng kinh doanh." },
       ],
     },
+    demo: {
+      kicker: "Dùng thử Demo",
+      title: "Dùng thử NEXBILL ngay — không cần đăng ký",
+      sub: "Đăng nhập bằng tài khoản demo và khám phá mọi tính năng: tính tiền thuê PS, thu ngân, đặt chỗ, báo cáo, đến kế toán.",
+      emailLabel: "Email",
+      passwordLabel: "Mật khẩu",
+      cta: "Vào bản Demo",
+      copy: "Sao chép",
+      copied: "Đã sao chép",
+      note: "Tài khoản demo được nhiều người dùng chung — đừng nhập dữ liệu thật. Dữ liệu có thể bị đặt lại bất cứ lúc nào.",
+      signup: "Hoặc đăng ký miễn phí cho cửa hàng của bạn",
+    },
     mobile: {
       kicker: "Thu ngân không cần PC", title: "Chỉ cần điện thoại Android — cửa hàng sẵn sàng",
       sub: "Không cần mua máy tính thu ngân. Mở NEXBILL trên điện thoại Android, ghép máy in nhiệt Bluetooth và vận hành hằng ngày ngay trong tay.",
@@ -1077,6 +1139,18 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Built-In na Anti-Fraud Control", desc: "Kailangan ng approval ng manager ang paglipat ng cash sa pagitan ng mga account, awtomatikong na-fla-flag ang mga risky na shift, at may trust score ang customer batay sa history nila — hindi lang basic na transaction log na walang oversight." },
         { title: "Iisang Sistema para sa Maraming Uri ng Negosyo", desc: "Pagpapaupa ng konsola, pagpapaupa ng gamit (home rental), at pagbebenta ng pagkain/inumin ay pinagsasama sa iisang bill at iisang report — hindi na kailangan ng hiwalay na POS app para sa bawat linya ng negosyo." },
       ],
+    },
+    demo: {
+      kicker: "Subukan ang Demo",
+      title: "Subukan ang NEXBILL ngayon — walang sign-up",
+      sub: "Mag-log in gamit ang demo account at tuklasin ang lahat ng feature: billing ng PS rental, cashier, booking, report, hanggang accounting.",
+      emailLabel: "Email",
+      passwordLabel: "Password",
+      cta: "Buksan ang Demo",
+      copy: "Kopyahin",
+      copied: "Nakopya",
+      note: "Ginagamit ng maraming tao ang demo account — huwag maglagay ng totoong data. Maaaring ma-reset ang data anumang oras.",
+      signup: "O mag-sign up nang libre para sa iyong outlet",
     },
     mobile: {
       kicker: "Cashier na walang PC", title: "Android phone lang — handa na ang outlet",
