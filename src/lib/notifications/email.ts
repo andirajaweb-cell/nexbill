@@ -15,8 +15,11 @@
  *
  * ENV required for real sending:
  *   RESEND_API_KEY
- *   RESEND_FROM_EMAIL   e.g. "NEXBILL <billing@yourdomain.com>" — must be a
+ *   RESEND_FROM_EMAIL   e.g. "NEXBILL <noreply@nexbill.id>" — must be a
  *                        domain verified in your Resend account.
+ * Optional:
+ *   RESEND_REPLY_TO     e.g. "sales@nexbill.id" — where replies from owners land (a real
+ *                        mailbox), so the From address itself needs no inbox.
  */
 
 interface SendEmailInput {
@@ -44,6 +47,7 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean;
       },
       body: JSON.stringify({
         from: process.env.RESEND_FROM_EMAIL,
+        ...(process.env.RESEND_REPLY_TO ? { reply_to: process.env.RESEND_REPLY_TO.split(",").map((x) => x.trim()).filter(Boolean) } : {}),
         to: [input.to],
         subject: input.subject,
         html: input.html,
