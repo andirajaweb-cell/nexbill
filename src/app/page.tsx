@@ -880,7 +880,7 @@ function LandingPageInner() {
           <div className="hero-corner-copy">
             <span className="eyebrow" style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)' }}>{t.hero.eyebrow}</span>
             <p>{t.hero.lede}</p>
-            <Link href="/daftar" className="btn btn-primary hero-corner-btn">{t.hero.cta}</Link>
+            <Link href={`/daftar?lang=${lang}`} className="btn btn-primary hero-corner-btn">{t.hero.cta}</Link>
           </div>
 
           <div className="hero-grow-video-frame" ref={heroGrowVideoFrameRef}>
@@ -929,7 +929,7 @@ function LandingPageInner() {
               <h2 className="intro-headline" style={{ textShadow: '0 10px 30px rgba(0,0,0,0.8)' }}>{t.intro.headlinePre}<span className="glow-text">{t.intro.headlineHighlight}</span></h2>
               <p className="sub" style={{ textShadow: '0 4px 10px rgba(0,0,0,0.8)', color: '#fff' }}>{t.intro.sub}</p>
               <div className="hero-ctas">
-                <Link href="/daftar" className="btn btn-primary">{t.intro.ctaPrimary}</Link>
+                <Link href={`/daftar?lang=${lang}`} className="btn btn-primary">{t.intro.ctaPrimary}</Link>
                 <a href="#fitur" className="btn btn-ghost" style={{ backdropFilter: 'blur(8px)' }}>{t.intro.ctaGhost}</a>
                 <a href="#coba-demo" className="btn btn-ghost" style={{ backdropFilter: 'blur(8px)' }}>{t.demo.kicker}</a>
               </div>
@@ -1202,7 +1202,7 @@ function LandingPageInner() {
           </div>
           <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '14px', marginTop: '22px' }}>{t.mobile.note}</p>
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
-            <Link href="/daftar" className="btn btn-primary">{t.mobile.cta}</Link>
+            <Link href={`/daftar?lang=${lang}`} className="btn btn-primary">{t.mobile.cta}</Link>
           </div>
         </div>
       </section>
@@ -1219,9 +1219,9 @@ function LandingPageInner() {
           <div className="feat-card" style={{ maxWidth: '520px', margin: '0 auto', display: 'grid', gap: '12px', backdropFilter: 'blur(10px)', backgroundColor: 'rgba(13, 21, 38, 0.6)' }}>
             <DemoCredential label={t.demo.emailLabel} value={DEMO_PUBLIC_EMAIL} copyLabel={t.demo.copy} copiedLabel={t.demo.copied} />
             <DemoCredential label={t.demo.passwordLabel} value={DEMO_PUBLIC_PASSWORD} copyLabel={t.demo.copy} copiedLabel={t.demo.copied} />
-            <Link href="/login?demo=1" className="btn btn-primary btn-block">{t.demo.cta}</Link>
+            <Link href={`/login?demo=1&lang=${lang}`} className="btn btn-primary btn-block">{t.demo.cta}</Link>
             <p style={{ fontSize: '12.5px', color: 'var(--text-dim)', textAlign: 'center', margin: 0 }}>{t.demo.note}</p>
-            <Link href="/daftar" style={{ fontSize: '13px', color: '#22d3ee', textAlign: 'center' }}>{t.demo.signup} →</Link>
+            <Link href={`/daftar?lang=${lang}`} style={{ fontSize: '13px', color: '#22d3ee', textAlign: 'center' }}>{t.demo.signup} →</Link>
           </div>
         </div>
       </section>
@@ -1274,7 +1274,7 @@ function LandingPageInner() {
                   <li key={i}><span className="check">✓</span> {f}</li>
                 ))}
               </ul>
-              <Link href="/daftar" className="btn btn-ghost btn-block">{t.harga.starter.cta}</Link>
+              <Link href={`/daftar?lang=${lang}`} className="btn btn-ghost btn-block">{t.harga.starter.cta}</Link>
             </div>
 
             {/* PRO — flat per outlet, unit tak terbatas, semua fitur + AI. */}
@@ -1294,7 +1294,7 @@ function LandingPageInner() {
                   <li key={i}><span className="check">✓</span> {f}</li>
                 ))}
               </ul>
-              <Link href="/daftar" className="btn btn-primary btn-block">{t.harga.pro.cta}</Link>
+              <Link href={`/daftar?lang=${lang}`} className="btn btn-primary btn-block">{t.harga.pro.cta}</Link>
             </div>
           </div>
 

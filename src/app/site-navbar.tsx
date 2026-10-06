@@ -78,7 +78,7 @@ function LangDropdown({ align }: { align: "left" | "right" }) {
 
 export function SiteNavbar() {
   const [navOpen, setNavOpen] = useState(false);
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   const sectionLinks = [
     { href: "/#solusi", label: t.nav.solusi },
@@ -101,9 +101,9 @@ export function SiteNavbar() {
             <Link href="/about">{t.nav.about}</Link>
             <LangDropdown align="right" />
             <div className="nav-cta">
-              <Link href="/daftar" className="nav-cta-primary">{t.nav.daftar}</Link>
+              <Link href={`/daftar?lang=${lang}`} className="nav-cta-primary">{t.nav.daftar}</Link>
               <span className="nav-cta-divider" aria-hidden="true">/</span>
-              <Link href="/login" className="nav-cta-secondary">{t.nav.login}</Link>
+              <Link href={`/login?lang=${lang}`} className="nav-cta-secondary">{t.nav.login}</Link>
             </div>
           </div>
         </div>
@@ -126,8 +126,8 @@ export function SiteNavbar() {
             <a key={l.href} href={l.href} onClick={() => setNavOpen(false)}>{l.label}</a>
           ))}
           <Link href="/about" onClick={() => setNavOpen(false)}>{t.nav.about}</Link>
-          <Link href="/login" onClick={() => setNavOpen(false)}>{t.nav.masuk}</Link>
-          <Link href="/daftar" onClick={() => setNavOpen(false)}>{t.nav.daftarAkun}</Link>
+          <Link href={`/login?lang=${lang}`} onClick={() => setNavOpen(false)}>{t.nav.masuk}</Link>
+          <Link href={`/daftar?lang=${lang}`} onClick={() => setNavOpen(false)}>{t.nav.daftarAkun}</Link>
         </div>
       )}
     </nav>

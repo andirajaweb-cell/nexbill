@@ -263,8 +263,17 @@ function LoginForm() {
   }, [params]);
 
   useEffect(() => {
+    // ?lang= dari landing page (beda domain dengan dashboard, jadi localStorage-nya tidak terbagi)
+    // didahulukan, lalu disimpan supaya /daftar ikut memakai bahasa yang sama.
+    const fromQuery = params.get("lang") as LangCode | null;
+    if (fromQuery && LANG_OPTIONS.includes(fromQuery)) {
+      setLang(fromQuery);
+      window.localStorage.setItem(LANG_STORAGE_KEY, fromQuery);
+      return;
+    }
     const saved = window.localStorage.getItem(LANG_STORAGE_KEY) as LangCode | null;
     if (saved && LANG_OPTIONS.includes(saved)) setLang(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Surfaces the redirect from /api/auth/google/callback when Google sign-in couldn't complete

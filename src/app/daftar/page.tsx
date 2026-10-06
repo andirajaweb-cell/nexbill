@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { createClient } from "@/lib/client";
 import { SEA_BANKS } from "@/lib/data/sea-banks";
+import { DAFTAR_COPY, DAFTAR_LANGS, DAFTAR_LANG_STORAGE_KEY, LANDING_LANG_STORAGE_KEY, type DaftarLang } from "./copy";
 
 interface PlanInfo {
   starter: { name: string; pricePerUnit: number; minUnits: number } | null;
@@ -21,7 +22,22 @@ function rupiah(n: number) {
   return `Rp${Math.round(n).toLocaleString("id-ID")}`;
 }
 
-const STEPS = ["Usaha", "Cabang", "TV & Konsol", "Operasional", "Akun Owner", "Review"];
+const STEP_COUNT = 6;
+
+/** "{a} dan {b}" → teks dengan placeholder diganti. */
+function fmt(template: string, vars: Record<string, string | number>) {
+  return template.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+}
+
+/** Seperti fmt(), tapi nilai placeholder boleh berupa elemen React (mis. teks tebal/berwarna/link). */
+function rich(template: string, vars: Record<string, React.ReactNode>) {
+  return template.split(/(\{\w+\})/g).map((part, i) => {
+    const m = part.match(/^\{(\w+)\}$/);
+    return m && m[1] in vars ? <span key={i}>{vars[m[1]]}</span> : <span key={i}>{part}</span>;
+  });
+}
+
+const isDaftarLang = (v: string | null | undefined): v is DaftarLang => !!v && DAFTAR_LANGS.some((l) => l.code === v);
 
 export default function DaftarPage() {
   return (
@@ -47,6 +63,40 @@ function DaftarPageInner() {
   const [error, setError] = useState("");
   const [plan, setPlan] = useState<PlanInfo | null>(null);
   const [result, setResult] = useState<any>(null);
+
+  // Bahasa halaman: ?lang= → pilihan di /login (disimpan bersama) → bahasa landing page → Indonesia.
+  const [lang, setLang] = useState<DaftarLang>("id");
+  useEffect(() => {
+    const q = searchParams.get("lang");
+    let saved: string | null = null;
+    let landing: string | null = null;
+    try {
+      saved = window.localStorage.getItem(DAFTAR_LANG_STORAGE_KEY);
+      landing = window.localStorage.getItem(LANDING_LANG_STORAGE_KEY);
+    } catch {
+      // storage diblokir — pakai bawaan
+    }
+    const pick = [q, saved, landing].find(isDaftarLang);
+    if (pick) setLang(pick);
+    if (isDaftarLang(q)) {
+      try {
+        window.localStorage.setItem(DAFTAR_LANG_STORAGE_KEY, q);
+      } catch {
+        // abaikan
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const changeLang = (code: DaftarLang) => {
+    setLang(code);
+    try {
+      window.localStorage.setItem(DAFTAR_LANG_STORAGE_KEY, code);
+    } catch {
+      // abaikan
+    }
+  };
+  const t = DAFTAR_COPY[lang];
+  const STEPS = t.steps;
 
   const [businessName, setBusinessName] = useState("");
   const [address, setAddress] = useState("");
@@ -115,11 +165,11 @@ function DaftarPageInner() {
         options: { redirectTo: `${window.location.origin}/api/auth/google/callback` },
       });
       if (oauthError) {
-        setError("Daftar dengan Google gagal. Coba lagi, atau isi manual di bawah.");
+        setError(t.googleError);
         setGoogleBusy(false);
       }
     } catch {
-      setError("Daftar dengan Google gagal. Coba lagi, atau isi manual di bawah.");
+      setError(t.googleError);
       setGoogleBusy(false);
     }
   };
@@ -143,19 +193,19 @@ function DaftarPageInner() {
   const goNext = () => {
     setError("");
     if (step === 0 && !businessName.trim()) {
-      setError("Nama usaha wajib diisi.");
+      setError(t.errBusinessName);
       return;
     }
     if (step === 4) {
-      if (!outletName.trim()) return setError("Nama outlet/merchant wajib diisi.");
-      if (!ownerName.trim()) return setError("Nama pemilik (owner) wajib diisi.");
-      if (!email.trim() || !email.includes("@")) return setError("Email tidak valid.");
+      if (!outletName.trim()) return setError(t.errOutletName);
+      if (!ownerName.trim()) return setError(t.errOwnerName);
+      if (!email.trim() || !email.includes("@")) return setError(t.errEmail);
       if (!viaGoogle) {
-        if (password.length < 8) return setError("Password minimal 8 karakter.");
-        if (password !== confirmPassword) return setError("Konfirmasi password tidak sama.");
+        if (password.length < 8) return setError(t.errPasswordMin);
+        if (password !== confirmPassword) return setError(t.errPasswordMatch);
       }
     }
-    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+    setStep((s) => Math.min(STEP_COUNT - 1, s + 1));
   };
   const goBack = () => {
     setError("");
@@ -209,15 +259,15 @@ function DaftarPageInner() {
           setViaGoogle(false);
           setStep(4);
         }
-        setError(data.error ?? "Pendaftaran gagal.");
+        setError(data.error ?? t.errRegister);
         return;
       }
       setResult(data);
     } catch (err: unknown) {
       setError(
         err instanceof DOMException && err.name === "AbortError"
-          ? "Pendaftaran butuh waktu lebih lama dari biasanya (kemungkinan server sedang sibuk). Coba lagi sebentar lagi."
-          : "Tidak bisa terhubung ke server. Cek koneksi internet kamu dan coba lagi."
+          ? t.errTimeout
+          : t.errNetwork
       );
     } finally {
       clearTimeout(timeout);
@@ -230,40 +280,35 @@ function DaftarPageInner() {
       <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-[#05070f] px-3 sm:px-4 py-5 sm:py-10">
         <Card className="w-full max-w-lg space-y-5">
           <div>
-            <div className="text-lg font-bold text-cyan-400">Pendaftaran Berhasil 🎉</div>
+            <div className="text-lg font-bold text-cyan-400">{t.successTitle}</div>
             <p className="text-sm text-neutral-400 mt-1">
-              Outlet <span className="text-neutral-100 font-medium">{result.outlet.name}</span> sudah dibuat
-              {result.branchesCreated > 0 ? ` beserta ${result.branchesCreated} cabang lainnya` : ""}. Masa percobaan 30 hari sudah aktif.
+              {rich(t.successBody, {
+                outlet: <span className="text-neutral-100 font-medium">{result.outlet.name}</span>,
+                branches: result.branchesCreated > 0 ? fmt(t.successBranches, { n: result.branchesCreated }) : "",
+              })}
             </p>
           </div>
 
           <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
-            <div className="text-xs font-semibold text-neutral-300">Rekomendasi Berdasarkan Jawabanmu</div>
+            <div className="text-xs font-semibold text-neutral-300">{t.recTitle}</div>
             <div className="text-sm text-neutral-300 space-y-1">
               <div>
-                Smart Plug dibutuhkan: <span className="text-cyan-400 font-medium">{result.recommendation.smartPlugQty} unit</span> (untuk TV
-                analog/smart TV)
+                {t.recSmartPlug} <span className="text-cyan-400 font-medium">{fmt(t.units, { n: result.recommendation.smartPlugQty })}</span> {t.recSmartPlugNote}
               </div>
               {result.recommendation.starterMonthly != null && result.recommendation.proMonthly != null && (
                 <div>
-                  Paket yang disarankan:{" "}
-                  <span className="text-cyan-400 font-medium">{result.recommendation.recommendedPlan === "pro" ? "Pro" : "Starter"}</span> — Starter{" "}
-                  {rupiah(result.recommendation.starterMonthly)}/bln ({result.recommendation.totalUnits} unit) · Pro {rupiah(result.recommendation.proMonthly)}/bln
-                  (unit tak terbatas + semua fitur). Bebas pilih setelah trial.
+                  {t.recPlan} <span className="text-cyan-400 font-medium">{result.recommendation.recommendedPlan === "pro" ? "Pro" : "Starter"}</span> —{" "}
+                  {fmt(t.recPlanDetail, { starter: rupiah(result.recommendation.starterMonthly), units: result.recommendation.totalUnits, pro: rupiah(result.recommendation.proMonthly) })}
                 </div>
               )}
               <div>
-                Estimasi akun staf yang perlu dibuat:{" "}
-                <span className="text-cyan-400 font-medium">{result.recommendation.staffAccountsSuggested} akun</span> (kasir/dapur/lainnya),
-                untuk {result.recommendation.shifts} shift
+                {t.recStaff} <span className="text-cyan-400 font-medium">{fmt(t.recStaffValue, { n: result.recommendation.staffAccountsSuggested })}</span>{" "}
+                {fmt(t.recStaffNote, { shifts: result.recommendation.shifts })}
               </div>
             </div>
           </div>
 
-          <p className="text-xs text-neutral-500">
-            Kamu sudah otomatis masuk (login). Lanjutkan ke halaman Langganan untuk memilih paket (Starter/Pro) dan membeli smart plug, atau
-            langsung ke Dashboard.
-          </p>
+          <p className="text-xs text-neutral-500">{t.successNote}</p>
 
           <div className="flex gap-2">
             <Button
@@ -273,7 +318,7 @@ function DaftarPageInner() {
                 router.refresh();
               }}
             >
-              Ke Halaman Langganan
+              {t.toBilling}
             </Button>
             <Button
               variant="secondary"
@@ -283,7 +328,7 @@ function DaftarPageInner() {
                 router.refresh();
               }}
             >
-              Ke Dashboard
+              {t.toDashboard}
             </Button>
           </div>
         </Card>
@@ -297,30 +342,46 @@ function DaftarPageInner() {
         {busy && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-[inherit] bg-[#05070f]/90 backdrop-blur-sm">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400/30 border-t-cyan-400" />
-            <p className="text-sm text-neutral-300">Menyiapkan outlet & akun kamu...</p>
+            <p className="text-sm text-neutral-300">{t.busyOverlay}</p>
           </div>
         )}
-        <div>
-          <div className="text-lg font-bold text-cyan-400">Daftar NEXBILL</div>
-          <p className="text-sm text-neutral-500">Coba gratis 30 hari — beberapa pertanyaan singkat dulu untuk menyiapkan akunmu.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-lg font-bold text-cyan-400">{t.title}</div>
+            <p className="text-sm text-neutral-500">{t.subtitle}</p>
+          </div>
+          <label className="shrink-0">
+            <span className="sr-only">{t.language}</span>
+            <select
+              aria-label={t.language}
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-neutral-200 outline-none focus:border-cyan-400/50"
+              value={lang}
+              onChange={(e) => changeLang(e.target.value as DaftarLang)}
+            >
+              {DAFTAR_LANGS.map((l) => (
+                <option key={l.code} value={l.code} className="bg-neutral-900">
+                  {l.flag} {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {refCode && (
           <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-            Kode referral <span className="font-mono font-semibold">{refCode}</span> terdeteksi — kamu dapat diskon{" "}
-            <span className="font-semibold">20%</span> untuk tagihan langganan pertama.
+            {rich(t.referral, { code: <span className="font-mono font-semibold">{refCode}</span>, pct: <span className="font-semibold">20%</span> })}
           </div>
         )}
 
         <div className="flex items-center gap-1">
           {STEPS.map((label, i) => (
-            <div key={label} className="flex-1">
+            <div key={i} className="flex-1">
               <div className={`h-1 rounded-full ${i <= step ? "bg-cyan-400" : "bg-white/10"}`} />
             </div>
           ))}
         </div>
         <div className="text-xs text-neutral-500">
-          Langkah {step + 1}/{STEPS.length} — {STEPS[step]}
+          {fmt(t.stepLabel, { n: step + 1, total: STEP_COUNT, name: STEPS[step] })}
         </div>
 
         <div className="space-y-3 min-h-[220px]">
@@ -328,7 +389,7 @@ function DaftarPageInner() {
             <>
               {viaGoogle ? (
                 <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-                  Terverifikasi via Google: <span className="font-medium">{email}</span>
+                  {rich(t.verifiedGoogle, { email: <span className="font-medium">{email}</span> })}
                 </div>
               ) : (
                 <>
@@ -338,21 +399,21 @@ function DaftarPageInner() {
                     disabled={googleBusy}
                     className="w-full flex items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] py-3 text-sm font-medium text-neutral-200 transition hover:bg-white/[0.07] hover:border-white/20 disabled:opacity-60"
                   >
-                    {googleBusy ? "Membuka Google..." : "Daftar dengan Google"}
+                    {googleBusy ? t.googleButtonBusy : t.googleButton}
                   </button>
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-white/10" />
-                    <span className="text-[11px] uppercase tracking-wider text-neutral-500">atau isi manual</span>
+                    <span className="text-[11px] uppercase tracking-wider text-neutral-500">{t.orManual}</span>
                     <div className="h-px flex-1 bg-white/10" />
                   </div>
                 </>
               )}
               <div>
-                <label className={labelClass}>Nama Usaha</label>
+                <label className={labelClass}>{t.businessName}</label>
                 <input
                   autoFocus
                   className={inputClass}
-                  placeholder="cth. Rental PS Jaya Bersama"
+                  placeholder={t.businessPlaceholder}
                   value={businessName}
                   onChange={(e) => {
                     setBusinessName(e.target.value);
@@ -361,21 +422,21 @@ function DaftarPageInner() {
                 />
               </div>
               <div>
-                <label className={labelClass}>Alamat (opsional)</label>
+                <label className={labelClass}>{t.address}</label>
                 <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} />
               </div>
               <div>
-                <label className={labelClass}>No. Telepon/WhatsApp (opsional)</label>
+                <label className={labelClass}>{t.phone}</label>
                 <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
               <div>
-                <label className={labelClass}>Negara</label>
+                <label className={labelClass}>{t.country}</label>
                 <select className={inputClass} value={country} onChange={(e) => setCountry(e.target.value)}>
                   {SEA_BANKS.map((c) => (
                     <option key={c.code} value={c.code}>{c.label}</option>
                   ))}
                 </select>
-                <p className="text-[11px] text-neutral-600 mt-1">Menentukan simbol mata uang (Rp, RM, ฿, dst.) yang tampil di seluruh dashboard outlet ini — bisa diganti lagi nanti di Pengaturan.</p>
+                <p className="text-[11px] text-neutral-600 mt-1">{t.countryHint}</p>
               </div>
             </>
           )}
@@ -383,7 +444,7 @@ function DaftarPageInner() {
           {step === 1 && (
             <>
               <div>
-                <label className={labelClass}>Berapa jumlah cabang yang kamu miliki (termasuk yang ini)?</label>
+                <label className={labelClass}>{t.branchQuestion}</label>
                 <input
                   type="number"
                   min={1}
@@ -393,19 +454,16 @@ function DaftarPageInner() {
                   onChange={(e) => setBranchCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
                 />
               </div>
-              <p className="text-xs text-neutral-500">
-                Kalau lebih dari 1, cabang lain otomatis dibuat sekaligus dan digabung dalam satu tagihan (billing group) — bisa diganti
-                nama/alamatnya nanti di menu Pengaturan.
-              </p>
+              <p className="text-xs text-neutral-500">{t.branchHint}</p>
             </>
           )}
 
           {step === 2 && (
             <>
-              <p className="text-xs text-neutral-500">Berapa banyak unit TV di outlet ini, berdasarkan jenisnya?</p>
+              <p className="text-xs text-neutral-500">{t.tvQuestion}</p>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className={labelClass}>TV Android</label>
+                  <label className={labelClass}>{t.tvAndroid}</label>
                   <input
                     type="number"
                     min={0}
@@ -415,7 +473,7 @@ function DaftarPageInner() {
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Smart TV</label>
+                  <label className={labelClass}>{t.tvSmart}</label>
                   <input
                     type="number"
                     min={0}
@@ -425,7 +483,7 @@ function DaftarPageInner() {
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>TV Analog</label>
+                  <label className={labelClass}>{t.tvAnalog}</label>
                   <input
                     type="number"
                     min={0}
@@ -439,23 +497,25 @@ function DaftarPageInner() {
                 <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3 text-xs text-neutral-300 space-y-1">
                   {preview.smartPlugQty > 0 && (
                     <div>
-                      TV analog/smart TV butuh Smart Plug agar bisa dikontrol otomatis dari sistem —{" "}
-                      <span className="text-cyan-400 font-medium">{preview.smartPlugQty} unit</span>
+                      {rich(t.tvSmartPlugNeeded, { n: <span className="text-cyan-400 font-medium">{fmt(t.units, { n: preview.smartPlugQty })}</span> })}
                     </div>
                   )}
                   {totalTv > 0 && preview.starterMonthly != null && preview.proMonthly != null && (
                     <div>
-                      Estimasi setelah trial 30 hari: <span className="text-cyan-400 font-medium">Starter {rupiah(preview.starterMonthly)}/bln</span> (
-                      {preview.starterUnits} unit × {rupiah(plan?.starter?.pricePerUnit ?? 0)}
-                      {totalTv < (plan?.starter?.minUnits ?? 0) ? `, minimal ${plan?.starter?.minUnits} unit` : ""}) atau{" "}
-                      <span className="text-cyan-400 font-medium">Pro {rupiah(preview.proMonthly)}/bln</span> (unit tak terbatas + akuntansi, aset, PPOB,
-                      anti-fraud, AI, multi-cabang). Tahunan: bayar {plan?.annualMonthsCharged ?? 10} bulan, aktif 12 bulan.
+                      {rich(t.tvEstimate, {
+                        starter: <span className="text-cyan-400 font-medium">Starter {rupiah(preview.starterMonthly)}{t.perMonth}</span>,
+                        units: fmt(t.units, { n: preview.starterUnits }),
+                        price: rupiah(plan?.starter?.pricePerUnit ?? 0),
+                        min: totalTv < (plan?.starter?.minUnits ?? 0) ? fmt(t.tvMinUnits, { n: plan?.starter?.minUnits ?? 0 }) : "",
+                        pro: <span className="text-cyan-400 font-medium">Pro {rupiah(preview.proMonthly)}{t.perMonth}</span>,
+                        months: plan?.annualMonthsCharged ?? 10,
+                      })}
                     </div>
                   )}
                   {preview.smartPlugQty === 0 && totalTv > 0 && (
-                    <div>Semua unit TV Android — tidak perlu smart plug untuk memulai.</div>
+                    <div>{t.tvAllAndroid}</div>
                   )}
-                  {totalTv === 0 && <div>Belum ada unit diisi — bisa ditambah kapan saja nanti di menu Kelola Unit.</div>}
+                  {totalTv === 0 && <div>{t.tvNone}</div>}
                 </div>
               )}
             </>
@@ -464,7 +524,7 @@ function DaftarPageInner() {
           {step === 3 && (
             <>
               <div>
-                <label className={labelClass}>Berapa shift kerja saat ini?</label>
+                <label className={labelClass}>{t.shiftsQuestion}</label>
                 <input
                   type="number"
                   min={1}
@@ -474,10 +534,10 @@ function DaftarPageInner() {
                   onChange={(e) => setShifts(Math.max(1, Number(e.target.value) || 1))}
                 />
               </div>
-              <p className="text-xs text-neutral-500 pt-1">Berapa karyawan per peran (di luar owner)?</p>
+              <p className="text-xs text-neutral-500 pt-1">{t.employeesQuestion}</p>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className={labelClass}>Kasir</label>
+                  <label className={labelClass}>{t.roleKasir}</label>
                   <input
                     type="number"
                     min={0}
@@ -487,7 +547,7 @@ function DaftarPageInner() {
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Dapur</label>
+                  <label className={labelClass}>{t.roleDapur}</label>
                   <input
                     type="number"
                     min={0}
@@ -497,7 +557,7 @@ function DaftarPageInner() {
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Lainnya</label>
+                  <label className={labelClass}>{t.roleLainnya}</label>
                   <input
                     type="number"
                     min={0}
@@ -507,25 +567,22 @@ function DaftarPageInner() {
                   />
                 </div>
               </div>
-              <div className="text-xs text-neutral-500">
-                Total {staffTotal} akun staf disarankan (akan dibuatkan manual di menu Staf setelah masuk — biar kamu yang atur email/password
-                masing-masing).
-              </div>
+              <div className="text-xs text-neutral-500">{fmt(t.staffTotal, { n: staffTotal })}</div>
             </>
           )}
 
           {step === 4 && (
             <>
               <div>
-                <label className={labelClass}>Nama Outlet/Merchant (tampil di struk & halaman booking publik)</label>
+                <label className={labelClass}>{t.outletName}</label>
                 <input className={inputClass} value={outletName} onChange={(e) => setOutletName(e.target.value)} />
               </div>
               <div>
-                <label className={labelClass}>Nama Pemilik (Owner)</label>
+                <label className={labelClass}>{t.ownerName}</label>
                 <input className={inputClass} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
               </div>
               <div>
-                <label className={labelClass}>Email Owner (untuk login)</label>
+                <label className={labelClass}>{t.ownerEmail}</label>
                 <input
                   type="email"
                   className={inputClass}
@@ -537,16 +594,16 @@ function DaftarPageInner() {
               </div>
               {viaGoogle ? (
                 <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-                  Terverifikasi via Google — tidak perlu password, login berikutnya cukup pakai tombol "Masuk dengan Google".
+                  {t.googleNoPassword}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={labelClass}>Password</label>
+                    <label className={labelClass}>{t.password}</label>
                     <PasswordInput className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} />
                   </div>
                   <div>
-                    <label className={labelClass}>Konfirmasi Password</label>
+                    <label className={labelClass}>{t.confirmPassword}</label>
                     <PasswordInput className={inputClass} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
                   </div>
                 </div>
@@ -558,28 +615,27 @@ function DaftarPageInner() {
             <div className="space-y-2 text-sm">
               <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-1 text-neutral-300">
                 <div>
-                  <span className="text-neutral-500">Usaha:</span> {businessName || "-"}
+                  <span className="text-neutral-500">{t.reviewBusiness}</span> {businessName || "-"}
                 </div>
                 <div>
-                  <span className="text-neutral-500">Outlet pertama:</span> {outletName || "-"}
+                  <span className="text-neutral-500">{t.reviewOutlet}</span> {outletName || "-"}
                 </div>
                 <div>
-                  <span className="text-neutral-500">Jumlah cabang:</span> {branchCount}
+                  <span className="text-neutral-500">{t.reviewBranches}</span> {branchCount}
                 </div>
                 <div>
-                  <span className="text-neutral-500">Unit TV:</span> {tvAndroid} Android, {tvSmart} Smart TV, {tvAnalog} Analog (total {totalTv})
+                  <span className="text-neutral-500">{t.reviewUnits}</span> {fmt(t.reviewUnitsValue, { a: tvAndroid, s: tvSmart, g: tvAnalog, t: totalTv })}
                 </div>
                 <div>
-                  <span className="text-neutral-500">Shift:</span> {shifts} — <span className="text-neutral-500">Karyawan:</span> {empKasir}{" "}
-                  kasir, {empDapur} dapur, {empLainnya} lainnya
+                  <span className="text-neutral-500">{t.reviewShift}</span> {shifts} — <span className="text-neutral-500">{t.reviewStaff}</span>{" "}
+                  {fmt(t.reviewStaffValue, { k: empKasir, d: empDapur, l: empLainnya })}
                 </div>
                 <div>
-                  <span className="text-neutral-500">Owner:</span> {ownerName || "-"} ({email || "-"})
+                  <span className="text-neutral-500">{t.reviewOwner}</span> {ownerName || "-"} ({email || "-"})
                 </div>
               </div>
               <p className="text-xs text-neutral-500">
-                Dengan mendaftar, satu outlet {branchCount > 1 ? `(+${branchCount - 1} cabang) ` : ""}dan satu akun Owner akan langsung dibuat,
-                lengkap dengan masa percobaan 30 hari.
+                {fmt(t.reviewNote, { branches: branchCount > 1 ? fmt(t.reviewBranchesExtra, { n: branchCount - 1 }) : "" })}
               </p>
             </div>
           )}
@@ -590,48 +646,46 @@ function DaftarPageInner() {
         <div className="flex gap-2 pt-1">
           {step > 0 && (
             <Button variant="secondary" className="flex-1" onClick={goBack} disabled={busy}>
-              Kembali
+              {t.back}
             </Button>
           )}
-          {step < STEPS.length - 1 ? (
+          {step < STEP_COUNT - 1 ? (
             <Button className="flex-1" onClick={goNext}>
-              Lanjut
+              {t.next}
             </Button>
           ) : (
             <Button className="flex-1" onClick={submit} disabled={busy}>
-              {busy ? "Memproses..." : "Daftar Sekarang"}
+              {busy ? t.processing : t.submit}
             </Button>
           )}
         </div>
 
         <p className="text-center text-[11px] text-neutral-600">
-          Dengan mendaftar, Anda menyetujui{" "}
-          <a href="/syarat-ketentuan" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
-            Syarat &amp; Ketentuan
-          </a>{" "}
-          dan{" "}
-          <a href="/kebijakan-privasi" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
-            Kebijakan Privasi
-          </a>{" "}
-          NEXBILL.
+          {rich(t.consent, {
+            terms: (
+              <a href="/syarat-ketentuan" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
+                {t.terms}
+              </a>
+            ),
+            privacy: (
+              <a href="/kebijakan-privasi" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
+                {t.privacy}
+              </a>
+            ),
+          })}
         </p>
 
         <p className="text-center text-xs text-neutral-600">
-          Sudah punya akun?{" "}
+          {t.haveAccount}{" "}
           <a href="/login" className="text-cyan-400 hover:underline">
-            Masuk di sini
+            {t.loginHere}
           </a>
         </p>
         {/* Catalog auto-picks the language from the browser (no ?lang=). */}
         <p className="text-center text-xs text-neutral-600">
-          Ingin tahu semua fiturnya dulu?{" "}
-          <a
-            href="/downloads/katalog-fitur-nexbill.html"
-            target="_blank"
-            rel="noopener"
-            className="text-cyan-400 hover:underline"
-          >
-            Lihat Katalog Fitur NEXBILL
+          {t.catalogQuestion}{" "}
+          <a href="/downloads/katalog-fitur-nexbill.html" target="_blank" rel="noopener" className="text-cyan-400 hover:underline">
+            {t.catalogLink}
           </a>
         </p>
       </Card>

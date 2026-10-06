@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useLanguage } from "./landing-i18n";
 
 export function SiteFooter() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   return (
     <footer style={{ backgroundColor: "transparent", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
@@ -29,8 +29,8 @@ export function SiteFooter() {
           <Link href="/#harga">{t.nav.harga}</Link>
           <Link href="/#faq">{t.nav.faq}</Link>
           <Link href="/about">{t.nav.about}</Link>
-          <Link href="/login">{t.nav.login}</Link>
-          <Link href="/daftar">{t.nav.daftar}</Link>
+          <Link href={`/login?lang=${lang}`}>{t.nav.login}</Link>
+          <Link href={`/daftar?lang=${lang}`}>{t.nav.daftar}</Link>
           <Link href="/kebijakan-cookie">{t.cookieBanner.policyLinkLabel}</Link>
           <Link href="/kebijakan-refund">{t.footer.refundLabel}</Link>
           <Link href="/syarat-ketentuan">{t.footer.termsLabel}</Link>
