@@ -12,6 +12,12 @@ import { useState } from "react";
  * kompatibilitas). Lihat public/brands/README.md untuk daftar berkas & sumber resminya.
  */
 
+/**
+ * Isi dengan alamat halaman Play Store SETELAH NEXBILL rilis produksi — badge otomatis menjadi
+ * tautan dan keterangan "Segera hadir" hilang. Selama null, badge tampil tanpa tautan.
+ */
+export const PLAY_STORE_URL: string | null = null; // "https://play.google.com/store/apps/details?id=id.nexbill.app"
+
 export interface ShowcaseCopy {
   kicker: string;
   title: string;
@@ -26,10 +32,11 @@ export interface ShowcaseCopy {
 
 export const SUPPORTED_SYSTEMS: { key: string; label: string; file?: string }[] = [
   { key: "tuya", label: "Tuya Smart / Smart Life", file: "/brands/tuya.svg" },
-  { key: "android-tv", label: "Android TV / Google TV", file: "/brands/android-tv.svg" },
   { key: "tasmota", label: "Tasmota (MQTT)", file: "/brands/tasmota.svg" },
-  { key: "qris", label: "QRIS", file: "/brands/qris.svg" },
-  { key: "ipaymu", label: "iPaymu", file: "/brands/ipaymu.svg" },
+  { key: "ipaymu", label: "iPaymu", file: "/brands/ipaymu.png" },
+  // Belum ada berkas logo resmi → chip teks. Tambahkan file: "/brands/<nama>.svg" setelah berkasnya ada.
+  { key: "android-tv", label: "Android TV / Google TV" },
+  { key: "qris", label: "QRIS" },
   { key: "bluetooth-printer", label: "Printer Thermal Bluetooth (ESC/POS)" },
 ];
 
@@ -47,7 +54,9 @@ function BrandChip({ label, file }: { label: string; file?: string }) {
         padding: "8px 16px",
         borderRadius: "12px",
         border: "1px solid var(--card-border)",
-        background: "rgba(13, 21, 38, 0.55)",
+        // Logo resmi ditaruh di atas latar putih (warna aslinya — teks gelap/biru — tetap terbaca
+        // tanpa mengubah logo); chip teks tetap gelap seperti kartu lain.
+        background: failed ? "rgba(13, 21, 38, 0.55)" : "#ffffff",
         backdropFilter: "blur(8px)",
         color: "var(--text-dim)",
         fontSize: "13px",
@@ -58,7 +67,7 @@ function BrandChip({ label, file }: { label: string; file?: string }) {
         label
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={file} alt={label} style={{ height: "26px", width: "auto", objectFit: "contain" }} onError={() => setFailed(true)} />
+        <img src={file} alt={label} style={{ height: "28px", width: "auto", maxWidth: "140px", objectFit: "contain" }} onError={() => setFailed(true)} />
       )}
     </div>
   );
@@ -105,16 +114,26 @@ export function AppShowcase({ copy }: { copy: ShowcaseCopy }) {
             <div className="feat-card" style={{ backdropFilter: "blur(10px)", backgroundColor: "rgba(13, 21, 38, 0.6)" }}>
               <h3 style={{ marginBottom: "6px" }}>{copy.androidTitle}</h3>
               <p style={{ marginBottom: "14px" }}>{copy.androidSub}</p>
-              {playBadgeFailed ? (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", border: "1px solid rgba(34,211,238,0.35)", borderRadius: "10px", padding: "10px 14px", color: "#e0f2fe", fontSize: "14px", fontWeight: 600 }}>
-                  {copy.playSoon}
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px" }}>
+                {/* Logo Android resmi (public/brands/android.svg) di atas latar putih. */}
+                <span style={{ display: "inline-flex", alignItems: "center", background: "#ffffff", borderRadius: "10px", padding: "6px 14px", height: "52px", boxSizing: "border-box" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brands/android.svg" alt="Android" style={{ height: "26px", width: "auto" }} />
                 </span>
-              ) : (
-                // Badge resmi "Get it on Google Play" — taruh di public/brands/google-play-badge.png
-                // (unduh dari Google Play badge generator) dan ganti href ke halaman aplikasi
-                // setelah rilis produksi. Selama berkasnya belum ada, tampil teks "Segera hadir".
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src="/brands/google-play-badge.png" alt="Google Play" style={{ height: "52px", width: "auto" }} onError={() => setPlayBadgeFailed(true)} />
+                {playBadgeFailed ? null : PLAY_STORE_URL ? (
+                  <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Google Play">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/brands/google-play-badge.svg" alt="Get it on Google Play" style={{ height: "52px", width: "auto", display: "block" }} onError={() => setPlayBadgeFailed(true)} />
+                  </a>
+                ) : (
+                  // Belum rilis produksi: badge tampil TANPA tautan + keterangan "segera hadir"
+                  // (pedoman Google: badge menautkan ke halaman aplikasi yang tersedia).
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src="/brands/google-play-badge.svg" alt="Google Play" style={{ height: "52px", width: "auto", display: "block", opacity: 0.85 }} onError={() => setPlayBadgeFailed(true)} />
+                )}
+              </div>
+              {!PLAY_STORE_URL && (
+                <div style={{ marginTop: "10px", fontSize: "13px", fontWeight: 600, color: "#67e8f9" }}>{copy.playSoon}</div>
               )}
             </div>
           </div>

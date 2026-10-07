@@ -14,3 +14,8 @@ menampilkan chip teks nama sistem (otomatis, tidak perlu ubah kode).
 | `ipaymu.svg`                 | Logo iPaymu                           | Kit merek dari iPaymu (dashboard merchant)                     |
 
 Tinggi tampil ±26px (badge Google Play ±52px). SVG atau PNG transparan, latar gelap.
+
+Status (2026-10-07): sudah ada `tuya.svg`, `tasmota.svg`, `ipaymu.png`, `android.svg`,
+`google-play-badge.svg`. Untuk menambah logo baru (mis. `android-tv.svg`, `qris.svg`), taruh berkasnya
+di sini lalu isi `file: "/brands/<nama>"` pada entri yang sesuai di `SUPPORTED_SYSTEMS`
+(src/app/landing-showcase.tsx). Badge Google Play menjadi tautan setelah `PLAY_STORE_URL` diisi.
