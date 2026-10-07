@@ -6,6 +6,10 @@
  *  - panduan cetak public/downloads/nexbill-agent/panduan-android.html (scripts/build-android-guide.tsx)
  * Gambar sengaja generik (bukan tangkapan layar / logo aplikasi pihak ketiga) supaya tetap benar
  * walau tampilan Termux atau merek HP berbeda.
+ *
+ * Satu-satunya teks yang bergantung bahasa adalah tiruan layar terminal agent (pilihan bahasa &
+ * pesan "terhubung"): hanya Indonesia & Inggris — dashboard selain Bahasa Indonesia memakai Inggris,
+ * sama persis dengan pesan asli agent (public/downloads/nexbill-agent/android/index.js).
  */
 
 export type RelayIllustrationKind = "prepare" | "token" | "install" | "paste" | "language" | "tv" | "battery" | "done";
@@ -34,7 +38,17 @@ function Phone({ x, y, w = 70, h = 128, children }: { x: number; y: number; w?: 
   );
 }
 
-export function RelayIllustration({ kind, className }: { kind: RelayIllustrationKind; className?: string }) {
+export type RelayIllustrationLang = "id" | "en";
+export const relayIllustrationLang = (dashboardLang: string): RelayIllustrationLang => (dashboardLang === "id" ? "id" : "en");
+
+/** Tiruan output agent di terminal, per bahasa (pilihan menu yang disorot + pesan setelah tersambung). */
+const TERMINAL: Record<RelayIllustrationLang, { chosen: number; connected: string }> = {
+  id: { chosen: 0, connected: "✓ Terhubung (1.3.0) …" },
+  en: { chosen: 1, connected: "✓ Connected (1.3.0) …" },
+};
+
+export function RelayIllustration({ kind, className, lang = "id" }: { kind: RelayIllustrationKind; className?: string; lang?: RelayIllustrationLang }) {
+  const term = TERMINAL[lang];
   const common = { viewBox: "0 0 240 150", className, role: "img" as const, "aria-hidden": true, style: { width: "100%", height: "auto", display: "block" } };
   switch (kind) {
     case "prepare":
@@ -133,10 +147,10 @@ export function RelayIllustration({ kind, className }: { kind: RelayIllustration
           <rect width="240" height="150" rx="14" fill={C.card} />
           <rect x="18" y="18" width="204" height="114" rx="10" fill={C.term} stroke={C.line} />
           {["1) Bahasa Indonesia", "2) English", "3) Bahasa Melayu", "4) ไทย  5) Filipino  6) Tiếng Việt"].map((l, i) => (
-            <text key={i} x="30" y={40 + i * 13} fontSize="8.5" fontFamily="monospace" fill={i === 0 ? C.green : C.dim}>{l}</text>
+            <text key={i} x="30" y={40 + i * 13} fontSize="8.5" fontFamily="monospace" fill={i === term.chosen ? C.green : C.dim}>{l}</text>
           ))}
           <text x="30" y="98" fontSize="8.5" fontFamily="monospace" fill={C.amber}>Agent Token: <tspan fill={C.text}>nbx_7F3k…92Qa</tspan></text>
-          <text x="30" y="118" fontSize="8.5" fontFamily="monospace" fill={C.green}>✓ Terhubung (1.3.0) …</text>
+          <text x="30" y="118" fontSize="8.5" fontFamily="monospace" fill={C.green}>{term.connected}</text>
         </svg>
       );
     case "tv":

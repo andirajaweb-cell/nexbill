@@ -8,6 +8,7 @@ import {
   bytesToBase64,
   chunkBytes,
   testReceiptDoc,
+  receiptLangFor,
   CHARS_PER_LINE,
 } from "./escpos";
 
@@ -60,6 +61,17 @@ describe("buildReceiptEscPos", () => {
     expect(doc.totals.map((t) => t.label)).toEqual(["Subtotal", "Diskon", "TOTAL"]);
     expect(doc.totals[1].value).toBe("-Rp5.000");
     expect(doc.payment[0].value).toBe("QRIS");
+  });
+
+  it("prints English labels when the dashboard is not Indonesian (receipts: id/en only)", () => {
+    expect(receiptLangFor("id")).toBe("id");
+    expect(receiptLangFor("th")).toBe("en");
+    const doc = receiptDocFromOrder({ ...data, outlet: { ...data.outlet, receiptFooterText: "" } }, { formatMoney: money, formatDate: () => "10/3/2026", lang: "en" });
+    expect(doc.totals.map((t) => t.label)).toEqual(["Subtotal", "Discount", "TOTAL"]);
+    expect(doc.payment.map((p) => p.value)).toEqual(["QRIS", "PAID"]);
+    expect(doc.meta[1].label).toBe("Date");
+    expect(doc.footerLines).toEqual(["Thank you!"]);
+    expect(testReceiptDoc("NEXBILL", 58, "now", "en").headerLines).toEqual(["Bluetooth printer test print"]);
   });
 
   it("starts with ESC @ and never exceeds the line width", () => {

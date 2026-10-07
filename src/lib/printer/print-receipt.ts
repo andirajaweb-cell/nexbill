@@ -1,8 +1,8 @@
 "use client";
 
-import { uiText } from "@/lib/i18n/client-text";
+import { readStoredLang, uiText } from "@/lib/i18n/client-text";
 import "@/lib/i18n/dict-printer";
-import { buildReceiptEscPos, receiptDocFromOrder, testReceiptDoc, type PaperWidth } from "./escpos";
+import { buildReceiptEscPos, receiptDocFromOrder, receiptLangFor, RECEIPT_LOCALE, testReceiptDoc, type PaperWidth } from "./escpos";
 import { getDevicePrinterSettings, saveDevicePrinterSettings, printConnectionOf, type DevicePrinterSettings } from "./deviceSettings";
 import { printViaBluetooth, printViaRawBt, prepareBluetoothPrinter } from "./bluetooth-printer";
 
@@ -27,17 +27,22 @@ export async function printOrderReceipt(orderId: string, outletId: string | null
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.order) throw new Error(data?.error ?? uiText("printer.receipt.loadFailed", "Gagal memuat data struk."));
   const paper: PaperWidth = settings?.paperWidthMm ?? (data.outlet?.printerPaperWidthMm === 80 ? 80 : 58);
-  const bytes = buildReceiptEscPos(receiptDocFromOrder(data), paper, { cut: !!settings?.autoCut });
+  const bytes = buildReceiptEscPos(receiptDocFromOrder(data, { lang: receiptLangFor(readStoredLang()) }), paper, { cut: !!settings?.autoCut });
 
   if (conn === "rawbt") printViaRawBt(bytes);
   else await printViaBluetooth(bytes, { savedDeviceId: settings?.bluetoothDeviceId });
   return "printed";
 }
 
+function testReceiptDocFor(outletName: string, paper: PaperWidth) {
+  const lang = receiptLangFor(readStoredLang());
+  return testReceiptDoc(outletName, paper, new Date().toLocaleString(RECEIPT_LOCALE[lang]), lang);
+}
+
 /** Struk uji dari Pengaturan → Printer. */
 export async function printTestReceipt(outletId: string, settings: DevicePrinterSettings, outletName: string): Promise<{ id: string; name: string } | null> {
   const paper: PaperWidth = settings.paperWidthMm;
-  const bytes = buildReceiptEscPos(testReceiptDoc(outletName, paper, new Date().toLocaleString("id-ID")), paper, { cut: !!settings.autoCut });
+  const bytes = buildReceiptEscPos(testReceiptDocFor(outletName, paper), paper, { cut: !!settings.autoCut });
   if (printConnectionOf(settings) === "rawbt") {
     printViaRawBt(bytes);
     return null;

@@ -9,7 +9,7 @@
 import fs from "fs";
 import path from "path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RelayIllustration, type RelayIllustrationKind } from "../src/components/devices/AndroidRelayIllustrations";
+import { RelayIllustration, relayIllustrationLang, type RelayIllustrationKind } from "../src/components/devices/AndroidRelayIllustrations";
 import { translate, type LangCode } from "../src/lib/i18n/registry";
 import "../src/lib/i18n/dict-devices-guide";
 import { ANDROID_INSTALL_COMMAND } from "../src/app/dashboard/devices/android-relay-guide";
@@ -24,14 +24,14 @@ const LANGS: { code: LangCode; label: string }[] = [
 ];
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const img = (k: RelayIllustrationKind) => renderToStaticMarkup(<RelayIllustration kind={k} />);
+const img = (k: RelayIllustrationKind, lang: LangCode) => renderToStaticMarkup(<RelayIllustration kind={k} lang={relayIllustrationLang(lang)} />);
 
 function article(lang: LangCode) {
   const t = (k: string) => esc(translate(lang, `devices.guide.android.${k}`));
   const title = esc(translate(lang, "devices.guide.android.tabAndroid"));
   const step = (n: number, k: RelayIllustrationKind, titleKey: string, body: string) => `
     <section class="step">
-      <div class="pic">${img(k)}</div>
+      <div class="pic">${img(k, lang)}</div>
       <div class="txt"><h2><span class="num">${n}</span>${t(titleKey)}</h2>${body}</div>
     </section>`;
   const cmd = (c: string) => `<pre class="code">${esc(c)}</pre>`;

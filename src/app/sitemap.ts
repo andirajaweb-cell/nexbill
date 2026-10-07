@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "./layout";
+import { allBlogPaths } from "@/components/blog/blog-data";
 
 // Auto-generated /sitemap.xml (Next.js App Router convention). Only public marketing pages are
 // listed here — /dashboard, /platform-admin, /api, /receipt, /payment, /book/[slug] etc. are
@@ -23,17 +24,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/en/playstation-rental-app", priority: 0.9, changeFrequency: "monthly" },
     { path: "/en/playstation-rental-management-software", priority: 0.9, changeFrequency: "monthly" },
     { path: "/en/ps-rental-system", priority: 0.9, changeFrequency: "monthly" },
-    // Blog engine (docs/SEO-ARCHITECTURE.md §6, Phase 4) — first topic cluster, "Billing &
-    // Operasional", plus its 6 real articles and the author profile page (E-E-A-T).
-    { path: "/blog", priority: 0.8, changeFrequency: "weekly" },
-    { path: "/blog/billing-dan-operasional", priority: 0.8, changeFrequency: "weekly" },
-    { path: "/blog/billing-dan-operasional/cara-hitung-tarif-sewa-ps", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/blog/billing-dan-operasional/bep-rental-ps", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/blog/billing-dan-operasional/kesalahan-kasir-rental-ps", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/blog/billing-dan-operasional/cara-tutup-shift-kasir-rental-ps", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/blog/billing-dan-operasional/harga-sewa-ps4-vs-ps5", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/blog/billing-dan-operasional/kapan-butuh-sistem-multi-cabang", priority: 0.7, changeFrequency: "monthly" },
+    // Blog engine (docs/SEO-ARCHITECTURE.md §6, Phase 4) — Indonesian (/blog) + English (/en/blog),
+    // every index/cluster/article listed from blog-data.ts so the sitemap can't drift from the routes,
+    // plus the author profile page in both languages (E-E-A-T).
+    ...allBlogPaths().map((path) => {
+      const isArticle = path.split("/").filter(Boolean).length === (path.startsWith("/en/") ? 4 : 3);
+      return { path, priority: isArticle ? 0.7 : 0.8, changeFrequency: isArticle ? ("monthly" as const) : ("weekly" as const) };
+    }),
     { path: "/authors/andika-rajasa", priority: 0.5, changeFrequency: "monthly" },
+    { path: "/en/authors/andika-rajasa", priority: 0.5, changeFrequency: "monthly" },
     // NOTE: bare /book is intentionally excluded — it's a dead-end "link tidak lengkap" message,
     // not real content (see book/layout.tsx, which sets noindex on it). Real per-outlet booking
     // pages live at /book/[slug] and are merchant-specific, not NEXBILL marketing content, so
