@@ -89,6 +89,7 @@ export default function AccountingPage() {
         <WorkflowGuide
           onClose={() => setShowWorkflow(false)}
           shortcuts={(["Neraca Saldo", "Audit", "Laba Rugi", "Tutup Periode"] as Tab[]).filter((tb) => visibleTabs.includes(tb))}
+          tabLabel={(tb) => t(TAB_LABEL_KEYS[tb as Tab].key, TAB_LABEL_KEYS[tb as Tab].fallback)}
           onOpenTab={(tb) => {
             setTab(tb as Tab);
             setShowWorkflow(false);

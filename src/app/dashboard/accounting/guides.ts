@@ -5,6 +5,10 @@
  *
  * Kode akun yang disebut di sini adalah kode bawaan (lib/accounting/coa-data.ts) — outlet bisa
  * memindahkannya lewat Account Mapping, jadi teksnya selalu menyebut "bawaan".
+ *
+ * File ini adalah SUMBER (Bahasa Indonesia). Terjemahan ada di guides.<lang>.ts dengan struktur yang
+ * sama persis (tab, jumlah butir per bagian, tahap alur kerja) — dijaga oleh guides.test.ts — dan
+ * dipilih lewat getAccountingGuideBook(lang) di guides-book.ts.
  */
 
 export interface TabGuideContent {
@@ -395,3 +399,48 @@ export const GOLDEN_RULES: string[] = [
   "Setiap selisih (kas laci, saldo bank, stok) harus dijelaskan, bukan dibiarkan.",
   "Laporan hanya seakurat input: harga modal produk, penyusutan, dan expense yang lengkap menentukan laba yang benar.",
 ];
+
+/** Label tampilan panduan (judul bagian, tombol). */
+export interface GuideUiText {
+  guidePrefix: string;
+  open: string;
+  close: string;
+  concept: string;
+  uses: string;
+  watch: string;
+  steps: string;
+  workflowTitle: string;
+  workflowIntro: string;
+  closeAria: string;
+  goldenRules: string;
+  startFrom: string;
+}
+
+/** Satu bahasa lengkap: panduan per tab + alur kerja + aturan emas + label tampilan. */
+export interface AccountingGuideBook {
+  tabs: Record<string, TabGuideContent>;
+  workflow: WorkflowStage[];
+  goldenRules: string[];
+  ui: GuideUiText;
+}
+
+export const ACCOUNTING_GUIDE_BOOK_ID: AccountingGuideBook = {
+  tabs: ACCOUNTING_TAB_GUIDES,
+  workflow: ACCOUNTING_WORKFLOW,
+  goldenRules: GOLDEN_RULES,
+  ui: {
+    guidePrefix: "Panduan",
+    open: "Baca panduan",
+    close: "Tutup",
+    concept: "Konsep akuntansinya",
+    uses: "Kegunaan",
+    watch: "Yang harus diperhatikan",
+    steps: "Langkah kerja",
+    workflowTitle: "Panduan Alur Kerja Akuntansi Outlet",
+    workflowIntro:
+      "Hampir semua jurnal dibuat otomatis dari kasir, rental, expense, belanja supplier, dan aset. Tugas Anda: memastikan setiap transaksi tercatat di menunya, lalu memeriksa dan menutup buku secara rutin.",
+    closeAria: "Tutup panduan",
+    goldenRules: "Aturan emas pembukuan",
+    startFrom: "Mulai dari:",
+  },
+};
