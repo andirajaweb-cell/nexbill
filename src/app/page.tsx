@@ -13,6 +13,7 @@ import { LoadingScreen } from "./loading-screen";
 import { LanguageProvider, useLanguage } from "./landing-i18n";
 import { DEFAULT_PRICING } from "@/lib/subscription/pricing";
 import { DEMO_PUBLIC_EMAIL, DEMO_PUBLIC_PASSWORD } from "@/lib/demo-public";
+import { AppShowcase } from "./landing-showcase";
 
 // NOTE: a <Script src=".../model-viewer.min.js"> tag used to live in the JSX below, loaded
 // unconditionally on every page view even though no <model-viewer> element is ever rendered
@@ -1178,6 +1179,9 @@ function LandingPageInner() {
           </div>
         </div>
       </section>
+
+      {/* SECTION: APLIKASI ANDROID — mockup HP berisi screenshot asli + strip "Bekerja dengan". */}
+      <AppShowcase copy={t.appShowcase} />
 
       {/* SECTION: KASIR TANPA PC — HP Android + printer Bluetooth + notifikasi push + scan kamera.
           Klaim dijaga akurat: kontrol TV tanpa PC hanya lewat smart plug WiFi; Android TV tetap

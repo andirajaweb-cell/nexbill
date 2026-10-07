@@ -67,6 +67,8 @@ export interface LandingCopy {
   // "Kasir tanpa PC" (2026-10): HP Android + printer Bluetooth + notifikasi + scan kamera.
   mobile: { kicker: string; title: string; sub: string; items: Feature[]; note: string; cta: string };
   // "Coba Demo" (2026-10): kredensial akun demo publik — lihat src/lib/demo-public.ts.
+  // Mockup HP + Android/Google Play + "Bekerja dengan" (landing-showcase.tsx).
+  appShowcase: import("./landing-showcase").ShowcaseCopy;
   demo: { kicker: string; title: string; sub: string; emailLabel: string; passwordLabel: string; cta: string; copy: string; copied: string; note: string; signup: string };
   // Struktur harga 2026-10 (lihat src/lib/subscription/pricing.ts): dua kartu Starter (per unit,
   // minimal N unit) & Pro (flat per outlet), toggle bulanan/tahunan. Angka harga TIDAK ditulis di
@@ -175,6 +177,17 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Kontrol Internal Anti-Fraud", desc: "Pemindahan kas antar pos wajib approval atasan, deteksi pola shift berisiko otomatis, dan skor kepercayaan pelanggan berbasis riwayat — bukan sekadar catatan transaksi tanpa lapisan pengawasan." },
         { title: "Satu Sistem untuk Banyak Model Bisnis", desc: "Sewa konsol, sewa alat/barang (home rental), sampai jual makanan/minuman digabung jadi satu tagihan dan satu laporan — tidak perlu tempel-tempel aplikasi kasir terpisah untuk tiap lini bisnis." },
       ],
+    },
+    appShowcase: {
+      kicker: "Aplikasi Android",
+      title: "Dashboard lengkap di genggaman",
+      sub: "Pantau omzet, jalankan billing, dan layani kasir langsung dari HP — tampilan yang sama dengan dashboard, dirancang untuk layar kecil.",
+      androidTitle: "NEXBILL untuk Android",
+      androidSub: "Pasang aplikasi NEXBILL di HP atau tablet Android: struk Bluetooth, scan barcode, dan notifikasi sesi & booking walau aplikasi ditutup.",
+      playSoon: "Segera hadir di Google Play",
+      worksWith: "Bekerja dengan",
+      altDashboard: "Dashboard NEXBILL di HP: ringkasan pendapatan hari ini",
+      altRental: "Billing rental PS di HP: timer sisa waktu dan tagihan berjalan",
     },
     demo: {
       kicker: "Coba Demo",
@@ -367,6 +380,17 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "One System for Multiple Business Lines", desc: "Console rental, equipment rental, and food & drink sales combine into a single bill and a single report — no need to stitch together separate POS apps for each line of business." },
       ],
     },
+    appShowcase: {
+      kicker: "Android App",
+      title: "The full dashboard in your hand",
+      sub: "Track revenue, run billing, and serve customers right from your phone — the same dashboard, designed for small screens.",
+      androidTitle: "NEXBILL for Android",
+      androidSub: "Install the NEXBILL app on an Android phone or tablet: Bluetooth receipts, barcode scanning, and session & booking alerts even when the app is closed.",
+      playSoon: "Coming soon to Google Play",
+      worksWith: "Works with",
+      altDashboard: "NEXBILL dashboard on a phone: today's revenue summary",
+      altRental: "PS rental billing on a phone: time-left timer and running bill",
+    },
     demo: {
       kicker: "Try the Demo",
       title: "Try NEXBILL now — no sign-up",
@@ -557,6 +581,17 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Kawalan Dalaman Anti-Penipuan", desc: "Pemindahan tunai antara akaun wajib kelulusan pengurus, syif berisiko dikesan automatik, dan pelanggan diberi skor kepercayaan berdasarkan sejarah — bukan sekadar log transaksi tanpa lapisan pengawasan." },
         { title: "Satu Sistem untuk Pelbagai Lini Perniagaan", desc: "Sewa konsol, sewa peralatan (home rental), dan jualan makanan/minuman digabung jadi satu bil dan satu laporan — tidak perlu guna app kaunter jualan berasingan untuk setiap lini perniagaan." },
       ],
+    },
+    appShowcase: {
+      kicker: "Aplikasi Android",
+      title: "Papan pemuka lengkap dalam genggaman",
+      sub: "Pantau hasil jualan, jalankan bil dan layan pelanggan terus dari telefon — paparan yang sama dengan papan pemuka, direka untuk skrin kecil.",
+      androidTitle: "NEXBILL untuk Android",
+      androidSub: "Pasang aplikasi NEXBILL pada telefon atau tablet Android: resit Bluetooth, imbas kod bar, dan notifikasi sesi & tempahan walaupun aplikasi ditutup.",
+      playSoon: "Akan datang di Google Play",
+      worksWith: "Berfungsi dengan",
+      altDashboard: "Papan pemuka NEXBILL pada telefon: ringkasan hasil hari ini",
+      altRental: "Bil sewa PS pada telefon: pemasa baki masa dan bil semasa",
     },
     demo: {
       kicker: "Cuba Demo",
@@ -752,6 +787,17 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "ระบบเดียวสำหรับหลายประเภทธุรกิจ", desc: "เช่าคอนโซล เช่าอุปกรณ์ (home rental) และขายอาหาร/เครื่องดื่ม รวมเป็นบิลเดียวและรายงานเดียว — ไม่ต้องใช้แอปแคชเชียร์แยกสำหรับแต่ละธุรกิจ" },
       ],
     },
+    appShowcase: {
+      kicker: "แอป Android",
+      title: "แดชบอร์ดครบในมือคุณ",
+      sub: "ดูยอดขาย เปิดบิล และบริการลูกค้าได้จากมือถือ — หน้าจอเดียวกับแดชบอร์ด ออกแบบมาสำหรับจอเล็ก",
+      androidTitle: "NEXBILL สำหรับ Android",
+      androidSub: "ติดตั้งแอป NEXBILL บนมือถือหรือแท็บเล็ต Android: ใบเสร็จผ่านบลูทูธ สแกนบาร์โค้ด และแจ้งเตือนเซสชันและการจองแม้ปิดแอป",
+      playSoon: "เร็วๆ นี้บน Google Play",
+      worksWith: "ใช้งานร่วมกับ",
+      altDashboard: "แดชบอร์ด NEXBILL บนมือถือ: สรุปรายได้วันนี้",
+      altRental: "บิลร้านเช่า PS บนมือถือ: นาฬิกาเวลาที่เหลือและยอดที่กำลังคิด",
+    },
     demo: {
       kicker: "ทดลองเดโม",
       title: "ลองใช้ NEXBILL ได้เลย ไม่ต้องสมัคร",
@@ -946,6 +992,17 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Một Hệ Thống Cho Nhiều Mô Hình Kinh Doanh", desc: "Cho thuê máy chơi game, cho thuê thiết bị (home rental), và bán đồ ăn/thức uống gộp thành một hóa đơn và một báo cáo duy nhất — không cần ghép nhiều ứng dụng thu ngân riêng lẻ cho từng mảng kinh doanh." },
       ],
     },
+    appShowcase: {
+      kicker: "Ứng dụng Android",
+      title: "Toàn bộ dashboard trong tay bạn",
+      sub: "Theo dõi doanh thu, tính tiền và phục vụ khách ngay trên điện thoại — giao diện giống dashboard, thiết kế cho màn hình nhỏ.",
+      androidTitle: "NEXBILL cho Android",
+      androidSub: "Cài ứng dụng NEXBILL trên điện thoại hoặc máy tính bảng Android: in hóa đơn Bluetooth, quét mã vạch và thông báo phiên chơi & đặt chỗ kể cả khi đóng ứng dụng.",
+      playSoon: "Sắp có trên Google Play",
+      worksWith: "Hoạt động với",
+      altDashboard: "Dashboard NEXBILL trên điện thoại: tóm tắt doanh thu hôm nay",
+      altRental: "Tính tiền thuê PS trên điện thoại: đồng hồ thời gian còn lại và hóa đơn đang chạy",
+    },
     demo: {
       kicker: "Dùng thử Demo",
       title: "Dùng thử NEXBILL ngay — không cần đăng ký",
@@ -1139,6 +1196,17 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { title: "Built-In na Anti-Fraud Control", desc: "Kailangan ng approval ng manager ang paglipat ng cash sa pagitan ng mga account, awtomatikong na-fla-flag ang mga risky na shift, at may trust score ang customer batay sa history nila — hindi lang basic na transaction log na walang oversight." },
         { title: "Iisang Sistema para sa Maraming Uri ng Negosyo", desc: "Pagpapaupa ng konsola, pagpapaupa ng gamit (home rental), at pagbebenta ng pagkain/inumin ay pinagsasama sa iisang bill at iisang report — hindi na kailangan ng hiwalay na POS app para sa bawat linya ng negosyo." },
       ],
+    },
+    appShowcase: {
+      kicker: "Android App",
+      title: "Buong dashboard sa iyong kamay",
+      sub: "Bantayan ang kita, patakbuhin ang billing, at pagsilbihan ang customer mula sa phone — parehong dashboard, ginawa para sa maliit na screen.",
+      androidTitle: "NEXBILL para sa Android",
+      androidSub: "I-install ang NEXBILL app sa Android phone o tablet: Bluetooth na resibo, pag-scan ng barcode, at alerto sa session at booking kahit sarado ang app.",
+      playSoon: "Malapit na sa Google Play",
+      worksWith: "Gumagana kasama ng",
+      altDashboard: "NEXBILL dashboard sa phone: buod ng kita ngayong araw",
+      altRental: "Billing ng PS rental sa phone: timer ng natitirang oras at tumatakbong bill",
     },
     demo: {
       kicker: "Subukan ang Demo",
