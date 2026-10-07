@@ -212,4 +212,17 @@ registerDict({
   "assets.purchase.cancelledReason": { id: "Dibatalkan", en: "Cancelled", ms: "Dibatalkan", th: "ยกเลิกแล้ว", fil: "Kinansela", vi: "Đã hủy" },
   "assets.purchase.empty": { id: "Belum ada pembelian aset.", en: "No asset purchases yet.", ms: "Belum ada belian aset.", th: "ยังไม่มีการซื้อสินทรัพย์", fil: "Wala pang pagbili ng asset.", vi: "Chưa có giao dịch mua tài sản." },
   "assets.formPurchaseHint": { id: "Satu aset, dicatat sebagai Pembelian Aset 1 baris. Untuk beberapa unit sekaligus, ongkos kirim/pasang, uang muka, atau aset saldo awal, gunakan tab Pembelian Aset.", en: "One asset, recorded as a 1-row Asset Purchase. For several units at once, shipping/installation costs, a down payment, or opening-balance assets, use the Asset Purchase tab.", ms: "Satu aset, direkodkan sebagai Belian Aset 1 baris. Untuk beberapa unit sekaligus, kos penghantaran/pemasangan, wang pendahuluan, atau aset baki pembukaan, gunakan tab Belian Aset.", th: "สินทรัพย์หนึ่งรายการ บันทึกเป็นการซื้อสินทรัพย์ 1 แถว หากต้องการหลายหน่วยพร้อมกัน ค่าขนส่ง/ติดตั้ง เงินมัดจำ หรือสินทรัพย์ยอดยกมา ให้ใช้แท็บซื้อสินทรัพย์", fil: "Isang asset, itatala bilang 1-row na Pagbili ng Asset. Para sa ilang unit nang sabay, gastos sa padala/pagkabit, down payment, o opening-balance na asset, gamitin ang tab na Pagbili ng Asset.", vi: "Một tài sản, được ghi là Mua tài sản 1 dòng. Để mua nhiều đơn vị cùng lúc, chi phí vận chuyển/lắp đặt, tiền đặt cọc hoặc tài sản số dư đầu kỳ, hãy dùng tab Mua tài sản." },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "assets.purchase.status.unpaid": { id: "Belum Dibayar", en: "Unpaid", ms: "Belum Dibayar", th: "ยังไม่ชำระ", fil: "Hindi pa Bayad", vi: "Chưa thanh toán" },
+  "assets.purchase.status.partial": { id: "Sebagian", en: "Partially Paid", ms: "Sebahagian", th: "ชำระบางส่วน", fil: "Bahagyang Bayad", vi: "Thanh toán một phần" },
+  "assets.purchase.status.paid": { id: "Lunas", en: "Paid", ms: "Lunas", th: "ชำระครบ", fil: "Bayad na", vi: "Đã thanh toán" },
+  "assets.purchase.status.cancelled": { id: "Dibatalkan", en: "Cancelled", ms: "Dibatalkan", th: "ยกเลิกแล้ว", fil: "Kinansela", vi: "Đã hủy" },
+  "assets.purchase.funding.paid": { id: "Lunas sekarang", en: "Paid in full now", ms: "Bayar penuh sekarang", th: "ชำระเต็มจำนวนทันที", fil: "Bayad nang buo ngayon", vi: "Thanh toán đủ ngay" },
+  "assets.purchase.funding.partial": { id: "Uang muka (DP), sisanya utang", en: "Down payment, rest on credit", ms: "Wang pendahuluan, baki sebagai hutang", th: "ชำระมัดจำ ส่วนที่เหลือเป็นเจ้าหนี้", fil: "Paunang bayad, ang natitira ay utang", vi: "Đặt cọc, phần còn lại ghi nợ" },
+  "assets.purchase.funding.payable": { id: "Utang — bayar nanti", en: "On credit — pay later", ms: "Hutang — bayar kemudian", th: "เป็นเจ้าหนี้ — ชำระภายหลัง", fil: "Utang — bayaran mamaya", vi: "Ghi nợ — trả sau" },
+  "assets.purchase.funding.openingBalance": { id: "Saldo awal (aset yang sudah dimiliki)", en: "Opening balance (asset already owned)", ms: "Baki pembukaan (aset yang sudah dimiliki)", th: "ยอดยกมา (สินทรัพย์ที่มีอยู่แล้ว)", fil: "Opening balance (asset na pag-aari na)", vi: "Số dư đầu kỳ (tài sản đã sở hữu)" },
+
+  // --- Label yang ditemukan sapuan JSX tambahan ---
+  "assets.purchase.monthsShort": { id: "{n} bln", en: "{n} mo", ms: "{n} bln", th: "{n} เดือน", fil: "{n} buwan", vi: "{n} tháng" },
 });

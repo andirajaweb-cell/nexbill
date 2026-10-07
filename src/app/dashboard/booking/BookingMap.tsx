@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { layoutBookingMap, mapWindow, timeAtPosition, type MapBooking, type MapUnit } from "@/lib/rental/booking-map";
 import "@/lib/i18n/dict-booking";
 
@@ -57,7 +57,7 @@ export function BookingMap({
   onSlotClick: (unitId: string | null, consoleType: string | null, start: Date) => void;
   onBookingClick: (b: MapBookingRow) => void;
 }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [showHidden, setShowHidden] = useState(false);
   const win = useMemo(() => mapWindow(date), [date]);
   const rows = useMemo(
@@ -107,7 +107,7 @@ export function BookingMap({
           </button>
         )}
         <span className="text-xs text-neutral-500">
-          {t("booking.map.windowInfo", "{date}, 08.00 s/d 08.00 besok · {n} booking").replace("{date}", win.start.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })).replace("{n}", String(total))}
+          {t("booking.map.windowInfo", "{date}, 08.00 s/d 08.00 besok · {n} booking").replace("{date}", win.start.toLocaleDateString(DATE_LOCALE[lang], { weekday: "long", day: "numeric", month: "long" })).replace("{n}", String(total))}
         </span>
         <label className="ml-auto flex items-center gap-1 text-xs text-neutral-400">
           <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} /> {t("booking.map.showCancelled", "Tampilkan yang batal/kedaluwarsa")}
@@ -132,7 +132,7 @@ export function BookingMap({
             </div>
             {hours.map((h) => (
               <div key={h.getTime()} style={{ width: HOUR_PX }} className={`px-1 py-1 text-[11px] border-r border-neutral-800/60 ${h.getHours() === 0 ? "text-cyan-300 font-semibold" : "text-neutral-400"}`}>
-                {h.getHours() === 0 ? h.toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : `${String(h.getHours()).padStart(2, "0")}.00`}
+                {h.getHours() === 0 ? h.toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "short" }) : `${String(h.getHours()).padStart(2, "0")}.00`}
               </div>
             ))}
           </div>

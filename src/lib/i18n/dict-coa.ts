@@ -311,4 +311,9 @@ registerDict({
   "coa.9310": { id: "Kliring POS", en: "POS Clearing", ms: "Kliring POS", th: "บัญชีพัก POS", fil: "POS Clearing", vi: "Trung gian POS" },
   "coa.9320": { id: "Kliring PPOB", en: "PPOB Clearing", ms: "Kliring PPOB", th: "บัญชีพัก PPOB", fil: "PPOB Clearing", vi: "Trung gian PPOB" },
   "coa.9330": { id: "Kliring Saldo Awal", en: "Opening Balance Clearing", ms: "Kliring Baki Pembukaan", th: "บัญชีพักยอดยกมา", fil: "Opening Balance Clearing", vi: "Trung gian số dư đầu kỳ" },
+
+  // --- Akun default yang belum punya terjemahan (ditemukan audit i18n) ---
+  "coa.2144": { id: "Utang PPh Final UMKM", en: "Final MSME Income Tax Payable", ms: "Cukai Pendapatan Muktamad PKS Belum Bayar", th: "ภาษีเงินได้อัตราสุดท้าย SME ค้างจ่าย", fil: "Payable na Final Income Tax ng MSME", vi: "Thuế TNDN khoán DNNVV phải nộp" },
+  "coa.3131": { id: "Pembagian Dividen", en: "Dividend Distribution", ms: "Pengagihan Dividen", th: "การจ่ายเงินปันผล", fil: "Pamamahagi ng Dibidendo", vi: "Chia cổ tức" },
+  "coa.8500": { id: "Beban Pajak Penghasilan", en: "Income Tax Expense", ms: "Perbelanjaan Cukai Pendapatan", th: "ค่าใช้จ่ายภาษีเงินได้", fil: "Income Tax Expense", vi: "Chi phí thuế thu nhập doanh nghiệp" },
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { uiText } from "@/lib/i18n/client-text";
+import "@/lib/i18n/dict-printer";
 import { bytesToBase64, chunkBytes } from "./escpos";
 
 /**
@@ -131,12 +133,15 @@ function withTimeout<T>(p: Promise<T>, ms: number, msg: string): Promise<T> {
 }
 
 async function openDevice(device: BtDevice): Promise<{ device: BtDevice; characteristic: GattCharacteristic }> {
-  if (!device.gatt) throw new PrinterError("Perangkat ini bukan printer Bluetooth LE.", "connect_failed");
-  const server = device.gatt.connected ? device.gatt : await withTimeout(device.gatt.connect(), 8000, "Printer tidak merespons. Pastikan printer menyala dan dekat dengan HP.");
+  if (!device.gatt) throw new PrinterError(uiText("printer.bt.notBle", "Perangkat ini bukan printer Bluetooth LE."), "connect_failed");
+  const server = device.gatt.connected ? device.gatt : await withTimeout(device.gatt.connect(), 8000, uiText("printer.bt.noResponse", "Printer tidak merespons. Pastikan printer menyala dan dekat dengan HP."));
   const characteristic = await findWritable(server);
   if (!characteristic) {
     throw new PrinterError(
-      "Printer tersambung tapi tidak menyediakan jalur cetak BLE yang dikenali. Coba mode RawBT (Pengaturan → Printer) untuk printer Bluetooth Classic.",
+      uiText(
+        "printer.bt.noCharacteristic",
+        "Printer tersambung tapi tidak menyediakan jalur cetak BLE yang dikenali. Coba mode RawBT (Pengaturan → Printer) untuk printer Bluetooth Classic."
+      ),
       "no_characteristic"
     );
   }
@@ -149,14 +154,14 @@ async function openDevice(device: BtDevice): Promise<{ device: BtDevice; charact
  */
 export async function pairPrinter(): Promise<{ id: string; name: string }> {
   const bt = bluetooth();
-  if (!bt) throw new PrinterError("Browser ini tidak mendukung Bluetooth. Pakai Chrome di Android atau aplikasi NEXBILL Android.", "unsupported");
+  if (!bt) throw new PrinterError(uiText("printer.bt.unsupported", "Browser ini tidak mendukung Bluetooth. Pakai Chrome di Android atau aplikasi NEXBILL Android."), "unsupported");
   let device: BtDevice;
   try {
     device = await bt.requestDevice({ acceptAllDevices: true, optionalServices: PRINTER_SERVICE_UUIDS });
   } catch (e) {
     const name = (e as { name?: string })?.name;
-    if (name === "NotFoundError") throw new PrinterError("Pemilihan printer dibatalkan.", "cancelled");
-    if (name === "SecurityError") throw new PrinterError("Ketuk tombolnya sekali lagi untuk memilih printer.", "needs_gesture");
+    if (name === "NotFoundError") throw new PrinterError(uiText("printer.bt.cancelled", "Pemilihan printer dibatalkan."), "cancelled");
+    if (name === "SecurityError") throw new PrinterError(uiText("printer.bt.needsGesture", "Ketuk tombolnya sekali lagi untuk memilih printer."), "needs_gesture");
     throw new PrinterError(e instanceof Error ? e.message : String(e), "connect_failed");
   }
   active = await openDevice(device);
@@ -175,7 +180,7 @@ async function ensureConnected(savedId?: string | null): Promise<void> {
     }
   }
   const bt = bluetooth();
-  if (!bt) throw new PrinterError("Browser ini tidak mendukung Bluetooth. Pakai Chrome di Android atau aplikasi NEXBILL Android.", "unsupported");
+  if (!bt) throw new PrinterError(uiText("printer.bt.unsupported", "Browser ini tidak mendukung Bluetooth. Pakai Chrome di Android atau aplikasi NEXBILL Android."), "unsupported");
   if (savedId && bt.getDevices) {
     try {
       const known = (await bt.getDevices()).find((d) => d.id === savedId);
@@ -217,7 +222,10 @@ export async function printViaBluetooth(bytes: Uint8Array, opts: { savedDeviceId
     }
   } catch (e) {
     active = null;
-    throw new PrinterError(`Gagal mengirim ke printer: ${e instanceof Error ? e.message : String(e)}. Coba lagi — printer akan disambungkan ulang.`, "write_failed");
+    throw new PrinterError(
+      uiText("printer.bt.writeFailed", "Gagal mengirim ke printer: {error}. Coba lagi — printer akan disambungkan ulang.").replace("{error}", e instanceof Error ? e.message : String(e)),
+      "write_failed"
+    );
   }
   return { id: target.device.id, name: target.device.name || "Printer Bluetooth" };
 }

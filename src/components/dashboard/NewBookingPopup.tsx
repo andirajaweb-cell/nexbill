@@ -5,7 +5,7 @@ import { CalendarPlus, MessageCircle, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { Button } from "@/components/ui/Button";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { scaledGain } from "@/lib/ui/notification-sound";
 import { OPEN_BOOKING_EVENT, BOOKINGS_CHANGED_EVENT } from "@/lib/rental/booking-events";
 import "@/lib/i18n/dict-booking";
@@ -79,7 +79,7 @@ const write = (k: string, v: string) => { try { localStorage.setItem(k, v); } ca
  * terpisah (lib/push) untuk saat dashboard tidak dibuka.
  */
 export function NewBookingPopup() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -216,10 +216,10 @@ export function NewBookingPopup() {
             <div className="col-span-2 rounded-lg bg-neutral-800/60 p-2.5">
               <div className="text-[11px] text-neutral-500">{t("booking.popup.schedule", "Jadwal")}</div>
               <div className="font-semibold text-neutral-100">
-                {start.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}
+                {start.toLocaleDateString(DATE_LOCALE[lang], { weekday: "long", day: "numeric", month: "long" })}
               </div>
               <div className="text-neutral-200">
-                {start.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} – {end.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                {start.toLocaleTimeString(DATE_LOCALE[lang], { hour: "2-digit", minute: "2-digit" })} – {end.toLocaleTimeString(DATE_LOCALE[lang], { hour: "2-digit", minute: "2-digit" })}
                 <span className="text-neutral-500"> · {minutes >= 60 ? `${Math.floor(minutes / 60)} ${t("booking.popup.hours", "jam")}${minutes % 60 ? ` ${minutes % 60} ${t("booking.popup.minutes", "mnt")}` : ""}` : `${minutes} ${t("booking.popup.minutes", "mnt")}`}</span>
               </div>
             </div>
@@ -248,7 +248,7 @@ export function NewBookingPopup() {
             )}
           </div>
           <div className="flex items-center justify-between text-[11px] text-neutral-500">
-            <span>{t("booking.popup.receivedAt", "Masuk {time}").replace("{time}", new Date(current.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }))}</span>
+            <span>{t("booking.popup.receivedAt", "Masuk {time}").replace("{time}", new Date(current.createdAt).toLocaleTimeString(DATE_LOCALE[lang], { hour: "2-digit", minute: "2-digit" }))}</span>
             <div className="flex gap-3">
               {queue.length > 1 && <button type="button" className="hover:text-neutral-300" onClick={() => dismiss(queue.map((b) => b.id))}>{t("booking.popup.dismissAll", "Tutup semua")}</button>}
               <button type="button" className="hover:text-neutral-300" onClick={() => dismiss([current.id])}>{t("booking.popup.later", "Nanti")}</button>

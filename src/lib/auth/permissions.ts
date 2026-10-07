@@ -48,22 +48,24 @@ export type Permission =
 export const ALL_ROLES: StaffRole[] = ["superuser", "owner", "manager", "cashier", "accountant", "kitchen", "supervisor"];
 
 /** Every permission, grouped for the "Role & Izin" checklist UI so 24 raw enum values don't dump onto the owner as one flat list. */
-export const PERMISSION_GROUPS: { group: string; permissions: Permission[] }[] = [
-  { group: "Umum", permissions: ["view_dashboard_owner", "manage_staff", "manage_settings", "manage_admin_data"] },
+export const PERMISSION_GROUPS: { group: string; groupKey: string; permissions: Permission[] }[] = [
+  { group: "Umum", groupKey: "staff.permGroup.general", permissions: ["view_dashboard_owner", "manage_staff", "manage_settings", "manage_admin_data"] },
   {
     group: "Kasir & Transaksi",
+    groupKey: "staff.permGroup.cashier",
     permissions: ["void_order_direct", "refund_order", "approve_requests", "manage_bookings", "manage_ppob", "manage_membership", "kitchen_display"],
   },
-  { group: "Pendapatan Lain-lain", permissions: ["manage_other_income"] },
-  { group: "Marketplace Antar-Outlet", permissions: ["manage_marketplace"] },
-  { group: "Setoran Kas", permissions: ["manage_cash_deposit", "void_cash_deposit"] },
-  { group: "Home Rental (Sewa Dibawa Pulang)", permissions: ["manage_home_rental", "manage_feature_flags"] },
-  { group: "Inventori & Harga", permissions: ["manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history", "permanently_delete_purchase_history"] },
+  { group: "Pendapatan Lain-lain", groupKey: "staff.permGroup.otherIncome", permissions: ["manage_other_income"] },
+  { group: "Marketplace Antar-Outlet", groupKey: "staff.permGroup.marketplace", permissions: ["manage_marketplace"] },
+  { group: "Setoran Kas", groupKey: "staff.permGroup.cashDeposit", permissions: ["manage_cash_deposit", "void_cash_deposit"] },
+  { group: "Home Rental (Sewa Dibawa Pulang)", groupKey: "staff.permGroup.homeRental", permissions: ["manage_home_rental", "manage_feature_flags"] },
+  { group: "Inventori & Harga", groupKey: "staff.permGroup.inventory", permissions: ["manage_pricing_promo", "manage_inventory_purchasing", "manage_supplier_purchase_history", "permanently_delete_purchase_history"] },
   {
     group: "Accounting & Keuangan",
+    groupKey: "staff.permGroup.accounting",
     permissions: ["view_accounting", "post_manual_journal", "manage_coa", "manage_expenses", "approve_expenses", "void_expense", "manage_assets", "close_period", "reopen_period"],
   },
-  { group: "Laporan & Perangkat", permissions: ["view_reports", "manage_devices"] },
+  { group: "Laporan & Perangkat", groupKey: "staff.permGroup.reports", permissions: ["view_reports", "manage_devices"] },
 ];
 
 export const ALL_PERMISSIONS: Permission[] = PERMISSION_GROUPS.flatMap((g) => g.permissions);
@@ -101,6 +103,42 @@ export const PERMISSION_LABEL: Record<Permission, string> = {
   void_cash_deposit: "Batalkan Setoran Kas yang Sudah Diposting",
   close_period: "Tutup Periode Akuntansi (Kunci Bulan)",
   reopen_period: "Buka Kembali Periode Akuntansi yang Sudah Ditutup",
+};
+
+/** Key kamus (dict-staff.ts) untuk PERMISSION_LABEL — label di atas tetap sumber Bahasa Indonesia (dipakai juga di server). */
+export const PERMISSION_LABEL_KEY: Record<Permission, string> = {
+  view_dashboard_owner: "staff.permission.viewDashboardOwner",
+  manage_staff: "staff.permission.manageStaff",
+  view_accounting: "staff.permission.viewAccounting",
+  post_manual_journal: "staff.permission.postManualJournal",
+  void_order_direct: "staff.permission.voidOrderDirect",
+  refund_order: "staff.permission.refundOrder",
+  approve_requests: "staff.permission.approveRequests",
+  manage_pricing_promo: "staff.permission.managePricingPromo",
+  manage_inventory_purchasing: "staff.permission.manageInventoryPurchasing",
+  manage_supplier_purchase_history: "staff.permission.manageSupplierPurchaseHistory",
+  permanently_delete_purchase_history: "staff.permission.permanentlyDeletePurchaseHistory",
+  view_reports: "staff.permission.viewReports",
+  manage_devices: "staff.permission.manageDevices",
+  kitchen_display: "staff.permission.kitchenDisplay",
+  manage_admin_data: "staff.permission.manageAdminData",
+  manage_expenses: "staff.permission.manageExpenses",
+  approve_expenses: "staff.permission.approveExpenses",
+  void_expense: "staff.permission.voidExpense",
+  manage_assets: "staff.permission.manageAssets",
+  manage_settings: "staff.permission.manageSettings",
+  manage_bookings: "staff.permission.manageBookings",
+  manage_ppob: "staff.permission.managePpob",
+  manage_coa: "staff.permission.manageCoa",
+  manage_other_income: "staff.permission.manageOtherIncome",
+  manage_home_rental: "staff.permission.manageHomeRental",
+  manage_feature_flags: "staff.permission.manageFeatureFlags",
+  manage_membership: "staff.permission.manageMembership",
+  manage_marketplace: "staff.permission.manageMarketplace",
+  manage_cash_deposit: "staff.permission.manageCashDeposit",
+  void_cash_deposit: "staff.permission.voidCashDeposit",
+  close_period: "staff.permission.closePeriod",
+  reopen_period: "staff.permission.reopenPeriod",
 };
 
 /**
@@ -216,12 +254,24 @@ export function setEffectivePermissions(role: StaffRole, permissions: string[]):
   effectiveMatrix = { ...effectiveMatrix, [role]: new Set(permissions as Permission[]) };
 }
 
-export function roleLabel(role: StaffRole): string {
+const ROLE_LABEL_KEY: Record<StaffRole, string> = {
+  manager: "staff.role.manager",
+  cashier: "staff.role.cashier",
+  accountant: "staff.role.accountant",
+  kitchen: "staff.role.kitchen",
+  supervisor: "staff.role.supervisor",
+  superuser: "staff.role.superuser",
+  owner: "staff.role.owner",
+};
+
+/** Nama role. Di dashboard kirim `t` dari useDashboardLang agar ikut bahasa tampilan; di server tetap Bahasa Indonesia. */
+export function roleLabel(role: StaffRole, t?: (key: string, fallback: string) => string): string {
   const labels: Record<StaffRole, string> = {
     manager: "Manager", cashier: "Kasir",
     accountant: "Akuntan", kitchen: "Dapur", supervisor: "Supervisor", superuser: "Superuser", owner: "Owner",
   };
-  return labels[role] ?? role;
+  const label = labels[role] ?? role;
+  return t && ROLE_LABEL_KEY[role] ? t(ROLE_LABEL_KEY[role], label) : label;
 }
 
 /**

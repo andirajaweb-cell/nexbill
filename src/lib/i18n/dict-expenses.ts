@@ -307,4 +307,18 @@ registerDict({
   "expenses.filter.period.month": { id: "Per bulan", en: "By month", ms: "Mengikut bulan", th: "ตามเดือน", fil: "Ayon sa buwan", vi: "Theo tháng" },
   "expenses.filter.period.year": { id: "Per tahun", en: "By year", ms: "Mengikut tahun", th: "ตามปี", fil: "Ayon sa taon", vi: "Theo năm" },
   "expenses.filter.clearKeyword": { id: "Hapus kata kunci", en: "Clear keyword", ms: "Padam kata kunci", th: "ล้างคำค้นหา", fil: "Burahin ang keyword", vi: "Xóa từ khóa" },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "expenses.audit.inputBy": { id: "Diinput: {name}", en: "Entered by: {name}", ms: "Dimasukkan oleh: {name}", th: "บันทึกโดย: {name}", fil: "Inilagay ni: {name}", vi: "Nhập bởi: {name}" },
+  "expenses.audit.approvedBy": { id: "Approved: {name}", en: "Approved: {name}", ms: "Diluluskan: {name}", th: "อนุมัติโดย: {name}", fil: "Inaprubahan: {name}", vi: "Đã duyệt: {name}" },
+  "expenses.audit.rejectedBy": { id: "Rejected: {name} ({reason})", en: "Rejected: {name} ({reason})", ms: "Ditolak: {name} ({reason})", th: "ปฏิเสธโดย: {name} ({reason})", fil: "Tinanggihan: {name} ({reason})", vi: "Đã từ chối: {name} ({reason})" },
+  "expenses.audit.paidBy": { id: "Dibayar: {name}", en: "Paid by: {name}", ms: "Dibayar oleh: {name}", th: "ชำระโดย: {name}", fil: "Binayaran ni: {name}", vi: "Thanh toán bởi: {name}" },
+  "expenses.audit.voidedBy": { id: "Dibatalkan: {name} ({reason})", en: "Voided: {name} ({reason})", ms: "Dibatalkan: {name} ({reason})", th: "ยกเลิกโดย: {name} ({reason})", fil: "Kinansela: {name} ({reason})", vi: "Đã hủy: {name} ({reason})" },
+  "expenses.saving.submit": { id: "Mengirim expense...", en: "Submitting expense...", ms: "Menghantar perbelanjaan...", th: "กำลังส่งค่าใช้จ่าย...", fil: "Isinusumite ang gastos...", vi: "Đang gửi chi phí..." },
+  "expenses.saving.approve": { id: "Menyetujui & membukukan expense...", en: "Approving & posting expense...", ms: "Meluluskan & membukukan perbelanjaan...", th: "กำลังอนุมัติและบันทึกบัญชีค่าใช้จ่าย...", fil: "Inaaprubahan at itinatala ang gastos...", vi: "Đang duyệt & ghi sổ chi phí..." },
+  "expenses.saving.cancel": { id: "Membatalkan expense...", en: "Cancelling expense...", ms: "Membatalkan perbelanjaan...", th: "กำลังยกเลิกค่าใช้จ่าย...", fil: "Kinakansela ang gastos...", vi: "Đang hủy chi phí..." },
+  "expenses.saving.reject": { id: "Menolak expense...", en: "Rejecting expense...", ms: "Menolak perbelanjaan...", th: "กำลังปฏิเสธค่าใช้จ่าย...", fil: "Tinatanggihan ang gastos...", vi: "Đang từ chối chi phí..." },
+  "expenses.saving.void": { id: "Membatalkan expense & membalik jurnal...", en: "Voiding expense & reversing journal...", ms: "Membatalkan perbelanjaan & membalikkan jurnal...", th: "กำลังยกเลิกค่าใช้จ่ายและกลับรายการบัญชี...", fil: "Kinakansela ang gastos at binabaligtad ang journal...", vi: "Đang hủy chi phí & đảo bút toán..." },
+  "expenses.actionFailed": { id: "Gagal memproses. Coba lagi.", en: "Processing failed. Please try again.", ms: "Gagal diproses. Cuba lagi.", th: "ดำเนินการไม่สำเร็จ ลองอีกครั้ง", fil: "Hindi naproseso. Subukan muli.", vi: "Xử lý thất bại. Vui lòng thử lại." },
+  "expenses.template.deactivateFailed": { id: "Gagal menonaktifkan template.", en: "Failed to deactivate the template.", ms: "Gagal menyahaktifkan templat.", th: "ปิดใช้งานเทมเพลตไม่สำเร็จ", fil: "Hindi na-deactivate ang template.", vi: "Không tắt được mẫu." },
 });

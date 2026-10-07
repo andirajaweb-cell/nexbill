@@ -319,8 +319,8 @@ function subsectionToDraft(s: HelpSubsection): SubsectionDraft {
   };
 }
 
-function draftToSubsection(d: SubsectionDraft): HelpSubsection {
-  const out: HelpSubsection = { title: d.title.trim() || "(Tanpa judul)" };
+function draftToSubsection(d: SubsectionDraft, untitled: string): HelpSubsection {
+  const out: HelpSubsection = { title: d.title.trim() || untitled };
   if (d.navHint.trim()) out.navHint = d.navHint.trim();
   if (d.intro.trim()) out.intro = d.intro.trim();
   const steps = linesToArray(d.stepsText);
@@ -359,7 +359,7 @@ function HelpEditor({ category: c, onCancel, onSaved }: { category: HelpCategory
     const notes = linesToArray(notesText);
     body.steps = steps.length ? steps : undefined;
     body.notes = notes.length ? notes : undefined;
-    body.subsections = subsections.length ? subsections.map(draftToSubsection) : undefined;
+    body.subsections = subsections.length ? subsections.map((d) => draftToSubsection(d, t("help.editor.untitled", "(Tanpa judul)"))) : undefined;
 
     const res = await fetch(`/api/help-content/${c.id}`, {
       method: "PUT",

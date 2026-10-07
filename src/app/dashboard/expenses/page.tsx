@@ -11,7 +11,7 @@ import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
 import { useSavingOverlay, fetchJson } from "@/lib/ui/use-saving-overlay";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import { outletDateYmd } from "@/lib/time/outlet-time";
 import { EMPTY_EXPENSE_FILTER, expenseTotal, expenseYears, filterExpenses, isFilterActive, type ExpenseLike, type ExpenseListFilter } from "@/lib/expenses/list-filter";
@@ -92,7 +92,7 @@ export default function ExpensesPage() {
 }
 
 function DashboardTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [data, setData] = useState<any>(null);
   useEffect(() => { fetchJsonObject(`/api/expenses/dashboard?outletId=${outletId}`).then(setData); }, [outletId]);
   if (!data) return <div className="text-sm text-neutral-500">{t("expenses.loading", "Memuat...")}</div>;
@@ -113,7 +113,7 @@ function DashboardTab({ outletId }: { outletId: string }) {
           <h2 className="font-medium mb-2 text-amber-400">{t("expenses.paymentReminder", "Payment Reminder")}</h2>
           <div className="space-y-1 text-sm">
             {data.dueSoon.map((e: any) => (
-              <div key={e.id} className="flex justify-between"><span>{e.expenseNumber} — {e.description}</span><span>{rupiah(e.amount)} · {t("expenses.dueDateLabel", "jatuh tempo")} {new Date(e.dueDate).toLocaleDateString("id-ID")}</span></div>
+              <div key={e.id} className="flex justify-between"><span>{e.expenseNumber} — {e.description}</span><span>{rupiah(e.amount)} · {t("expenses.dueDateLabel", "jatuh tempo")} {new Date(e.dueDate).toLocaleDateString(DATE_LOCALE[lang])}</span></div>
             ))}
           </div>
         </Card>
@@ -273,11 +273,11 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   const visibleBookedTotal = visibleBooked.reduce((s, e) => s + expenseTotal(e), 0);
 
   const auditTrail = (e: any) => {
-    const parts = [`Diinput: ${staffName(e.staffUserId)}`];
-    if (e.approvedBy) parts.push(`Approved: ${staffName(e.approvedBy)}`);
-    if (e.rejectedBy) parts.push(`Rejected: ${staffName(e.rejectedBy)} (${e.rejectReason ?? "-"})`);
-    if (e.paidBy) parts.push(`Dibayar: ${staffName(e.paidBy)}`);
-    if (e.voidedBy) parts.push(`Dibatalkan: ${staffName(e.voidedBy)} (${e.voidReason ?? "-"})`);
+    const parts = [t("expenses.audit.inputBy", "Diinput: {name}").replace("{name}", staffName(e.staffUserId))];
+    if (e.approvedBy) parts.push(t("expenses.audit.approvedBy", "Approved: {name}").replace("{name}", staffName(e.approvedBy)));
+    if (e.rejectedBy) parts.push(t("expenses.audit.rejectedBy", "Rejected: {name} ({reason})").replace("{name}", staffName(e.rejectedBy)).replace("{reason}", e.rejectReason ?? "-"));
+    if (e.paidBy) parts.push(t("expenses.audit.paidBy", "Dibayar: {name}").replace("{name}", staffName(e.paidBy)));
+    if (e.voidedBy) parts.push(t("expenses.audit.voidedBy", "Dibatalkan: {name} ({reason})").replace("{name}", staffName(e.voidedBy)).replace("{reason}", e.voidReason ?? "-"));
     return parts.join(" · ");
   };
 
@@ -339,16 +339,16 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
   const act = (id: string, action: "submit" | "approve" | "cancel" | "reject" | "void", extra?: any) =>
     proses.jalankan(`row:${id}`, async () => {
       const message = ({
-  submit: "Mengirim expense...",
-  approve: "Menyetujui & membukukan expense...",
-  cancel: "Membatalkan expense...",
-  reject: "Menolak expense...",
-  void: "Membatalkan expense & membalik jurnal...",
-})[action];
+        submit: t("expenses.saving.submit", "Mengirim expense..."),
+        approve: t("expenses.saving.approve", "Menyetujui & membukukan expense..."),
+        cancel: t("expenses.saving.cancel", "Membatalkan expense..."),
+        reject: t("expenses.saving.reject", "Menolak expense..."),
+        void: t("expenses.saving.void", "Membatalkan expense & membalik jurnal..."),
+      })[action];
       const { res, data } = await saving.run(message, () =>
         fetchJson(`/api/expenses/${id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(extra ?? {}) })
       );
-      if (!res.ok) return showAlert(data.error ?? "Gagal memproses. Coba lagi.");
+      if (!res.ok) return showAlert(data.error ?? t("expenses.actionFailed", "Gagal memproses. Coba lagi."));
       load();
     });
 
@@ -654,7 +654,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
               // Tanggal ikut disebut dalam ringkasan — inilah kolom yang paling mungkin terlewat
               // saat mencatat tagihan bulan lalu, dan akibat salahnya (biaya mendarat di bulan yang
               // keliru) tidak terlihat sampai Laba Rugi bulan itu dibaca ulang.
-              const tanggal = form.expenseDate ? new Date(`${form.expenseDate}T12:00:00+07:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+              const tanggal = form.expenseDate ? new Date(`${form.expenseDate}T12:00:00+07:00`).toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "long", year: "numeric" }) : "";
               return (
                 <span>
                   {tanggal && <span className="text-neutral-400">{tanggal} — </span>}
@@ -735,7 +735,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
             {visibleExpenses.map((e: any) => (
               <tr key={e.id} className="border-b border-neutral-900 align-top" title={auditTrail(e)}>
                 <td className="py-2 font-mono text-xs">{e.expenseNumber}</td>
-                <td className="text-xs">{new Date(e.expenseDate).toLocaleDateString("id-ID")}</td>
+                <td className="text-xs">{new Date(e.expenseDate).toLocaleDateString(DATE_LOCALE[lang])}</td>
                 <td className="text-xs">{accountName(e.accountId)}</td>
                 <td className="text-xs max-w-[200px] truncate" title={e.description}>{e.description || e.category}</td>
                 <td>{rupiah(e.amount + (e.taxAmount ?? 0))}</td>
@@ -879,7 +879,7 @@ function CostCenterTab({ outletId, role }: { outletId: string; role: StaffRole }
 }
 
 function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [rows, setRows] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -909,7 +909,7 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
     if (!await showConfirm(t("expenses.confirmDeactivateRecurring", "Nonaktifkan recurring expense ini?"), { tone: "danger" })) return;
     const { res, data } = await saving.run(t("expenses.overlay.deactivate", "Menonaktifkan template..."), () => fetchJson(`/api/expenses/recurring/${id}`, { method: "DELETE" }));
     // Dulu hasilnya tidak dicek sama sekali: gagal pun layar diam, dan template tetap aktif tanpa pemberitahuan.
-    if (!res.ok) return showAlert(data.error ?? "Gagal menonaktifkan template.");
+    if (!res.ok) return showAlert(data.error ?? t("expenses.template.deactivateFailed", "Gagal menonaktifkan template."));
     load();
   });
 
@@ -997,7 +997,7 @@ function RecurringTab({ outletId, role }: { outletId: string; role: StaffRole })
           <Card key={r.id} className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium">{r.name} {!r.isActive && <span className="text-xs text-neutral-500">{t("expenses.inactive", "(nonaktif)")}</span>}</div>
-              <div className="text-xs text-neutral-500">{rupiah(r.amount)} · {frequencyLabel(r.frequency)} · {t("expenses.nextDueDate", "Jatuh tempo berikutnya")} {new Date(r.nextDueDate).toLocaleDateString("id-ID")}</div>
+              <div className="text-xs text-neutral-500">{rupiah(r.amount)} · {frequencyLabel(r.frequency)} · {t("expenses.nextDueDate", "Jatuh tempo berikutnya")} {new Date(r.nextDueDate).toLocaleDateString(DATE_LOCALE[lang])}</div>
             </div>
             {canManage && r.isActive && <Button variant="ghost" className="text-xs text-red-400" disabled={proses.sibuk(`row:${r.id}`)} onClick={() => deactivate(r.id)}>{t("expenses.deactivate", "Nonaktifkan")}</Button>}
           </Card>

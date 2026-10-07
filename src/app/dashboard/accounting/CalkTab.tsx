@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PeriodBar, resolvePeriodPreset, describePeriod, type PeriodPreset } from "@/components/reports/PeriodPicker";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { uiText } from "@/lib/i18n/client-text";
 import { useCurrency } from "@/lib/currency/client";
 import type { Calk, CalkGroup } from "@/lib/accounting/calk";
 
@@ -28,7 +29,7 @@ export function CalkTab() {
     fetch(`/api/accounting/calk?${qs}`)
       .then(async (res) => {
         const body = await res.json();
-        if (!res.ok) throw new Error(body.error ?? "Gagal memuat CALK.");
+        if (!res.ok) throw new Error(body.error ?? uiText("accounting.calk.loadFailed", "Gagal memuat CALK."));
         setError(null);
         setCalk(body);
       })

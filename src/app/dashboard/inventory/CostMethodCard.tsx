@@ -7,7 +7,7 @@ import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 
 /**
  * Pilihan metode harga modal (penilaian persediaan) — ditampilkan di tab Belanja Supplier.
@@ -22,9 +22,12 @@ export interface CostMethodInfo {
   drift: number;
 }
 
-const OPTIONS: { value: CostMethod | "lifo"; title: string; icon: React.ReactNode; text: string; example: string; disabled?: boolean }[] = [
+const OPTIONS: { value: CostMethod | "lifo"; titleKey: string; title: string; icon: React.ReactNode; textKey: string; text: string; exampleKey: string; example: string; disabled?: boolean }[] = [
   {
     value: "average",
+    titleKey: "inventory.costMethod.average",
+    textKey: "inventory.costMethod.average.text",
+    exampleKey: "inventory.costMethod.average.example",
     title: "Rata-rata tertimbang",
     icon: <Scale size={16} />,
     text: "Setiap belanja dicampur dengan stok yang ada, sehingga harga modal = rata-rata harga semua unit di gudang. Paling sederhana dan stabil — cocok untuk sebagian besar outlet.",
@@ -32,6 +35,9 @@ const OPTIONS: { value: CostMethod | "lifo"; title: string; icon: React.ReactNod
   },
   {
     value: "fifo",
+    titleKey: "inventory.costMethod.fifo",
+    textKey: "inventory.costMethod.fifo.text",
+    exampleKey: "inventory.costMethod.fifo.example",
     title: "FIFO — masuk pertama, keluar pertama",
     icon: <Layers size={16} />,
     text: "Barang yang dibeli lebih dulu dianggap terjual lebih dulu. HPP mengikuti harga belanja terlama yang masih ada; sisa stok bernilai harga belanja terbaru. Cocok untuk barang yang harganya sering naik atau punya kedaluwarsa.",
@@ -39,6 +45,9 @@ const OPTIONS: { value: CostMethod | "lifo"; title: string; icon: React.ReactNod
   },
   {
     value: "lifo",
+    titleKey: "inventory.costMethod.lifo",
+    textKey: "inventory.costMethod.lifo.text",
+    exampleKey: "",
     title: "LIFO — tidak tersedia",
     icon: <Ban size={16} />,
     text: "Masuk terakhir keluar pertama tidak diperbolehkan oleh SAK EMKM / PSAK 14 dan UU PPh Pasal 10 ayat (6) — laporan keuangan dan SPT yang memakainya tidak sesuai standar dan aturan pajak.",
@@ -48,7 +57,7 @@ const OPTIONS: { value: CostMethod | "lifo"; title: string; icon: React.ReactNod
 ];
 
 export function CostMethodCard({ info, onChanged }: { info: CostMethodInfo | null; onChanged: () => void }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { user } = useAuth();
   const role = (user?.role ?? "cashier") as StaffRole;
   const canChange = hasPermission(role, "manage_coa") && hasPermission(role, "manage_inventory_purchasing");
@@ -74,7 +83,7 @@ export function CostMethodCard({ info, onChanged }: { info: CostMethodInfo | nul
     try {
       const res = await fetch("/api/inventory/cost-method", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return showAlert(data.error ?? "Gagal mengganti metode.");
+      if (!res.ok) return showAlert(data.error ?? t("inventory.costMethod.switchFailed", "Gagal mengganti metode."));
       onChanged();
       showAlert(
         method === "fifo"
@@ -92,7 +101,7 @@ export function CostMethodCard({ info, onChanged }: { info: CostMethodInfo | nul
     try {
       const res = await fetch("/api/inventory/cost-method", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reconcile: true }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return showAlert(data.error ?? "Gagal.");
+      if (!res.ok) return showAlert(data.error ?? t("inventory.costMethod.reconcileFailed", "Gagal menyamakan lapisan."));
       onChanged();
     } finally {
       setBusy(false);
@@ -106,9 +115,9 @@ export function CostMethodCard({ info, onChanged }: { info: CostMethodInfo | nul
         <div>
           <div className="text-xs text-neutral-500">{t("inventory.costMethod.label", "Metode harga modal (penilaian persediaan)")}</div>
           <div className="flex items-center gap-1.5 font-medium text-sky-300">
-            {current.icon} {t(`inventory.costMethod.${current.value}`, current.title)}
+            {current.icon} {t(current.titleKey, current.title)}
           </div>
-          {info.since && <div className="text-[11px] text-neutral-500">{t("inventory.costMethod.since", "Berlaku sejak {date}").replace("{date}", new Date(info.since).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }))}</div>}
+          {info.since && <div className="text-[11px] text-neutral-500">{t("inventory.costMethod.since", "Berlaku sejak {date}").replace("{date}", new Date(info.since).toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "long", year: "numeric" }))}</div>}
         </div>
         <span className="shrink-0 text-xs text-sky-400">{open ? t("inventory.costMethod.hide", "Tutup") : t("inventory.costMethod.show", "Lihat / ubah")}</span>
       </button>
@@ -124,11 +133,11 @@ export function CostMethodCard({ info, onChanged }: { info: CostMethodInfo | nul
                   className={`rounded-lg border p-3 text-xs space-y-1.5 ${active ? "border-emerald-500/60 bg-emerald-500/5" : o.disabled ? "border-neutral-800 opacity-60" : "border-neutral-700"}`}
                 >
                   <div className="flex items-center gap-1.5 text-sm font-medium">
-                    {o.icon} {o.title}
+                    {o.icon} {t(o.titleKey, o.title)}
                     {active && <span className="ml-auto rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300">{t("inventory.costMethod.active", "Dipakai")}</span>}
                   </div>
-                  <p className="text-neutral-400">{o.text}</p>
-                  {o.example && <p className="text-neutral-500 italic">{o.example}</p>}
+                  <p className="text-neutral-400">{t(o.textKey, o.text)}</p>
+                  {o.exampleKey && <p className="text-neutral-500 italic">{t(o.exampleKey, o.example)}</p>}
                   {!active && !o.disabled && canChange && (
                     <Button variant="secondary" className="text-xs px-2 py-1" disabled={busy} onClick={() => change(o.value as CostMethod)}>
                       {t("inventory.costMethod.use", "Pakai metode ini")}
@@ -163,22 +172,29 @@ export function CostMethodCard({ info, onChanged }: { info: CostMethodInfo | nul
 
 /** Rincian lapisan FIFO satu produk — dipakai tab Produk. */
 export function FifoLayerList({ layers, unit, formatMoney }: { layers: CostMethodInfo["layers"]; unit: string; formatMoney: (n: number) => string }) {
-  const SOURCE: Record<string, string> = { purchase: "Belanja", opening: "Stok awal", adjustment: "Penyesuaian", restock: "Retur/void", switch: "Saldo pindah metode" };
-  if (!layers.length) return <div className="text-xs text-neutral-500">Belum ada lapisan — harga modal memakai harga terakhir.</div>;
+  const { t, lang } = useDashboardLang();
+  const SOURCE: Record<string, string> = {
+    purchase: t("inventory.fifoLayer.source.purchase", "Belanja"),
+    opening: t("inventory.fifoLayer.source.opening", "Stok awal"),
+    adjustment: t("inventory.fifoLayer.source.adjustment", "Penyesuaian"),
+    restock: t("inventory.fifoLayer.source.restock", "Retur/void"),
+    switch: t("inventory.fifoLayer.source.switch", "Saldo pindah metode"),
+  };
+  if (!layers.length) return <div className="text-xs text-neutral-500">{t("inventory.fifoLayer.empty", "Belum ada lapisan — harga modal memakai harga terakhir.")}</div>;
   return (
     <div className="space-y-0.5 text-xs">
       {layers.map((l, i) => (
         <div key={i} className="flex justify-between gap-4">
           <span className="text-neutral-400">
             {i === 0 ? "▶ " : ""}
-            {new Date(l.receivedAt).toLocaleDateString("id-ID")} · {SOURCE[l.source] ?? l.source}
+            {new Date(l.receivedAt).toLocaleDateString(DATE_LOCALE[lang])} · {SOURCE[l.source] ?? l.source}
           </span>
           <span>
             {Math.round(l.qtyRemaining * 100) / 100} {unit} × {formatMoney(l.unitCost)}
           </span>
         </div>
       ))}
-      <div className="pt-1 text-[11px] text-neutral-500">▶ = lapisan yang keluar berikutnya saat terjual</div>
+      <div className="pt-1 text-[11px] text-neutral-500">{t("inventory.fifoLayer.legend", "▶ = lapisan yang keluar berikutnya saat terjual")}</div>
     </div>
   );
 }

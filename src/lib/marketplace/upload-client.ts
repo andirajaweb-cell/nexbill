@@ -1,4 +1,6 @@
 "use client";
+import { uiText } from "@/lib/i18n/client-text";
+import "@/lib/i18n/dict-marketplace";
 
 /**
  * Unggah foto Marketplace dari browser (foto barang, bukti bayar/serah-terima, bukti aduan).
@@ -37,7 +39,7 @@ export async function unggahFotoMarketplace(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", blob, nama);
   const res = await fetch("/api/marketplace/upload", { method: "POST", body: fd });
-  const data = await res.json().catch(() => ({ error: "Foto terlalu besar atau koneksi terputus." }));
-  if (!res.ok) throw new Error(data.error || "Gagal mengunggah foto.");
+  const data = await res.json().catch(() => ({ error: uiText("marketplace.upload.tooLarge", "Foto terlalu besar atau koneksi terputus.") }));
+  if (!res.ok) throw new Error(data.error || uiText("marketplace.upload.failed", "Gagal mengunggah foto."));
   return data.url as string;
 }

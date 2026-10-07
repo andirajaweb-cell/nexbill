@@ -335,4 +335,18 @@ registerDict({
   "period.custom": { id: "Custom / Tanggal Tertentu", en: "Custom / Specific Dates", ms: "Tersuai / Tarikh Tertentu", th: "กำหนดเอง / วันที่เจาะจง", fil: "Custom / Partikular na Petsa", vi: "Tùy chỉnh / Ngày cụ thể" },
   "period.singleDateHint": { id: "(kosongkan untuk tanggal tunggal)", en: "(leave empty for a single date)", ms: "(kosongkan untuk satu tarikh)", th: "(เว้นว่างสำหรับวันเดียว)", fil: "(iwanang blangko para sa iisang petsa)", vi: "(để trống nếu chỉ một ngày)" },
   "period.allTime": { id: "Sepanjang Waktu", en: "All Time", ms: "Sepanjang Masa", th: "ตลอดเวลา", fil: "Lahat ng Panahon", vi: "Toàn thời gian" },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "stat.paidTransactions": { id: "{n} transaksi lunas", en: "{n} paid transactions", ms: "{n} transaksi berbayar", th: "{n} รายการที่ชำระแล้ว", fil: "{n} bayad na transaksyon", vi: "{n} giao dịch đã thanh toán" },
+  "shell.saving.hint": { id: "Jangan tutup atau muat ulang halaman ini.", en: "Don't close or reload this page.", ms: "Jangan tutup atau muat semula halaman ini.", th: "อย่าปิดหรือรีโหลดหน้านี้", fil: "Huwag isara o i-reload ang pahinang ito.", vi: "Đừng đóng hoặc tải lại trang này." },
+  "shell.saving.badResponse": { id: "Server tidak merespons dengan benar. Cek daftar sebelum mencoba lagi.", en: "The server did not respond properly. Check the list before trying again.", ms: "Pelayan tidak memberi respons dengan betul. Semak senarai sebelum mencuba lagi.", th: "เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง ตรวจสอบรายการก่อนลองอีกครั้ง", fil: "Hindi maayos ang tugon ng server. Tingnan ang listahan bago subukan muli.", vi: "Máy chủ phản hồi không đúng. Kiểm tra danh sách trước khi thử lại." },
+
+  // --- Nama role (TopBar, Sidebar, halaman Staff — lib/auth/permissions.ts roleLabel) ---
+  "staff.role.manager": { id: "Manager", en: "Manager", ms: "Pengurus", th: "ผู้จัดการ", fil: "Manager", vi: "Quản lý" },
+  "staff.role.cashier": { id: "Kasir", en: "Cashier", ms: "Juruwang", th: "แคชเชียร์", fil: "Cashier", vi: "Thu ngân" },
+  "staff.role.accountant": { id: "Akuntan", en: "Accountant", ms: "Akauntan", th: "นักบัญชี", fil: "Accountant", vi: "Kế toán" },
+  "staff.role.kitchen": { id: "Dapur", en: "Kitchen", ms: "Dapur", th: "ครัว", fil: "Kusina", vi: "Bếp" },
+  "staff.role.supervisor": { id: "Supervisor", en: "Supervisor", ms: "Penyelia", th: "หัวหน้างาน", fil: "Supervisor", vi: "Giám sát" },
+  "staff.role.superuser": { id: "Superuser", en: "Superuser", ms: "Superuser", th: "Superuser", fil: "Superuser", vi: "Superuser" },
+  "staff.role.owner": { id: "Owner", en: "Owner", ms: "Pemilik", th: "เจ้าของ", fil: "May-ari", vi: "Chủ cửa hàng" },
 });

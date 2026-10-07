@@ -489,4 +489,9 @@ registerDict({
   "homeRental.reports.tableRisk": { id: "Risiko", en: "Risk", ms: "Risiko", th: "ความเสี่ยง", fil: "Risk", vi: "Rủi ro" },
   "homeRental.reports.blacklistBadge": { id: "Blacklist", en: "Blacklist", ms: "Senarai Hitam", th: "บัญชีดำ", fil: "Blacklist", vi: "Danh sách đen" },
   "homeRental.reports.noCustomerDataYet": { id: "Belum ada data pelanggan.", en: "No customer data yet.", ms: "Belum ada data pelanggan.", th: "ยังไม่มีข้อมูลลูกค้า", fil: "Wala pang customer data.", vi: "Chưa có dữ liệu khách hàng." },
+
+  // --- Label yang ditemukan sapuan JSX tambahan ---
+  "homeRental.booking.plusDeposit": { id: "(+dep {amount})", en: "(+deposit {amount})", ms: "(+deposit {amount})", th: "(+มัดจำ {amount})", fil: "(+deposito {amount})", vi: "(+cọc {amount})" },
+  "homeRental.policy.notePlaceholder": { id: "Catatan", en: "Note", ms: "Catatan", th: "หมายเหตุ", fil: "Tala", vi: "Ghi chú" },
+  "homeRental.policy.addRule": { id: "+ Tambah", en: "+ Add", ms: "+ Tambah", th: "+ เพิ่ม", fil: "+ Idagdag", vi: "+ Thêm" },
 });

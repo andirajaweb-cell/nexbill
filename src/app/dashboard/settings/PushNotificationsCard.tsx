@@ -10,6 +10,15 @@ import { isPushSupported, currentPushSubscription, enablePush, disablePush } fro
 import type { PushCategory } from "@/lib/push/rules";
 import "@/lib/i18n/dict-push";
 
+const CATEGORY_KEY: Record<PushCategory, string> = {
+  session: "push.cat.session",
+  customer_request: "push.cat.customer_request",
+  booking: "push.cat.booking",
+  payment: "push.cat.payment",
+  fraud: "push.cat.fraud",
+  low_stock: "push.cat.low_stock",
+  shift_summary: "push.cat.shift_summary",
+};
 const CATEGORY_FALLBACK: Record<PushCategory, string> = {
   session: "Sesi bilik hampir habis / sudah habis",
   customer_request: "Permintaan QR pelanggan (pesan F&B, tambah waktu, panggil kasir)",
@@ -78,7 +87,7 @@ export function PushNotificationsCard() {
     try {
       const res = await fetch("/api/push/test", { method: "POST" });
       const out = await res.json();
-      if (!res.ok) return showAlert(out.error ?? "Gagal.");
+      if (!res.ok) return showAlert(out.error ?? t("push.testFailed", "Gagal mengirim notifikasi uji."));
       showAlert(t("push.testSent", "Notifikasi uji dikirim ke {n} perangkat.").replace("{n}", String(out.delivered ?? 0)));
     } finally {
       setBusy(false);
@@ -122,7 +131,7 @@ export function PushNotificationsCard() {
           {prefs.allowed.map((c) => (
             <label key={c} className="flex items-center gap-2 text-xs text-neutral-400">
               <input type="checkbox" checked={prefs.enabled.includes(c)} onChange={() => toggle(c)} />
-              {t(`push.cat.${c}`, CATEGORY_FALLBACK[c])}
+              {t(CATEGORY_KEY[c], CATEGORY_FALLBACK[c])}
             </label>
           ))}
         </div>

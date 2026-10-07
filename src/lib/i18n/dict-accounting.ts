@@ -737,4 +737,9 @@ registerDict({
   "accounting.pl.drillDown.openHint": { id: "Buka detail transaksi di tab baru", en: "Open transaction details in a new tab", ms: "Buka butiran transaksi dalam tab baharu", th: "เปิดรายละเอียดธุรกรรมในแท็บใหม่", fil: "Buksan ang detalye ng transaksyon sa bagong tab", vi: "Mở chi tiết giao dịch trong tab mới" },
   "accounting.guide.hideWorkflow": { id: "Tutup Panduan Alur Kerja", en: "Close Workflow Guide", ms: "Tutup Panduan Aliran Kerja", th: "ปิดคู่มือขั้นตอนการทำงาน", fil: "Isara ang Gabay sa Workflow", vi: "Đóng hướng dẫn quy trình" },
   "accounting.guide.showWorkflow": { id: "Panduan Alur Kerja", en: "Workflow Guide", ms: "Panduan Aliran Kerja", th: "คู่มือขั้นตอนการทำงาน", fil: "Gabay sa Workflow", vi: "Hướng dẫn quy trình" },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "accounting.audit.runFailed": { id: "Gagal menjalankan audit.", en: "Failed to run the audit.", ms: "Gagal menjalankan audit.", th: "เรียกใช้การตรวจสอบไม่สำเร็จ", fil: "Hindi napatakbo ang audit.", vi: "Không chạy được kiểm toán." },
+  "accounting.audit.fixFailed": { id: "Perbaikan gagal.", en: "The fix failed.", ms: "Pembetulan gagal.", th: "แก้ไขไม่สำเร็จ", fil: "Nabigo ang pag-aayos.", vi: "Sửa lỗi thất bại." },
+  "accounting.calk.loadFailed": { id: "Gagal memuat CALK.", en: "Failed to load the notes to the financial statements.", ms: "Gagal memuatkan nota kepada penyata kewangan.", th: "โหลดหมายเหตุประกอบงบการเงินไม่สำเร็จ", fil: "Hindi na-load ang mga tala sa financial statements.", vi: "Không tải được thuyết minh báo cáo tài chính." },
 });

@@ -89,7 +89,7 @@ export function UnitRequestsPanel({
         body: JSON.stringify({ action, rejectReason }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) showAlert(data.error ?? "Gagal");
+      if (!res.ok) showAlert(data.error ?? t("rental.requests.actionFailed", "Gagal memproses permintaan."));
       else if (action === "accept") onHandled?.();
       await load();
     } finally {

@@ -314,4 +314,7 @@ registerDict({
   "devices.guide.android.s0Title": { id: "Siapkan HP", en: "Prepare the phone", ms: "Sediakan telefon", th: "เตรียมมือถือ", fil: "Ihanda ang phone", vi: "Chuẩn bị điện thoại" },
   "devices.guide.android.fullGuide": { id: "Buka panduan bergambar lengkap (bisa dicetak)", en: "Open the full illustrated guide (printable)", ms: "Buka panduan bergambar penuh (boleh dicetak)", th: "เปิดคู่มือแบบมีภาพฉบับเต็ม (พิมพ์ได้)", fil: "Buksan ang buong gabay na may larawan (puwedeng i-print)", vi: "Mở hướng dẫn minh họa đầy đủ (có thể in)" },
   "devices.guide.android.openDevices": { id: "Ke Kontrol Perangkat", en: "Go to Device Control", ms: "Ke Kawalan Peranti", th: "ไปที่ควบคุมอุปกรณ์", fil: "Pumunta sa Device Control", vi: "Đến Điều khiển thiết bị" },
+
+  // --- Nama file unduhan panduan ---
+  "devices.guide.tv.fullGuideFilename": { id: "Panduan-NexbillAgent.html", en: "NexbillAgent-Guide.html", ms: "Panduan-NexbillAgent.html", th: "คู่มือ-NexbillAgent.html", fil: "Gabay-NexbillAgent.html", vi: "Huong-dan-NexbillAgent.html" },
 });

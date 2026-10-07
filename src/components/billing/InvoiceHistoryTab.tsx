@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Printer } from "lucide-react";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-billing";
 
 interface InvoiceRow {
@@ -94,7 +94,7 @@ function printInvoice(inv: InvoiceRow, money: (idr: number) => string, t: (k: st
  * trip — this list already includes every status (unpaid/paid/expired/cancelled).
  */
 export function InvoiceHistoryTab({ invoices, money }: { invoices: InvoiceRow[]; money: (idr: number) => string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [filter, setFilter] = useState<(typeof STATUS_FILTERS)[number]>("all");
 
   const filtered = useMemo(() => (filter === "all" ? invoices : invoices.filter((i) => i.status === filter)), [invoices, filter]);
@@ -137,7 +137,7 @@ export function InvoiceHistoryTab({ invoices, money }: { invoices: InvoiceRow[];
               </div>
               <div className="text-xs text-neutral-500 truncate">
                 {INVOICE_TYPE_LABEL_KEYS[inv.type] ? t(INVOICE_TYPE_LABEL_KEYS[inv.type].key, INVOICE_TYPE_LABEL_KEYS[inv.type].fallback) : inv.type}
-                {inv.createdAt ? ` · ${new Date(inv.createdAt).toLocaleDateString("id-ID")}` : ""}
+                {inv.createdAt ? ` · ${new Date(inv.createdAt).toLocaleDateString(DATE_LOCALE[lang])}` : ""}
                 {inv.status === "expired" && inv.cancelReason ? ` · ${t("billing.invoiceHistory.autoExpiredNote", "kedaluwarsa otomatis 2x24 jam")}` : ""}
               </div>
             </div>

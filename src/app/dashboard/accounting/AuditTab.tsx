@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { uiText } from "@/lib/i18n/client-text";
 import { useCurrency } from "@/lib/currency/client";
 import type { AuditCheck } from "@/lib/accounting/audit";
 
@@ -29,7 +30,7 @@ const STATUS_STYLE: Record<AuditCheck["status"], { icon: React.ReactNode; border
  * jurnal koreksi/pembalik yang tercatat.
  */
 export function AuditTab() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<AuditResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ export function AuditTab() {
       fetch("/api/accounting/audit")
         .then(async (res) => {
           const body = await res.json();
-          if (!res.ok) return showAlert(body.error ?? "Gagal menjalankan audit.");
+          if (!res.ok) return showAlert(body.error ?? uiText("accounting.audit.runFailed", "Gagal menjalankan audit."));
           setData(body);
         })
         .finally(() => setLoading(false)),
@@ -64,7 +65,7 @@ export function AuditTab() {
     try {
       const res = await fetch("/api/accounting/audit/fix", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: c.code }) });
       const body = await res.json();
-      if (!res.ok) return showAlert(body.error ?? "Perbaikan gagal.");
+      if (!res.ok) return showAlert(body.error ?? t("accounting.audit.fixFailed", "Perbaikan gagal."));
       await showAlert(body.message);
       await run();
     } finally {
@@ -175,7 +176,7 @@ export function AuditTab() {
                 <span className={warnings ? "text-amber-400" : "text-neutral-500"}>{warnings} {t("accounting.audit.warnings", "peringatan")}</span>
                 {" · "}
                 <span className="text-neutral-500">
-                  {t("accounting.audit.checkedAt", "diperiksa {time}").replace("{time}", new Date(data.checkedAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }))}
+                  {t("accounting.audit.checkedAt", "diperiksa {time}").replace("{time}", new Date(data.checkedAt).toLocaleString(DATE_LOCALE[lang], { dateStyle: "medium", timeStyle: "short" }))}
                 </span>
               </p>
             )}

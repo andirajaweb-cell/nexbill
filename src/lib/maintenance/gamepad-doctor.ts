@@ -69,6 +69,16 @@ export const AMBANG = {
   DURASI_PUTAR_MIN: 3000,
 } as const;
 
+/**
+ * Penerjemah teks: (key kamus, teks Bahasa Indonesia) → teks tampil. Default-nya mengembalikan teks
+ * Indonesia apa adanya; layar dashboard mengirim t() dari useDashboardLang (kamus dict-maintenance.ts)
+ * sehingga temuan & laporan tampil dalam bahasa dashboard.
+ */
+export type Tx = (key: string, fallback: string) => string;
+const ID: Tx = (_key, fallback) => fallback;
+/** Isi placeholder {nama} di teks hasil terjemahan. */
+const isi = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (m, k: string) => (k in v ? String(v[k]) : m));
+
 const BOBOT: Record<Tingkat, number> = { ok: 0, belum: 0, ringan: 5, sedang: 15, berat: 30 };
 
 export const NAMA_TOMBOL_STANDAR = [
@@ -78,8 +88,16 @@ export const NAMA_TOMBOL_STANDAR = [
   "D-pad Atas", "D-pad Bawah", "D-pad Kiri", "D-pad Kanan", "Tombol PS/Home",
 ];
 
-export function namaTombol(i: number, standar: boolean): string {
-  return standar && NAMA_TOMBOL_STANDAR[i] ? NAMA_TOMBOL_STANDAR[i] : `Tombol #${i}`;
+/** Key kamus untuk NAMA_TOMBOL_STANDAR (urutan sama). */
+const NAMA_TOMBOL_KEY = [
+  "maintenance.doctor.button.cross", "maintenance.doctor.button.circle", "maintenance.doctor.button.square", "maintenance.doctor.button.triangle",
+  "maintenance.doctor.button.l1", "maintenance.doctor.button.r1", "maintenance.doctor.button.l2", "maintenance.doctor.button.r2",
+  "maintenance.doctor.button.select", "maintenance.doctor.button.start", "maintenance.doctor.button.l3", "maintenance.doctor.button.r3",
+  "maintenance.doctor.button.dpadUp", "maintenance.doctor.button.dpadDown", "maintenance.doctor.button.dpadLeft", "maintenance.doctor.button.dpadRight", "maintenance.doctor.button.home",
+];
+
+export function namaTombol(i: number, standar: boolean, tx: Tx = ID): string {
+  return standar && NAMA_TOMBOL_STANDAR[i] ? tx(NAMA_TOMBOL_KEY[i], NAMA_TOMBOL_STANDAR[i]) : isi(tx("maintenance.doctor.button.numbered", "Tombol #{n}"), { n: i });
 }
 
 /* ================= STATISTIK DASAR ================= */
@@ -108,9 +126,12 @@ function tingkatTurun(nilai: number, a: { ringan: number; sedang: number; berat:
 }
 
 export const STICK = [
-  { nama: "Stick kiri", x: 0, y: 1 },
-  { nama: "Stick kanan", x: 2, y: 3 },
+  { nama: "Stick kiri", namaKey: "maintenance.doctor.stick.left", x: 0, y: 1 },
+  { nama: "Stick kanan", namaKey: "maintenance.doctor.stick.right", x: 2, y: 3 },
 ] as const;
+
+/** Nama stick dalam bahasa tampil. */
+export const namaStick = (s: (typeof STICK)[number], tx: Tx = ID) => tx(s.namaKey, s.nama);
 
 const durasi = (s: Sampel[]) => (s.length > 1 ? s[s.length - 1].t - s[0].t : 0);
 
@@ -129,10 +150,21 @@ export interface HasilDiamStick {
  * (noise — potensiometer kotor/aus), tombol yang terbaca ditekan sendiri (nyangkut), dan trigger
  * yang tidak kembali ke nol.
  */
-export function analisaDiam(sampel: Sampel[], standar: boolean): { stick: HasilDiamStick[]; temuan: Temuan[] } {
+export function analisaDiam(sampel: Sampel[], standar: boolean, tx: Tx = ID): { stick: HasilDiamStick[]; temuan: Temuan[] } {
   const temuan: Temuan[] = [];
   if (sampel.length < 10 || durasi(sampel) < AMBANG.DURASI_DIAM_MIN) {
-    return { stick: [], temuan: [{ kode: "diam_kurang", komponen: "Uji diam", tingkat: "belum", judul: "Rekaman terlalu singkat", detail: "Ulangi uji diam minimal 3 detik tanpa menyentuh stik." }] };
+    return {
+      stick: [],
+      temuan: [
+        {
+          kode: "diam_kurang",
+          komponen: tx("maintenance.doctor.idle.component", "Uji diam"),
+          tingkat: "belum",
+          judul: tx("maintenance.doctor.tooShort", "Rekaman terlalu singkat"),
+          detail: tx("maintenance.doctor.idle.tooShortDetail", "Ulangi uji diam minimal 3 detik tanpa menyentuh stik."),
+        },
+      ],
+    };
   }
 
   const stick: HasilDiamStick[] = [];
@@ -144,25 +176,30 @@ export function analisaDiam(sampel: Sampel[], standar: boolean): { stick: HasilD
     const offsetY = rata(ys);
     const offset = Math.hypot(offsetX, offsetY);
     const noise = Math.max(simpanganBaku(xs), simpanganBaku(ys));
-    stick.push({ nama: s.nama, offsetX: bulat(offsetX, 3), offsetY: bulat(offsetY, 3), offset: bulat(offset, 3), noise: bulat(noise, 4) });
+    const nama = namaStick(s, tx);
+    stick.push({ nama, offsetX: bulat(offsetX, 3), offsetY: bulat(offsetY, 3), offset: bulat(offset, 3), noise: bulat(noise, 4) });
 
     const tDrift = tingkatNaik(offset, AMBANG.DRIFT);
     temuan.push({
       kode: "drift",
-      komponen: s.nama,
+      komponen: nama,
       tingkat: tDrift,
-      judul: tDrift === "ok" ? "Titik tengah normal" : "Drift (titik tengah bergeser)",
-      detail: `Bergeser ${pct(offset)} dari tengah (X ${offsetX >= 0 ? "+" : ""}${bulat(offsetX, 2)}, Y ${offsetY >= 0 ? "+" : ""}${bulat(offsetY, 2)}).`,
+      judul: tDrift === "ok" ? tx("maintenance.doctor.drift.okTitle", "Titik tengah normal") : tx("maintenance.doctor.drift.title", "Drift (titik tengah bergeser)"),
+      detail: isi(tx("maintenance.doctor.drift.detail", "Bergeser {pct} dari tengah (X {x}, Y {y})."), {
+        pct: pct(offset),
+        x: `${offsetX >= 0 ? "+" : ""}${bulat(offsetX, 2)}`,
+        y: `${offsetY >= 0 ? "+" : ""}${bulat(offsetY, 2)}`,
+      }),
       ...(tDrift === "ok"
         ? {}
         : {
-            penyebab: "Potensiometer analog aus atau kotor, atau pegas pengembali stick melemah.",
+            penyebab: tx("maintenance.doctor.drift.cause", "Potensiometer analog aus atau kotor, atau pegas pengembali stick melemah."),
             rekomendasi:
               tDrift === "ringan"
-                ? "Masih tertutup deadzone kebanyakan game. Semprot contact cleaner ke celah stick sambil diputar-putar, lalu uji ulang."
+                ? tx("maintenance.doctor.drift.fixLight", "Masih tertutup deadzone kebanyakan game. Semprot contact cleaner ke celah stick sambil diputar-putar, lalu uji ulang.")
                 : tDrift === "sedang"
-                  ? "Karakter bisa jalan sendiri di game yang deadzone-nya kecil. Bersihkan potensiometer (bongkar, contact cleaner/IPA 99%); bila tidak membaik, ganti modul analog."
-                  : "Stik tidak layak disewakan. Ganti modul analog (potensiometer) — pertimbangkan modul Hall-effect yang tidak aus.",
+                  ? tx("maintenance.doctor.drift.fixMedium", "Karakter bisa jalan sendiri di game yang deadzone-nya kecil. Bersihkan potensiometer (bongkar, contact cleaner/IPA 99%); bila tidak membaik, ganti modul analog.")
+                  : tx("maintenance.doctor.drift.fixHeavy", "Stik tidak layak disewakan. Ganti modul analog (potensiometer) — pertimbangkan modul Hall-effect yang tidak aus."),
           }),
     });
 
@@ -170,12 +207,12 @@ export function analisaDiam(sampel: Sampel[], standar: boolean): { stick: HasilD
     if (tNoise !== "ok") {
       temuan.push({
         kode: "noise",
-        komponen: s.nama,
+        komponen: nama,
         tingkat: tNoise,
-        judul: "Nilai bergetar saat diam (jitter)",
-        detail: `Simpangan nilai ${bulat(noise, 3)} padahal stick tidak disentuh.`,
-        penyebab: "Jalur karbon potensiometer kotor/aus, solderan retak, atau kabel flex longgar.",
-        rekomendasi: "Bersihkan potensiometer; periksa solderan kaki modul analog. Jika tetap bergetar, ganti modul analog.",
+        judul: tx("maintenance.doctor.noise.title", "Nilai bergetar saat diam (jitter)"),
+        detail: isi(tx("maintenance.doctor.noise.detail", "Simpangan nilai {n} padahal stick tidak disentuh."), { n: bulat(noise, 3) }),
+        penyebab: tx("maintenance.doctor.noise.cause", "Jalur karbon potensiometer kotor/aus, solderan retak, atau kabel flex longgar."),
+        rekomendasi: tx("maintenance.doctor.noise.fix", "Bersihkan potensiometer; periksa solderan kaki modul analog. Jika tetap bergetar, ganti modul analog."),
       });
     }
   }
@@ -191,23 +228,23 @@ export function analisaDiam(sampel: Sampel[], standar: boolean): { stick: HasilD
       if (diam > AMBANG.TRIGGER_DIAM) {
         temuan.push({
           kode: "trigger_diam",
-          komponen: namaTombol(i, standar),
+          komponen: namaTombol(i, standar, tx),
           tingkat: diam > 0.25 ? "berat" : "sedang",
-          judul: "Trigger tidak kembali penuh",
-          detail: `Terbaca ${pct(diam)} padahal tidak ditekan.`,
-          penyebab: "Pegas trigger lemah/patah, atau trigger tersangkut kotoran/casing.",
-          rekomendasi: "Bersihkan sela trigger; ganti pegas trigger bila perlu.",
+          judul: tx("maintenance.doctor.triggerIdle.title", "Trigger tidak kembali penuh"),
+          detail: isi(tx("maintenance.doctor.triggerIdle.detail", "Terbaca {pct} padahal tidak ditekan."), { pct: pct(diam) }),
+          penyebab: tx("maintenance.doctor.triggerIdle.cause", "Pegas trigger lemah/patah, atau trigger tersangkut kotoran/casing."),
+          rekomendasi: tx("maintenance.doctor.triggerIdle.fix", "Bersihkan sela trigger; ganti pegas trigger bila perlu."),
         });
       }
     } else if (ditekan > 0.5 || rata(vals) > 0.3) {
       temuan.push({
         kode: "tombol_nyangkut",
-        komponen: namaTombol(i, standar),
+        komponen: namaTombol(i, standar, tx),
         tingkat: "berat",
-        judul: "Tombol terbaca ditekan sendiri (nyangkut)",
-        detail: `Terbaca ditekan ${pct(ditekan)} waktu tanpa disentuh.`,
-        penyebab: "Tombol macet oleh kotoran/tumpahan minuman, karet tombol robek, atau jalur PCB korsleting.",
-        rekomendasi: "Bongkar, bersihkan tombol & PCB dengan IPA 99%, ganti karet konduktif. Jangan disewakan sebelum diperbaiki.",
+        judul: tx("maintenance.doctor.stuck.title", "Tombol terbaca ditekan sendiri (nyangkut)"),
+        detail: isi(tx("maintenance.doctor.stuck.detail", "Terbaca ditekan {pct} waktu tanpa disentuh."), { pct: pct(ditekan) }),
+        penyebab: tx("maintenance.doctor.stuck.cause", "Tombol macet oleh kotoran/tumpahan minuman, karet tombol robek, atau jalur PCB korsleting."),
+        rekomendasi: tx("maintenance.doctor.stuck.fix", "Bongkar, bersihkan tombol & PCB dengan IPA 99%, ganti karet konduktif. Jangan disewakan sebelum diperbaiki."),
       });
     }
   }
@@ -233,10 +270,21 @@ export interface HasilPutarStick {
  * Stick diputar mentok melingkar beberapa kali. Mengukur: jangkauan tiap arah, keseimbangan kiri-
  * kanan & atas-bawah, dan "dead spot" (sudut yang tidak mencapai tepi).
  */
-export function analisaPutar(sampel: Sampel[]): { stick: HasilPutarStick[]; temuan: Temuan[] } {
+export function analisaPutar(sampel: Sampel[], tx: Tx = ID): { stick: HasilPutarStick[]; temuan: Temuan[] } {
   const temuan: Temuan[] = [];
   if (sampel.length < 20 || durasi(sampel) < AMBANG.DURASI_PUTAR_MIN) {
-    return { stick: [], temuan: [{ kode: "putar_kurang", komponen: "Uji putar", tingkat: "belum", judul: "Rekaman terlalu singkat", detail: "Ulangi: putar kedua stick mentok melingkar minimal 3 kali putaran." }] };
+    return {
+      stick: [],
+      temuan: [
+        {
+          kode: "putar_kurang",
+          komponen: tx("maintenance.doctor.rotate.component", "Uji putar"),
+          tingkat: "belum",
+          judul: tx("maintenance.doctor.tooShort", "Rekaman terlalu singkat"),
+          detail: tx("maintenance.doctor.rotate.tooShortDetail", "Ulangi: putar kedua stick mentok melingkar minimal 3 kali putaran."),
+        },
+      ],
+    };
   }
 
   const stick: HasilPutarStick[] = [];
@@ -259,8 +307,9 @@ export function analisaPutar(sampel: Sampel[]): { stick: HasilPutarStick[]; temu
     }
     const tersentuh = sektor.filter((r) => r > 0).length;
     const luar = sektor.filter((r) => r > 0);
+    const nama = namaStick(s, tx);
     const hasil: HasilPutarStick = {
-      nama: s.nama,
+      nama,
       kanan: bulat(Math.min(kanan, 1.5), 3),
       kiri: bulat(Math.min(kiri, 1.5), 3),
       bawah: bulat(Math.min(bawah, 1.5), 3),
@@ -274,36 +323,36 @@ export function analisaPutar(sampel: Sampel[]): { stick: HasilPutarStick[]; temu
     if (tersentuh < AMBANG.SEKTOR_MIN) {
       temuan.push({
         kode: "putar_tidak_penuh",
-        komponen: s.nama,
+        komponen: nama,
         tingkat: "belum",
-        judul: "Putaran belum lengkap",
-        detail: `Baru ${tersentuh} dari ${AMBANG.SEKTOR} arah yang tersentuh. Ulangi dengan memutar mentok penuh melingkar.`,
+        judul: tx("maintenance.doctor.rotateIncomplete.title", "Putaran belum lengkap"),
+        detail: isi(tx("maintenance.doctor.rotateIncomplete.detail", "Baru {n} dari {total} arah yang tersentuh. Ulangi dengan memutar mentok penuh melingkar."), { n: tersentuh, total: AMBANG.SEKTOR }),
       });
       continue;
     }
 
     const arah = [
-      { n: "kanan", v: kanan },
-      { n: "kiri", v: kiri },
-      { n: "bawah", v: bawah },
-      { n: "atas", v: atas },
+      { n: tx("maintenance.doctor.dir.right", "kanan"), v: kanan },
+      { n: tx("maintenance.doctor.dir.left", "kiri"), v: kiri },
+      { n: tx("maintenance.doctor.dir.down", "bawah"), v: bawah },
+      { n: tx("maintenance.doctor.dir.up", "atas"), v: atas },
     ];
     const terlemah = arah.reduce((a, b) => (b.v < a.v ? b : a));
     const tJ = tingkatTurun(terlemah.v, AMBANG.JANGKAUAN);
     temuan.push({
       kode: "jangkauan",
-      komponen: s.nama,
+      komponen: nama,
       tingkat: tJ,
-      judul: tJ === "ok" ? "Jangkauan penuh ke semua arah" : `Jangkauan kurang ke arah ${terlemah.n}`,
-      detail: `Kanan ${pct(kanan)}, kiri ${pct(kiri)}, atas ${pct(atas)}, bawah ${pct(bawah)}.`,
+      judul: tJ === "ok" ? tx("maintenance.doctor.range.okTitle", "Jangkauan penuh ke semua arah") : isi(tx("maintenance.doctor.range.title", "Jangkauan kurang ke arah {dir}"), { dir: terlemah.n }),
+      detail: isi(tx("maintenance.doctor.range.detail", "Kanan {right}, kiri {left}, atas {up}, bawah {down}."), { right: pct(kanan), left: pct(kiri), up: pct(atas), down: pct(bawah) }),
       ...(tJ === "ok"
         ? {}
         : {
-            penyebab: "Potensiometer aus di ujung jalurnya, atau gerak stick tertahan (casing/cincin karet/kotoran).",
+            penyebab: tx("maintenance.doctor.range.cause", "Potensiometer aus di ujung jalurnya, atau gerak stick tertahan (casing/cincin karet/kotoran)."),
             rekomendasi:
               tJ === "ringan"
-                ? "Umumnya belum terasa di game. Bersihkan sela stick dan uji ulang."
-                : "Karakter tidak bisa lari/berbelok penuh. Bersihkan; bila tetap, ganti modul analog.",
+                ? tx("maintenance.doctor.range.fixLight", "Umumnya belum terasa di game. Bersihkan sela stick dan uji ulang.")
+                : tx("maintenance.doctor.range.fixHeavy", "Karakter tidak bisa lari/berbelok penuh. Bersihkan; bila tetap, ganti modul analog."),
           }),
     });
 
@@ -314,12 +363,15 @@ export function analisaPutar(sampel: Sampel[]): { stick: HasilPutarStick[]; temu
     if (tA !== "ok") {
       temuan.push({
         kode: "asimetri",
-        komponen: s.nama,
+        komponen: nama,
         tingkat: tA,
-        judul: "Keseimbangan analog tidak rata",
-        detail: asimX >= asimY ? `Kanan ${pct(kanan)} vs kiri ${pct(kiri)} (selisih ${pct(asimX)}).` : `Atas ${pct(atas)} vs bawah ${pct(bawah)} (selisih ${pct(asimY)}).`,
-        penyebab: "Potensiometer aus sebelah atau modul analog bengkok/miring setelah jatuh.",
-        rekomendasi: "Periksa kedudukan modul analog; ganti modul bila selisih tetap ada setelah dibersihkan.",
+        judul: tx("maintenance.doctor.asym.title", "Keseimbangan analog tidak rata"),
+        detail:
+          asimX >= asimY
+            ? isi(tx("maintenance.doctor.asym.detailX", "Kanan {right} vs kiri {left} (selisih {diff})."), { right: pct(kanan), left: pct(kiri), diff: pct(asimX) })
+            : isi(tx("maintenance.doctor.asym.detailY", "Atas {up} vs bawah {down} (selisih {diff})."), { up: pct(atas), down: pct(bawah), diff: pct(asimY) }),
+        penyebab: tx("maintenance.doctor.asym.cause", "Potensiometer aus sebelah atau modul analog bengkok/miring setelah jatuh."),
+        rekomendasi: tx("maintenance.doctor.asym.fix", "Periksa kedudukan modul analog; ganti modul bila selisih tetap ada setelah dibersihkan."),
       });
     }
 
@@ -328,12 +380,12 @@ export function analisaPutar(sampel: Sampel[]): { stick: HasilPutarStick[]; temu
       const derajat = dead.map((d) => Math.round((d.i * 360) / AMBANG.SEKTOR)).join("°, ") + "°";
       temuan.push({
         kode: "dead_spot",
-        komponen: s.nama,
+        komponen: nama,
         tingkat: dead.length >= 3 ? "berat" : "sedang",
-        judul: "Ada sudut yang tidak mencapai tepi (dead spot)",
-        detail: `${dead.length} sektor di bawah ${pct(AMBANG.DEAD_SPOT)} (sekitar sudut ${derajat}).`,
-        penyebab: "Jalur potensiometer tergerus di titik tertentu, atau ada benda/kotoran yang menahan gerak di arah itu.",
-        rekomendasi: "Bersihkan; bila dead spot tetap di sudut yang sama, ganti modul analog.",
+        judul: tx("maintenance.doctor.deadSpot.title", "Ada sudut yang tidak mencapai tepi (dead spot)"),
+        detail: isi(tx("maintenance.doctor.deadSpot.detail", "{n} sektor di bawah {pct} (sekitar sudut {angles})."), { n: dead.length, pct: pct(AMBANG.DEAD_SPOT), angles: derajat }),
+        penyebab: tx("maintenance.doctor.deadSpot.cause", "Jalur potensiometer tergerus di titik tertentu, atau ada benda/kotoran yang menahan gerak di arah itu."),
+        rekomendasi: tx("maintenance.doctor.deadSpot.fix", "Bersihkan; bila dead spot tetap di sudut yang sama, ganti modul analog."),
       });
     }
   }
@@ -356,7 +408,7 @@ export interface HasilTombol {
  * Setiap tombol ditekan penuh beberapa kali. Mengukur: tombol yang tidak merespons, tekanan
  * maksimum (tombol analog/berbasis tekanan), dan pantulan kontak (satu tekan terbaca dua kali).
  */
-export function analisaTombol(sampel: Sampel[], standar: boolean): { tombol: HasilTombol[]; temuan: Temuan[] } {
+export function analisaTombol(sampel: Sampel[], standar: boolean, tx: Tx = ID): { tombol: HasilTombol[]; temuan: Temuan[] } {
   const temuan: Temuan[] = [];
   const nTombol = Math.max(0, ...sampel.map((p) => p.buttons.length));
   const tombol: HasilTombol[] = [];
@@ -380,7 +432,7 @@ export function analisaTombol(sampel: Sampel[], standar: boolean): { tombol: Has
       if (!b.pressed && sebelum) lepasTerakhir = p.t;
       sebelum = b.pressed;
     }
-    const h: HasilTombol = { index: i, nama: namaTombol(i, standar), pernahDitekan: jumlahTekan > 0, jumlahTekan, maxNilai: bulat(maxNilai, 3), analog, bounce };
+    const h: HasilTombol = { index: i, nama: namaTombol(i, standar, tx), pernahDitekan: jumlahTekan > 0, jumlahTekan, maxNilai: bulat(maxNilai, 3), analog, bounce };
     tombol.push(h);
 
     if (!h.pernahDitekan) {
@@ -391,10 +443,10 @@ export function analisaTombol(sampel: Sampel[], standar: boolean): { tombol: Has
         kode: "tombol_mati",
         komponen: h.nama,
         tingkat: "sedang",
-        judul: "Tidak merespons (atau belum ditekan)",
-        detail: "Tidak pernah terbaca ditekan selama uji. Tekan sekali lagi dengan mantap; bila tetap tidak terbaca, tombol bermasalah.",
-        penyebab: "Karet konduktif di bawah tombol aus/kotor, jalur PCB putus, atau (L1/R1) mikro-switch rusak.",
-        rekomendasi: "Bersihkan pad PCB & karet dengan IPA 99%; ganti karet konduktif atau switch tombol.",
+        judul: tx("maintenance.doctor.dead.title", "Tidak merespons (atau belum ditekan)"),
+        detail: tx("maintenance.doctor.dead.detail", "Tidak pernah terbaca ditekan selama uji. Tekan sekali lagi dengan mantap; bila tetap tidak terbaca, tombol bermasalah."),
+        penyebab: tx("maintenance.doctor.dead.cause", "Karet konduktif di bawah tombol aus/kotor, jalur PCB putus, atau (L1/R1) mikro-switch rusak."),
+        rekomendasi: tx("maintenance.doctor.dead.fix", "Bersihkan pad PCB & karet dengan IPA 99%; ganti karet konduktif atau switch tombol."),
       });
       continue;
     }
@@ -403,10 +455,10 @@ export function analisaTombol(sampel: Sampel[], standar: boolean): { tombol: Has
         kode: "tekanan_kurang",
         komponen: h.nama,
         tingkat: h.maxNilai < 0.7 ? "sedang" : "ringan",
-        judul: "Tidak mencapai tekanan penuh",
-        detail: `Tekanan maksimum ${pct(h.maxNilai)}.`,
-        penyebab: "Lapisan karbon di karet konduktif menipis (tombol berbasis tekanan).",
-        rekomendasi: "Ganti karet konduktif tombol.",
+        judul: tx("maintenance.doctor.pressure.title", "Tidak mencapai tekanan penuh"),
+        detail: isi(tx("maintenance.doctor.pressure.detail", "Tekanan maksimum {pct}."), { pct: pct(h.maxNilai) }),
+        penyebab: tx("maintenance.doctor.pressure.cause", "Lapisan karbon di karet konduktif menipis (tombol berbasis tekanan)."),
+        rekomendasi: tx("maintenance.doctor.pressure.fix", "Ganti karet konduktif tombol."),
       });
     }
     if (h.bounce >= 2) {
@@ -414,10 +466,10 @@ export function analisaTombol(sampel: Sampel[], standar: boolean): { tombol: Has
         kode: "bounce",
         komponen: h.nama,
         tingkat: h.bounce >= 4 ? "sedang" : "ringan",
-        judul: "Satu tekan terbaca berkali-kali (bouncing)",
-        detail: `${h.bounce} kali terbaca ganda dalam <${AMBANG.BOUNCE_MS} ms.`,
-        penyebab: "Kontak tombol kotor/oksidasi atau karet konduktif retak.",
-        rekomendasi: "Bersihkan pad PCB & karet tombol; ganti karet bila tetap.",
+        judul: tx("maintenance.doctor.bounce.title", "Satu tekan terbaca berkali-kali (bouncing)"),
+        detail: isi(tx("maintenance.doctor.bounce.detail", "{n} kali terbaca ganda dalam <{ms} ms."), { n: h.bounce, ms: AMBANG.BOUNCE_MS }),
+        penyebab: tx("maintenance.doctor.bounce.cause", "Kontak tombol kotor/oksidasi atau karet konduktif retak."),
+        rekomendasi: tx("maintenance.doctor.bounce.fix", "Bersihkan pad PCB & karet tombol; ganti karet bila tetap."),
       });
     }
   }
@@ -438,14 +490,14 @@ export interface HasilTrigger {
  * kehalusan (jumlah level berbeda yang terbaca), dan loncatan nilai (sensor kotor).
  * Hanya untuk mapping standar (indeks 6 & 7).
  */
-export function analisaTrigger(sampel: Sampel[], standar: boolean): { trigger: HasilTrigger[]; temuan: Temuan[] } {
+export function analisaTrigger(sampel: Sampel[], standar: boolean, tx: Tx = ID): { trigger: HasilTrigger[]; temuan: Temuan[] } {
   const temuan: Temuan[] = [];
   const trigger: HasilTrigger[] = [];
   if (!standar) return { trigger, temuan };
 
   for (const i of [6, 7]) {
     const vals = sampel.map((p) => p.buttons[i]?.value ?? 0);
-    const nama = namaTombol(i, true);
+    const nama = namaTombol(i, true, tx);
     const maks = Math.max(0, ...vals);
     const level = Array.from(new Set(vals.map((v) => Math.round(v * 100)))).sort((a, b) => a - b);
     let loncatan = 0;
@@ -457,10 +509,10 @@ export function analisaTrigger(sampel: Sampel[], standar: boolean): { trigger: H
         kode: "trigger_mati",
         komponen: nama,
         tingkat: "sedang",
-        judul: "Tidak terbaca (atau belum ditarik)",
-        detail: "Nilai tidak pernah naik selama uji.",
-        penyebab: "Sensor trigger rusak, kabel flex trigger lepas, atau karet konduktif trigger aus.",
-        rekomendasi: "Periksa flex & sensor trigger; ganti bila perlu.",
+        judul: tx("maintenance.doctor.triggerDead.title", "Tidak terbaca (atau belum ditarik)"),
+        detail: tx("maintenance.doctor.triggerDead.detail", "Nilai tidak pernah naik selama uji."),
+        penyebab: tx("maintenance.doctor.triggerDead.cause", "Sensor trigger rusak, kabel flex trigger lepas, atau karet konduktif trigger aus."),
+        rekomendasi: tx("maintenance.doctor.triggerDead.fix", "Periksa flex & sensor trigger; ganti bila perlu."),
       });
       continue;
     }
@@ -469,19 +521,24 @@ export function analisaTrigger(sampel: Sampel[], standar: boolean): { trigger: H
       kode: "trigger_penuh",
       komponen: nama,
       tingkat: tP,
-      judul: tP === "ok" ? "Trigger mencapai tekanan penuh" : "Trigger tidak bisa ditarik penuh",
-      detail: `Maksimum ${pct(maks)}, ${level.length} tingkat nilai berbeda terbaca.`,
-      ...(tP === "ok" ? {} : { penyebab: "Sensor/karet trigger aus, atau gerak trigger tertahan casing.", rekomendasi: "Bersihkan dan periksa mekanik trigger; ganti sensor/karet trigger." }),
+      judul: tP === "ok" ? tx("maintenance.doctor.triggerFull.okTitle", "Trigger mencapai tekanan penuh") : tx("maintenance.doctor.triggerFull.title", "Trigger tidak bisa ditarik penuh"),
+      detail: isi(tx("maintenance.doctor.triggerFull.detail", "Maksimum {pct}, {n} tingkat nilai berbeda terbaca."), { pct: pct(maks), n: level.length }),
+      ...(tP === "ok"
+        ? {}
+        : {
+            penyebab: tx("maintenance.doctor.triggerFull.cause", "Sensor/karet trigger aus, atau gerak trigger tertahan casing."),
+            rekomendasi: tx("maintenance.doctor.triggerFull.fix", "Bersihkan dan periksa mekanik trigger; ganti sensor/karet trigger."),
+          }),
     });
     if (level.length >= 5 && loncatan > 0.35) {
       temuan.push({
         kode: "trigger_loncat",
         komponen: nama,
         tingkat: "ringan",
-        judul: "Nilai trigger meloncat, tidak halus",
-        detail: `Ada loncatan ${pct(loncatan)} sekaligus saat ditarik perlahan.`,
-        penyebab: "Permukaan sensor/karet konduktif trigger kotor atau aus sebagian.",
-        rekomendasi: "Bersihkan sensor trigger; ganti bila tetap meloncat.",
+        judul: tx("maintenance.doctor.triggerJump.title", "Nilai trigger meloncat, tidak halus"),
+        detail: isi(tx("maintenance.doctor.triggerJump.detail", "Ada loncatan {pct} sekaligus saat ditarik perlahan."), { pct: pct(loncatan) }),
+        penyebab: tx("maintenance.doctor.triggerJump.cause", "Permukaan sensor/karet konduktif trigger kotor atau aus sebagian."),
+        rekomendasi: tx("maintenance.doctor.triggerJump.fix", "Bersihkan sensor trigger; ganti bila tetap meloncat."),
       });
     }
     if (level.length < 4 && maks >= AMBANG.TEKANAN_PENUH) {
@@ -489,8 +546,8 @@ export function analisaTrigger(sampel: Sampel[], standar: boolean): { trigger: H
         kode: "trigger_digital",
         komponen: nama,
         tingkat: "ok",
-        judul: "Trigger terbaca digital (hanya on/off)",
-        detail: "Hanya terbaca lepas/penuh. Normal bila ditarik cepat, atau pada stik KW/driver tertentu.",
+        judul: tx("maintenance.doctor.triggerDigital.title", "Trigger terbaca digital (hanya on/off)"),
+        detail: tx("maintenance.doctor.triggerDigital.detail", "Hanya terbaca lepas/penuh. Normal bila ditarik cepat, atau pada stik KW/driver tertentu."),
       });
     }
   }
@@ -512,7 +569,7 @@ export interface Laporan {
 
 const URUT: Record<Tingkat, number> = { berat: 0, sedang: 1, ringan: 2, belum: 3, ok: 4 };
 
-export function susunLaporan(semua: Temuan[]): Laporan {
+export function susunLaporan(semua: Temuan[], tx: Tx = ID): Laporan {
   const temuan = [...semua].sort((a, b) => URUT[a.tingkat] - URUT[b.tingkat]);
   const masalah = temuan.filter((t) => t.tingkat === "ringan" || t.tingkat === "sedang" || t.tingkat === "berat");
   const skor = Math.max(0, 100 - masalah.reduce((s, t) => s + BOBOT[t.tingkat], 0));
@@ -526,10 +583,22 @@ export function susunLaporan(semua: Temuan[]): Laporan {
   else vonis = "layak";
 
   const JUDUL: Record<Vonis, [string, string]> = {
-    layak: ["Layak disewakan", "Tidak ada masalah berarti. Ulangi pengecekan rutin tiap minggu atau setelah stik jatuh/terkena tumpahan."],
-    catatan: ["Layak dengan catatan", "Masih bisa dipakai, tapi jadwalkan pembersihan/servis sebelum masalahnya memburuk dan dikeluhkan pelanggan."],
-    tidak_layak: ["Tidak layak disewakan", "Tarik dari unit dan servis dulu. Pelanggan akan merasakan masalah ini dan bisa mengeluh atau meminta kompensasi."],
-    belum_lengkap: ["Pengujian belum lengkap", "Beberapa langkah belum sah (terlalu singkat atau putaran belum penuh). Ulangi langkah bertanda \"Belum\" sebelum mengambil keputusan."],
+    layak: [
+      tx("maintenance.doctor.verdict.fit", "Layak disewakan"),
+      tx("maintenance.doctor.verdict.fitAdvice", "Tidak ada masalah berarti. Ulangi pengecekan rutin tiap minggu atau setelah stik jatuh/terkena tumpahan."),
+    ],
+    catatan: [
+      tx("maintenance.doctor.verdict.notes", "Layak dengan catatan"),
+      tx("maintenance.doctor.verdict.notesAdvice", "Masih bisa dipakai, tapi jadwalkan pembersihan/servis sebelum masalahnya memburuk dan dikeluhkan pelanggan."),
+    ],
+    tidak_layak: [
+      tx("maintenance.doctor.verdict.unfit", "Tidak layak disewakan"),
+      tx("maintenance.doctor.verdict.unfitAdvice", "Tarik dari unit dan servis dulu. Pelanggan akan merasakan masalah ini dan bisa mengeluh atau meminta kompensasi."),
+    ],
+    belum_lengkap: [
+      tx("maintenance.doctor.verdict.incomplete", "Pengujian belum lengkap"),
+      tx("maintenance.doctor.verdict.incompleteAdvice", "Beberapa langkah belum sah (terlalu singkat atau putaran belum penuh). Ulangi langkah bertanda \"Belum sah\" sebelum mengambil keputusan."),
+    ],
   };
   return { skor, vonis, judulVonis: JUDUL[vonis][0], saranVonis: JUDUL[vonis][1], temuan, masalah };
 }

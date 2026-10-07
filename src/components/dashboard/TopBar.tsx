@@ -164,7 +164,7 @@ export function TopBar() {
             <span className="hidden xl:inline text-sm text-neutral-300">
               {t("topbar.loginAs")} <span className="font-medium text-neutral-100">{user.name}</span>
             </span>
-            <Badge status={ROLE_BADGE_STATUS[user.role] ?? "unknown"}>{roleLabel(user.role as StaffRole)}</Badge>
+            <Badge status={ROLE_BADGE_STATUS[user.role] ?? "unknown"}>{roleLabel(user.role as StaffRole, t)}</Badge>
             {user.linkedOutlets && user.linkedOutlets.length > 1 && (
               <div className="relative" ref={outletPanelRef}>
                 <button

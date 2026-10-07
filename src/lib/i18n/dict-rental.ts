@@ -179,4 +179,10 @@ registerDict({
   "rental.accessoryPreset.stick": { id: "Stick Tambahan", en: "Extra Controller", ms: "Kayu Kawalan Tambahan", th: "จอยเสริม", fil: "Extra na Controller", vi: "Tay cầm thêm" },
   "rental.accessoryPreset.vr": { id: "Kacamata VR", en: "VR Headset", ms: "Cermin Mata VR", th: "แว่น VR", fil: "VR Goggles", vi: "Kính VR" },
   "rental.accessoryPreset.headset": { id: "Headset", en: "Headset", ms: "Headset", th: "หูฟัง", fil: "Headset", vi: "Tai nghe" },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "rental.duration.minutes": { id: "{m} menit", en: "{m} min", ms: "{m} minit", th: "{m} นาที", fil: "{m} minuto", vi: "{m} phút" },
+  "rental.duration.hours": { id: "{h} jam", en: "{h} h", ms: "{h} jam", th: "{h} ชม.", fil: "{h} oras", vi: "{h} giờ" },
+  "rental.duration.hoursMinutes": { id: "{h} jam {m} menit", en: "{h} h {m} min", ms: "{h} jam {m} minit", th: "{h} ชม. {m} นาที", fil: "{h} oras {m} minuto", vi: "{h} giờ {m} phút" },
+  "rental.requests.actionFailed": { id: "Gagal memproses permintaan.", en: "Failed to process the request.", ms: "Gagal memproses permintaan.", th: "ดำเนินการคำขอไม่สำเร็จ", fil: "Hindi naproseso ang kahilingan.", vi: "Không xử lý được yêu cầu." },
 });

@@ -20,12 +20,13 @@ import { ProfitLossSteps } from "./ProfitLossSteps";
 import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
 import { BookOpen } from "lucide-react";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import { useCurrency } from "@/lib/currency/client";
 import "@/lib/i18n/dict-accounting";
 import "@/lib/i18n/dict-coa";
 import "@/lib/i18n/dict-expenses";
+import "@/lib/i18n/dict-transactions";
 
 // Formerly a hardcoded `const rupiah = (n) => \`Rp${...toLocaleString("id-ID")}\`` — every account
 // balance on this page (Trial Balance, P&L, Neraca, Arus Kas, Piutang/Hutang, Jurnal, Saldo Awal)
@@ -1021,7 +1022,7 @@ function AgingCards({ buckets }: { buckets: Record<string, number> }) {
 }
 
 function ReceivablesTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [collectFor, setCollectFor] = useState<{ id: string; orderId: string | null; outstanding: number; method: string; amount: number } | null>(null);
@@ -1198,7 +1199,7 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
               <tr key={r.id} className="border-b border-neutral-900">
                 <td className="py-2 text-xs">{r.customerName}</td>
                 <td className="text-xs">{rupiah(r.outstanding)}</td>
-                <td className="text-xs">{r.dueDate ? new Date(r.dueDate).toLocaleDateString("id-ID") : "-"}</td>
+                <td className="text-xs">{r.dueDate ? new Date(r.dueDate).toLocaleDateString(DATE_LOCALE[lang]) : "-"}</td>
                 <td className={`text-xs ${r.agingBucket === "d60plus" ? "text-red-400" : r.agingBucket === "d31_60" ? "text-amber-400" : ""}`}>
                   {r.daysOverdue > 0 ? t("accounting.receivables.daysOverdue", "{n} hari").replace("{n}", String(r.daysOverdue)) : t("accounting.receivables.notYetDue", "Belum jatuh tempo")}
                 </td>
@@ -1232,7 +1233,7 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
 }
 
 function PayablesTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const [cashBankAccounts, setCashBankAccounts] = useState<any[]>([]);
@@ -1366,7 +1367,7 @@ function PayablesTab({ outletId }: { outletId: string }) {
                 <tr key={r.id} className="border-b border-neutral-900">
                   <td className="py-2 text-xs font-mono">{r.reference}</td>
                   <td className="text-xs">{r.payee}{r.description ? <span className="text-neutral-500"> — {r.description}</span> : null}</td>
-                  <td className="text-xs">{new Date(r.expenseDate).toLocaleDateString("id-ID")}</td>
+                  <td className="text-xs">{new Date(r.expenseDate).toLocaleDateString(DATE_LOCALE[lang])}</td>
                   <td className="text-xs">{rupiah(r.amount)}</td>
                   <td className="text-xs text-amber-300">{r.status === "draft" ? t("accounting.payables.awaitingDraft", "Draft") : t("accounting.payables.awaitingPending", "Menunggu approval")}</td>
                 </tr>
@@ -2185,7 +2186,7 @@ function CashFlowTab({ outletId }: { outletId: string }) {
           <tbody>
             {cf.byDay.map((d: any) => (
               <tr key={d.date} className="border-b border-neutral-900">
-                <td className="py-2">{new Date(d.date).toLocaleDateString("id-ID")}</td>
+                <td className="py-2">{new Date(d.date).toLocaleDateString(DATE_LOCALE[lang])}</td>
                 <td className="text-right text-emerald-400">{rupiah(d.in)}</td>
                 <td className="text-right text-red-400">{rupiah(d.out)}</td>
                 <td className={`text-right font-medium ${d.net >= 0 ? "" : "text-red-400"}`}>{rupiah(d.net)}</td>
@@ -2372,7 +2373,7 @@ function DataMigrationTab({ outletId }: { outletId: string }) {
 }
 
 function OpeningBalanceCard({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [existing, setExisting] = useState<any>(null);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
@@ -2436,7 +2437,7 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
 
       {existing ? (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-3 space-y-2">
-          <div className="text-sm font-medium text-emerald-400">{t("accounting.openingBalance.alreadyActive", "Saldo Awal sudah aktif ({date})").replace("{date}", new Date(existing.entry.entryDate).toLocaleDateString("id-ID"))}</div>
+          <div className="text-sm font-medium text-emerald-400">{t("accounting.openingBalance.alreadyActive", "Saldo Awal sudah aktif ({date})").replace("{date}", new Date(existing.entry.entryDate).toLocaleDateString(DATE_LOCALE[lang]))}</div>
           <table className="w-full text-xs">
             <tbody>
               {existing.lines.map((l: any) => (

@@ -8,7 +8,7 @@ import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { showAlert } from "@/lib/ui/dialog";
 import { Paperclip, Download, X, FileVideo } from "lucide-react";
 import "@/lib/i18n/dict-chat";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang, type LangCode } from "@/lib/i18n/dashboard-lang";
 
 interface Thread {
   id: string;
@@ -21,9 +21,9 @@ interface Thread {
 }
 
 /** "3 Sep 2026, 14:05" — used on both the ticket list (last activity) and each message bubble. */
-function formatDateTime(iso: string | null): string {
+function formatDateTime(iso: string | null, lang: LangCode): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString(DATE_LOCALE[lang], { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 interface Message {
@@ -74,7 +74,7 @@ function AttachmentPreview({ url, type, name, t }: { url: string; type?: string 
 }
 
 export default function SupportChatPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const CATEGORY_LABEL: Record<string, string> = {
     keluhan: t("chat.category.keluhan", "Keluhan"),
     saran: t("chat.category.saran", "Saran"),
@@ -283,7 +283,7 @@ export default function SupportChatPage() {
                 </div>
                 <div className="flex items-center justify-between gap-2 text-xs text-neutral-500">
                   <span>{CATEGORY_LABEL[th.category]}</span>
-                  <span className="shrink-0">{formatDateTime(th.lastMessageAt || th.createdAt)}</span>
+                  <span className="shrink-0">{formatDateTime(th.lastMessageAt || th.createdAt, lang)}</span>
                 </div>
               </button>
             ))}
@@ -303,7 +303,7 @@ export default function SupportChatPage() {
                   <div key={m.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.sender === "platform_admin" ? "bg-white/5" : "bg-cyan-500/15 ml-auto"}`}>
                     <div className="flex items-center justify-between gap-3 mb-0.5">
                       <span className="text-[10px] text-neutral-500">{m.sender === "platform_admin" ? m.senderName || t("chat.supportName", "NEXBILL Support") : m.senderName || t("chat.youLabel", "Kamu")}</span>
-                      <span className="text-[10px] text-neutral-600 shrink-0">{formatDateTime(m.createdAt)}</span>
+                      <span className="text-[10px] text-neutral-600 shrink-0">{formatDateTime(m.createdAt, lang)}</span>
                     </div>
                     {m.body}
                     {m.attachmentUrl && <AttachmentPreview url={m.attachmentUrl} type={m.attachmentType} name={m.attachmentName} t={t} />}

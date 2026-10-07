@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { LANG_OPTIONS, LANG_STORAGE_KEY, translate, type LangCode } from "./registry";
+import { DATE_LOCALE, LANG_OPTIONS, LANG_STORAGE_KEY, translate, type LangCode } from "./registry";
 // Side-effect import: registers the shell dictionary (nav/sidebar/topbar/dashboard overview)
 // into the registry. Imported here (not from the server layout) so it runs in BOTH the
 // server-side render pass of this "use client" module and the browser bundle after hydration —
@@ -18,7 +18,8 @@ import "./dict-shell";
  */
 
 export type { LangCode };
-export { LANG_OPTIONS };
+export { LANG_OPTIONS, DATE_LOCALE };
+export { readStoredLang } from "./client-text";
 
 interface Ctx {
   lang: LangCode;
@@ -45,20 +46,6 @@ export function DashboardLangProvider({ children }: { children: ReactNode }) {
   const t = (key: string, fallback?: string) => translate(lang, key, fallback);
 
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>;
-}
-
-/**
- * Bahasa dashboard yang tersimpan, untuk komponen yang dipasang DI LUAR DashboardLangProvider
- * (mis. DialogHost di root layout). Hanya untuk dipanggil di browser setelah ada interaksi.
- */
-export function readStoredLang(): LangCode {
-  try {
-    const saved = window.localStorage.getItem(LANG_STORAGE_KEY);
-    if (saved && LANG_OPTIONS.some((o) => o.code === saved)) return saved as LangCode;
-  } catch {
-    // storage diblokir — pakai Bahasa Indonesia
-  }
-  return "id";
 }
 
 export function useDashboardLang(): Ctx {

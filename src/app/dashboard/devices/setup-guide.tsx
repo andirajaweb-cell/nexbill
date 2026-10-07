@@ -201,7 +201,7 @@ export function DeviceSetupGuide() {
                         >
                           {t("devices.guide.tv.fullGuideRead", "Baca Panduan")}
                         </a>
-                        <a className={linkButtonCls} href={FULL_GUIDE_URL} download="Panduan-NexbillAgent.html">
+                        <a className={linkButtonCls} href={`${FULL_GUIDE_URL}?lang=${lang}`} download={t("devices.guide.tv.fullGuideFilename", "Panduan-NexbillAgent.html")}>
                           {t("devices.guide.tv.fullGuideDownload", "Unduh Panduan")}
                         </a>
                       </div>

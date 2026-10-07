@@ -1,5 +1,7 @@
 "use client";
 
+import { uiText } from "@/lib/i18n/client-text";
+import "@/lib/i18n/dict-printer";
 import { buildReceiptEscPos, receiptDocFromOrder, testReceiptDoc, type PaperWidth } from "./escpos";
 import { getDevicePrinterSettings, saveDevicePrinterSettings, printConnectionOf, type DevicePrinterSettings } from "./deviceSettings";
 import { printViaBluetooth, printViaRawBt, prepareBluetoothPrinter } from "./bluetooth-printer";
@@ -23,7 +25,7 @@ export async function printOrderReceipt(orderId: string, outletId: string | null
 
   const res = await fetch(`/api/orders/${orderId}/receipt`);
   const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.order) throw new Error(data?.error ?? "Gagal memuat data struk.");
+  if (!res.ok || !data?.order) throw new Error(data?.error ?? uiText("printer.receipt.loadFailed", "Gagal memuat data struk."));
   const paper: PaperWidth = settings?.paperWidthMm ?? (data.outlet?.printerPaperWidthMm === 80 ? 80 : 58);
   const bytes = buildReceiptEscPos(receiptDocFromOrder(data), paper, { cut: !!settings?.autoCut });
 

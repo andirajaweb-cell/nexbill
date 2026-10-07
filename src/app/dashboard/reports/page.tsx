@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import "@/lib/i18n/dict-reports";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { PeriodBar, resolvePeriodPreset, describePeriod, type PeriodPreset } from "@/components/reports/PeriodPicker";
 
@@ -423,7 +423,7 @@ function CustomerTab({ outletId }: { outletId: string }) {
 
 /** All 9 requested Expense report views (Detail, by Category/Account/Supplier/Payment Method/Branch/Cost Center, Expense vs Revenue, Trend) from one /api/reports/expenses call. */
 function ExpenseReportTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [data, setData] = useState<any>(null);
   const period = useReportPeriod();
@@ -484,7 +484,7 @@ function ExpenseReportTab({ outletId }: { outletId: string }) {
             {data.detail.slice(0, 100).map((e: any) => (
               <tr key={e.id} className="border-b border-neutral-900">
                 <td className="py-2 font-mono text-xs">{e.expenseNumber}</td>
-                <td className="text-xs">{new Date(e.expenseDate).toLocaleDateString("id-ID")}</td>
+                <td className="text-xs">{new Date(e.expenseDate).toLocaleDateString(DATE_LOCALE[lang])}</td>
                 <td className="text-xs">{e.accountLabel}</td>
                 <td className="text-xs max-w-[220px] truncate" title={e.description}>{e.description || e.category}</td>
                 <td className="text-xs">{e.supplierLabel || "-"}</td>

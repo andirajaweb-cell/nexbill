@@ -10,7 +10,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang, type LangCode } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-transactions";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
@@ -61,8 +61,8 @@ const PRESET_KEY: Record<PeriodPreset, string> = {
 /** Same as row.businessDate/createdAt formatting elsewhere on this page, but including seconds —
  * a cashier double-entering the same sale typically does so within seconds of the first, so the
  * default minute-precision display can make two genuinely distinct transactions look identical. */
-function formatDateTimeWithSeconds(iso: string): string {
-  return new Date(iso).toLocaleString("id-ID", {
+function formatDateTimeWithSeconds(iso: string, lang: LangCode): string {
+  return new Date(iso).toLocaleString(DATE_LOCALE[lang], {
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit",
   });
@@ -234,7 +234,7 @@ export default function TransactionsPage() {
 }
 
 function TransactionListTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { user } = useAuth();
   const role = (user?.role ?? "cashier") as any;
   const canRefund = hasPermission(role, "refund_order");
@@ -421,11 +421,11 @@ function TransactionListTab({ outletId }: { outletId: string }) {
                     className="py-2 whitespace-nowrap"
                     title={
                       row.businessDate && row.businessDate !== row.createdAt
-                        ? `${t("transactions.col.timeCreatedTooltip", "Order dibuat")}: ${formatDateTimeWithSeconds(row.createdAt)}`
+                        ? `${t("transactions.col.timeCreatedTooltip", "Order dibuat")}: ${formatDateTimeWithSeconds(row.createdAt, lang)}`
                         : undefined
                     }
                   >
-                    <div>{formatDateTimeWithSeconds(row.businessDate ?? row.createdAt)}</div>
+                    <div>{formatDateTimeWithSeconds(row.businessDate ?? row.createdAt, lang)}</div>
                     <div className="text-[10px] text-neutral-600 font-mono">#{row.id.slice(0, 8)}</div>
                   </td>
                   <td>{row.staffName}</td>

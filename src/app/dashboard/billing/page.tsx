@@ -22,7 +22,7 @@ import "@/lib/i18n/dict-app-mode";
 import { BillingProfileTab } from "@/components/billing/BillingProfileTab";
 import { DepositTab } from "@/components/billing/DepositTab";
 import { InvoiceHistoryTab } from "@/components/billing/InvoiceHistoryTab";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-billing";
 
 // UsageGrowthTab pulls in recharts — only fetched when the "Pertumbuhan Data" tab is actually
@@ -238,7 +238,7 @@ const CATEGORY_ICON: Record<string, React.ElementType> = {
 const VA_BANK_NAME: Record<string, string> = { bca: "BCA", bni: "BNI", mandiri: "Mandiri", bri: "BRI", permata: "Permata" };
 
 export default function BillingPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { user } = useAuth();
   
   const role = (user?.role ?? "cashier") as Parameters<typeof hasPermission>[0];
@@ -784,8 +784,8 @@ export default function BillingPage() {
           <div className="font-semibold text-amber-300">{t("billing.grace.title", "Masa tenggang (toleransi) — segera bayar tagihan perpanjangan")}</div>
           <p className="text-sm text-neutral-400 mt-1">
             {t("billing.grace.body", "Tanggal langganan habis: {expiry}. Toleransi diberikan sampai {graceUntil} — setelah itu semua fitur akan dikunci penuh.")
-              .replace("{expiry}", sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString("id-ID") : "-")
-              .replace("{graceUntil}", sub.graceUntil ? new Date(sub.graceUntil).toLocaleDateString("id-ID") : "-")}
+              .replace("{expiry}", sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString(DATE_LOCALE[lang]) : "-")
+              .replace("{graceUntil}", sub.graceUntil ? new Date(sub.graceUntil).toLocaleDateString(DATE_LOCALE[lang]) : "-")}
           </p>
           {canRenewNow && (
             <Button className="mt-3" onClick={doRenew} disabled={renewBusy}>{renewBusy ? t("billing.common.processing", "Memproses...") : t("billing.common.renewNow", "Perpanjang Sekarang")}</Button>
@@ -845,7 +845,7 @@ export default function BillingPage() {
             </p>
           )}
           <p className="text-sm text-neutral-400 mt-1">
-            {t("billing.paid.periodActiveUntil", "Periode aktif sampai {date}").replace("{date}", sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString("id-ID") : "-")}
+            {t("billing.paid.periodActiveUntil", "Periode aktif sampai {date}").replace("{date}", sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString(DATE_LOCALE[lang]) : "-")}
             {sub.status === "active" && daysToExpiry !== null && daysToExpiry <= 7 && (
               <span className="text-amber-400">
                 {t("billing.paid.expiringSoonSuffix", " — akan habis {when}, segera perpanjang.").replace(
@@ -1107,7 +1107,7 @@ export default function BillingPage() {
             <p className="text-sm text-neutral-400 mt-1">
               {aiAddon?.includedViaPlan && t("billing.ai.includedInPlan", "Sudah termasuk dalam paket langganan — tidak ada biaya tambahan, tidak perlu diaktifkan terpisah.")}
               {!aiAddon?.includedViaPlan && aiAddon?.freeViaTrial && t("billing.ai.freeTrial", "Gratis selama masa percobaan berjalan — tidak perlu diaktifkan terpisah.")}
-              {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && aiAddon?.active && t("billing.ai.activeUntil", "Aktif sampai {date}.").replace("{date}", aiAddon.periodEnd ? new Date(aiAddon.periodEnd).toLocaleDateString("id-ID") : "-")}
+              {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && aiAddon?.active && t("billing.ai.activeUntil", "Aktif sampai {date}.").replace("{date}", aiAddon.periodEnd ? new Date(aiAddon.periodEnd).toLocaleDateString(DATE_LOCALE[lang]) : "-")}
               {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && !aiAddon?.active && t("billing.ai.locked", "Terkunci — di paket Starter, AI diaktifkan sebagai Add-on terpisah karena setiap pemakaiannya punya biaya nyata ke penyedia AI. Paket Pro sudah termasuk AI.")}
             </p>
           </div>
