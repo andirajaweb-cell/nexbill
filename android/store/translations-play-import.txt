@@ -1,0 +1,247 @@
+NEXBILL — Google Play store listing translations
+Default language: Indonesian (id) — already filled in Play Console, not included here.
+
+============================================================
+Language: English (United States) – en-US
+============================================================
+
+App name:
+NEXBILL: PS Rental Cashier
+
+Short description:
+PS rental billing on your phone: timers, F&B cashier, auto TV control, reports.
+
+Full description:
+NEXBILL is a billing and cashier app for PS and game-console rental businesses. Booth timers, F&B cashier, automatic TV on/off, bookings, and owner reports — all from an Android phone, no cashier computer needed.
+
+⏱️ PS RENTAL BILLING FROM YOUR PHONE
+• Start, pause, extend, move, and stop sessions right from the phone
+• Hour packages, per-console rates, promos, and membership with points
+• Booking Map: every booth's schedule by the hour on one screen
+• Automatic pop-up for every new online booking, so the cashier never misses one
+
+🛒 CASHIER & STOCK
+• F&B cashier on the same bill as the rental
+• Scan product barcodes and member-card QR codes with the phone camera
+• Stock, stock-take, and goods received with barcodes
+• One-tap receipts to 58/80mm Bluetooth thermal printers
+
+📺 AUTOMATIC TV & POWER
+• TVs on WiFi smart plugs (Tuya / Tasmota) switch on and off with each session
+• Android TV / Google TV controlled through the NEXBILL Relay Agent — on a PC or a spare Android phone
+• Time-left warnings and a "Time's up" screen on the TV
+
+🔔 ALERTS EVEN WHEN THE APP IS CLOSED
+• Booth sessions ending or ended
+• Food orders, extra-time requests, and cashier calls from the booth customer QR
+• New online bookings, low stock, and the revenue summary when a shift closes
+
+📊 FOR OWNERS
+• Real-time revenue, shift, and cash reports from anywhere, with shift history by day/month/year
+• Automatic accounting: balance sheet, profit & loss, payables, assets, and bill-payment (PPOB) records
+• Cashier anti-fraud, multi-branch, and AI Business Assistant (Pro plan)
+• Role-based access: owner, manager, supervisor, cashier, kitchen, accountant
+
+🌏 6 LANGUAGES
+Indonesian, English, Malay, Thai, Filipino, Vietnamese.
+
+Try it free for 30 days with every Pro feature, or explore the demo account at nexbill.id. Accounts and subscriptions are managed through your NEXBILL account.
+
+Support: sales@nexbill.id · nexbill.id
+Developed by Digitrajasa.
+
+============================================================
+Language: Malay – ms
+============================================================
+
+App name:
+NEXBILL: Bil Sewa PS
+
+Short description:
+Aplikasi bil sewa PS: pemasa, juruwang, TV automatik, tempahan & laporan.
+
+Full description:
+NEXBILL ialah aplikasi bil dan juruwang untuk perniagaan sewa PS dan konsol permainan. Pemasa bilik, juruwang makanan-minuman, TV hidup-mati automatik, tempahan, dan laporan pemilik — semuanya dari telefon Android, tanpa komputer juruwang.
+
+⏱️ BIL SEWA PS DARI TELEFON
+• Mula, jeda, tambah masa, pindah bilik, dan hentikan sesi terus dari telefon
+• Pakej jam, kadar ikut konsol, promosi, dan keahlian dengan mata ganjaran
+• Peta Tempahan: jadual semua bilik mengikut jam dalam satu skrin
+• Pop-up automatik setiap kali ada tempahan dalam talian baharu
+
+🛒 JURUWANG & STOK
+• Juruwang makanan-minuman dalam satu bil bersama sewa
+• Imbas kod bar produk dan QR kad ahli dengan kamera telefon
+• Stok, kiraan stok, dan barang masuk dengan kod bar
+• Resit ke pencetak terma 58/80mm melalui Bluetooth, sekali ketik
+
+📺 TV & ELEKTRIK AUTOMATIK
+• TV dengan palam pintar WiFi (Tuya / Tasmota) hidup dan mati mengikut sesi
+• Android TV / Google TV dikawal melalui Relay Agent NEXBILL — di PC atau telefon Android terpakai
+• Amaran baki masa dan skrin "Masa Tamat" di TV
+
+🔔 NOTIFIKASI WALAUPUN APLIKASI DITUTUP
+• Sesi bilik hampir tamat atau sudah tamat
+• Pesanan makanan, minta tambah masa, dan panggil juruwang dari QR pelanggan di bilik
+• Tempahan dalam talian baharu, stok rendah, dan ringkasan jualan semasa tutup syif
+
+📊 UNTUK PEMILIK
+• Jualan, syif, dan tunai masa nyata dari mana-mana, termasuk sejarah syif ikut hari/bulan/tahun
+• Perakaunan automatik: kunci kira-kira, untung rugi, hutang, aset, dan rekod PPOB
+• Anti-penipuan juruwang, pelbagai cawangan, dan AI Business Assistant (pelan Pro)
+• Akses ikut peranan: pemilik, pengurus, penyelia, juruwang, dapur, akauntan
+
+🌏 6 BAHASA
+Indonesia, English, Melayu, ไทย, Filipino, Tiếng Việt.
+
+Cuba percuma 30 hari dengan semua ciri Pro, atau lihat akaun demo di nexbill.id. Akaun dan langganan diurus melalui akaun NEXBILL anda.
+
+Bantuan: sales@nexbill.id · nexbill.id
+Dibangunkan oleh Digitrajasa.
+
+============================================================
+Language: Thai – th
+============================================================
+
+App name:
+NEXBILL: คิดเงินร้านเช่า PS
+
+Short description:
+แอปคิดเงินร้านเช่า PS: จับเวลา แคชเชียร์ เปิดปิดทีวีอัตโนมัติ จองคิว และรายงาน
+
+Full description:
+NEXBILL คือแอปคิดเงินและแคชเชียร์สำหรับร้านเช่า PS และเครื่องเกมคอนโซล จับเวลาห้อง ขายอาหารและเครื่องดื่ม เปิด-ปิดทีวีอัตโนมัติ รับจอง และดูรายงานเจ้าของร้าน — ทั้งหมดจากมือถือ Android ไม่ต้องมีคอมพิวเตอร์แคชเชียร์
+
+⏱️ คิดเงินร้านเช่า PS จากมือถือ
+• เริ่ม หยุดชั่วคราว เพิ่มเวลา ย้ายห้อง และจบเซสชันได้จากมือถือ
+• แพ็กเกจรายชั่วโมง ราคาตามเครื่อง โปรโมชัน และสมาชิกพร้อมแต้มสะสม
+• แผนผังการจอง: ดูตารางทุกห้องรายชั่วโมงในหน้าจอเดียว
+• ป๊อปอัปแจ้งเตือนทุกครั้งที่มีการจองออนไลน์ใหม่
+
+🛒 แคชเชียร์และสต็อก
+• ขายอาหารและเครื่องดื่มรวมในบิลเดียวกับค่าเช่า
+• สแกนบาร์โค้ดสินค้าและ QR บัตรสมาชิกด้วยกล้องมือถือ
+• สต็อก ตรวจนับสต็อก และรับสินค้าเข้าด้วยบาร์โค้ด
+• พิมพ์ใบเสร็จไปยังเครื่องพิมพ์ความร้อน 58/80 มม. ผ่าน Bluetooth ในแตะเดียว
+
+📺 ทีวีและไฟฟ้าอัตโนมัติ
+• ทีวีที่ต่อปลั๊กอัจฉริยะ WiFi (Tuya / Tasmota) เปิด-ปิดตามเซสชัน
+• ควบคุม Android TV / Google TV ผ่าน Relay Agent ของ NEXBILL — ติดตั้งบน PC หรือมือถือ Android เครื่องเก่า
+• เตือนเวลาที่เหลือและหน้าจอ "หมดเวลา" บนทีวี
+
+🔔 แจ้งเตือนแม้ปิดแอป
+• เซสชันใกล้หมดเวลาหรือหมดเวลาแล้ว
+• สั่งอาหาร ขอเพิ่มเวลา และเรียกแคชเชียร์จาก QR ลูกค้าในห้อง
+• การจองออนไลน์ใหม่ สต็อกใกล้หมด และสรุปยอดขายเมื่อปิดกะ
+
+📊 สำหรับเจ้าของร้าน
+• ยอดขาย กะ และเงินสดแบบเรียลไทม์จากทุกที่ พร้อมประวัติกะรายวัน/เดือน/ปี
+• บัญชีอัตโนมัติ: งบดุล กำไรขาดทุน เจ้าหนี้ สินทรัพย์ และบันทึก PPOB
+• ป้องกันการทุจริตของแคชเชียร์ หลายสาขา และ AI Business Assistant (แพ็กเกจ Pro)
+• สิทธิ์ตามบทบาท: เจ้าของ ผู้จัดการ หัวหน้างาน แคชเชียร์ ครัว นักบัญชี
+
+🌏 6 ภาษา
+Indonesia, English, Melayu, ไทย, Filipino, Tiếng Việt
+
+ทดลองใช้ฟรี 30 วันพร้อมทุกฟีเจอร์ Pro หรือดูบัญชีเดโมที่ nexbill.id บัญชีและการสมัครสมาชิกจัดการผ่านบัญชี NEXBILL ของคุณ
+
+ช่วยเหลือ: sales@nexbill.id · nexbill.id
+พัฒนาโดย Digitrajasa
+
+============================================================
+Language: Filipino – fil
+============================================================
+
+App name:
+NEXBILL: Billing sa PS Rental
+
+Short description:
+Billing app ng PS rental: timer, cashier, auto TV, booking at ulat ng owner.
+
+Full description:
+Ang NEXBILL ay billing at cashier app para sa negosyong PS at game-console rental. Timer ng booth, cashier ng pagkain at inumin, awtomatikong on/off ng TV, booking, at ulat para sa owner — lahat mula sa Android phone, walang kailangang cashier computer.
+
+⏱️ PS RENTAL BILLING MULA SA PHONE
+• Simulan, i-pause, dagdagan ang oras, ilipat ng booth, at tapusin ang session mula sa phone
+• Hourly package, presyo kada console, promo, at membership na may points
+• Booking Map: iskedyul ng lahat ng booth kada oras sa iisang screen
+• Awtomatikong pop-up sa bawat bagong online booking
+
+🛒 CASHIER AT STOCK
+• Cashier ng pagkain at inumin sa iisang bill kasama ang renta
+• I-scan ang barcode ng produkto at QR ng member card gamit ang camera ng phone
+• Stock, stock count, at pagtanggap ng paninda gamit ang barcode
+• Resibo sa 58/80mm Bluetooth thermal printer sa isang tap
+
+📺 AWTOMATIKONG TV AT KURYENTE
+• Ang TV na naka-WiFi smart plug (Tuya / Tasmota) ay bumubukas at namamatay ayon sa session
+• Kontrolado ang Android TV / Google TV sa pamamagitan ng NEXBILL Relay Agent — sa PC o lumang Android phone
+• Babala sa natitirang oras at "Tapos na ang Oras" na screen sa TV
+
+🔔 ALERTO KAHIT SARADO ANG APP
+• Session na malapit nang matapos o tapos na
+• Order ng pagkain, hiling na dagdag-oras, at tawag sa cashier mula sa QR ng customer sa booth
+• Bagong online booking, mababang stock, at buod ng benta pagsara ng shift
+
+📊 PARA SA OWNER
+• Real-time na benta, shift, at cash mula kahit saan, kasama ang shift history kada araw/buwan/taon
+• Awtomatikong accounting: balance sheet, kita at lugi, payables, assets, at talaan ng PPOB
+• Anti-fraud sa cashier, multi-branch, at AI Business Assistant (Pro plan)
+• Access ayon sa role: owner, manager, supervisor, cashier, kusina, accountant
+
+🌏 6 NA WIKA
+Indonesia, English, Melayu, ไทย, Filipino, Tiếng Việt.
+
+Subukan nang libre sa loob ng 30 araw kasama ang lahat ng Pro feature, o tingnan ang demo account sa nexbill.id. Ang account at subscription ay pinamamahalaan sa iyong NEXBILL account.
+
+Tulong: sales@nexbill.id · nexbill.id
+Ginawa ng Digitrajasa.
+
+============================================================
+Language: Vietnamese – vi
+============================================================
+
+App name:
+NEXBILL: Tính tiền thuê PS
+
+Short description:
+App tính tiền tiệm thuê PS: hẹn giờ, thu ngân, tự bật/tắt TV, đặt chỗ, báo cáo.
+
+Full description:
+NEXBILL là ứng dụng tính tiền và thu ngân cho tiệm cho thuê PS và máy chơi game console. Hẹn giờ phòng, bán đồ ăn thức uống, tự động bật/tắt TV, nhận đặt chỗ và xem báo cáo chủ tiệm — tất cả trên điện thoại Android, không cần máy tính thu ngân.
+
+⏱️ TÍNH TIỀN THUÊ PS TRÊN ĐIỆN THOẠI
+• Bắt đầu, tạm dừng, thêm giờ, chuyển phòng và kết thúc phiên ngay trên điện thoại
+• Gói theo giờ, giá theo từng máy, khuyến mãi và thẻ thành viên tích điểm
+• Bản đồ đặt chỗ: lịch của mọi phòng theo giờ trên một màn hình
+• Tự động hiện thông báo mỗi khi có đặt chỗ trực tuyến mới
+
+🛒 THU NGÂN & KHO HÀNG
+• Bán đồ ăn thức uống chung một hóa đơn với tiền thuê
+• Quét mã vạch sản phẩm và mã QR thẻ thành viên bằng camera điện thoại
+• Tồn kho, kiểm kê và nhập hàng bằng mã vạch
+• In hóa đơn ra máy in nhiệt 58/80mm qua Bluetooth chỉ với một chạm
+
+📺 TV & ĐIỆN TỰ ĐỘNG
+• TV cắm ổ cắm thông minh WiFi (Tuya / Tasmota) tự bật và tắt theo phiên chơi
+• Điều khiển Android TV / Google TV qua NEXBILL Relay Agent — cài trên PC hoặc điện thoại Android cũ
+• Cảnh báo thời gian còn lại và màn hình "Hết giờ" trên TV
+
+🔔 THÔNG BÁO NGAY CẢ KHI ĐÃ ĐÓNG ỨNG DỤNG
+• Phiên chơi sắp hết giờ hoặc đã hết giờ
+• Gọi món, xin thêm giờ và gọi thu ngân từ mã QR khách hàng tại phòng
+• Đặt chỗ trực tuyến mới, hàng sắp hết và tổng kết doanh thu khi đóng ca
+
+📊 DÀNH CHO CHỦ TIỆM
+• Doanh thu, ca làm và tiền mặt theo thời gian thực từ bất cứ đâu, kèm lịch sử ca theo ngày/tháng/năm
+• Kế toán tự động: bảng cân đối kế toán, lãi lỗ, công nợ phải trả, tài sản và ghi nhận PPOB
+• Chống gian lận thu ngân, nhiều chi nhánh và AI Business Assistant (gói Pro)
+• Phân quyền theo vai trò: chủ tiệm, quản lý, giám sát, thu ngân, bếp, kế toán
+
+🌏 6 NGÔN NGỮ
+Indonesia, English, Melayu, ไทย, Filipino, Tiếng Việt.
+
+Dùng thử miễn phí 30 ngày với mọi tính năng Pro, hoặc xem tài khoản demo tại nexbill.id. Tài khoản và gói đăng ký được quản lý qua tài khoản NEXBILL của bạn.
+
+Hỗ trợ: sales@nexbill.id · nexbill.id
+Phát triển bởi Digitrajasa.
