@@ -4,6 +4,8 @@ import { Check, Copy, Smartphone, BatteryCharging, Wifi, AlertTriangle } from "l
 import { Button } from "@/components/ui/Button";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-devices-guide";
+import { RelayIllustration, type RelayIllustrationKind } from "@/components/devices/AndroidRelayIllustrations";
+import { ANDROID_GUIDE_URL } from "@/components/devices/AndroidRelayVisualGuide";
 
 /**
  * Panduan memasang Relay Agent di HP ANDROID (bukan PC) untuk outlet yang awam teknologi.
@@ -43,20 +45,25 @@ function CopyCommand({ command }: { command: string }) {
   );
 }
 
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+function Step({ n, title, illus, children }: { n: number; title: string; illus: RelayIllustrationKind; children: React.ReactNode }) {
   return (
-    <div className="flex gap-3">
-      <div className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20 text-[11px] font-bold text-cyan-300">{n}</div>
-      <div className="flex-1 space-y-1.5">
-        <div className="text-neutral-200 font-medium">{title}</div>
-        {children}
+    <div className="grid gap-3 sm:grid-cols-[150px_1fr] items-start rounded-xl border border-neutral-800 bg-white/[0.015] p-3">
+      <div className="max-w-[220px] sm:max-w-none">
+        <RelayIllustration kind={illus} />
+      </div>
+      <div className="flex gap-3">
+        <div className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20 text-[11px] font-bold text-cyan-300">{n}</div>
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="text-neutral-200 font-medium">{title}</div>
+          {children}
+        </div>
       </div>
     </div>
   );
 }
 
 export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestToken: () => void; requesting: boolean }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   return (
     <div className="space-y-4">
       <p>
@@ -65,6 +72,10 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
           "Tidak punya PC di outlet? HP Android bisa menggantikannya. HP ini menjadi \"jembatan\" antara NEXBILL dan Android TV di outlet. Ikuti langkah di bawah pelan-pelan — semua perintah tinggal disalin, tidak perlu mengetik. Cukup sekali per outlet."
         )}
       </p>
+
+      <a href={`${ANDROID_GUIDE_URL}?lang=${lang}`} target="_blank" rel="noopener noreferrer" className={linkButtonCls}>
+        {t("devices.guide.android.fullGuide", "Buka panduan bergambar lengkap (bisa dicetak)")}
+      </a>
 
       <div className="grid gap-2 sm:grid-cols-3">
         {[
@@ -79,14 +90,14 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
         ))}
       </div>
 
-      <Step n={1} title={t("devices.guide.android.s1Title", "Minta Token")}>
+      <Step n={1} illus="token" title={t("devices.guide.android.s1Title", "Minta Token")}>
         <p>{t("devices.guide.android.s1Body", "Tekan tombol di bawah. Token dikirim ke menu Chat/Bantuan. Buka menu itu di HP yang akan dipakai, supaya token mudah disalin nanti.")}</p>
         <Button className="text-xs" onClick={onRequestToken} disabled={requesting}>
           {requesting ? t("devices.guide.tv.requesting", "Mengirim...") : t("devices.guide.tv.requestTokenButton", "Minta Token Relay Agent")}
         </Button>
       </Step>
 
-      <Step n={2} title={t("devices.guide.android.s2Title", "Pasang aplikasi Termux dan Termux:Boot")}>
+      <Step n={2} illus="install" title={t("devices.guide.android.s2Title", "Pasang aplikasi Termux dan Termux:Boot")}>
         <p>
           {t(
             "devices.guide.android.s2Body",
@@ -100,7 +111,7 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
         <p className="text-neutral-500">{t("devices.guide.android.s2Note", "Setelah terpasang, buka Termux:Boot SEKALI saja (cukup dibuka lalu ditutup) supaya agent bisa menyala otomatis saat HP dinyalakan ulang.")}</p>
       </Step>
 
-      <Step n={3} title={t("devices.guide.android.s3Title", "Salin satu perintah ke Termux")}>
+      <Step n={3} illus="paste" title={t("devices.guide.android.s3Title", "Salin satu perintah ke Termux")}>
         <p>
           {t(
             "devices.guide.android.s3Body",
@@ -110,7 +121,7 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
         <CopyCommand command={ANDROID_INSTALL_COMMAND} />
       </Step>
 
-      <Step n={4} title={t("devices.guide.android.s4Title", "Pilih bahasa dan tempel token")}>
+      <Step n={4} illus="language" title={t("devices.guide.android.s4Title", "Pilih bahasa dan tempel token")}>
         <p>
           {t(
             "devices.guide.android.s4Body",
@@ -119,7 +130,7 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
         </p>
       </Step>
 
-      <Step n={5} title={t("devices.guide.android.s5Title", "Sambungkan setiap TV (sekali per TV)")}>
+      <Step n={5} illus="tv" title={t("devices.guide.android.s5Title", "Sambungkan setiap TV (sekali per TV)")}>
         <p>
           {t(
             "devices.guide.android.s5Body",
@@ -130,7 +141,7 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
         <p className="text-neutral-500">{t("devices.guide.android.s5Note", "Ganti 192.168.1.50 dengan IP TV Anda. Berhasil kalau tertulis \"device\" di samping IP TV.")}</p>
       </Step>
 
-      <Step n={6} title={t("devices.guide.android.s6Title", "Supaya tidak dimatikan oleh HP (penting!)")}>
+      <Step n={6} illus="battery" title={t("devices.guide.android.s6Title", "Supaya tidak dimatikan oleh HP (penting!)")}>
         <ul className="list-disc pl-4 space-y-1">
           <li>{t("devices.guide.android.s6a", "Pengaturan → Aplikasi → Termux → Baterai → pilih \"Tidak dibatasi\" / \"Unrestricted\". Lakukan juga untuk Termux:Boot.")}</li>
           <li>{t("devices.guide.android.s6b", "Buka daftar aplikasi terbaru, tekan lama Termux, lalu pilih Kunci (ikon gembok) supaya tidak ikut tertutup saat \"Bersihkan semua\".")}</li>
@@ -138,7 +149,7 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
         </ul>
       </Step>
 
-      <Step n={7} title={t("devices.guide.android.s7Title", "Tambahkan TV di NEXBILL")}>
+      <Step n={7} illus="done" title={t("devices.guide.android.s7Title", "Tambahkan TV di NEXBILL")}>
         <p>{t("devices.guide.tv.step5Body", "Kembali ke halaman ini, klik \"Tambah Perangkat\", pilih protokol \"TV (Android/Google TV)\", isi nama dan IP TV dari Langkah 4, lalu Simpan. Selesai — TV bisa dinyalakan/dimatikan dari dashboard ini.")}</p>
       </Step>
 
@@ -150,7 +161,7 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
           <li>{t("devices.guide.android.trouble1", "Relay Agent \"offline\": buka Termux, ketik nexbill lalu Enter.")}</li>
           <li>{t("devices.guide.android.trouble2", "TV tidak merespons: pastikan TV menyala/standby dan di WiFi yang sama, lalu di Termux ketik nexbill-tv diikuti IP TV.")}</li>
           <li>{t("devices.guide.android.trouble3", "Setelah HP dinyalakan ulang, agent menyala sendiri (Termux:Boot). Kalau tidak, buka Termux dan ketik nexbill.")}</li>
-          <li>{t("devices.guide.android.trouble4", "Memperbarui agent: di Termux ketik nexbill-update. Token tidak perlu dimasukkan ulang.")}</li>
+          <li>{t("devices.guide.android.trouble4", "Agent memperbarui diri otomatis (diperiksa tiap 6 jam, dipasang pukul 03.00–06.00). Ingin langsung versi terbaru? Di Termux ketik nexbill-update — token tidak perlu dimasukkan ulang.")}</li>
           <li>{t("devices.guide.android.trouble5", "Masih bingung? Kirim foto layar Termux ke menu Chat/Bantuan — tim NEXBILL akan membantu.")}</li>
         </ul>
       </div>

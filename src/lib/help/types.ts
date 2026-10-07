@@ -14,6 +14,8 @@ export interface HelpSubsection {
   intro?: string;
   steps?: string[];
   notes?: string[];
+  /** Panduan bergambar yang ditampilkan di bawah langkah (komponen tetap, bukan teks yang bisa diedit). */
+  visual?: "android-relay";
 }
 
 export const HELP_GROUP_IDS = ["mulai", "peran", "operasional", "penjualan", "inventori", "keuangan", "sistem", "bantuan"] as const;

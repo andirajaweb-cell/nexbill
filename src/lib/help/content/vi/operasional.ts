@@ -341,6 +341,7 @@ export const OPERASIONAL: HelpCategory[] = [
       },
       {
         title: "Android TV qua điện thoại Android (không cần PC)",
+        visual: "android-relay",
         steps: [
           "Không có máy tính? Điện thoại Android 7+ có thể làm Relay Agent. Dùng một điện thoại riêng luôn ở cửa hàng, luôn cắm sạc và cùng WiFi với TV.",
           "Tại Điều khiển thiết bị → Hướng dẫn thiết lập thiết bị → TV, chọn tab \"Dùng điện thoại Android (không cần PC)\" và làm theo 7 bước: yêu cầu token, cài Termux và Termux:Boot từ F-Droid, sao chép một lệnh vào Termux, chọn ngôn ngữ và dán token.",

@@ -11,6 +11,7 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useAuth } from "@/lib/auth/client";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { AndroidRelayVisualGuide } from "@/components/devices/AndroidRelayVisualGuide";
 
 /** Same editable-fields shape as src/lib/help/overrides.ts (kept in sync manually — this is a
  * thin client type, not imported from the server module to avoid pulling `@/db/client` into the
@@ -257,6 +258,7 @@ function HelpArticle({
                   ))}
                 </ol>
               )}
+              {sub.visual === "android-relay" && <AndroidRelayVisualGuide />}
               {sub.notes && sub.notes.length > 0 && (
                 <ul className="list-disc list-inside space-y-1 text-xs text-amber-300/80 mt-2">
                   {sub.notes.map((n, j) => (
@@ -302,6 +304,8 @@ interface SubsectionDraft {
   intro: string;
   stepsText: string;
   notesText: string;
+  /** Dibawa apa adanya (tidak bisa diedit) supaya panduan bergambar tidak hilang setelah disimpan. */
+  visual?: HelpSubsection["visual"];
 }
 
 function subsectionToDraft(s: HelpSubsection): SubsectionDraft {
@@ -311,6 +315,7 @@ function subsectionToDraft(s: HelpSubsection): SubsectionDraft {
     intro: s.intro ?? "",
     stepsText: (s.steps ?? []).join("\n"),
     notesText: (s.notes ?? []).join("\n"),
+    visual: s.visual,
   };
 }
 
@@ -322,6 +327,7 @@ function draftToSubsection(d: SubsectionDraft): HelpSubsection {
   const notes = linesToArray(d.notesText);
   if (steps.length) out.steps = steps;
   if (notes.length) out.notes = notes;
+  if (d.visual) out.visual = d.visual;
   return out;
 }
 

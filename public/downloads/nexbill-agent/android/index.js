@@ -38,7 +38,7 @@ const crypto = require('crypto');
 const readline = require('readline');
 const { execFile, execFileSync, spawn } = require('child_process');
 
-const AGENT_VERSION = '1.2.0';
+const AGENT_VERSION = '1.3.0';
 
 const IS_PKG = !!process.pkg;
 // Saat dibangun jadi .exe, folder kerja = folder tempat .exe berada. Saat dijalankan lewat
@@ -49,9 +49,18 @@ const CONFIG_PATH = path.join(APP_DIR, 'config.json');
 const LOCK_PATH = path.join(APP_DIR, 'agent.lock');
 const LOG_PATH = path.join(APP_DIR, 'agent.log');
 const LOCAL_ADB = path.join(APP_DIR, 'adb.exe');
-const OLD_EXE = path.join(APP_DIR, 'NexbillAgent.old.exe');
-const NEW_EXE = path.join(APP_DIR, 'NexbillAgent.new.exe');
-const BAD_EXE = path.join(APP_DIR, 'NexbillAgent.bad.exe');
+// HP Android lewat Termux (lihat pos-rental-ps/public/downloads/nexbill-agent/android). Node di
+// Termux melaporkan platform "android"; PREFIX dicek juga untuk build Node lain di Termux.
+const IS_ANDROID = process.platform === 'android' || String(process.env.PREFIX || '').includes('com.termux');
+const UPDATE_PLATFORM = IS_ANDROID ? 'android' : 'windows';
+// Berkas yang diganti saat update: .exe di Windows, index.js di Android.
+const SELF_FILE = IS_ANDROID ? __filename : process.execPath;
+const OLD_EXE = IS_ANDROID ? path.join(APP_DIR, 'index.old.js') : path.join(APP_DIR, 'NexbillAgent.old.exe');
+const NEW_EXE = IS_ANDROID ? path.join(APP_DIR, 'index.new.js') : path.join(APP_DIR, 'NexbillAgent.new.exe');
+const BAD_EXE = IS_ANDROID ? path.join(APP_DIR, 'index.bad.js') : path.join(APP_DIR, 'NexbillAgent.bad.exe');
+// Di Android agent dijalankan dalam putaran oleh perintah `nexbill` / Termux:Boot; keluar dengan
+// kode ini = "jalankan saya lagi" (dipakai setelah update & pembatalan update).
+const ANDROID_RESTART_EXIT_CODE = 75;
 
 // Hostname ini tertanam di SEMUA build yang pernah dibagikan — jangan diubah tanpa memindahkan
 // Cloudflare Tunnel-nya juga (lihat RELAY-HUB-SETUP.md).
@@ -433,10 +442,21 @@ function manifestMessage(m) {
  * untuk hal apa pun. Versi yang sama atau lebih lama ditolak meski tanda tangannya sah: tanpa itu,
  * versi lama yang punya celah keamanan bisa "diputar ulang" dan dipasang lagi.
  */
-function verifyManifest(m, publicKeyB64, currentVersion, badVersions) {
+/**
+ * Alamat unduhan yang sah per platform. Windows: .exe langsung di folder unduhan. Android: .js di
+ * subfolder android/. Alamat ikut ditandatangani, jadi manifest Windows tidak bisa dipakai di
+ * Android (dan sebaliknya) walau tanda tangannya sah.
+ */
+function isAllowedUpdateUrl(url, platform) {
+  if (typeof url !== 'string' || url.includes('..') || url.includes('?') || url.includes('#')) return false;
+  if (platform === 'android') return url.startsWith(`${UPDATE_BASE_URL}android/`) && url.endsWith('.js');
+  return url.startsWith(UPDATE_BASE_URL) && !url.startsWith(`${UPDATE_BASE_URL}android/`) && url.endsWith('.exe');
+}
+
+function verifyManifest(m, publicKeyB64, currentVersion, badVersions, platform) {
   if (!m || typeof m !== 'object') return { ok: false, reason: 'format manifest tidak dikenal' };
   if (typeof m.version !== 'string' || !VERSION_PATTERN.test(m.version)) return { ok: false, reason: 'nomor versi tidak valid' };
-  if (typeof m.url !== 'string' || !m.url.startsWith(UPDATE_BASE_URL) || !m.url.endsWith('.exe') || m.url.includes('..')) {
+  if (!isAllowedUpdateUrl(m.url, platform || 'windows')) {
     return { ok: false, reason: 'alamat unduhan tidak diizinkan' };
   }
   if (typeof m.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(m.sha256)) return { ok: false, reason: 'hash tidak valid' };
@@ -725,7 +745,21 @@ let tokenRejected = false;
 let updateChannel = 'stable';
 
 function updatesEnabled() {
-  return IS_PKG && process.platform === 'win32' && !!UPDATE_PUBLIC_KEY_B64;
+  if (!UPDATE_PUBLIC_KEY_B64) return false;
+  return (IS_PKG && process.platform === 'win32') || IS_ANDROID;
+}
+
+/**
+ * Menyalakan ulang agent setelah update / pembatalan. Windows: jalankan .exe baru di jendela baru.
+ * Android: keluar dengan kode khusus — putaran di perintah `nexbill` / Termux:Boot menjalankannya lagi.
+ */
+function restartAgent(args) {
+  if (IS_ANDROID) {
+    setTimeout(() => process.exit(ANDROID_RESTART_EXIT_CODE), 500);
+    return;
+  }
+  relaunch(args);
+  setTimeout(() => process.exit(0), 500);
 }
 
 function capabilities() {
@@ -910,10 +944,10 @@ async function checkForUpdate(config) {
   updateBusy = true;
   let manifest = null;
   try {
-    const manifestUrl = `${UPDATE_BASE_URL}${updateChannel === 'beta' ? 'latest-beta.json' : 'latest.json'}`;
+    const manifestUrl = `${UPDATE_BASE_URL}${IS_ANDROID ? 'android/' : ''}${updateChannel === 'beta' ? 'latest-beta.json' : 'latest.json'}`;
     const raw = await httpsGetBuffer(manifestUrl, 64 * 1024);
     manifest = JSON.parse(raw.toString('utf8'));
-    const check = verifyManifest(manifest, UPDATE_PUBLIC_KEY_B64, AGENT_VERSION, config.badVersions);
+    const check = verifyManifest(manifest, UPDATE_PUBLIC_KEY_B64, AGENT_VERSION, config.badVersions, UPDATE_PLATFORM);
     if (!check.ok) {
       if (!check.notNewer) log('WARN', t('updateRejected', { version: manifest && manifest.version ? manifest.version : '?', reason: check.reason }));
       return;
@@ -942,7 +976,7 @@ function tryApplyUpdate(config) {
   if (!isInUpdateWindow(new Date()) || activeCommands > 0) return;
 
   const { version, file } = pendingDownload;
-  const exe = process.execPath;
+  const exe = SELF_FILE;
   log('INFO', t('updateInstalling', { version }));
   try {
     safeUnlink(OLD_EXE);
@@ -963,8 +997,7 @@ function tryApplyUpdate(config) {
 
   config.pendingUpdate = { version, previousVersion: AGENT_VERSION, starts: 0, installedAt: new Date().toISOString() };
   saveConfig(config);
-  relaunch(['--after-update', String(process.pid)]);
-  setTimeout(() => process.exit(0), 500);
+  restartAgent(['--after-update', String(process.pid)]);
 }
 
 /**
@@ -972,7 +1005,7 @@ function tryApplyUpdate(config) {
  * — tanpa itu, agent akan memasang versi rusak yang sama setiap malam.
  */
 function rollback(config, reason) {
-  const exe = process.execPath;
+  const exe = SELF_FILE;
   if (!fs.existsSync(OLD_EXE)) {
     log('ERROR', `Tidak bisa kembali ke versi sebelumnya: ${OLD_EXE} tidak ada.`);
     delete config.pendingUpdate;
@@ -993,8 +1026,7 @@ function rollback(config, reason) {
   config.badVersions = bad;
   delete config.pendingUpdate;
   saveConfig(config);
-  relaunch(['--after-update', String(process.pid)]);
-  setTimeout(() => process.exit(0), 500);
+  restartAgent(['--after-update', String(process.pid)]);
   return true;
 }
 
@@ -1155,6 +1187,7 @@ module.exports = {
   compareVersions,
   manifestMessage,
   verifyManifest,
+  isAllowedUpdateUrl,
   isInUpdateWindow,
   normalizeLang,
   parseLanguageChoice,

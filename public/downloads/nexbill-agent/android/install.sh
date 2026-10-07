@@ -30,9 +30,21 @@ npm install --silent --no-audit --no-fund ws@8 >/dev/null
 say "[3/5] Membuat perintah pintas: nexbill, nexbill-tv, nexbill-update..."
 cat > "$BIN/nexbill" <<'EOS'
 #!/data/data/com.termux/files/usr/bin/bash
-# Menyalakan NEXBILL Relay Agent. Biarkan jendela Termux ini terbuka (boleh di belakang).
+# Menyalakan NEXBILL Relay Agent. Biarkan Termux terbuka (boleh di belakang).
+# Agent berjalan dalam putaran: setelah update otomatis (kode 75) atau berhenti tak terduga, agent
+# dinyalakan lagi sendiri. Ctrl+C / tutup normal = berhenti.
 termux-wake-lock 2>/dev/null || true
-cd "$HOME/nexbill" && exec node index.js "$@"
+cd "$HOME/nexbill" || exit 1
+while true; do
+  node index.js "$@"
+  code=$?
+  set --   # argumen seperti --lang hanya dipakai sekali
+  case "$code" in
+    0|130) exit 0 ;;
+    75) echo "[NEXBILL] Versi baru terpasang - menyalakan ulang..."; sleep 2 ;;
+    *) echo "[NEXBILL] Agent berhenti (kode $code) - menyalakan ulang dalam 10 detik..."; sleep 10 ;;
+  esac
+done
 EOS
 cat > "$BIN/nexbill-tv" <<'EOS'
 #!/data/data/com.termux/files/usr/bin/bash
@@ -61,8 +73,17 @@ say "[4/5] Mengatur agar agent menyala otomatis saat HP dinyalakan (butuh aplika
 mkdir -p "$HOME/.termux/boot"
 cat > "$HOME/.termux/boot/start-nexbill.sh" <<'EOS'
 #!/data/data/com.termux/files/usr/bin/sh
+# Dijalankan Termux:Boot saat HP menyala. Agent dinyalakan ulang otomatis setelah update/berhenti.
 termux-wake-lock
-cd "$HOME/nexbill" && node index.js >> agent-boot.log 2>&1
+cd "$HOME/nexbill" || exit 1
+while true; do
+  # log dibatasi ~1 MB supaya memori HP tidak penuh
+  if [ -f agent-boot.log ] && [ "$(wc -c < agent-boot.log)" -gt 1000000 ]; then : > agent-boot.log; fi
+  node index.js >> agent-boot.log 2>&1
+  code=$?
+  [ "$code" = "0" ] && break
+  sleep 5
+done
 EOS
 chmod +x "$HOME/.termux/boot/start-nexbill.sh"
 
@@ -70,7 +91,7 @@ say "[5/5] Selesai dipasang."
 echo "Perintah yang bisa dipakai di Termux:"
 echo "  nexbill              -> menyalakan agent"
 echo "  nexbill-tv <IP TV>   -> menyambungkan ke TV (sekali per TV)"
-echo "  nexbill-update       -> memperbarui agent"
+echo "  nexbill-update       -> memperbarui agent sekarang (otomatis juga tiap malam 03.00-06.00)"
 echo "  nexbill --lang       -> mengganti bahasa"
 
 if [ -z "$NEXBILL_NO_START" ]; then

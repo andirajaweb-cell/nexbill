@@ -341,6 +341,7 @@ export const OPERASIONAL: HelpCategory[] = [
       },
       {
         title: "Android TV lewat HP Android (tanpa PC)",
+        visual: "android-relay",
         steps: [
           "Tidak punya PC? HP Android 7+ bisa menjadi Relay Agent. Pakai HP khusus yang selalu di outlet, selalu dicas, dan di WiFi yang sama dengan TV.",
           "Di Kontrol Perangkat → Panduan Setup Perangkat → TV, pilih tab \"Pakai HP Android (tanpa PC)\" dan ikuti 7 langkahnya: minta token, pasang Termux & Termux:Boot dari F-Droid, salin satu perintah ke Termux, pilih bahasa & tempel token.",

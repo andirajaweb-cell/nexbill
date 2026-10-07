@@ -341,6 +341,7 @@ export const OPERASIONAL: HelpCategory[] = [
       },
       {
         title: "Android TV gamit ang Android phone (walang PC)",
+        visual: "android-relay",
         steps: [
           "Walang PC? Puwedeng maging Relay Agent ang Android 7+ na phone. Gumamit ng phone na para rito lang, laging nasa outlet, laging naka-charge, at nasa parehong WiFi ng mga TV.",
           "Sa Device Control → Gabay sa Setup ng Device → TV, piliin ang tab na \"Gumamit ng Android phone (walang PC)\" at sundin ang 7 hakbang: humingi ng token, i-install ang Termux at Termux:Boot mula sa F-Droid, kopyahin ang isang command sa Termux, pumili ng wika at i-paste ang token.",
