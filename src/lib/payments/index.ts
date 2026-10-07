@@ -288,7 +288,7 @@ export async function confirmDeposit(paymentId: string, confirmation?: PaymentCo
   // Conditional on still not being "success": two concurrent confirms can't both win.
   const [updated] = await db
     .update(payments)
-    .set({ status: "success", paidAt: new Date().toISOString(), ...confirmationPatch(existing, confirmation) })
+    .set({ status: "success", paidAt: confirmation?.paidAt ?? new Date().toISOString(), ...confirmationPatch(existing, confirmation) })
     .where(and(eq(payments.id, paymentId), ne(payments.status, "success")))
     .returning();
   if (!updated) return existing;
@@ -317,6 +317,8 @@ export interface PaymentConfirmation {
   reference?: string | null;
   /** Drawer shift of the confirmer — used only when the payment has no shift yet. */
   shiftId?: string | null;
+  /** When the money was really received (Mode Offline replay: cash taken while the internet was down). Defaults to now. */
+  paidAt?: string | null;
 }
 
 function confirmationPatch(existing: typeof payments.$inferSelect, c?: PaymentConfirmation) {
@@ -337,7 +339,7 @@ export async function markPaymentSuccess(paymentId: string, confirmation?: Payme
   // racing a manual confirm) can't settle the same payment twice.
   const [payment] = await db
     .update(payments)
-    .set({ status: "success", paidAt: new Date().toISOString(), ...confirmationPatch(existing, confirmation) })
+    .set({ status: "success", paidAt: confirmation?.paidAt ?? new Date().toISOString(), ...confirmationPatch(existing, confirmation) })
     .where(and(eq(payments.id, paymentId), ne(payments.status, "success")))
     .returning();
   if (!payment) return existing;

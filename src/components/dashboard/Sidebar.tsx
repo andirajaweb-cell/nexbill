@@ -218,7 +218,7 @@ export function Sidebar() {
       {user ? (
         <>
           <div className="text-sm font-medium truncate text-neutral-200">{user.name}</div>
-          <div className="text-xs text-neutral-500 mb-2">{roleLabel(user.role as StaffRole)}</div>
+          <div className="text-xs text-neutral-500 mb-2">{roleLabel(user.role as StaffRole, t)}</div>
         </>
       ) : (
         <div className="text-xs text-amber-400 mb-2">{t("sidebar.invalidSession")}</div>

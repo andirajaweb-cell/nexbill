@@ -9,10 +9,11 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { resolveSendToKitchen } from "@/lib/kitchen/routing";
 import "@/lib/i18n/dict-inventory";
+import "@/lib/i18n/dict-accounting";
 import { SupplierTab } from "./SupplierTab";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
@@ -971,7 +972,7 @@ function RecipeTab({ outletId }: { outletId: string }) {
 
 /** Quick supplier purchase for finished/resale F&B products (no recipe/BOM) — transport/parking/other costs get prorated into landed cost, which updates products.costPrice so HPP reflects true cost. */
 function SupplierPurchaseTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const { user } = useAuth();
   // Gate: exactly owner/superuser/supervisor/manager by default (see DEFAULT_ROLE_PERMISSIONS in
@@ -1194,7 +1195,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       });
       const data = await res.json().catch(() => ({}));
       setOverlay(null);
-      if (!res.ok) return showAlert(data.error ?? "Gagal membatalkan invoice.");
+      if (!res.ok) return showAlert(data.error ?? t("inventory.invoice.cancelFailed", "Gagal membatalkan invoice."));
       load();
     } finally {
       setOverlay(null);
@@ -1220,7 +1221,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       const res = await fetch(`/api/purchase-invoices/${invoiceId}/purge`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
       setOverlay(null);
-      if (!res.ok) return showAlert(data.error ?? "Gagal menghapus invoice.");
+      if (!res.ok) return showAlert(data.error ?? t("inventory.invoice.deleteFailed", "Gagal menghapus invoice."));
       load();
     } finally {
       setOverlay(null);
@@ -1264,7 +1265,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
           <div className="text-xs text-amber-400">
             {t("inventory.supplierPurchase.backdateHint", "Belanja dicatat pada {date} — stok, harga modal, kas/utang, dan jurnal memakai tanggal ini. Kalau periode itu sudah ditutup, jurnalnya jatuh ke hari ini.").replace(
               "{date}",
-              new Date(`${purchaseDate}T12:00:00+07:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+              new Date(`${purchaseDate}T12:00:00+07:00`).toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "long", year: "numeric" })
             )}
           </div>
         )}
@@ -1379,7 +1380,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
         <Card className="border-emerald-500/40 text-xs space-y-1">
           <div className="font-medium text-sm mb-1">
             {t("inventory.supplierPurchase.savedResult", "Belanja tersimpan — {invoiceNumber}").replace("{invoiceNumber}", lastResult.invoice.invoiceNumber)}
-            <span className="ml-2 text-xs font-normal text-neutral-400">{new Date(lastResult.invoice.invoiceDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+            <span className="ml-2 text-xs font-normal text-neutral-400">{new Date(lastResult.invoice.invoiceDate).toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "long", year: "numeric" })}</span>
           </div>
           {lastResult.lineBreakdown.map((l: any, i: number) => (
             <div key={i} className="flex justify-between">
@@ -1484,7 +1485,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
             <div>
               <div className="text-sm font-medium">{inv.invoiceNumber ?? `INV #${inv.id.slice(0, 8)}`} — {rupiah(inv.amount)}</div>
               <div className="text-xs text-neutral-500">
-                {new Date(inv.invoiceDate).toLocaleDateString("id-ID")}
+                {new Date(inv.invoiceDate).toLocaleDateString(DATE_LOCALE[lang])}
                 {" · "}
                 {t("inventory.supplierPurchase.purchasedBy", "Dibeli oleh")} {inv.staffName ?? "-"}
               </div>
@@ -1524,7 +1525,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
 }
 
 function PurchaseOrderTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [pos, setPos] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
@@ -1661,7 +1662,7 @@ function PurchaseOrderTab({ outletId }: { outletId: string }) {
                 PO #{po.id.slice(0, 8)} — {rupiah(po.totalAmount)}
                 {po.notes?.includes("Auto-generated") && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 align-middle">{t("inventory.po.autoBadge", "Auto: Stok Minimum")}</span>}
               </div>
-              <div className="text-xs text-neutral-500">{po.items.length} {t("inventory.po.itemUnit", "item")} · {new Date(po.orderDate).toLocaleDateString("id-ID")}</div>
+              <div className="text-xs text-neutral-500">{po.items.length} {t("inventory.po.itemUnit", "item")} · {new Date(po.orderDate).toLocaleDateString(DATE_LOCALE[lang])}</div>
             </div>
             <div className="flex items-center gap-2">
               <Badge status={po.status === "received" ? "available" : "pending"}>{po.status.replace("_", " ")}</Badge>

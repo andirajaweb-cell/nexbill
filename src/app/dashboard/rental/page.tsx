@@ -23,13 +23,23 @@ import { confirmPaymentReceived } from "@/lib/payments/confirm-client";
 import { computeSessionCharge, estimateAccessoryCharge } from "@/lib/rental/charge";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { describeError } from "@/lib/api/error";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { LiveClock } from "@/components/dashboard/LiveClock";
 import "@/lib/i18n/dict-rental";
+
+const UNIT_STATUS_KEY: Record<string, string> = {
+  available: "rental.unitStatus.available",
+  occupied: "rental.unitStatus.occupied",
+  booked: "rental.unitStatus.booked",
+  maintenance: "rental.unitStatus.maintenance",
+};
 import { scaledGain } from "@/lib/ui/notification-sound";
 import { NotificationVolumeControl } from "@/components/dashboard/NotificationVolumeControl";
 import { UnitRequestsPanel } from "./UnitRequestsPanel";
 import { UnitQrModal } from "./UnitQrModal";
+import { OfflineRentalBoard } from "./OfflineRentalBoard";
+import { useConnectivity, useOfflineData } from "@/lib/offline/hooks";
+import { getLastOutletId } from "@/lib/offline/store";
 
 // recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
 const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
@@ -213,13 +223,13 @@ const ACCESSORY_PRESETS = [
 
 /** Human-readable duration for the bill breakdown (e.g. "1 jam 25 menit", "45 menit") — separate from
  * ElapsedTimer's live hh:mm:ss clock, which is meant for at-a-glance ticking, not billing context. */
-function formatPlayDuration(totalMinutes: number) {
+function formatPlayDuration(totalMinutes: number, t: (key: string, fallback?: string) => string) {
   const mins = Math.max(0, Math.round(totalMinutes));
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  if (h === 0) return `${m} menit`;
-  if (m === 0) return `${h} jam`;
-  return `${h} jam ${m} menit`;
+  if (h === 0) return t("rental.duration.minutes", "{m} menit").replace("{m}", String(m));
+  if (m === 0) return t("rental.duration.hours", "{h} jam").replace("{h}", String(h));
+  return t("rental.duration.hoursMinutes", "{h} jam {m} menit").replace("{h}", String(h)).replace("{m}", String(m));
 }
 
 function ElapsedTimer({ startedAt, accumulatedPauseMs, paused }: { startedAt: string; accumulatedPauseMs: number; paused: boolean }) {
@@ -310,7 +320,7 @@ function consoleLabel(type: string) {
   return CONSOLE_TYPES.find((c) => c.value === type)?.label ?? type.toUpperCase();
 }
 
-export default function RentalPage() {
+function OnlineRentalPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { t, lang } = useDashboardLang();
@@ -1392,7 +1402,7 @@ export default function RentalPage() {
                       <span className="text-[10px] text-neutral-500 uppercase">{unit.tvType.replace("_", " ")}</span>
                     </div>
                   </div>
-                  <Badge status={unit.status}>{t(`rental.unitStatus.${unit.status}`, unit.status)}</Badge>
+                  <Badge status={unit.status}>{(UNIT_STATUS_KEY[unit.status] ? t(UNIT_STATUS_KEY[unit.status], unit.status) : unit.status)}</Badge>
                 </div>
 
                 <div className="text-sm text-neutral-400">{rupiah(unit.hourlyRate)} {t("rental.perHourSuffix", "/jam")}</div>
@@ -1433,9 +1443,9 @@ export default function RentalPage() {
                       <div className="flex justify-between">
                         <span className="text-neutral-500">
                           {t("rental.playDurationLabel", "Lama Bermain")}
-                          {allowedMinutes ? ` ${t("rental.plannedSuffix", "(rencana {duration})").replace("{duration}", formatPlayDuration(allowedMinutes))}` : ""}
+                          {allowedMinutes ? ` ${t("rental.plannedSuffix", "(rencana {duration})").replace("{duration}", formatPlayDuration(allowedMinutes, t))}` : ""}
                         </span>
-                        <span>{formatPlayDuration(elapsedHours * 60)}</span>
+                        <span>{formatPlayDuration(elapsedHours * 60, t)}</span>
                       </div>
                       <div className="flex justify-between"><span className="text-neutral-500">{t("rental.costAccrued", "Cost Accrued")}</span><span>{rupiah(rentalEstimate)}</span></div>
                       {sessionAccessories.length > 0 && (
@@ -1617,7 +1627,7 @@ export default function RentalPage() {
                       ? t("rental.selectedForNewSession", "Dipilih di Sesi Baru →")
                       : unit.status === "available"
                       ? t("rental.selectThisStation", "Pilih Stasiun Ini")
-                      : t(`rental.unitStatus.${unit.status}`, unit.status)}
+                      : (UNIT_STATUS_KEY[unit.status] ? t(UNIT_STATUS_KEY[unit.status], unit.status) : unit.status)}
                   </Button>
                 )}
 
@@ -1683,11 +1693,11 @@ export default function RentalPage() {
                       <button
                         key={p.id}
                         onClick={() => { setSelectedPromoId(p.id); setPlannedMinutes(String(p.durationMinutes)); }}
-                        title={`${p.name} — ${formatPlayDuration(p.durationMinutes ?? 0)} · ${rupiah(p.packagePrice ?? 0)}`}
+                        title={`${p.name} — ${formatPlayDuration(p.durationMinutes ?? 0, t)} · ${rupiah(p.packagePrice ?? 0)}`}
                         className={`rounded-lg border px-2.5 py-1.5 text-xs text-left transition ${selectedPromoId === p.id ? "border-cyan-400 bg-cyan-500/15 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.3)]" : "border-white/10 text-neutral-400 hover:bg-white/5"}`}
                       >
                         <div className="font-medium leading-tight">{p.name}</div>
-                        <div className="text-[10px] opacity-80 leading-tight">{formatPlayDuration(p.durationMinutes ?? 0)} · {rupiah(p.packagePrice ?? 0)}</div>
+                        <div className="text-[10px] opacity-80 leading-tight">{formatPlayDuration(p.durationMinutes ?? 0, t)} · {rupiah(p.packagePrice ?? 0)}</div>
                       </button>
                     ))}
                   </div>
@@ -1890,7 +1900,7 @@ export default function RentalPage() {
               {recentOrders.map((o) => (
                 <div key={o.id} className="flex items-center justify-between text-xs border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
                   <div className="min-w-0">
-                    <div className="text-neutral-300">{new Date(o.createdAt).toLocaleString("id-ID", { dateStyle: "short", timeStyle: "short" })}</div>
+                    <div className="text-neutral-300">{new Date(o.createdAt).toLocaleString(DATE_LOCALE[lang], { dateStyle: "short", timeStyle: "short" })}</div>
                     <div className="text-[10px] text-neutral-500">{o.rentalSessionId ? t("rental.rentalLabel", "Rental") : t("rental.posLabel", "POS")}</div>
                   </div>
                   <span className="font-medium text-cyan-300">{rupiah(o.total)}</span>
@@ -1908,4 +1918,21 @@ export default function RentalPage() {
       </Card>
     </div>
   );
+}
+
+/**
+ * Mode Offline: while the outlet's internet is down — and until every transaction recorded
+ * offline has reached the server — the cashier works on the offline board (OfflineRentalBoard),
+ * whose actions are queued on this device. The normal board only comes back once the queue holds
+ * nothing but actions the server rejected (shown for review above it), so nobody can act online on
+ * a unit whose offline history hasn't been replayed yet.
+ */
+export default function RentalPage() {
+  const { user } = useAuth();
+  const online = useConnectivity();
+  const outletId = user?.outletId ?? getLastOutletId();
+  const { queue } = useOfflineData(outletId);
+  const unsent = queue.some((q) => !q.error);
+  if (!online || unsent) return <OfflineRentalBoard outletId={outletId} online={online} />;
+  return <OnlineRentalPage />;
 }

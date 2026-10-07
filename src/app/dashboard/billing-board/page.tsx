@@ -6,7 +6,7 @@ import { Clock, UtensilsCrossed, Gamepad2 } from "lucide-react";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { usePollingWhenVisible } from "@/lib/api/use-polling";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-billing-board";
 
 interface BoardRow {
@@ -52,7 +52,7 @@ function LiveTimer({ startedAt, accumulatedPauseMs, paused }: { startedAt: strin
 }
 
 export default function BillingBoardPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [outletId, setOutletId] = useState<string | null>(null);
   const [rows, setRows] = useState<BoardRow[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -103,7 +103,7 @@ export default function BillingBoardPage() {
           <p className="text-sm text-neutral-500">{t("billingBoard.subtitle", "Semua sesi PS aktif, timer, dan bill berjalan dalam satu layar. Auto-refresh setiap 3 detik.")}</p>
         </div>
         <div className="text-xs text-neutral-500">
-          {lastUpdated ? t("billingBoard.updatedAt", "Diperbarui {time}").replace("{time}", lastUpdated.toLocaleTimeString("id-ID")) : t("billingBoard.loading", "Memuat...")}
+          {lastUpdated ? t("billingBoard.updatedAt", "Diperbarui {time}").replace("{time}", lastUpdated.toLocaleTimeString(DATE_LOCALE[lang])) : t("billingBoard.loading", "Memuat...")}
         </div>
       </div>
 

@@ -30,8 +30,12 @@ export type RelayAction = (typeof RELAY_ACTIONS)[number];
  * "self_update" tidak memetakan ke perintah mana pun — agent mengambil update sendiri, bukan
  * disuruh hub. Ia ada di daftar supaya dashboard bisa tahu agent mana yang akan memperbarui
  * dirinya dan mana yang masih harus dipasang manual.
+ *
+ * "local_control" (agent v1.4+) juga tidak memetakan ke perintah hub: agent membuka halaman Kontrol
+ * Lokal di LAN dan menerima local_config (lihat lib/relay/local-control.ts) supaya TV & plug
+ * Tasmota tetap bisa dikontrol saat internet outlet putus.
  */
-export const RELAY_CAPABILITIES = ["power", "open_screensaver", "switch_hdmi", "tv_info", "self_update"] as const;
+export const RELAY_CAPABILITIES = ["power", "open_screensaver", "switch_hdmi", "tv_info", "self_update", "local_control"] as const;
 export type RelayCapability = (typeof RELAY_CAPABILITIES)[number];
 
 export const ACTION_REQUIRES: Record<RelayAction, RelayCapability> = {

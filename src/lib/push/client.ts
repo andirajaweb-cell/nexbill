@@ -1,5 +1,8 @@
 "use client";
 
+import { uiText } from "@/lib/i18n/client-text";
+import "@/lib/i18n/dict-push";
+
 /** Sisi browser untuk notifikasi push (lihat lib/push/service.ts dan public/sw.js). */
 
 export function isPushSupported(): boolean {
@@ -44,7 +47,7 @@ export async function enablePush(isAndroidApp: boolean): Promise<EnableResult> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ subscription: sub.toJSON(), isAndroidApp }),
   });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error ?? "Gagal menyimpan langganan notifikasi.");
+  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error ?? uiText("push.subscribeFailed", "Gagal menyimpan langganan notifikasi."));
   return "enabled";
 }
 

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { useAuth } from "@/lib/auth/client";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-booking";
 import { BookingMap, toLocalYmd } from "./BookingMap";
 import { OPEN_BOOKING_EVENT, BOOKINGS_CHANGED_EVENT } from "@/lib/rental/booking-events";
@@ -49,7 +49,7 @@ const SOURCE_CLASS: Record<string, string> = {
 };
 
 export default function BookingPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { user } = useAuth();
   const isAdmin = user?.role === "superuser" || user?.role === "owner";
   const STATUS_LABEL: Record<string, string> = {
@@ -331,7 +331,7 @@ export default function BookingPage() {
               </div>
               <div className="rounded-lg bg-neutral-800/60 p-2 col-span-2">
                 <div className="text-neutral-500">{t("booking.map.detailSchedule", "Jadwal")}</div>
-                <div className="font-medium">{new Date(detail.scheduledStart).toLocaleString("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} — {new Date(detail.scheduledEnd).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>
+                <div className="font-medium">{new Date(detail.scheduledStart).toLocaleString(DATE_LOCALE[lang], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} — {new Date(detail.scheduledEnd).toLocaleTimeString(DATE_LOCALE[lang], { hour: "2-digit", minute: "2-digit" })}</div>
               </div>
               {detail.dpAmount > 0 && (
                 <div className="rounded-lg bg-neutral-800/60 p-2 col-span-2"><span className="text-neutral-500">DP</span> <span className="font-medium">{rupiah(detail.dpAmount)}</span></div>
@@ -353,7 +353,7 @@ export default function BookingPage() {
                 <span className={`text-[10px] px-1.5 py-0.5 rounded border ${SOURCE_CLASS[b.source] ?? SOURCE_CLASS.kasir}`}>{SOURCE_LABEL[b.source] ?? b.source}</span>
               </div>
               <div className="text-xs text-neutral-500">
-                {new Date(b.scheduledStart).toLocaleString("id-ID")} — {new Date(b.scheduledEnd).toLocaleTimeString("id-ID")}
+                {new Date(b.scheduledStart).toLocaleString("id-ID")} — {new Date(b.scheduledEnd).toLocaleTimeString(DATE_LOCALE[lang])}
                 {b.dpAmount > 0 && ` · ${t("booking.dpPrefix", "DP {amount}").replace("{amount}", rupiah(b.dpAmount))}`}
                 {b.waitlistPosition && ` · ${t("booking.waitlistPrefix", "Antrian #{n}").replace("{n}", String(b.waitlistPosition))}`}
                 {b.cancelReason && ` · ${b.cancelReason}`}

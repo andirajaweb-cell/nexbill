@@ -8,14 +8,19 @@ import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
+import { AUX_SHEET_NAME, templateHeaders, templateLangFor, type HistoricalCategory } from "@/lib/accounting/historical-import-columns";
 
 /**
  * Accounting → Migrasi Data → Impor Data Historis. Aturan impornya ada di
  * lib/accounting/historical-import.ts; layar ini: pilih mode, unduh template (berisi COA outlet
  * sendiri), "Periksa dulu" (validasi tanpa menyimpan), lalu "Impor".
+ *
+ * Bahasa template mengikuti bahasa dashboard (Indonesia → template Indonesia, lainnya → Inggris),
+ * dan daftar kolom di layar diambil dari historical-import-columns.ts — sumber yang sama dengan
+ * file Excel — jadi nama kolom yang tampil selalu cocok dengan file yang diunduh.
  */
 
-type Category = "penjualan" | "pembelian" | "pendapatan_lain" | "pengeluaran";
+type Category = HistoricalCategory;
 type Mode = "kas" | "saldo_awal";
 
 interface Summary {
@@ -30,35 +35,41 @@ interface Summary {
   details: { row: number; action: "posted" | "skipped" | "error" | "ok"; error?: string; date?: string; account?: string; amount?: number; counter?: string }[];
 }
 
-const CATEGORIES: { value: Category; title: string; desc: string; columns: string }[] = [
+const CATEGORIES: { value: Category; titleKey: string; title: string; descKey: string; desc: string }[] = [
   {
     value: "penjualan",
+    titleKey: "accounting.migration.categoryPenjualan",
     title: "Penjualan",
+    descKey: "accounting.migration.cardDescPenjualan",
     desc: "Omzet lama per hari/per kategori (rental, F&B, produk, PPOB), lengkap dengan diskon dan HPP supaya Laba Kotor historis benar.",
-    columns: "Tanggal* · Kategori Pendapatan / Kode Akun Pendapatan · Deskripsi · Penjualan Kotor* · Diskon · HPP · Kode Akun HPP · Metode Pembayaran* · Pelanggan · Referensi",
   },
   {
     value: "pembelian",
+    titleKey: "accounting.migration.categoryPembelian",
     title: "Pembelian",
+    descKey: "accounting.migration.cardDescPembelian",
     desc: "Belanja stok (masuk Persediaan) atau barang habis pakai (beban), tunai atau utang supplier.",
-    columns: "Tanggal* · Jenis / Kode Akun Tujuan · Deskripsi · Nominal* · Metode Pembayaran* · Supplier · Referensi",
   },
   {
     value: "pendapatan_lain",
+    titleKey: "accounting.migration.categoryPendapatanLain",
     title: "Pendapatan Lain-lain",
+    descKey: "accounting.migration.cardDescPendapatanLain",
     desc: "Komisi, sewa tempat, penjualan barang bekas, sponsorship, denda, bunga bank, dan pendapatan non-inti lainnya.",
-    columns: "Tanggal* · Kategori / Kode Akun Pendapatan · Deskripsi · Diterima Dari · Nominal* · Metode Pembayaran*",
   },
   {
     value: "pengeluaran",
+    titleKey: "accounting.migration.categoryPengeluaran",
     title: "Pengeluaran",
+    descKey: "accounting.migration.cardDescPengeluaran",
     desc: "Gaji, sewa, listrik, air, internet, servis, iklan, admin bank, pajak, dan beban lain — tunai atau utang.",
-    columns: "Tanggal* · Kategori Beban / Kode Akun Beban · Deskripsi · Dibayar Kepada · Nominal* · Metode Pembayaran*",
   },
 ];
 
+const DATE_LOCALE: Record<string, string> = { id: "id-ID", en: "en-US", ms: "ms-MY", th: "th-TH", fil: "fil-PH", vi: "vi-VN" };
+
 export function HistoricalImportSection() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [mode, setMode] = useState<Mode>("kas");
   const [openingDate, setOpeningDate] = useState<string | null | undefined>(undefined);
 
@@ -69,7 +80,7 @@ export function HistoricalImportSection() {
       if (d) setMode("saldo_awal");
     });
   }, []);
-  const openingLabel = openingDate ? new Date(openingDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : null;
+  const openingLabel = openingDate ? new Date(openingDate).toLocaleDateString(DATE_LOCALE[lang] ?? "id-ID", { day: "numeric", month: "long", year: "numeric" }) : null;
 
   return (
     <Card className="space-y-4">
@@ -135,8 +146,9 @@ export function HistoricalImportSection() {
 }
 
 function ImportCard({ category, mode }: { category: (typeof CATEGORIES)[number]; mode: Mode }) {
-  const { t } = useDashboardLang();
-  const catTitle = (c: (typeof CATEGORIES)[number]) => t(`accounting.migration.cat.${c.value}.title`, c.title);
+  const { t, lang } = useDashboardLang();
+  const templateLang = templateLangFor(lang);
+  const title = t(category.titleKey, category.title);
   const { formatMoney: rupiah } = useCurrency();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState<null | "check" | "import">(null);
@@ -145,13 +157,14 @@ function ImportCard({ category, mode }: { category: (typeof CATEGORIES)[number];
 
   const send = async (dryRun: boolean) => {
     if (!file) return showAlert(t("accounting.historicalImport.alertChooseFile", "Pilih file Excel (.xlsx) dulu."));
-    if (!dryRun && !(await showConfirm(t("accounting.migration.confirmImport", "Impor {title} dengan mode \"{mode}\"? Setiap baris menjadi jurnal bertanggal asli.").replace("{title}", catTitle(category)).replace("{mode}", mode === "kas" ? t("accounting.migration.modeCashTitle", "Kas/Bank (riwayat lengkap)") : t("accounting.migration.modeHistoryTitle", "Hanya riwayat Laba Rugi"))))) return;
+    if (!dryRun && !(await showConfirm(t("accounting.migration.confirmImport", "Impor {title} dengan mode \"{mode}\"? Setiap baris menjadi jurnal bertanggal asli.").replace("{title}", title).replace("{mode}", mode === "kas" ? t("accounting.migration.modeCashTitle", "Kas/Bank (riwayat lengkap)") : t("accounting.migration.modeHistoryTitle", "Hanya riwayat Laba Rugi"))))) return;
     setBusy(dryRun ? "check" : "import");
     try {
       const fd = new FormData();
       fd.append("category", category.value);
       fd.append("mode", mode);
       fd.append("dryRun", dryRun ? "1" : "0");
+      fd.append("lang", lang);
       fd.append("file", file);
       const res = await fetch("/api/accounting/historical-import", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
@@ -175,15 +188,23 @@ function ImportCard({ category, mode }: { category: (typeof CATEGORIES)[number];
         />
       )}
       <div>
-        <h3 className="text-sm font-medium">{catTitle(category)}</h3>
-        <p className="text-xs text-neutral-500">{t(`accounting.migration.cat.${category.value}.desc`, category.desc)}</p>
+        <h3 className="text-sm font-medium">{title}</h3>
+        <p className="text-xs text-neutral-500">{t(category.descKey, category.desc)}</p>
         <button className="text-[11px] text-sky-400 hover:underline" onClick={() => setShowCols((s) => !s)}>
           {showCols ? t("accounting.migration.hideColumns", "Sembunyikan kolom") : t("accounting.migration.showColumns", "Lihat kolom template")}
         </button>
-        {showCols && <p className="text-[11px] text-neutral-400">{category.columns} <span className="text-neutral-500">{t("accounting.migration.columnsNote", "(* wajib — rincian di sheet Petunjuk)")}</span></p>}
+        {showCols && (
+          <p className="text-[11px] text-neutral-400">
+            {templateHeaders(category.value, templateLang).join(" · ")}{" "}
+            <span className="text-neutral-500">
+              {t("accounting.migration.columnsNote", "(* wajib — rincian di sheet {sheet}. Nama kolom persis seperti di file template.)").replace("{sheet}", AUX_SHEET_NAME.guide[templateLang])}
+              {templateLang === "en" && ` ${t("accounting.migration.templateLangNote", "")}`}
+            </span>
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <a href={`/api/accounting/historical-import/template?category=${category.value}`} className="inline-flex items-center gap-1 text-xs rounded-lg bg-neutral-800 hover:bg-neutral-700 px-3 py-2 font-medium transition">
+        <a href={`/api/accounting/historical-import/template?category=${category.value}&lang=${templateLang}`} className="inline-flex items-center gap-1 text-xs rounded-lg bg-neutral-800 hover:bg-neutral-700 px-3 py-2 font-medium transition">
           <Download size={12} /> {t("accounting.historicalImport.downloadTemplate", "Download Template")}
         </a>
         <input

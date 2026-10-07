@@ -105,4 +105,7 @@ registerDict({
   "help.editor.subsectionIntroPlaceholder": { id: "Kalimat pembuka sub-bagian (opsional)", en: "Subsection intro sentence (optional)", ms: "Ayat pembuka sub-bahagian (pilihan)", th: "ประโยคเปิดหัวข้อย่อย (ไม่บังคับ)", fil: "Panimulang pangungusap ng subsection (opsyonal)", vi: "Câu mở đầu mục con (tùy chọn)" },
   "help.editor.subsectionStepsPlaceholder": { id: "Langkah — satu per baris", en: "Steps — one per line", ms: "Langkah — satu setiap baris", th: "ขั้นตอน — หนึ่งรายการต่อบรรทัด", fil: "Mga Hakbang — isa bawat linya", vi: "Các bước — mỗi dòng một bước" },
   "help.editor.subsectionNotesPlaceholder": { id: "Catatan — satu per baris", en: "Notes — one per line", ms: "Nota — satu setiap baris", th: "หมายเหตุ — หนึ่งรายการต่อบรรทัด", fil: "Mga Tala — isa bawat linya", vi: "Ghi chú — mỗi dòng một ghi chú" },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "help.editor.untitled": { id: "(Tanpa judul)", en: "(Untitled)", ms: "(Tanpa tajuk)", th: "(ไม่มีชื่อ)", fil: "(Walang pamagat)", vi: "(Không có tiêu đề)" },
 });

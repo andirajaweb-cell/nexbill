@@ -1,4 +1,5 @@
 "use client";
+import { uiText } from "@/lib/i18n/client-text";
 import { useState } from "react";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 
@@ -12,7 +13,7 @@ import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
  *   ...
  *   return <>{saving.element}...</>;
  */
-export function useSavingOverlay(defaultHint = "Jangan tutup atau muat ulang halaman ini.") {
+export function useSavingOverlay(defaultHint = uiText("shell.saving.hint", "Jangan tutup atau muat ulang halaman ini.")) {
   const [state, setState] = useState<{ message: string; hint: string } | null>(null);
 
   async function run<T>(message: string, fn: () => Promise<T>, hint = defaultHint): Promise<T> {
@@ -35,6 +36,6 @@ export function useSavingOverlay(defaultHint = "Jangan tutup atau muat ulang hal
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- response shapes vary per endpoint, same as res.json()
 export async function fetchJson(input: RequestInfo, init?: RequestInit): Promise<{ res: Response; data: any }> {
   const res = await fetch(input, init);
-  const data = await res.json().catch(() => ({ error: "Server tidak merespons dengan benar. Cek daftar sebelum mencoba lagi." }));
+  const data = await res.json().catch(() => ({ error: uiText("shell.saving.badResponse", "Server tidak merespons dengan benar. Cek daftar sebelum mencoba lagi.") }));
   return { res, data };
 }

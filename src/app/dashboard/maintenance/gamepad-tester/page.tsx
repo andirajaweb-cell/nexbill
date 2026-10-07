@@ -12,7 +12,7 @@ const KUNCI_SUARA = "nexbill.gamepadTester.suara";
 
 interface NotifKoneksi {
   jenis: "terhubung" | "terputus";
-  label: string;
+  label: Family;
   slot: number;
   kunci: number;
 }
@@ -73,6 +73,11 @@ const FAMILY_LABEL: Record<Family, string> = {
   sony_other: "Controller Sony (model tidak dikenali)",
   generic: "Controller generik / non-Sony",
 };
+const FAMILY_LABEL_KEY: Partial<Record<Family, string>> = {
+  sony_other: "maintenance.gamepad.family.sonyOther",
+  generic: "maintenance.gamepad.family.generic",
+};
+const familyLabel = (family: Family, t: (k: string, f: string) => string) => (FAMILY_LABEL_KEY[family] ? t(FAMILY_LABEL_KEY[family]!, FAMILY_LABEL[family]) : FAMILY_LABEL[family]);
 
 const FACE_BUTTONS = [
   { idx: 0, ds: "Cross", generic: "A", color: "#4aa3ff" }, // bottom
@@ -81,7 +86,7 @@ const FACE_BUTTONS = [
   { idx: 3, ds: "Triangle", generic: "Y", color: "#3ee08a" }, // top
 ];
 
-function GamepadDiagram({ snap, family }: { snap: Snapshot; family: Family }) {
+function GamepadDiagram({ snap, family, t }: { snap: Snapshot; family: Family; t: (k: string, f: string) => string }) {
   const isDs = family !== "generic";
   const btn = (i: number) => snap.buttons[i] ?? { pressed: false, value: 0 };
   const [lx, ly, rx, ry] = [snap.axes[0] ?? 0, snap.axes[1] ?? 0, snap.axes[2] ?? 0, snap.axes[3] ?? 0];
@@ -163,8 +168,8 @@ function GamepadDiagram({ snap, family }: { snap: Snapshot; family: Family }) {
         <circle cx={210} cy={95} r={10} fill={btn(16).pressed ? "#4aa3ff" : "#2a2a34"} stroke="#555" />
       )}
 
-      <Stick x={lx} y={ly} cx={150} cy={165} clicked={btn(10).pressed} label="L3 (Stick Kiri)" />
-      <Stick x={rx} y={ry} cx={270} cy={165} clicked={btn(11).pressed} label="R3 (Stick Kanan)" />
+      <Stick x={lx} y={ly} cx={150} cy={165} clicked={btn(10).pressed} label={t("maintenance.gamepad.l3Label", "L3 (Stick Kiri)")} />
+      <Stick x={rx} y={ry} cx={270} cy={165} clicked={btn(11).pressed} label={t("maintenance.gamepad.r3Label", "R3 (Stick Kanan)")} />
     </svg>
   );
 }
@@ -177,7 +182,7 @@ function GamepadCard({ snap, t, android }: { snap: Snapshot; t: (k: string, f: s
     <Card className="space-y-4">
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
-          <h3 className="font-medium text-neutral-100">{FAMILY_LABEL[family]}</h3>
+          <h3 className="font-medium text-neutral-100">{familyLabel(family, t)}</h3>
           <p className="text-[11px] text-neutral-600 break-all">{snap.id}</p>
         </div>
         {nonStandard && (
@@ -189,7 +194,7 @@ function GamepadCard({ snap, t, android }: { snap: Snapshot; t: (k: string, f: s
         )}
       </div>
 
-      <GamepadDiagram snap={snap} family={family} />
+      <GamepadDiagram snap={snap} family={family} t={t} />
 
       <p className="text-[11px] text-neutral-500 text-center">
         {t(
@@ -202,7 +207,7 @@ function GamepadCard({ snap, t, android }: { snap: Snapshot; t: (k: string, f: s
         <IndikatorLive snap={snap} standar={!nonStandard} />
       </div>
       <div className="border-t border-white/5 pt-4">
-        <PemeriksaanTerpandu snap={snap} standar={!nonStandard} labelController={FAMILY_LABEL[family]} />
+        <PemeriksaanTerpandu snap={snap} standar={!nonStandard} labelController={familyLabel(family, t)} />
       </div>
     </Card>
   );
@@ -274,10 +279,10 @@ function BantuanPs3({ t, terbuka }: { t: (k: string, f: string) => string; terbu
             {t("maintenance.gamepad.ps3Clone", "Penting: driver ini hanya dijamin untuk stik PS3 ORIGINAL Sony. Stik KW sering tidak terbaca.")}
           </p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
-            <a href="https://github.com/nefarius/DsHidMini" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Sumber: github.com/nefarius/DsHidMini</a>
-            <a href={`https://github.com/nefarius/DsHidMini/releases/tag/setup-v${DRIVER_PS3_VERSI}`} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Catatan rilis v{DRIVER_PS3_VERSI}</a>
-            <a href="https://docs.nefarius.at/projects/DsHidMini/v3/How-to-Install/" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Panduan resmi (Inggris)</a>
-            <a href="/downloads/ps3-driver/LICENSE-DsHidMini.txt" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">Lisensi BSD-3</a>
+            <a href="https://github.com/nefarius/DsHidMini" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">{t("maintenance.gamepad.ds3Source", "Sumber: {url}").replace("{url}", "github.com/nefarius/DsHidMini")}</a>
+            <a href={`https://github.com/nefarius/DsHidMini/releases/tag/setup-v${DRIVER_PS3_VERSI}`} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">{t("maintenance.gamepad.ds3ReleaseNotes", "Catatan rilis v{version}").replace("{version}", DRIVER_PS3_VERSI)}</a>
+            <a href="https://docs.nefarius.at/projects/DsHidMini/v3/How-to-Install/" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">{t("maintenance.gamepad.ds3OfficialGuide", "Panduan resmi (Inggris)")}</a>
+            <a href="/downloads/ps3-driver/LICENSE-DsHidMini.txt" target="_blank" rel="noopener noreferrer" className="text-sky-300 underline">{t("maintenance.gamepad.ds3License", "Lisensi BSD-3")}</a>
           </div>
           <p className="text-xs text-neutral-400 leading-relaxed">
             {t("maintenance.gamepad.ps3Alt", "Tanpa memasang driver: buka halaman ini di HP Android lewat Chrome, lalu colok stik PS3 pakai kabel OTG.")}
@@ -391,7 +396,7 @@ export default function GamepadTesterPage() {
     window.addEventListener("pointerdown", buka);
     window.addEventListener("keydown", buka);
 
-    const labelDari = (id: string) => FAMILY_LABEL[detectFamily(id)];
+    const labelDari = (id: string) => detectFamily(id);
     const onConnect = (e: GamepadEvent) => {
       setNotif({ jenis: "terhubung", label: labelDari(e.gamepad.id), slot: e.gamepad.index + 1, kunci: Date.now() });
       if (suaraRef.current && !bunyiTerhubung()) setAudioTerkunci(true);
@@ -515,7 +520,7 @@ export default function GamepadTesterPage() {
                 : t("maintenance.gamepad.toast.disconnected", "Controller terputus")}
             </div>
             <div className="text-xs opacity-80">
-              {notif.label} · {t("maintenance.gamepad.toast.slot", "Slot")} {notif.slot}
+              {familyLabel(notif.label, t)} · {t("maintenance.gamepad.toast.slot", "Slot")} {notif.slot}
             </div>
           </div>
         </div>

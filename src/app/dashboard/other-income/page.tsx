@@ -11,7 +11,7 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
 import { showAlert, showPrompt } from "@/lib/ui/dialog";
 import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import { outletDateYmd } from "@/lib/time/outlet-time";
 import "@/lib/i18n/dict-other-income";
@@ -28,14 +28,14 @@ import "@/lib/i18n/dict-coa";
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const inputCls = "w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm";
 
-const CATEGORY_LABEL_KEY: Record<string, { key: string; fallback: string; hint: string }> = {
-  vendor_commission: { key: "otherIncome.category.vendorCommission", fallback: "Komisi / Kerjasama Vendor", hint: "Komisi titip jual voucher, bagi hasil mesin/vending, fee kerjasama." },
-  asset_rental: { key: "otherIncome.category.assetRental", fallback: "Sewa Tempat/Aset ke Pihak Lain", hint: "Sewa lahan parkir, sewa ruangan untuk acara, sewa etalase." },
-  asset_sale: { key: "otherIncome.category.assetSale", fallback: "Penjualan Aset/Barang Bekas", hint: "Barang bekas/rongsokan yang TIDAK terdaftar di menu Aset (kardus, botol, perabot lama)." },
-  sponsorship: { key: "otherIncome.category.sponsorship", fallback: "Sponsorship / Kerjasama Event", hint: "Dana sponsor turnamen/event dari brand." },
-  penalty_compensation: { key: "otherIncome.category.penaltyCompensation", fallback: "Denda / Ganti Rugi dari Pelanggan", hint: "Ganti rugi stik rusak, denda keterlambatan di luar tagihan sewa." },
-  bank_interest_cashback: { key: "otherIncome.category.bankInterestCashback", fallback: "Bunga Bank / Cashback / Promo", hint: "Bunga tabungan, cashback e-wallet/kartu, hadiah promo." },
-  other: { key: "otherIncome.category.other", fallback: "Lain-lain", hint: "Pendapatan non-inti lain yang tidak masuk kategori di atas." },
+const CATEGORY_LABEL_KEY: Record<string, { key: string; fallback: string; hintKey: string; hint: string }> = {
+  vendor_commission: { key: "otherIncome.category.vendorCommission", fallback: "Komisi / Kerjasama Vendor", hintKey: "otherIncome.category.vendorCommission.hint", hint: "Komisi titip jual voucher, bagi hasil mesin/vending, fee kerjasama." },
+  asset_rental: { key: "otherIncome.category.assetRental", fallback: "Sewa Tempat/Aset ke Pihak Lain", hintKey: "otherIncome.category.assetRental.hint", hint: "Sewa lahan parkir, sewa ruangan untuk acara, sewa etalase." },
+  asset_sale: { key: "otherIncome.category.assetSale", fallback: "Penjualan Aset/Barang Bekas", hintKey: "otherIncome.category.assetSale.hint", hint: "Barang bekas/rongsokan yang TIDAK terdaftar di menu Aset (kardus, botol, perabot lama)." },
+  sponsorship: { key: "otherIncome.category.sponsorship", fallback: "Sponsorship / Kerjasama Event", hintKey: "otherIncome.category.sponsorship.hint", hint: "Dana sponsor turnamen/event dari brand." },
+  penalty_compensation: { key: "otherIncome.category.penaltyCompensation", fallback: "Denda / Ganti Rugi dari Pelanggan", hintKey: "otherIncome.category.penaltyCompensation.hint", hint: "Ganti rugi stik rusak, denda keterlambatan di luar tagihan sewa." },
+  bank_interest_cashback: { key: "otherIncome.category.bankInterestCashback", fallback: "Bunga Bank / Cashback / Promo", hintKey: "otherIncome.category.bankInterestCashback.hint", hint: "Bunga tabungan, cashback e-wallet/kartu, hadiah promo." },
+  other: { key: "otherIncome.category.other", fallback: "Lain-lain", hintKey: "otherIncome.category.other.hint", hint: "Pendapatan non-inti lain yang tidak masuk kategori di atas." },
 };
 
 type Preset = "today" | "7d" | "this_month" | "last_month" | "custom";
@@ -79,7 +79,7 @@ const wibStart = (ymd: string) => new Date(`${ymd}T00:00:00+07:00`).toISOString(
 const wibEnd = (ymd: string) => new Date(`${ymd}T23:59:59.999+07:00`).toISOString();
 
 export default function OtherIncomePage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const catLabel = (cat: string) => (CATEGORY_LABEL_KEY[cat] ? t(CATEGORY_LABEL_KEY[cat].key, CATEGORY_LABEL_KEY[cat].fallback) : cat);
   const { user } = useAuth();
   const canManage = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_other_income");
@@ -223,7 +223,7 @@ export default function OtherIncomePage() {
           </div>
         </div>
         <div className="text-[11px] text-neutral-500">
-          {t("otherIncome.periodShown", "Periode {from} s/d {to} · {n} entri").replace("{from}", new Date(`${from}T12:00:00+07:00`).toLocaleDateString("id-ID")).replace("{to}", new Date(`${to}T12:00:00+07:00`).toLocaleDateString("id-ID")).replace("{n}", String(visible.length))}
+          {t("otherIncome.periodShown", "Periode {from} s/d {to} · {n} entri").replace("{from}", new Date(`${from}T12:00:00+07:00`).toLocaleDateString(DATE_LOCALE[lang])).replace("{to}", new Date(`${to}T12:00:00+07:00`).toLocaleDateString(DATE_LOCALE[lang])).replace("{n}", String(visible.length))}
         </div>
 
         <div className="overflow-x-auto">
@@ -244,7 +244,7 @@ export default function OtherIncomePage() {
               {visible.map((r) => (
                 <tr key={r.id} className={`border-b border-neutral-900 align-top ${r.status === "void" ? "opacity-50" : ""}`}>
                   <td className="py-2 whitespace-nowrap text-xs">
-                    {new Date(r.incomeDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                    {new Date(r.incomeDate).toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "short", year: "numeric" })}
                     {r.shiftId && <div className="text-[10px] text-sky-400">{t("otherIncome.inShift", "masuk shift")}</div>}
                   </td>
                   <td className="text-xs font-mono text-neutral-400">{r.incomeNumber}</td>
@@ -302,7 +302,7 @@ export default function OtherIncomePage() {
 }
 
 function EntryForm({ methods, accounts, onCreated }: { methods: { value: string; label: string }[]; accounts: ListResponse["accounts"]; onCreated: () => void }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const today = outletDateYmd(new Date());
   const empty = { category: "other", incomeDate: today, amount: "", payerName: "", description: "", paymentMethod: "cash", costCenterId: "", attachmentUrl: "" };
   const [form, setForm] = useState(empty);
@@ -370,7 +370,7 @@ function EntryForm({ methods, accounts, onCreated }: { methods: { value: string;
           <select className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
             {Object.entries(CATEGORY_LABEL_KEY).map(([k, entry]) => <option key={k} value={k}>{t(entry.key, entry.fallback)}</option>)}
           </select>
-          <div className="text-[11px] text-neutral-500">{CATEGORY_LABEL_KEY[form.category]?.hint}</div>
+          <div className="text-[11px] text-neutral-500">{CATEGORY_LABEL_KEY[form.category] && t(CATEGORY_LABEL_KEY[form.category].hintKey, CATEGORY_LABEL_KEY[form.category].hint)}</div>
           <div className="text-[11px] text-sky-300">{t("otherIncome.toAccount", "Dibukukan ke akun")} {acct(catRef)}</div>
           {form.category === "asset_sale" && (
             <div className="text-[11px] text-amber-400">
@@ -437,7 +437,7 @@ function EntryForm({ methods, accounts, onCreated }: { methods: { value: string;
         <div className="text-xs text-neutral-500 mb-1 flex items-center gap-1"><Info size={12} /> {t("otherIncome.summaryHeading", "Periksa sekali lagi")}</div>
         {amount > 0 ? (
           <span>
-            {new Date(`${form.incomeDate}T12:00:00+07:00`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })} —{" "}
+            {new Date(`${form.incomeDate}T12:00:00+07:00`).toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "long", year: "numeric" })} —{" "}
             {t("otherIncome.summarySentence", "{jenis} sebesar {amount}{dari}, diterima lewat {metode}. Jurnal: Debit {kas} / Kredit {akun}.")
               .replace("{jenis}", t(CATEGORY_LABEL_KEY[form.category].key, CATEGORY_LABEL_KEY[form.category].fallback))
               .replace("{amount}", rupiah(amount))

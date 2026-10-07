@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { LANG_OPTIONS, LANG_STORAGE_KEY, translate, type LangCode } from "./registry";
+import { DATE_LOCALE, LANG_OPTIONS, LANG_STORAGE_KEY, translate, type LangCode } from "./registry";
 // Side-effect import: registers the shell dictionary (nav/sidebar/topbar/dashboard overview)
 // into the registry. Imported here (not from the server layout) so it runs in BOTH the
 // server-side render pass of this "use client" module and the browser bundle after hydration —
@@ -18,7 +18,8 @@ import "./dict-shell";
  */
 
 export type { LangCode };
-export { LANG_OPTIONS };
+export { LANG_OPTIONS, DATE_LOCALE };
+export { readStoredLang } from "./client-text";
 
 interface Ctx {
   lang: LangCode;

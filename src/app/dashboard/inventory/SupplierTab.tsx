@@ -181,7 +181,7 @@ export function SupplierTab() {
             ).replace("{n}", String(removing.supplier.usageCount))}
           </p>
           <select className={inputCls} value={removing.targetId} onChange={(e) => setRemoving({ ...removing, targetId: e.target.value })}>
-            <option value="">{t("inventory.supplier.chooseTarget", "Pilih supplier tujuan...")}</option>
+            <option value="">{t("inventory.supplier.chooseTargetOption", "Pilih supplier tujuan...")}</option>
             {(rows ?? [])
               .filter((r) => r.id !== removing.supplier.id && !r.archivedAt)
               .map((r) => <option key={r.id} value={r.id}>{r.name}{r.phone ? ` · ${r.phone}` : ""}</option>)}

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { AlertTriangle, Info, PencilLine } from "lucide-react";
 import { __registerDialogListener, DialogState } from "@/lib/ui/dialog";
 import { Button } from "./ui/Button";
+import { readStoredLang } from "@/lib/i18n/dashboard-lang";
+import { translate } from "@/lib/i18n/registry";
+import "@/lib/i18n/dict-shell";
 
 /**
  * Renders whatever the current showAlert()/showConfirm()/showPrompt() call (see lib/ui/dialog.ts)
@@ -32,6 +35,9 @@ export function DialogHost() {
 
   if (!state) return null;
 
+  // Dipasang di root layout (di luar DashboardLangProvider), jadi bahasanya dibaca saat dialog dibuka.
+  const lang = readStoredLang();
+  const t = (key: string, fallback: string) => translate(lang, key, fallback);
   const isConfirm = state.kind === "confirm";
   const isPrompt = state.kind === "prompt";
   const promptOpts = state.kind === "prompt" ? state.options : undefined;
@@ -102,7 +108,7 @@ export function DialogHost() {
                     onChange={(e) => setTeks(e.target.value)}
                   />
                 )}
-                {wajib && !teks.trim() && <div className="mt-1 text-[11px] text-neutral-500">Wajib diisi.</div>}
+                {wajib && !teks.trim() && <div className="mt-1 text-[11px] text-neutral-500">{t("dialog.required", "Wajib diisi.")}</div>}
               </div>
             )}
           </div>
@@ -110,11 +116,11 @@ export function DialogHost() {
         <div className="flex justify-end gap-2">
           {(isConfirm || isPrompt) && (
             <Button variant="ghost" onClick={() => settle(false)}>
-              {state.options?.cancelLabel ?? "Batal"}
+              {state.options?.cancelLabel ?? t("dialog.cancel", "Batal")}
             </Button>
           )}
           <Button variant={danger ? "danger" : "primary"} onClick={() => settle(true)} disabled={!bolehKirim}>
-            {isConfirm || isPrompt ? state.options?.confirmLabel ?? (isPrompt ? "Simpan" : "Ya, Lanjutkan") : "OK"}
+            {isConfirm || isPrompt ? state.options?.confirmLabel ?? (isPrompt ? t("dialog.save", "Simpan") : t("dialog.confirm", "Ya, Lanjutkan")) : t("dialog.ok", "OK")}
           </Button>
         </div>
       </div>

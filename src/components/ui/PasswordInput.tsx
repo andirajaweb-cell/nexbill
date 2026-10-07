@@ -15,6 +15,7 @@
 // wrappers) without fighting it.
 import { forwardRef, useState, type InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 
 type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   wrapperClassName?: string;
@@ -23,6 +24,7 @@ type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & 
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
   ({ className = "", wrapperClassName = "", ...props }, ref) => {
     const [visible, setVisible] = useState(false);
+    const { t } = useDashboardLang();
     return (
       <div className={`relative ${wrapperClassName}`}>
         <input
@@ -39,7 +41,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           tabIndex={-1}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => setVisible((v) => !v)}
-          aria-label={visible ? "Sembunyikan password" : "Tampilkan password"}
+          aria-label={visible ? t("password.hide", "Sembunyikan password") : t("password.show", "Tampilkan password")}
           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors"
         >
           {visible ? <EyeOff size={16} strokeWidth={1.75} /> : <Eye size={16} strokeWidth={1.75} />}

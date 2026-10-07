@@ -10,6 +10,34 @@
 
 export type PaperWidth = 58 | 80;
 
+/**
+ * Bahasa struk: hanya Indonesia & Inggris. Struk dipegang pelanggan, jadi tidak ikut 6 bahasa dashboard —
+ * dashboard berbahasa Indonesia mencetak struk Indonesia, bahasa lain mencetak struk Inggris.
+ */
+export type ReceiptLang = "id" | "en";
+export const receiptLangFor = (dashboardLang: string | null | undefined): ReceiptLang => (dashboardLang === "id" || !dashboardLang ? "id" : "en");
+export const RECEIPT_LOCALE: Record<ReceiptLang, string> = { id: "id-ID", en: "en-US" };
+
+/** Label struk per bahasa — dipakai struk ESC/POS (di bawah) dan halaman /receipt/[id], supaya keduanya identik. */
+export const RECEIPT_TEXT: Record<ReceiptLang, {
+  receipt: string; no: string; date: string; subtotal: string; discount: string; serviceCharge: string; tax: string; rounding: string;
+  total: string; paymentMethod: string; status: string; paid: string; thanks: string;
+  testHeader: string; testPaper: string; testChars: string; testTime: string; testItem1: string; testItem2: string; testFooter1: string; testFooter2: string;
+}> = {
+  id: {
+    receipt: "Struk", no: "No", date: "Tanggal", subtotal: "Subtotal", discount: "Diskon", serviceCharge: "Service Charge", tax: "Pajak", rounding: "Pembulatan",
+    total: "TOTAL", paymentMethod: "Metode Bayar", status: "Status", paid: "LUNAS", thanks: "Terima kasih!",
+    testHeader: "Tes cetak printer Bluetooth", testPaper: "Kertas", testChars: "karakter", testTime: "Waktu", testItem1: "Rental PS5 - 1 jam", testItem2: "Es teh manis",
+    testFooter1: "Jika teks rapi & tidak terpotong,", testFooter2: "printer siap dipakai.",
+  },
+  en: {
+    receipt: "Receipt", no: "No", date: "Date", subtotal: "Subtotal", discount: "Discount", serviceCharge: "Service Charge", tax: "Tax", rounding: "Rounding",
+    total: "TOTAL", paymentMethod: "Payment", status: "Status", paid: "PAID", thanks: "Thank you!",
+    testHeader: "Bluetooth printer test print", testPaper: "Paper", testChars: "characters", testTime: "Time", testItem1: "PS5 rental - 1 hour", testItem2: "Iced sweet tea",
+    testFooter1: "If the text is neat & not cut off,", testFooter2: "the printer is ready to use.",
+  },
+};
+
 /** Jumlah karakter per baris dengan font A standar. */
 export const CHARS_PER_LINE: Record<PaperWidth, number> = { 58: 32, 80: 48 };
 
@@ -194,55 +222,61 @@ const defaultMoney = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-I
  * Data /api/orders/[id]/receipt → ReceiptDoc. Isi & label sama persis dengan halaman struk
  * /receipt/[id] supaya cetak Bluetooth dan cetak dialog sistem identik.
  */
-export function receiptDocFromOrder(data: ReceiptApiData, opts: { formatMoney?: (n: number) => string; formatDate?: (iso: string) => string } = {}): ReceiptDoc {
+export function receiptDocFromOrder(
+  data: ReceiptApiData,
+  opts: { formatMoney?: (n: number) => string; formatDate?: (iso: string) => string; lang?: ReceiptLang } = {}
+): ReceiptDoc {
+  const L = RECEIPT_TEXT[opts.lang ?? "id"];
   const money = opts.formatMoney ?? defaultMoney;
-  const fmtDate = opts.formatDate ?? ((iso: string) => new Date(iso).toLocaleString("id-ID"));
+  const fmtDate = opts.formatDate ?? ((iso: string) => new Date(iso).toLocaleString(RECEIPT_LOCALE[opts.lang ?? "id"]));
   const { order, items, payments, outlet } = data;
-  const totals: ReceiptLine[] = [{ label: "Subtotal", value: money(order.subtotal) }];
-  if ((order.discount ?? 0) > 0) totals.push({ label: "Diskon", value: `-${money(order.discount ?? 0)}` });
-  if ((order.serviceCharge ?? 0) > 0) totals.push({ label: "Service Charge", value: money(order.serviceCharge ?? 0) });
-  if ((order.tax ?? 0) > 0) totals.push({ label: "Pajak", value: money(order.tax ?? 0) });
+  const totals: ReceiptLine[] = [{ label: L.subtotal, value: money(order.subtotal) }];
+  if ((order.discount ?? 0) > 0) totals.push({ label: L.discount, value: `-${money(order.discount ?? 0)}` });
+  if ((order.serviceCharge ?? 0) > 0) totals.push({ label: L.serviceCharge, value: money(order.serviceCharge ?? 0) });
+  if ((order.tax ?? 0) > 0) totals.push({ label: L.tax, value: money(order.tax ?? 0) });
   const rounding = order.roundingAdjustment ?? 0;
-  if (rounding !== 0) totals.push({ label: "Pembulatan", value: `${rounding > 0 ? "" : "-"}${money(Math.abs(rounding))}` });
-  totals.push({ label: "TOTAL", value: money(order.total), bold: true });
+  if (rounding !== 0) totals.push({ label: L.rounding, value: `${rounding > 0 ? "" : "-"}${money(Math.abs(rounding))}` });
+  totals.push({ label: L.total, value: money(order.total), bold: true });
 
   const success = payments.find((p) => p.status === "success");
   const payment: ReceiptLine[] = success
     ? [
-        { label: "Metode Bayar", value: String(success.method ?? "").toUpperCase() },
-        { label: "Status", value: "LUNAS", bold: true },
+        { label: L.paymentMethod, value: String(success.method ?? "").toUpperCase() },
+        { label: L.status, value: L.paid, bold: true },
       ]
     : [];
 
   return {
-    title: outlet?.name || "Struk",
+    title: outlet?.name || L.receipt,
     headerLines: [outlet?.address ?? "", outlet?.phone ?? ""],
     meta: [
-      { label: "No", value: order.id.slice(0, 8).toUpperCase() },
-      { label: "Tanggal", value: fmtDate(order.createdAt) },
+      { label: L.no, value: order.id.slice(0, 8).toUpperCase() },
+      { label: L.date, value: fmtDate(order.createdAt) },
     ],
     items: items.map((i) => ({ name: i.description, qty: i.qty, total: money(i.lineTotal) })),
     totals,
     payment,
-    footerLines: [(outlet?.receiptFooterText || "Terima kasih!").trim()],
+    // Teks penutup yang diisi outlet sendiri (Pengaturan → Printer & Struk) dicetak apa adanya.
+    footerLines: [(outlet?.receiptFooterText || L.thanks).trim()],
   };
 }
 
 /** Struk uji untuk tombol "Tes Cetak" di Pengaturan. */
-export function testReceiptDoc(outletName: string, paper: PaperWidth, when: string): ReceiptDoc {
+export function testReceiptDoc(outletName: string, paper: PaperWidth, when: string, lang: ReceiptLang = "id"): ReceiptDoc {
+  const L = RECEIPT_TEXT[lang];
   return {
     title: outletName || "NEXBILL",
-    headerLines: ["Tes cetak printer Bluetooth"],
+    headerLines: [L.testHeader],
     meta: [
-      { label: "Kertas", value: `${paper}mm (${CHARS_PER_LINE[paper]} karakter)` },
-      { label: "Waktu", value: when },
+      { label: L.testPaper, value: `${paper}mm (${CHARS_PER_LINE[paper]} ${L.testChars})` },
+      { label: L.testTime, value: when },
     ],
     items: [
-      { name: "Rental PS5 - 1 jam", qty: 1, total: "Rp15.000" },
-      { name: "Es teh manis", qty: 2, total: "Rp10.000" },
+      { name: L.testItem1, qty: 1, total: "Rp15.000" },
+      { name: L.testItem2, qty: 2, total: "Rp10.000" },
     ],
-    totals: [{ label: "TOTAL", value: "Rp25.000", bold: true }],
+    totals: [{ label: L.total, value: "Rp25.000", bold: true }],
     payment: [],
-    footerLines: ["Jika teks rapi & tidak terpotong,", "printer siap dipakai."],
+    footerLines: [L.testFooter1, L.testFooter2],
   };
 }

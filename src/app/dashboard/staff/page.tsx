@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { PasswordInput } from "@/components/ui/PasswordInput";
-import { roleLabel, hasPermission, StaffRole, Permission, PERMISSION_GROUPS, PERMISSION_LABEL } from "@/lib/auth/permissions";
+import { roleLabel, hasPermission, StaffRole, Permission, PERMISSION_GROUPS, PERMISSION_LABEL, PERMISSION_LABEL_KEY } from "@/lib/auth/permissions";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
@@ -82,15 +82,15 @@ export default function StaffPage() {
     const self = s.id === meId;
     const ok = await showConfirm(
       self
-        ? "Keluarkan akunmu sendiri dari perangkat ini? Kamu akan diminta login lagi."
-        : `Keluarkan ${s.name} dari perangkat yang sedang dipakainya? Sesi di perangkat itu langsung berakhir dan ${s.name} bisa login di perangkat lain.`
+        ? t("staff.session.revokeSelfConfirm", "Keluarkan akunmu sendiri dari perangkat ini? Kamu akan diminta login lagi.")
+        : t("staff.session.revokeConfirm", "Keluarkan {name} dari perangkat yang sedang dipakainya? Sesi di perangkat itu langsung berakhir dan {name} bisa login di perangkat lain.").replaceAll("{name}", s.name)
     );
     if (!ok) return;
     setSessionBusy(s.id);
     try {
       const res = await fetch(`/api/staff/${s.id}/revoke-session`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return showAlert(data.error ?? "Gagal mengeluarkan sesi.");
+      if (!res.ok) return showAlert(data.error ?? t("staff.session.revokeFailed", "Gagal mengeluarkan sesi."));
       if (data.self) {
         router.replace("/login?error=session_ended");
         return;
@@ -104,15 +104,15 @@ export default function StaffPage() {
   const toggleSingleDevice = async (on: boolean) => {
     const ok = await showConfirm(
       on
-        ? "Aktifkan aturan satu akun satu perangkat? Akun yang sedang aktif di satu browser tidak bisa login di browser/PC lain sampai logout, 30 menit tidak dipakai, atau dikeluarkan dari halaman ini."
-        : "Matikan aturan ini? Satu akun bisa login di beberapa browser/PC sekaligus — kurang aman bila password staf bocor. Matikan hanya bila outlet memang memakai satu akun di beberapa perangkat (mis. kasir + tablet dapur)."
+        ? t("staff.session.singleDeviceOnConfirm", "Aktifkan aturan satu akun satu perangkat? Akun yang sedang aktif di satu browser tidak bisa login di browser/PC lain sampai logout, 30 menit tidak dipakai, atau dikeluarkan dari halaman ini.")
+        : t("staff.session.singleDeviceOffConfirm", "Matikan aturan ini? Satu akun bisa login di beberapa browser/PC sekaligus — kurang aman bila password staf bocor. Matikan hanya bila outlet memang memakai satu akun di beberapa perangkat (mis. kasir + tablet dapur).")
     );
     if (!ok) return;
     setSessionBusy("toggle");
     try {
       const res = await fetch("/api/staff/sessions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ singleDeviceLogin: on }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return showAlert(data.error ?? "Gagal menyimpan.");
+      if (!res.ok) return showAlert(data.error ?? t("staff.session.saveFailed", "Gagal menyimpan."));
       if (outletId) load(outletId);
     } finally {
       setSessionBusy(null);
@@ -122,7 +122,11 @@ export default function StaffPage() {
   const ago = (iso: string | null) => {
     if (!iso) return "";
     const m = Math.max(0, Math.round((sessionCheckedAt - new Date(iso).getTime()) / 60000));
-    return m < 1 ? "baru saja" : m < 60 ? `${m} menit lalu` : `${Math.round(m / 60)} jam lalu`;
+    return m < 1
+      ? t("staff.session.justNow", "baru saja")
+      : m < 60
+        ? t("staff.session.minutesAgo", "{n} menit lalu").replace("{n}", String(m))
+        : t("staff.session.hoursAgo", "{n} jam lalu").replace("{n}", String(Math.round(m / 60)));
   };
 
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
@@ -170,7 +174,7 @@ export default function StaffPage() {
   };
 
   const resetRole = async (role: StaffRole) => {
-    if (!await showConfirm(t("staff.confirm.resetRole", 'Kembalikan izin role "{role}" ke pengaturan bawaan aplikasi?').replace("{role}", roleLabel(role)))) return;
+    if (!await showConfirm(t("staff.confirm.resetRole", 'Kembalikan izin role "{role}" ke pengaturan bawaan aplikasi?').replace("{role}", roleLabel(role, t)))) return;
     setMatrixMsg("");
     const res = await fetch("/api/role-permissions", {
       method: "DELETE",
@@ -282,13 +286,13 @@ export default function StaffPage() {
                 <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("staff.addStaff.emailPlaceholder", "Email")} value={newStaff.email} onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })} />
                 <PasswordInput wrapperClassName="w-full" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("staff.addStaff.passwordPlaceholder", "Password")} value={newStaff.password} onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
                 <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={newStaff.role} onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value as StaffRole })}>
-                  {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                  {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r, t)}</option>)}
                 </select>
                 <Button onClick={createStaff}>{t("staff.addStaff.addBtn", "Tambah")}</Button>
               </div>
             </Card>
           ) : (
-            <div className="text-xs text-neutral-500 italic">{t("staff.addStaff.noPermission", "Role kamu ({role}) tidak punya izin menambah staf.").replace("{role}", roleLabel(myRole))}</div>
+            <div className="text-xs text-neutral-500 italic">{t("staff.addStaff.noPermission", "Role kamu ({role}) tidak punya izin menambah staf.").replace("{role}", roleLabel(myRole, t))}</div>
           )}
 
           {sessionInfo && (
@@ -323,9 +327,9 @@ export default function StaffPage() {
                           {/* Legacy Superuser accounts keep showing their real role so the select isn't forced onto a wrong value —
                               it's not a real option to switch TO though (disabled), matching the server-side block on promoting to superuser. */}
                           {s.role === "superuser" && <option value="superuser" disabled>{t("staff.table.superuserReserved", "Superuser (reserved)")}</option>}
-                          {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                          {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r, t)}</option>)}
                         </select>
-                      ) : roleLabel(s.role)}
+                      ) : roleLabel(s.role, t)}
                     </td>
                     <td><Badge status={s.isActive ? "available" : "maintenance"}>{s.isActive ? t("staff.status.active", "Aktif") : t("staff.status.inactive", "Nonaktif")}</Badge></td>
                     <td className="text-xs">
@@ -334,10 +338,10 @@ export default function StaffPage() {
                         if (!ss?.hasSession) return <span className="text-neutral-500">—</span>;
                         return (
                           <div>
-                            <span className={ss.active ? "text-emerald-400" : "text-neutral-500"}>{ss.device ?? "Perangkat"}</span>
-                            {ss.isYou && <span className="ml-1 text-[10px] text-sky-400">(kamu)</span>}
+                            <span className={ss.active ? "text-emerald-400" : "text-neutral-500"}>{ss.device ?? t("staff.session.device", "Perangkat")}</span>
+                            {ss.isYou && <span className="ml-1 text-[10px] text-sky-400">{t("staff.session.you", "(kamu)")}</span>}
                             <div className="text-[10px] text-neutral-500">
-                              {ss.active ? `aktif ${ago(ss.lastSeen)}` : `tidak aktif sejak ${ago(ss.lastSeen)}`}
+                              {(ss.active ? t("staff.session.activeAgo", "aktif {ago}") : t("staff.session.inactiveSince", "tidak aktif sejak {ago}")).replace("{ago}", ago(ss.lastSeen))}
                               {ss.ip ? ` · ${ss.ip}` : ""}
                             </div>
                           </div>
@@ -449,7 +453,7 @@ export default function StaffPage() {
                     <th className="py-2 pr-4 sticky left-0 bg-neutral-950">{t("staff.roles.permissionCol", "Izin")}</th>
                     {ROLES.map((r) => (
                       <th key={r} className="px-3 py-2 text-center whitespace-nowrap">
-                        <div>{roleLabel(r)}</div>
+                        <div>{roleLabel(r, t)}</div>
                         <button onClick={() => resetRole(r)} className="text-[10px] font-normal text-neutral-500 hover:text-emerald-400 underline underline-offset-2">
                           {t("staff.roles.resetBtn", "reset")}
                         </button>
@@ -459,10 +463,10 @@ export default function StaffPage() {
                 </thead>
                 <tbody>
                   {PERMISSION_GROUPS.map((group) => (
-                    <FragmentGroup key={group.group} groupLabel={group.group} colSpan={ROLES.length + 1}>
+                    <FragmentGroup key={group.group} groupLabel={t(group.groupKey, group.group)} colSpan={ROLES.length + 1}>
                       {group.permissions.map((permission) => (
                         <tr key={permission} className="border-b border-neutral-900">
-                          <td className="py-2 pr-4 sticky left-0 bg-neutral-950 text-neutral-300">{PERMISSION_LABEL[permission]}</td>
+                          <td className="py-2 pr-4 sticky left-0 bg-neutral-950 text-neutral-300">{t(PERMISSION_LABEL_KEY[permission], PERMISSION_LABEL[permission])}</td>
                           {ROLES.map((role) => {
                             const key = `${role}:${permission}`;
                             const locked = role === "superuser" && permission === "manage_staff";

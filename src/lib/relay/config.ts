@@ -60,6 +60,7 @@
  */
 
 import type { RelayAction, RelayCapability } from "./capabilities";
+import type { RelayLocalConfigMessage, RelayLocalConfigRequest, RelayLocalInfo } from "./local-control";
 
 // WebSocket port: agents connect here (outbound from the outlet).
 export const RELAY_WS_PORT = Number(process.env.RELAY_WS_PORT || 8081);
@@ -129,6 +130,8 @@ export interface RelayAuthMessage {
   agentVersion?: string;
   capabilities?: string[];
   os?: string;
+  /** v1.4+: alamat LAN halaman Kontrol Lokal (lib/relay/local-control.ts). */
+  local?: RelayLocalInfo;
 }
 
 /**
@@ -190,12 +193,13 @@ export interface RelayPongMessage {
   type: "pong";
 }
 
-export type RelayAgentToHubMessage = RelayAuthMessage | RelayResultMessage | RelayPingMessage;
+export type RelayAgentToHubMessage = RelayAuthMessage | RelayResultMessage | RelayPingMessage | RelayLocalConfigRequest;
 export type RelayHubToAgentMessage =
   | RelayAuthOkMessage
   | RelayAuthErrorMessage
   | RelayCommandMessage
-  | RelayPongMessage;
+  | RelayPongMessage
+  | RelayLocalConfigMessage;
 
 /** Body the Next.js adapter POSTs to the hub's internal /dispatch endpoint. */
 export interface RelayDispatchRequest {

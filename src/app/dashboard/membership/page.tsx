@@ -10,7 +10,7 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-membership";
 import { isPaidTier, summarizeTierBenefits, isMembershipActive, sisaHariKeanggotaan } from "@/lib/membership/tier-benefits";
 import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
@@ -27,8 +27,10 @@ const TAB_LABEL_KEY: Record<Tab, string> = {
 };
 
 const LOYALTY_TYPE_LABEL: Record<string, string> = { earn: "Diperoleh", redeem: "Ditukar", adjust: "Penyesuaian", expire: "Kedaluwarsa" };
+const LOYALTY_TYPE_KEY: Record<string, string> = { earn: "membership.loyaltyType.earn", redeem: "membership.loyaltyType.redeem", adjust: "membership.loyaltyType.adjust", expire: "membership.loyaltyType.expire" };
 const LOYALTY_TYPE_BADGE: Record<string, string> = { earn: "success", redeem: "pending", adjust: "unknown", expire: "failed" };
 const RENTAL_STATUS_LABEL: Record<string, string> = { running: "Berjalan", paused: "Jeda", finished: "Selesai", cancelled: "Batal" };
+const RENTAL_STATUS_KEY: Record<string, string> = { running: "membership.rentalStatus.running", paused: "membership.rentalStatus.paused", finished: "membership.rentalStatus.finished", cancelled: "membership.rentalStatus.cancelled" };
 const RENTAL_STATUS_BADGE: Record<string, string> = { running: "running", paused: "pending", finished: "finished", cancelled: "failed" };
 
 export default function MembershipPage() {
@@ -78,7 +80,7 @@ function MembershipPageInner() {
 }
 
 function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initialCustomerId?: string | null }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { user } = useAuth();
   const role = (user?.role ?? "cashier") as StaffRole;
   const canDelete = isSuperRole(user?.role);
@@ -98,7 +100,7 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
   // Active methods from /dashboard/payments incl. QRIS/rekening instructions — see usePaymentMethods.
   const { methods: paymentMethodOptions, find: findMethod, labelOf: methodLabel } = usePaymentMethods();
   const [sellBusy, setSellBusy] = useState(false);
-  const tr = (map: Record<string, string>, prefix: string, key: string) => t(`membership.${prefix}.${key}`, map[key] ?? key);
+  const tr = (map: Record<string, string>, keys: Record<string, string>, key: string) => (keys[key] ? t(keys[key], map[key] ?? key) : map[key] ?? key);
 
   const load = () => fetchJsonArray(`/api/customers${search ? `?search=${search}` : ""}`).then(setCustomers);
   useEffect(() => { load(); }, [search]);
@@ -301,7 +303,7 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
               {detail.orderHistory.length === 0 && <div className="text-xs text-neutral-600">{t("membership.noOrders", "Belum ada order.")}</div>}
               {detail.orderHistory.slice(0, expanded.orders ? undefined : 5).map((o: any) => (
                 <div key={o.id} className="text-xs flex justify-between py-0.5">
-                  <span>{new Date(o.createdAt).toLocaleDateString("id-ID")} · {o.source === "pos" ? t("membership.posSourceLabel", "Kasir") : o.source}</span>
+                  <span>{new Date(o.createdAt).toLocaleDateString(DATE_LOCALE[lang])} · {o.source === "pos" ? t("membership.posSourceLabel", "Kasir") : o.source}</span>
                   <span>{rupiah(o.total)}</span>
                 </div>
               ))}
@@ -320,11 +322,11 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
               {detail.rentalHistory.slice(0, expanded.rentals ? undefined : 5).map((r: any) => (
                 <div key={r.id} className="text-xs flex items-center justify-between py-0.5">
                   <div>
-                    <div>{new Date(r.startedAt).toLocaleDateString("id-ID")} · {r.unitName ?? t("membership.unitFallback", "Unit")}{r.gameName ? ` · ${r.gameName}` : ""}</div>
+                    <div>{new Date(r.startedAt).toLocaleDateString(DATE_LOCALE[lang])} · {r.unitName ?? t("membership.unitFallback", "Unit")}{r.gameName ? ` · ${r.gameName}` : ""}</div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span>{rupiah(r.totalAmount ?? 0)}</span>
-                    <Badge status={RENTAL_STATUS_BADGE[r.status] ?? "unknown"}>{tr(RENTAL_STATUS_LABEL, "rentalStatus", r.status)}</Badge>
+                    <Badge status={RENTAL_STATUS_BADGE[r.status] ?? "unknown"}>{tr(RENTAL_STATUS_LABEL, RENTAL_STATUS_KEY, r.status)}</Badge>
                   </div>
                 </div>
               ))}
@@ -344,8 +346,8 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
                 <div key={lt.id} className="text-xs flex items-center justify-between py-0.5 gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <Badge status={LOYALTY_TYPE_BADGE[lt.type] ?? "unknown"}>{tr(LOYALTY_TYPE_LABEL, "loyaltyType", lt.type)}</Badge>
-                      <span className="text-neutral-600">{new Date(lt.createdAt).toLocaleDateString("id-ID")}</span>
+                      <Badge status={LOYALTY_TYPE_BADGE[lt.type] ?? "unknown"}>{tr(LOYALTY_TYPE_LABEL, LOYALTY_TYPE_KEY, lt.type)}</Badge>
+                      <span className="text-neutral-600">{new Date(lt.createdAt).toLocaleDateString(DATE_LOCALE[lang])}</span>
                     </div>
                     {lt.note && <div className="text-neutral-500 truncate">{lt.note}</div>}
                   </div>

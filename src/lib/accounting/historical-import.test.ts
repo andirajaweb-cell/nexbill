@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { normalizeHeader, parseAmount, parseImportDate, resolveOption, rowFingerprint } from "./historical-import";
+import { mapHeaders, normalizeHeader, parseAmount, parseImportDate, resolveOption, rowFingerprint } from "./historical-import";
+import { TEMPLATE_COLUMNS, templateHeaders, templateLangFor, type HistoricalCategory } from "./historical-import-columns";
 
 /*
  * Impor Data Historis dulu salah membaca dua hal paling dasar dari Excel:
@@ -62,5 +63,43 @@ describe("headers, options, fingerprint", () => {
     expect(rowFingerprint("penjualan", "kas", row, 1)).toBe(a1);
     expect(rowFingerprint("penjualan", "kas", row, 2)).not.toBe(a1);
     expect(rowFingerprint("penjualan", "saldo_awal", row, 1)).not.toBe(a1);
+  });
+});
+
+/*
+ * Template tersedia dalam Bahasa Indonesia dan Inggris. Judul kolom di layar dan di file berasal dari
+ * TEMPLATE_COLUMNS, jadi setiap judul (dua bahasa) harus terbaca kembali ke kolom yang benar — dan
+ * file Indonesia tetap bisa diimpor dari dashboard berbahasa Inggris, begitu pula sebaliknya.
+ */
+describe("bilingual template columns", () => {
+  const categories = Object.keys(TEMPLATE_COLUMNS) as HistoricalCategory[];
+
+  it.each(categories.flatMap((c) => (["id", "en"] as const).map((l) => [c, l] as const)))("%s template (%s) headers map back to their columns", (category, lang) => {
+    const headers = templateHeaders(category, lang);
+    const idx = mapHeaders(headers);
+    TEMPLATE_COLUMNS[category].forEach((col, i) => expect(idx[col.key]).toBe(i));
+  });
+
+  it("uses English headers for the English template", () => {
+    expect(templateHeaders("penjualan", "en").slice(0, 2)).toEqual(["Date*", "Revenue Category"]);
+    expect(templateHeaders("penjualan", "id").slice(0, 2)).toEqual(["Tanggal*", "Kategori Pendapatan"]);
+  });
+
+  it("picks the Indonesian template only for an Indonesian dashboard", () => {
+    expect(templateLangFor("id")).toBe("id");
+    for (const l of ["en", "ms", "th", "fil", "vi", null, undefined]) expect(templateLangFor(l)).toBe("en");
+  });
+
+  it("still reads legacy Indonesian headers", () => {
+    const idx = mapHeaders(["Tgl", "Kategori", "Kode Akun", "Keterangan", "Jumlah", "Metode", "Pihak"]);
+    expect(idx).toMatchObject({ tanggal: 0, kategori: 1, kodeAkun: 2, deskripsi: 3, nominal: 4, metode: 5, pihak: 6 });
+  });
+
+  it("matches option labels in either language", () => {
+    const opts = { cash: ["Tunai (Cash)", "Cash"], transfer: ["Transfer Bank", "Bank Transfer"] };
+    expect(resolveOption("Cash", opts)).toBe("cash");
+    expect(resolveOption("tunai", opts)).toBe("cash");
+    expect(resolveOption("Bank Transfer", opts)).toBe("transfer");
+    expect(resolveOption("Transfer Bank", opts)).toBe("transfer");
   });
 });

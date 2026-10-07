@@ -4,7 +4,7 @@ import { Check, Copy, Smartphone, BatteryCharging, Wifi, AlertTriangle } from "l
 import { Button } from "@/components/ui/Button";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-devices-guide";
-import { RelayIllustration, type RelayIllustrationKind } from "@/components/devices/AndroidRelayIllustrations";
+import { RelayIllustration, relayIllustrationLang, type RelayIllustrationKind } from "@/components/devices/AndroidRelayIllustrations";
 import { ANDROID_GUIDE_URL } from "@/components/devices/AndroidRelayVisualGuide";
 
 /**
@@ -46,10 +46,11 @@ function CopyCommand({ command }: { command: string }) {
 }
 
 function Step({ n, title, illus, children }: { n: number; title: string; illus: RelayIllustrationKind; children: React.ReactNode }) {
+  const { lang } = useDashboardLang();
   return (
     <div className="grid gap-3 sm:grid-cols-[150px_1fr] items-start rounded-xl border border-neutral-800 bg-white/[0.015] p-3">
       <div className="max-w-[220px] sm:max-w-none">
-        <RelayIllustration kind={illus} />
+        <RelayIllustration kind={illus} lang={relayIllustrationLang(lang)} />
       </div>
       <div className="flex gap-3">
         <div className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20 text-[11px] font-bold text-cyan-300">{n}</div>

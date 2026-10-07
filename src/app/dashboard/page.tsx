@@ -275,7 +275,7 @@ export default function OwnerDashboardPage() {
 
       <SectionTitle>{t("section.revenueProfit")}</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard label={t("stat.todayRevenue")} value={data ? rupiah(data.omzet) : "—"} glow="emerald" icon={Wallet} sub={data ? `${data.transactionsCount} transaksi lunas` : undefined} />
+        <StatCard label={t("stat.todayRevenue")} value={data ? rupiah(data.omzet) : "—"} glow="emerald" icon={Wallet} sub={data ? t("stat.paidTransactions", "{n} transaksi lunas").replace("{n}", String(data.transactionsCount)) : undefined} />
         <StatCard label={t("stat.rentalRevenue")} value={data ? rupiah(data.revenueRental) : "—"} glow="cyan" icon={Gamepad2} />
         <StatCard label={t("stat.fnbRevenue")} value={data ? rupiah(data.revenueFnb) : "—"} glow="purple" icon={ShoppingBag} />
         <StatCard label={t("stat.otherProductRevenue")} value={data ? rupiah(data.revenueProduk) : "—"} glow="blue" icon={Coins} sub={t("stat.otherProductSub")} />

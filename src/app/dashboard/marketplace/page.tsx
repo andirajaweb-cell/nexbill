@@ -12,9 +12,6 @@ import {
   bersihUntukPenjual,
   bolehPindahStatus,
   bolehDilakukanOleh,
-  KATEGORI_LABEL,
-  KONDISI_LABEL,
-  STATUS_DEAL_LABEL,
   UJRAH_CONFIG_DEFAULT,
   UJRAH_AKTIF,
   ujrahConfigBerlaku,
@@ -22,14 +19,21 @@ import {
   type PeranDeal,
 } from "@/lib/marketplace/ujrah";
 import { MAX_FOTO_BARANG } from "@/lib/marketplace/photos";
-import { cariKontakDalamTeks, linkWhatsApp, ALASAN_TARIK, type AlasanTarik } from "@/lib/marketplace/anti-bypass";
+import { cariKontakDalamTeks, linkWhatsApp, type AlasanTarik } from "@/lib/marketplace/anti-bypass";
 import { unggahFotoMarketplace } from "@/lib/marketplace/upload-client";
 import { AMBANG } from "@/lib/marketplace/trust";
 import { BadgeKepercayaan, ModalProfilOutlet, TipsTransaksiAman, KeamananTab, PanelKeamananDeal, DaftarAduanSaya } from "./trust-ui";
+import { useMarketplaceLabels } from "./labels";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const TABS = ["Etalase", "Barang Saya", "Kesepakatan", "Keamanan & Rekening"] as const;
 type Tab = (typeof TABS)[number];
+const TAB_KEY: Record<Tab, string> = {
+  Etalase: "marketplace.tab.showcase",
+  "Barang Saya": "marketplace.tab.myItems",
+  Kesepakatan: "marketplace.tab.deals",
+  "Keamanan & Rekening": "marketplace.tab.security",
+};
 
 const STATUS_BADGE: Record<DealStatus, string> = {
   requested: "pending",
@@ -47,11 +51,12 @@ const labelKecil = "block text-[11px] uppercase tracking-wide text-neutral-500 m
  * — ini hanya supaya pengguna tahu sebelum menekan tombol, bukan setelah semua isian terisi.
  */
 function PeringatanKontak({ teks }: { teks: string }) {
+  const { t, jenisKontak } = useMarketplaceLabels();
   const jenis = cariKontakDalamTeks(teks);
   if (!jenis) return null;
   return (
     <p className="mt-1 text-[11px] text-amber-400">
-      Terdeteksi {jenis}. Hapus dulu — nomor HP dibuka otomatis setelah penawaran diterima, jadi tidak perlu ditulis di sini.
+      {t("marketplace.contactDetected", "Terdeteksi {jenis}. Hapus dulu — nomor HP dibuka otomatis setelah penawaran diterima, jadi tidak perlu ditulis di sini.").replace("{jenis}", jenisKontak(jenis))}
     </p>
   );
 }
@@ -67,6 +72,7 @@ function PeringatanKontak({ teks }: { teks: string }) {
  * justru bagi kepercayaan yang jadi modal utama marketplace ini.
  */
 export default function MarketplacePage() {
+  const { t } = useMarketplaceLabels();
   const { user } = useAuth();
   const role = (user?.role ?? "cashier") as StaffRole;
   const bolehTransaksi = hasPermission(role, "manage_marketplace");
@@ -78,9 +84,9 @@ export default function MarketplacePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="gm-display text-2xl font-bold gm-gradient-title">Marketplace Antar-Outlet</h1>
+        <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("marketplace.title", "Marketplace Antar-Outlet")}</h1>
         <p className="text-sm text-neutral-500">
-          Jual stok berlebih Anda ke outlet lain, atau beli dari mereka. Pembayaran dilakukan langsung antar-outlet — NEXBILL hanya mempertemukan dan mencatat.
+          {t("marketplace.subtitle", "Jual stok berlebih Anda ke outlet lain, atau beli dari mereka. Pembayaran dilakukan langsung antar-outlet — NEXBILL hanya mempertemukan dan mencatat.")}
         </p>
       </div>
 
@@ -88,34 +94,37 @@ export default function MarketplacePage() {
         {UJRAH_AKTIF ? (
           <>
             <p className="text-xs text-neutral-300">
-              <span className="font-medium text-emerald-300">Biaya jasa (ujrah):</span> {rupiah(UJRAH_CONFIG_DEFAULT.nominal)} per transaksi yang selesai, ditagihkan ke penjual — nominalnya tetap, tidak
-              mengambil persentase dari harga barang. Transaksi di bawah {rupiah(UJRAH_CONFIG_DEFAULT.hargaMinimum)} bebas biaya.
+              <span className="font-medium text-emerald-300">{t("marketplace.feeLabel", "Biaya jasa (ujrah):")}</span>{" "}
+              {t("marketplace.feeText", "{fee} per transaksi yang selesai, ditagihkan ke penjual — nominalnya tetap, tidak mengambil persentase dari harga barang. Transaksi di bawah {min} bebas biaya.")
+                .replace("{fee}", rupiah(UJRAH_CONFIG_DEFAULT.nominal))
+                .replace("{min}", rupiah(UJRAH_CONFIG_DEFAULT.hargaMinimum))}
             </p>
             <p className="mt-1 text-xs text-neutral-400">
-              Ujrah berlaku untuk setiap barang yang terjual ke outlet yang menemukannya di Etalase NEXBILL — termasuk bila pembayaran dan serah-terimanya dilakukan di luar aplikasi.
+              {t("marketplace.feeScope", "Ujrah berlaku untuk setiap barang yang terjual ke outlet yang menemukannya di Etalase NEXBILL — termasuk bila pembayaran dan serah-terimanya dilakukan di luar aplikasi.")}
             </p>
           </>
         ) : (
           <p className="text-xs text-neutral-300">
-            <span className="font-medium text-emerald-300">Gratis:</span> Marketplace Antar-Outlet saat ini tanpa biaya jasa apa pun — penjual menerima utuh sesuai harga yang disepakati.
+            <span className="font-medium text-emerald-300">{t("marketplace.freeLabel", "Gratis:")}</span>{" "}
+            {t("marketplace.freeText", "Marketplace Antar-Outlet saat ini tanpa biaya jasa apa pun — penjual menerima utuh sesuai harga yang disepakati.")}
           </p>
         )}
-        <p className="mt-1 text-xs text-neutral-400">Nomor HP penjual dan pembeli dibuka otomatis setelah penawaran diterima.</p>
+        <p className="mt-1 text-xs text-neutral-400">{t("marketplace.phonesRevealed", "Nomor HP penjual dan pembeli dibuka otomatis setelah penawaran diterima.")}</p>
       </div>
 
       {trust?.suspended && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
-          <p className="text-sm font-medium text-red-300">Akses Marketplace outlet Anda sedang ditangguhkan</p>
+          <p className="text-sm font-medium text-red-300">{t("marketplace.suspendedTitle", "Akses Marketplace outlet Anda sedang ditangguhkan")}</p>
           <p className="mt-0.5 text-xs text-neutral-300">
-            Barang Anda tidak tampil di etalase, dan Anda tidak bisa memasang, menawar, atau menerima penawaran baru. Kesepakatan yang sudah berjalan tetap bisa diselesaikan.
-            {trust.suspendedReason ? ` Alasan: ${trust.suspendedReason}` : ""} Hubungi Customer Service bila ingin mengajukan keberatan.
+            {t("marketplace.suspendedText", "Barang Anda tidak tampil di etalase, dan Anda tidak bisa memasang, menawar, atau menerima penawaran baru. Kesepakatan yang sudah berjalan tetap bisa diselesaikan.")}
+            {trust.suspendedReason ? ` ${t("marketplace.reasonPrefix", "Alasan:")} ${trust.suspendedReason}` : ""} {t("marketplace.suspendedAppeal", "Hubungi Customer Service bila ingin mengajukan keberatan.")}
           </p>
         </div>
       )}
       {trust && !trust.suspended && !trust.rekening && bolehTransaksi && (
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-neutral-300">
-          Anda belum mendaftarkan <span className="text-amber-300">rekening penerima</span>. Rekening wajib ada sebelum menerima penawaran — pembeli hanya diarahkan membayar ke rekening itu.{" "}
-          <button className="text-amber-300 underline" onClick={() => setTab("Keamanan & Rekening")}>Daftarkan sekarang</button>
+          {t("marketplace.noPayoutAccount", "Anda belum mendaftarkan rekening penerima. Rekening wajib ada sebelum menerima penawaran — pembeli hanya diarahkan membayar ke rekening itu.")}{" "}
+          <button className="text-amber-300 underline" onClick={() => setTab("Keamanan & Rekening")}>{t("marketplace.registerNow", "Daftarkan sekarang")}</button>
         </div>
       )}
 
@@ -124,7 +133,7 @@ export default function MarketplacePage() {
       <div className="flex gap-1 border-b border-neutral-800 overflow-x-auto">
         {TABS.map((item) => (
           <button key={item} onClick={() => setTab(item)} className={`shrink-0 px-3 py-2 text-sm ${tab === item ? "border-b-2 border-emerald-500 text-emerald-400" : "text-neutral-500 hover:text-neutral-300"}`}>
-            {item}
+            {t(TAB_KEY[item], item)}
           </button>
         ))}
       </div>
@@ -147,13 +156,14 @@ export default function MarketplacePage() {
 const unggahFoto = unggahFotoMarketplace;
 
 function PemilihFoto({ photos, onChange, onBusyChange }: { photos: string[]; onChange: (p: string[]) => void; onBusyChange: (busy: boolean) => void }) {
+  const { t } = useMarketplaceLabels();
   const [mengunggah, setMengunggah] = useState(0);
   const sisa = MAX_FOTO_BARANG - photos.length;
 
   const pilih = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const daftar = Array.from(files).slice(0, sisa);
-    if (files.length > sisa) showAlert(`Maksimal ${MAX_FOTO_BARANG} foto per barang — hanya ${sisa} foto pertama yang diunggah.`);
+    if (files.length > sisa) showAlert(t("marketplace.photo.tooMany", "Maksimal {max} foto per barang — hanya {n} foto pertama yang diunggah.").replace("{max}", String(MAX_FOTO_BARANG)).replace("{n}", String(sisa)));
 
     setMengunggah(daftar.length);
     onBusyChange(true);
@@ -165,12 +175,12 @@ function PemilihFoto({ photos, onChange, onBusyChange }: { photos: string[]; onC
         hasil = [...hasil, await unggahFoto(f)];
         onChange(hasil);
       } catch (err) {
-        gagal.push(`${f.name}: ${err instanceof Error ? err.message : "gagal"}`);
+        gagal.push(`${f.name}: ${err instanceof Error ? err.message : t("marketplace.photo.failedShort", "gagal")}`);
       }
       setMengunggah((n) => n - 1);
     }
     onBusyChange(false);
-    if (gagal.length) showAlert(`Sebagian foto gagal diunggah:\n${gagal.join("\n")}`);
+    if (gagal.length) showAlert(`${t("marketplace.photo.someFailed", "Sebagian foto gagal diunggah:")}\n${gagal.join("\n")}`);
   };
 
   const hapus = (i: number) => onChange(photos.filter((_, idx) => idx !== i));
@@ -178,20 +188,22 @@ function PemilihFoto({ photos, onChange, onBusyChange }: { photos: string[]; onC
 
   return (
     <div>
-      <label className={labelKecil}>Foto Barang ({photos.length}/{MAX_FOTO_BARANG})</label>
+      <label className={labelKecil}>
+        {t("marketplace.photo.label", "Foto Barang")} ({photos.length}/{MAX_FOTO_BARANG})
+      </label>
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {photos.map((url, i) => (
           <div key={url} className="relative aspect-square rounded-lg overflow-hidden border border-neutral-700 bg-neutral-900">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
+            <img src={url} alt={`${t("marketplace.photo.alt", "Foto")} ${i + 1}`} className="h-full w-full object-cover" />
             {i === 0 ? (
-              <span className="absolute left-1 top-1 rounded bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-medium text-black">Utama</span>
+              <span className="absolute left-1 top-1 rounded bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-medium text-black">{t("marketplace.photo.main", "Utama")}</span>
             ) : (
               <button type="button" disabled={mengunggah > 0} onClick={() => jadikanUtama(i)} className="absolute left-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-neutral-200 hover:bg-black/90">
-                Jadikan utama
+                {t("marketplace.photo.makeMain", "Jadikan utama")}
               </button>
             )}
-            <button type="button" disabled={mengunggah > 0} onClick={() => hapus(i)} aria-label="Hapus foto" className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/70 text-sm leading-6 text-white hover:bg-red-600">
+            <button type="button" disabled={mengunggah > 0} onClick={() => hapus(i)} aria-label={t("marketplace.photo.remove", "Hapus foto")} className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/70 text-sm leading-6 text-white hover:bg-red-600">
               ×
             </button>
           </div>
@@ -199,14 +211,14 @@ function PemilihFoto({ photos, onChange, onBusyChange }: { photos: string[]; onC
 
         {Array.from({ length: mengunggah }).map((_, i) => (
           <div key={`up-${i}`} className="aspect-square rounded-lg border border-dashed border-neutral-700 flex items-center justify-center text-[11px] text-neutral-500">
-            Mengunggah...
+            {t("marketplace.uploading", "Mengunggah...")}
           </div>
         ))}
 
         {sisa - mengunggah > 0 && (
           <label className="aspect-square rounded-lg border border-dashed border-neutral-600 hover:border-emerald-500/60 flex flex-col items-center justify-center gap-1 cursor-pointer text-neutral-400 hover:text-emerald-300">
             <span className="text-2xl leading-none">+</span>
-            <span className="text-[11px]">Tambah Foto</span>
+            <span className="text-[11px]">{t("marketplace.photo.add", "Tambah Foto")}</span>
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
@@ -219,13 +231,14 @@ function PemilihFoto({ photos, onChange, onBusyChange }: { photos: string[]; onC
         )}
       </div>
       <p className="mt-1 text-[11px] text-neutral-600">
-        Maksimal {MAX_FOTO_BARANG} foto (JPG/PNG/WEBP). Foto pertama jadi foto utama di etalase. Tunjukkan kondisi asli: depan, belakang, bagian yang lecet, dan kelengkapan.
+        {t("marketplace.photo.hint", "Maksimal {max} foto (JPG/PNG/WEBP). Foto pertama jadi foto utama di etalase. Tunjukkan kondisi asli: depan, belakang, bagian yang lecet, dan kelengkapan.").replace("{max}", String(MAX_FOTO_BARANG))}
       </p>
     </div>
   );
 }
 
 function GaleriFoto({ photos, judul, awal = 0, onClose }: { photos: string[]; judul: string; awal?: number; onClose: () => void }) {
+  const { t } = useMarketplaceLabels();
   const [i, setI] = useState(awal);
   const n = photos.length;
   const geser = (d: number) => setI((x) => (x + d + n) % n);
@@ -249,11 +262,11 @@ function GaleriFoto({ photos, judul, awal = 0, onClose }: { photos: string[]; ju
         </div>
         <div className="relative flex items-center justify-center rounded-lg bg-black" style={{ minHeight: "50vh" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photos[i]} alt={`${judul} — foto ${i + 1}`} className="max-h-[70vh] w-auto object-contain" />
+          <img src={photos[i]} alt={`${judul} — ${t("marketplace.photo.alt", "Foto")} ${i + 1}`} className="max-h-[70vh] w-auto object-contain" />
           {n > 1 && (
             <>
-              <button type="button" onClick={() => geser(-1)} aria-label="Foto sebelumnya" className="absolute left-2 h-10 w-10 rounded-full bg-black/60 text-xl text-white hover:bg-black/90">‹</button>
-              <button type="button" onClick={() => geser(1)} aria-label="Foto berikutnya" className="absolute right-2 h-10 w-10 rounded-full bg-black/60 text-xl text-white hover:bg-black/90">›</button>
+              <button type="button" onClick={() => geser(-1)} aria-label={t("marketplace.photo.prev", "Foto sebelumnya")} className="absolute left-2 h-10 w-10 rounded-full bg-black/60 text-xl text-white hover:bg-black/90">‹</button>
+              <button type="button" onClick={() => geser(1)} aria-label={t("marketplace.photo.next", "Foto berikutnya")} className="absolute right-2 h-10 w-10 rounded-full bg-black/60 text-xl text-white hover:bg-black/90">›</button>
             </>
           )}
         </div>
@@ -268,7 +281,7 @@ function GaleriFoto({ photos, judul, awal = 0, onClose }: { photos: string[]; ju
           </div>
         )}
         <div className="mt-3 text-center">
-          <button className="text-xs text-neutral-400 hover:text-white" onClick={onClose}>Tutup</button>
+          <button className="text-xs text-neutral-400 hover:text-white" onClick={onClose}>{t("marketplace.close", "Tutup")}</button>
         </div>
       </div>
     </div>
@@ -277,19 +290,21 @@ function GaleriFoto({ photos, judul, awal = 0, onClose }: { photos: string[]; ju
 
 /** Foto sampul di kartu barang; klik untuk membuka galeri. Tidak dirender sama sekali bila barang tanpa foto. */
 function SampulFoto({ photos, judul, onOpen }: { photos: string[]; judul: string; onOpen: () => void }) {
+  const { t } = useMarketplaceLabels();
   if (!photos?.length) return null;
   return (
     <button type="button" onClick={onOpen} className="relative -mx-1 mb-3 block aspect-[4/3] w-[calc(100%+0.5rem)] overflow-hidden rounded-lg bg-neutral-900">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photos[0]} alt={judul} loading="lazy" className="h-full w-full object-cover transition hover:scale-[1.02]" />
       {photos.length > 1 && (
-        <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">{photos.length} foto</span>
+        <span className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">{t("marketplace.photo.count", "{n} foto").replace("{n}", String(photos.length))}</span>
       )}
     </button>
   );
 }
 
 function EtalaseTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
+  const { t, kategori: labelKategori, kondisi, kategoriKeys } = useMarketplaceLabels();
   const [items, setItems] = useState<any[]>([]);
   const [cari, setCari] = useState("");
   const [kategori, setKategori] = useState("all");
@@ -304,16 +319,16 @@ function EtalaseTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
     <div className="space-y-4">
       <Card>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <input className={isian} placeholder="Cari barang..." value={cari} onChange={(e) => setCari(e.target.value)} />
+          <input className={isian} placeholder={t("marketplace.searchItems", "Cari barang...")} value={cari} onChange={(e) => setCari(e.target.value)} />
           <select className={isian} value={kategori} onChange={(e) => setKategori(e.target.value)}>
-            <option value="all">Semua kategori</option>
-            {Object.entries(KATEGORI_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            <option value="all">{t("marketplace.allCategories", "Semua kategori")}</option>
+            {kategoriKeys.map((k) => <option key={k} value={k}>{labelKategori(k)}</option>)}
           </select>
         </div>
       </Card>
 
       {items.length === 0 ? (
-        <Card><p className="text-sm text-neutral-500">Belum ada barang dari outlet lain. Coba lagi nanti, atau pasang barang Anda sendiri di tab Barang Saya.</p></Card>
+        <Card><p className="text-sm text-neutral-500">{t("marketplace.showcaseEmpty", "Belum ada barang dari outlet lain. Coba lagi nanti, atau pasang barang Anda sendiri di tab Barang Saya.")}</p></Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((it) => (
@@ -325,15 +340,18 @@ function EtalaseTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
                   <div className="text-xs text-neutral-500">{it.outletName}{it.city ? ` · ${it.city}` : ""}</div>
                   <BadgeKepercayaan profil={it.sellerProfile} onClick={() => setLihatProfil(it.outletId)} />
                 </div>
-                <Badge status="available">{KONDISI_LABEL[it.condition] ?? it.condition}</Badge>
+                <Badge status="available">{kondisi(it.condition)}</Badge>
               </div>
               {it.description && <p className="mt-2 text-xs text-neutral-400 whitespace-pre-line">{it.description}</p>}
               <div className="mt-3 flex items-end justify-between">
                 <div>
                   <div className="text-lg font-semibold text-emerald-400">{rupiah(it.price)}</div>
-                  <div className="text-[11px] text-neutral-600">{it.qty > 1 ? `Tersedia ${it.qty} unit · ` : ""}{it.negotiable ? "Bisa nego" : "Harga pas"}</div>
+                  <div className="text-[11px] text-neutral-600">
+                    {it.qty > 1 ? `${t("marketplace.availableUnits", "Tersedia {n} unit").replace("{n}", String(it.qty))} · ` : ""}
+                    {it.negotiable ? t("marketplace.negotiable", "Bisa nego") : t("marketplace.fixedPrice", "Harga pas")}
+                  </div>
                 </div>
-                {bolehTransaksi && <Button className="text-xs" onClick={() => setMenawar(it)}>Ajukan Beli</Button>}
+                {bolehTransaksi && <Button className="text-xs" onClick={() => setMenawar(it)}>{t("marketplace.requestBuy", "Ajukan Beli")}</Button>}
               </div>
             </Card>
           ))}
@@ -348,6 +366,8 @@ function EtalaseTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
 }
 
 function FormPenawaran({ listing, onClose, onDone }: { listing: any; onClose: () => void; onDone: () => void }) {
+  const { t, peringatan } = useMarketplaceLabels();
+  const peringatanPenjual = peringatan(listing.sellerProfile);
   const [qty, setQty] = useState(1);
   const [harga, setHarga] = useState<number>(listing.price);
   const [catatan, setCatatan] = useState("");
@@ -355,7 +375,7 @@ function FormPenawaran({ listing, onClose, onDone }: { listing: any; onClose: ()
   const [busy, setBusy] = useState(false);
 
   const kirim = async () => {
-    if (!noHp.trim()) return showAlert("Isi No. HP Anda — penjual akan menghubungi nomor ini setelah menerima penawaran.");
+    if (!noHp.trim()) return showAlert(t("marketplace.offer.phoneRequired", "Isi No. HP Anda — penjual akan menghubungi nomor ini setelah menerima penawaran."));
     setBusy(true);
     try {
       const res = await fetch("/api/marketplace/deals", {
@@ -365,7 +385,7 @@ function FormPenawaran({ listing, onClose, onDone }: { listing: any; onClose: ()
       });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
-      await showAlert(`Penawaran ${data.dealNumber} terkirim. Setelah penjual menerimanya, nomor HP kedua pihak muncul di tab Kesepakatan.`);
+      await showAlert(t("marketplace.offer.sent", "Penawaran {no} terkirim. Setelah penjual menerimanya, nomor HP kedua pihak muncul di tab Kesepakatan.").replace("{no}", data.dealNumber));
       onDone();
     } finally {
       setBusy(false);
@@ -380,52 +400,59 @@ function FormPenawaran({ listing, onClose, onDone }: { listing: any; onClose: ()
             // eslint-disable-next-line @next/next/no-img-element
             <img src={listing.photos[0]} alt={listing.title} className="mb-3 h-40 w-full rounded-lg object-cover" />
           )}
-          <h2 className="font-medium">Ajukan Beli — {listing.title}</h2>
-          <p className="mt-1 text-xs text-neutral-500">Dari {listing.outletName}. Harga pasang {rupiah(listing.price)}{listing.negotiable ? " (bisa nego)" : " (harga pas)"}.</p>
+          <h2 className="font-medium">
+            {t("marketplace.requestBuy", "Ajukan Beli")} — {listing.title}
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            {t("marketplace.offer.fromSeller", "Dari {outlet}. Harga pasang {price}").replace("{outlet}", listing.outletName).replace("{price}", rupiah(listing.price))}
+            {listing.negotiable ? ` (${t("marketplace.negotiableLower", "bisa nego")}).` : ` (${t("marketplace.fixedPriceLower", "harga pas")}).`}
+          </p>
           <BadgeKepercayaan profil={listing.sellerProfile} />
-          {listing.sellerProfile?.peringatan?.length > 0 && (
+          {peringatanPenjual.length > 0 && (
             <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-              <p className="text-xs font-medium text-amber-300">Perhatikan sebelum menawar</p>
+              <p className="text-xs font-medium text-amber-300">{t("marketplace.offer.cautionTitle", "Perhatikan sebelum menawar")}</p>
               <ul className="mt-1 list-disc pl-4 text-[11px] text-neutral-300 space-y-0.5">
-                {listing.sellerProfile.peringatan.map((p: string) => <li key={p}>{p}</li>)}
+                {peringatanPenjual.map((p: string) => <li key={p}>{p}</li>)}
               </ul>
-              <p className="mt-1 text-[11px] text-neutral-400">Sarankan bertemu langsung (COD) atau bayar setelah barang terlihat.</p>
+              <p className="mt-1 text-[11px] text-neutral-400">{t("marketplace.offer.cautionHint", "Sarankan bertemu langsung (COD) atau bayar setelah barang terlihat.")}</p>
             </div>
           )}
 
           <div className="mt-4 space-y-3">
             {listing.qty > 1 && (
               <div>
-                <label className={labelKecil}>Jumlah (tersedia {listing.qty})</label>
+                <label className={labelKecil}>{t("marketplace.offer.qty", "Jumlah (tersedia {n})").replace("{n}", String(listing.qty))}</label>
                 <input type="number" min={1} max={listing.qty} className={isian} value={qty} onChange={(e) => setQty(Number(e.target.value))} />
               </div>
             )}
             <div>
-              <label className={labelKecil}>Harga yang Anda tawarkan (per unit)</label>
+              <label className={labelKecil}>{t("marketplace.offer.price", "Harga yang Anda tawarkan (per unit)")}</label>
               <input type="number" min={0} className={isian} value={harga} disabled={!listing.negotiable} onChange={(e) => setHarga(Number(e.target.value))} />
             </div>
             <div>
-              <label className={labelKecil}>Catatan untuk penjual</label>
-              <textarea rows={2} className={`${isian} resize-y`} placeholder="Mis. bisa diambil kapan? apakah masih ada kardusnya?" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
+              <label className={labelKecil}>{t("marketplace.offer.note", "Catatan untuk penjual")}</label>
+              <textarea rows={2} className={`${isian} resize-y`} placeholder={t("marketplace.offer.notePlaceholder", "Mis. bisa diambil kapan? apakah masih ada kardusnya?")} value={catatan} onChange={(e) => setCatatan(e.target.value)} />
               <PeringatanKontak teks={catatan} />
             </div>
             <div>
-              <label className={labelKecil}>No. HP Anda (wajib)</label>
+              <label className={labelKecil}>{t("marketplace.offer.phone", "No. HP Anda (wajib)")}</label>
               <input className={isian} inputMode="tel" placeholder="0812 3456 7890" value={noHp} onChange={(e) => setNoHp(e.target.value)} />
-              <p className="mt-1 text-[11px] text-neutral-600">Baru terlihat oleh penjual setelah ia menerima penawaran Anda.</p>
+              <p className="mt-1 text-[11px] text-neutral-600">{t("marketplace.offer.phoneHint", "Baru terlihat oleh penjual setelah ia menerima penawaran Anda.")}</p>
             </div>
 
             <div className="rounded-lg bg-black/30 p-2.5 text-xs space-y-1">
-              <div className="flex justify-between"><span className="text-neutral-400">Total yang Anda bayar ke penjual</span><span className="font-medium text-emerald-400">{rupiah(harga * qty)}</span></div>
+              <div className="flex justify-between"><span className="text-neutral-400">{t("marketplace.offer.total", "Total yang Anda bayar ke penjual")}</span><span className="font-medium text-emerald-400">{rupiah(harga * qty)}</span></div>
               <p className="text-[11px] text-neutral-500">
-                Pembayaran dilakukan langsung ke outlet penjual (transfer atau bayar di tempat). NEXBILL tidak menahan dana dan tidak menjadi perantara pembayaran.
+                {t("marketplace.offer.directPayment", "Pembayaran dilakukan langsung ke outlet penjual (transfer atau bayar di tempat). NEXBILL tidak menahan dana dan tidak menjadi perantara pembayaran.")}
               </p>
             </div>
           </div>
 
           <div className="mt-4 flex gap-2">
-            <Button className="text-xs" disabled={busy || !(harga > 0) || !!cariKontakDalamTeks(catatan)} onClick={kirim}>{busy ? "Mengirim..." : "Kirim Penawaran"}</Button>
-            <button className="text-xs text-neutral-400" onClick={onClose}>Batal</button>
+            <Button className="text-xs" disabled={busy || !(harga > 0) || !!cariKontakDalamTeks(catatan)} onClick={kirim}>
+              {busy ? t("marketplace.sending", "Mengirim...") : t("marketplace.offer.send", "Kirim Penawaran")}
+            </Button>
+            <button className="text-xs text-neutral-400" onClick={onClose}>{t("marketplace.cancel", "Batal")}</button>
           </div>
         </Card>
       </div>
@@ -436,6 +463,7 @@ function FormPenawaran({ listing, onClose, onDone }: { listing: any; onClose: ()
 const formKosong = { title: "", description: "", category: "controller", condition: "used", qty: 1, price: 0, negotiable: true, city: "", contactPhone: "", photos: [] as string[] };
 
 function BarangSayaTab({ bolehTransaksi, profilSaya }: { bolehTransaksi: boolean; profilSaya: any }) {
+  const { t, kategori: labelKategori, kondisi: labelKondisi, kategoriKeys, kondisiKeys, alasanTarik } = useMarketplaceLabels();
   const [items, setItems] = useState<any[]>([]);
   const [form, setForm] = useState(formKosong);
   const [busy, setBusy] = useState(false);
@@ -446,11 +474,11 @@ function BarangSayaTab({ bolehTransaksi, profilSaya }: { bolehTransaksi: boolean
   useEffect(() => { load(); }, []);
 
   const simpan = async () => {
-    if (!form.title.trim()) return showAlert("Nama barang wajib diisi.");
-    if (!(form.price > 0)) return showAlert("Harga harus lebih dari 0.");
-    if (!form.contactPhone.trim()) return showAlert("Isi No. HP — pembeli akan menghubungi nomor ini setelah Anda menerima penawarannya.");
-    if (fotoSibuk) return showAlert("Tunggu sampai semua foto selesai diunggah.");
-    if (form.photos.length === 0 && !(await showConfirm("Pasang barang tanpa foto? Barang dengan foto jauh lebih dipercaya dan lebih cepat laku."))) return;
+    if (!form.title.trim()) return showAlert(t("marketplace.listing.nameRequired", "Nama barang wajib diisi."));
+    if (!(form.price > 0)) return showAlert(t("marketplace.listing.priceRequired", "Harga harus lebih dari 0."));
+    if (!form.contactPhone.trim()) return showAlert(t("marketplace.listing.phoneRequired", "Isi No. HP — pembeli akan menghubungi nomor ini setelah Anda menerima penawarannya."));
+    if (fotoSibuk) return showAlert(t("marketplace.listing.waitPhotos", "Tunggu sampai semua foto selesai diunggah."));
+    if (form.photos.length === 0 && !(await showConfirm(t("marketplace.listing.confirmNoPhoto", "Pasang barang tanpa foto? Barang dengan foto jauh lebih dipercaya dan lebih cepat laku.")))) return;
     setBusy(true);
     try {
       const { photos, ...isi } = form;
@@ -472,85 +500,91 @@ function BarangSayaTab({ bolehTransaksi, profilSaya }: { bolehTransaksi: boolean
     <div className="space-y-4">
       {bolehTransaksi && (
         <Card>
-          <h2 className="font-medium mb-3">Pasang Barang</h2>
+          <h2 className="font-medium mb-3">{t("marketplace.listing.title", "Pasang Barang")}</h2>
           {profilSaya?.isNew && (
             <div className="mb-3 rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs text-neutral-300">
-              Outlet Anda masih berstatus <span className="text-sky-300">Outlet Baru</span> di Marketplace, jadi nilai satu barang (harga × jumlah) dibatasi maksimal{" "}
-              {rupiah(AMBANG.NILAI_MAKS_OUTLET_BARU)}. Batas ini terbuka otomatis setelah akun NEXBILL outlet berumur {AMBANG.HARI_OUTLET_BARU} hari —
-              perlindungan bagi pembeli dari akun yang belum punya riwayat.
+              {t("marketplace.listing.newOutletLimit", "Outlet Anda masih berstatus Outlet Baru di Marketplace, jadi nilai satu barang (harga × jumlah) dibatasi maksimal {max}. Batas ini terbuka otomatis setelah akun NEXBILL outlet berumur {days} hari — perlindungan bagi pembeli dari akun yang belum punya riwayat.")
+                .replace("{max}", rupiah(AMBANG.NILAI_MAKS_OUTLET_BARU))
+                .replace("{days}", String(AMBANG.HARI_OUTLET_BARU))}
             </div>
           )}
           {form.price * form.qty > AMBANG.NILAI_MAKS_OUTLET_BARU && profilSaya?.isNew && (
-            <p className="mb-3 text-[11px] text-amber-400">Nilai barang ini melebihi batas outlet baru — kurangi harga atau jumlahnya.</p>
+            <p className="mb-3 text-[11px] text-amber-400">{t("marketplace.listing.overLimit", "Nilai barang ini melebihi batas outlet baru — kurangi harga atau jumlahnya.")}</p>
           )}
           <div className="space-y-3">
             <div>
-              <label className={labelKecil}>Nama Barang</label>
-              <input className={isian} placeholder="Mis. Stik PS4 DualShock (bekas, masih mulus)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              <label className={labelKecil}>{t("marketplace.listing.name", "Nama Barang")}</label>
+              <input className={isian} placeholder={t("marketplace.listing.namePlaceholder", "Mis. Stik PS4 DualShock (bekas, masih mulus)")} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
               <PeringatanKontak teks={form.title} />
             </div>
             {/* Setter fungsional: unggahan berjalan beberapa detik, dan isian lain yang diketik selama itu tidak boleh tertimpa. */}
             <PemilihFoto photos={form.photos} onChange={(p) => setForm((f) => ({ ...f, photos: p }))} onBusyChange={setFotoSibuk} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={labelKecil}>Kategori</label>
+                <label className={labelKecil}>{t("marketplace.listing.category", "Kategori")}</label>
                 <select className={isian} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                  {Object.entries(KATEGORI_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  {kategoriKeys.map((k) => <option key={k} value={k}>{labelKategori(k)}</option>)}
                 </select>
               </div>
               <div>
-                <label className={labelKecil}>Kondisi</label>
+                <label className={labelKecil}>{t("marketplace.listing.condition", "Kondisi")}</label>
                 <select className={isian} value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value })}>
-                  {Object.entries(KONDISI_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  {kondisiKeys.map((k) => <option key={k} value={k}>{labelKondisi(k)}</option>)}
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={labelKecil}>Harga per Unit (Rp)</label>
+                <label className={labelKecil}>{t("marketplace.listing.unitPrice", "Harga per Unit (Rp)")}</label>
                 <input type="number" min={0} className={isian} value={form.price || ""} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
               </div>
               <div>
-                <label className={labelKecil}>Jumlah Unit</label>
+                <label className={labelKecil}>{t("marketplace.listing.qty", "Jumlah Unit")}</label>
                 <input type="number" min={1} className={isian} value={form.qty} onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })} />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={labelKecil}>Kota</label>
-                <input className={isian} placeholder="Mis. Bandung" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                <label className={labelKecil}>{t("marketplace.listing.city", "Kota")}</label>
+                <input className={isian} placeholder={t("marketplace.listing.cityPlaceholder", "Mis. Bandung")} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
               </div>
               <div>
-                <label className={labelKecil}>No. HP yang Bisa Dihubungi (wajib)</label>
+                <label className={labelKecil}>{t("marketplace.listing.phone", "No. HP yang Bisa Dihubungi (wajib)")}</label>
                 <input className={isian} inputMode="tel" placeholder="0812 3456 7890" value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} />
-                <p className="mt-1 text-[11px] text-neutral-600">Tidak tampil di etalase — hanya dibuka ke pembeli setelah Anda menerima penawarannya.</p>
+                <p className="mt-1 text-[11px] text-neutral-600">{t("marketplace.listing.phoneHint", "Tidak tampil di etalase — hanya dibuka ke pembeli setelah Anda menerima penawarannya.")}</p>
               </div>
             </div>
             <div>
-              <label className={labelKecil}>Keterangan</label>
-              <textarea rows={3} className={`${isian} resize-y`} placeholder="Kondisi sebenarnya, kelengkapan, alasan dijual..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <label className={labelKecil}>{t("marketplace.listing.description", "Keterangan")}</label>
+              <textarea rows={3} className={`${isian} resize-y`} placeholder={t("marketplace.listing.descriptionPlaceholder", "Kondisi sebenarnya, kelengkapan, alasan dijual...")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <PeringatanKontak teks={form.description} />
             </div>
             <label className="flex items-center gap-2 text-xs text-neutral-400">
-              <input type="checkbox" checked={form.negotiable} onChange={(e) => setForm({ ...form, negotiable: e.target.checked })} /> Harga bisa nego
+              <input type="checkbox" checked={form.negotiable} onChange={(e) => setForm({ ...form, negotiable: e.target.checked })} /> {t("marketplace.listing.negotiable", "Harga bisa nego")}
             </label>
 
             {form.price > 0 && (
               <div className="rounded-lg bg-black/30 p-2.5 text-xs space-y-1">
-                <div className="flex justify-between"><span className="text-neutral-400">Pembeli bayar ke Anda</span><span>{rupiah(form.price * form.qty)}</span></div>
-                <div className="flex justify-between"><span className="text-neutral-400">Biaya jasa NEXBILL{UJRAH_AKTIF ? " (ujrah)" : ""}</span><span className={ujrah === 0 ? "text-neutral-500" : ""}>{ujrah === 0 ? (UJRAH_AKTIF ? "Bebas biaya" : "Gratis") : `− ${rupiah(ujrah)}`}</span></div>
-                <div className="flex justify-between border-t border-white/10 pt-1"><span className="text-neutral-300">Bersih untuk Anda</span><span className="font-medium text-emerald-400">{rupiah(bersihUntukPenjual(form.price, form.qty, ujrahConfigBerlaku()))}</span></div>
+                <div className="flex justify-between"><span className="text-neutral-400">{t("marketplace.listing.buyerPays", "Pembeli bayar ke Anda")}</span><span>{rupiah(form.price * form.qty)}</span></div>
+                <div className="flex justify-between"><span className="text-neutral-400">
+                    {t("marketplace.listing.serviceFee", "Biaya jasa NEXBILL")}
+                    {UJRAH_AKTIF ? " (ujrah)" : ""}
+                  </span>
+                  <span className={ujrah === 0 ? "text-neutral-500" : ""}>
+                    {ujrah === 0 ? (UJRAH_AKTIF ? t("marketplace.listing.noFee", "Bebas biaya") : t("marketplace.listing.free", "Gratis")) : `− ${rupiah(ujrah)}`}
+                  </span></div>
+                <div className="flex justify-between border-t border-white/10 pt-1"><span className="text-neutral-300">{t("marketplace.listing.net", "Bersih untuk Anda")}</span><span className="font-medium text-emerald-400">{rupiah(bersihUntukPenjual(form.price, form.qty, ujrahConfigBerlaku()))}</span></div>
               </div>
             )}
           </div>
           <Button className="mt-4" disabled={busy || fotoSibuk || !!cariKontakDalamTeks(form.title) || !!cariKontakDalamTeks(form.description)} onClick={simpan}>
-            {busy ? "Menyimpan..." : fotoSibuk ? "Menunggu foto..." : "Pasang di Etalase"}
+            {busy ? t("marketplace.saving", "Menyimpan...") : fotoSibuk ? t("marketplace.listing.waitingPhotos", "Menunggu foto...") : t("marketplace.listing.publish", "Pasang di Etalase")}
           </Button>
         </Card>
       )}
 
       {items.length === 0 ? (
-        <Card><p className="text-sm text-neutral-500">Anda belum memasang barang apa pun.</p></Card>
+        <Card><p className="text-sm text-neutral-500">{t("marketplace.myItemsEmpty", "Anda belum memasang barang apa pun.")}</p></Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((it) => (
@@ -559,17 +593,29 @@ function BarangSayaTab({ bolehTransaksi, profilSaya }: { bolehTransaksi: boolean
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
                   <div className="font-medium truncate">{it.title}</div>
-                  <div className="text-xs text-neutral-500">{KATEGORI_LABEL[it.category] ?? it.category} · {rupiah(it.price)}{it.qty > 1 ? ` · ${it.qty} unit` : ""}</div>
+                  <div className="text-xs text-neutral-500">
+                    {labelKategori(it.category)} · {rupiah(it.price)}
+                    {it.qty > 1 ? ` · ${t("marketplace.units", "{n} unit").replace("{n}", String(it.qty))}` : ""}
+                  </div>
                 </div>
                 <Badge status={it.status === "active" ? "available" : it.status === "reserved" ? "pending" : it.status === "sold" ? "finished" : "maintenance"}>
-                  {it.status === "active" ? "Tersedia" : it.status === "reserved" ? "Dipesan" : it.status === "sold" ? "Terjual" : "Ditarik"}
+                  {it.status === "active"
+                    ? t("marketplace.listingStatus.active", "Tersedia")
+                    : it.status === "reserved"
+                      ? t("marketplace.listingStatus.reserved", "Dipesan")
+                      : it.status === "sold"
+                        ? t("marketplace.listingStatus.sold", "Terjual")
+                        : t("marketplace.listingStatus.closed", "Ditarik")}
                 </Badge>
               </div>
               {bolehTransaksi && it.status === "active" && (
-                <button className="mt-3 text-xs text-red-400" onClick={() => setMenarik(it)}>Tarik dari Etalase</button>
+                <button className="mt-3 text-xs text-red-400" onClick={() => setMenarik(it)}>{t("marketplace.withdraw", "Tarik dari Etalase")}</button>
               )}
               {it.status === "closed" && it.closedReason && (
-                <div className="mt-2 text-[11px] text-neutral-500">Alasan: {ALASAN_TARIK[it.closedReason as AlasanTarik] ?? it.closedReason}{it.closedNote ? ` — ${it.closedNote}` : ""}</div>
+                <div className="mt-2 text-[11px] text-neutral-500">
+                  {t("marketplace.reasonPrefix", "Alasan:")} {alasanTarik(it.closedReason)}
+                  {it.closedNote ? ` — ${it.closedNote}` : ""}
+                </div>
               )}
             </Card>
           ))}
@@ -588,13 +634,14 @@ function BarangSayaTab({ bolehTransaksi, profilSaya }: { bolehTransaksi: boolean
  * layar ini mengatakannya terang-terangan alih-alih menyediakan jalan keluar yang tidak tercatat.
  */
 function FormTarikBarang({ listing, onClose, onDone }: { listing: any; onClose: () => void; onDone: () => void }) {
+  const { t, alasanTarik, alasanTarikKeys } = useMarketplaceLabels();
   const [alasan, setAlasan] = useState<AlasanTarik | "">("");
   const [catatan, setCatatan] = useState("");
   const [busy, setBusy] = useState(false);
 
   const kirim = async () => {
-    if (!alasan) return showAlert("Pilih alasan menarik barang.");
-    if (alasan === "other" && !catatan.trim()) return showAlert("Tuliskan alasannya untuk pilihan \"Lainnya\".");
+    if (!alasan) return showAlert(t("marketplace.withdrawForm.chooseReason", "Pilih alasan menarik barang."));
+    if (alasan === "other" && !catatan.trim()) return showAlert(t("marketplace.withdrawForm.otherRequired", "Tuliskan alasannya untuk pilihan \"Lainnya\"."));
     setBusy(true);
     try {
       const res = await fetch(`/api/marketplace/listings/${listing.id}`, {
@@ -614,33 +661,38 @@ function FormTarikBarang({ listing, onClose, onDone }: { listing: any; onClose: 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <Card>
-          <h2 className="font-medium">Tarik dari Etalase — {listing.title}</h2>
+          <h2 className="font-medium">
+            {t("marketplace.withdraw", "Tarik dari Etalase")} — {listing.title}
+          </h2>
 
           <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
             <p className="text-xs text-neutral-300">
-              Laku ke <span className="text-amber-300">outlet NEXBILL</span> yang melihat barang ini di Etalase? Jangan tarik barangnya — minta outlet itu menekan{" "}
-              <span className="text-amber-300">Ajukan Beli</span>, lalu terima penawarannya. Transaksinya tercatat, pendapatan Anda terbukukan otomatis, dan Anda terlindungi fitur keamanan
-              Marketplace (rekening terkunci, bukti, jalur aduan){UJRAH_AKTIF ? " — ujrah tetap berlaku sesuai ketentuan Marketplace" : ""}.
+              {t("marketplace.withdrawForm.soldToNexbill", "Laku ke outlet NEXBILL yang melihat barang ini di Etalase? Jangan tarik barangnya — minta outlet itu menekan Ajukan Beli, lalu terima penawarannya. Transaksinya tercatat, pendapatan Anda terbukukan otomatis, dan Anda terlindungi fitur keamanan Marketplace (rekening terkunci, bukti, jalur aduan).")}
+              {UJRAH_AKTIF ? ` ${t("marketplace.withdrawForm.feeStillApplies", "Ujrah tetap berlaku sesuai ketentuan Marketplace.")}` : ""}
             </p>
           </div>
 
           <div className="mt-3 space-y-2">
-            {(Object.entries(ALASAN_TARIK) as [AlasanTarik, string][]).map(([k, v]) => (
+            {alasanTarikKeys.map((k) => (
               <label key={k} className="flex items-start gap-2 text-sm cursor-pointer">
                 <input type="radio" name="alasan-tarik" className="mt-1" checked={alasan === k} onChange={() => setAlasan(k)} />
-                <span>{v}</span>
+                <span>{alasanTarik(k)}</span>
               </label>
             ))}
           </div>
 
           <div className="mt-3">
-            <label className={labelKecil}>Keterangan {alasan === "other" ? "(wajib)" : "(opsional)"}</label>
+            <label className={labelKecil}>
+              {t("marketplace.listing.description", "Keterangan")} {alasan === "other" ? t("marketplace.requiredParen", "(wajib)") : t("marketplace.optionalParen", "(opsional)")}
+            </label>
             <textarea rows={2} className={`${isian} resize-y`} value={catatan} onChange={(e) => setCatatan(e.target.value)} />
           </div>
 
           <div className="mt-4 flex gap-2">
-            <Button className="text-xs" disabled={busy || !alasan} onClick={kirim}>{busy ? "Menyimpan..." : "Tarik Barang"}</Button>
-            <button className="text-xs text-neutral-400" onClick={onClose}>Batal</button>
+            <Button className="text-xs" disabled={busy || !alasan} onClick={kirim}>
+              {busy ? t("marketplace.saving", "Menyimpan...") : t("marketplace.withdrawForm.submit", "Tarik Barang")}
+            </Button>
+            <button className="text-xs text-neutral-400" onClick={onClose}>{t("marketplace.cancel", "Batal")}</button>
           </div>
         </Card>
       </div>
@@ -649,6 +701,7 @@ function FormTarikBarang({ listing, onClose, onDone }: { listing: any; onClose: 
 }
 
 function KesepakatanTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
+  const { t, statusDeal, peringatan } = useMarketplaceLabels();
   const [deals, setDeals] = useState<any[]>([]);
   const load = () => fetchJsonArray("/api/marketplace/deals").then(setDeals);
   useEffect(() => { load(); }, []);
@@ -658,27 +711,41 @@ function KesepakatanTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
     if (ke === "accepted") {
       if (
         !(await showConfirm(
-          `Terima penawaran ${deal.dealNumber}? Dengan menerima, Anda berjanji menyerahkan barang sesuai foto & keterangan. ` +
-            `Nomor HP dan rekening penerima Anda akan terlihat oleh pembeli, dan rekeningnya DIKUNCI ke kesepakatan ini. ` +
-            `Serahkan barang setelah pembayaran benar-benar masuk (cek mutasi rekening, bukan hanya foto bukti transfer).`
+          t(
+            "marketplace.deal.confirmAccept",
+            "Terima penawaran {no}? Dengan menerima, Anda berjanji menyerahkan barang sesuai foto & keterangan. Nomor HP dan rekening penerima Anda akan terlihat oleh pembeli, dan rekeningnya DIKUNCI ke kesepakatan ini. Serahkan barang setelah pembayaran benar-benar masuk (cek mutasi rekening, bukan hanya foto bukti transfer)."
+          ).replace("{no}", deal.dealNumber)
         ))
       )
         return;
     }
     if (ke === "completed") {
-      if (!await showConfirm(`Tandai ${deal.dealNumber} selesai? Ini berarti barangnya sudah Anda terima DAN sudah Anda bayar ke penjual. Penjual akan otomatis mencatat pendapatannya. Jika ada masalah, jangan tandai selesai — gunakan "Laporkan Masalah".`)) return;
+      if (
+        !(await showConfirm(
+          t(
+            "marketplace.deal.confirmComplete",
+            "Tandai {no} selesai? Ini berarti barangnya sudah Anda terima DAN sudah Anda bayar ke penjual. Penjual akan otomatis mencatat pendapatannya. Jika ada masalah, jangan tandai selesai — gunakan \"Laporkan Masalah\"."
+          ).replace("{no}", deal.dealNumber)
+        ))
+      )
+        return;
       settlementMethod = "cash";
     }
     let alasan: string | undefined;
     if (ke === "rejected" || ke === "cancelled") {
-      const r = await showPrompt(ke === "rejected" ? `${deal.dealNumber} — alasan menolak penawaran?` : `${deal.dealNumber} — alasan membatalkan kesepakatan?`, {
-        title: ke === "rejected" ? "Tolak penawaran" : "Batalkan kesepakatan",
-        required: true,
-        multiline: true,
-        tone: "danger",
-        placeholder: "Alasan ini terbaca oleh pihak lawan. Jangan tulis nomor HP/kontak.",
-        confirmLabel: ke === "rejected" ? "Tolak" : "Batalkan",
-      });
+      const r = await showPrompt(
+        ke === "rejected"
+          ? `${deal.dealNumber} — ${t("marketplace.deal.rejectReasonPrompt", "alasan menolak penawaran?")}`
+          : `${deal.dealNumber} — ${t("marketplace.deal.cancelReasonPrompt", "alasan membatalkan kesepakatan?")}`,
+        {
+          title: ke === "rejected" ? t("marketplace.deal.rejectTitle", "Tolak penawaran") : t("marketplace.deal.cancelTitle", "Batalkan kesepakatan"),
+          required: true,
+          multiline: true,
+          tone: "danger",
+          placeholder: t("marketplace.deal.reasonPlaceholder", "Alasan ini terbaca oleh pihak lawan. Jangan tulis nomor HP/kontak."),
+          confirmLabel: ke === "rejected" ? t("marketplace.deal.reject", "Tolak") : t("marketplace.deal.cancel", "Batalkan"),
+        }
+      );
       if (r === null) return;
       alasan = r;
     }
@@ -694,7 +761,7 @@ function KesepakatanTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
   return (
     <div className="space-y-3">
       <DaftarAduanSaya bolehTransaksi={bolehTransaksi} versi={versiAduan} />
-      {deals.length === 0 && <Card><p className="text-sm text-neutral-500">Belum ada kesepakatan.</p></Card>}
+      {deals.length === 0 && <Card><p className="text-sm text-neutral-500">{t("marketplace.dealsEmpty", "Belum ada kesepakatan.")}</p></Card>}
       {deals.map((d) => {
         const peran = d.peran as PeranDeal;
         const status = d.status as DealStatus;
@@ -718,29 +785,42 @@ function KesepakatanTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs text-emerald-400">{d.dealNumber}</span>
-                  <Badge status={STATUS_BADGE[status]}>{STATUS_DEAL_LABEL[status]}</Badge>
-                  <span className="text-[11px] text-neutral-500">{peran === "seller" ? "Anda penjual" : "Anda pembeli"}</span>
+                  <Badge status={STATUS_BADGE[status]}>{statusDeal(status)}</Badge>
+                  <span className="text-[11px] text-neutral-500">{peran === "seller" ? t("marketplace.deal.youSell", "Anda penjual") : t("marketplace.deal.youBuy", "Anda pembeli")}</span>
                 </div>
                 <div className="mt-1 text-sm">{d.sellerNote}</div>
                 <div className="text-xs text-neutral-500">
-                  {peran === "seller" ? `Pembeli: ${d.buyerOutletName}` : `Penjual: ${d.sellerOutletName}`}
-                  {d.qty > 1 ? ` · ${d.qty} unit` : ""}
+                  {peran === "seller" ? `${t("marketplace.deal.buyer", "Pembeli")}: ${d.buyerOutletName}` : `${t("marketplace.deal.seller", "Penjual")}: ${d.sellerOutletName}`}
+                  {d.qty > 1 ? ` · ${t("marketplace.units", "{n} unit").replace("{n}", String(d.qty))}` : ""}
                 </div>
                 <BadgeKepercayaan profil={d.counterpartProfile} onClick={() => setLihatProfil(peran === "seller" ? d.buyerOutletId : d.sellerOutletId)} />
-                {status === "requested" && peran === "seller" && d.counterpartProfile?.peringatan?.length > 0 && (
-                  <div className="mt-1 text-[11px] text-amber-400">Perhatikan: {d.counterpartProfile.peringatan.join(" ")}</div>
+                {status === "requested" && peran === "seller" && peringatan(d.counterpartProfile).length > 0 && (
+                  <div className="mt-1 text-[11px] text-amber-400">
+                    {t("marketplace.deal.watchOut", "Perhatikan:")} {peringatan(d.counterpartProfile).join(" ")}
+                  </div>
                 )}
-                {d.buyerNote && <div className="mt-1 text-xs text-neutral-400">Catatan pembeli: {d.buyerNote}</div>}
-                {d.closedReason && <div className="mt-1 text-xs text-rose-400">Alasan: {d.closedReason}</div>}
+                {d.buyerNote && (
+                  <div className="mt-1 text-xs text-neutral-400">
+                    {t("marketplace.deal.buyerNote", "Catatan pembeli:")} {d.buyerNote}
+                  </div>
+                )}
+                {d.closedReason && (
+                  <div className="mt-1 text-xs text-rose-400">
+                    {t("marketplace.reasonPrefix", "Alasan:")} {d.closedReason}
+                  </div>
+                )}
                 {status === "requested" && (
-                  <div className="mt-1 text-[11px] text-neutral-500">Nomor HP kedua pihak dibuka setelah penjual menerima penawaran.</div>
+                  <div className="mt-1 text-[11px] text-neutral-500">{t("marketplace.deal.phonesAfterAccept", "Nomor HP kedua pihak dibuka setelah penjual menerima penawaran.")}</div>
                 )}
               </div>
 
               <div className="text-right shrink-0">
                 <div className="font-medium text-emerald-400">{rupiah(d.agreedPrice * d.qty)}</div>
                 {UJRAH_AKTIF && peran === "seller" && d.platformFeeAmount > 0 && (
-                  <div className="text-[11px] text-neutral-500">ujrah {rupiah(d.platformFeeAmount)}{d.platformFeeStatus === "invoiced" ? " (sudah ditagih)" : ""}</div>
+                  <div className="text-[11px] text-neutral-500">
+                    ujrah {rupiah(d.platformFeeAmount)}
+                    {d.platformFeeStatus === "invoiced" ? ` ${t("marketplace.deal.feeInvoiced", "(sudah ditagih)")}` : ""}
+                  </div>
                 )}
               </div>
             </div>
@@ -752,16 +832,17 @@ function KesepakatanTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
               return (
                 <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
                   <span className="text-xs text-neutral-300">
-                    {peran === "seller" ? "No. HP pembeli" : "No. HP penjual"}: <span className="font-mono text-emerald-300">{noLawan}</span>
+                    {peran === "seller" ? t("marketplace.deal.buyerPhone", "No. HP pembeli") : t("marketplace.deal.sellerPhone", "No. HP penjual")}:{" "}
+                    <span className="font-mono text-emerald-300">{noLawan}</span>
                   </span>
                   <a href={linkWhatsApp(noLawan)} target="_blank" rel="noopener noreferrer" className="text-xs rounded-md bg-emerald-500/15 px-2 py-1 text-emerald-300 hover:bg-emerald-500/25">
-                    Chat WhatsApp
+                    {t("marketplace.deal.chatWhatsapp", "Chat WhatsApp")}
                   </a>
                   {status === "accepted" && (
                     <span className="w-full text-[11px] text-neutral-500">
                       {peran === "buyer"
-                        ? "Setelah barang diterima dan dibayar, tekan \"Barang Diterima & Sudah Dibayar\" di bawah."
-                        : "Atur serah-terima dan pembayaran dengan pembeli. Pembeli yang menandai selesai setelah barang diterima."}
+                        ? t("marketplace.deal.buyerNextStep", "Setelah barang diterima dan dibayar, tekan \"Barang Diterima & Sudah Dibayar\" di bawah.")
+                        : t("marketplace.deal.sellerNextStep", "Atur serah-terima dan pembayaran dengan pembeli. Pembeli yang menandai selesai setelah barang diterima.")}
                     </span>
                   )}
                 </div>
@@ -772,8 +853,7 @@ function KesepakatanTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
               // Sisi pembeli sengaja tidak diposting otomatis — alasannya di lib/marketplace/service.ts.
               <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
                 <p className="text-xs text-neutral-300">
-                  Jangan lupa catat pembelian ini di pembukuan Anda lewat menu <span className="text-amber-300">Expense</span>. Sistem tidak mencatatnya sendiri karena hanya Anda yang tahu barang ini
-                  dipakai sebagai persediaan, aset tetap, atau perlengkapan — dan akunnya berbeda untuk masing-masing.
+                  {t("marketplace.deal.recordPurchase", "Jangan lupa catat pembelian ini di pembukuan Anda lewat menu Expense. Sistem tidak mencatatnya sendiri karena hanya Anda yang tahu barang ini dipakai sebagai persediaan, aset tetap, atau perlengkapan — dan akunnya berbeda untuk masing-masing.")}
                 </p>
               </div>
             )}
@@ -787,7 +867,13 @@ function KesepakatanTab({ bolehTransaksi }: { bolehTransaksi: boolean }) {
                     className={`text-xs px-2.5 py-1 ${ke === "rejected" || ke === "cancelled" ? "text-red-400" : ""}`}
                     onClick={() => pindah(d, ke)}
                   >
-                    {ke === "accepted" ? "Terima Penawaran" : ke === "completed" ? "Barang Diterima & Sudah Dibayar" : ke === "rejected" ? "Tolak" : "Batalkan"}
+                    {ke === "accepted"
+                      ? t("marketplace.deal.accept", "Terima Penawaran")
+                      : ke === "completed"
+                        ? t("marketplace.deal.complete", "Barang Diterima & Sudah Dibayar")
+                        : ke === "rejected"
+                          ? t("marketplace.deal.reject", "Tolak")
+                          : t("marketplace.deal.cancel", "Batalkan")}
                   </Button>
                 ))}
               </div>

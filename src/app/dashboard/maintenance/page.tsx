@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { Wrench, PlayCircle, CheckCircle2, Pencil, Trash2, ChevronDown, ChevronUp, PackagePlus, X } from "lucide-react";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import "@/lib/i18n/dict-maintenance";
 import "@/lib/i18n/dict-coa";
@@ -41,7 +41,7 @@ export default function MaintenancePage() {
 }
 
 function MaintenancePageInner() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const searchParams = useSearchParams();
   // Deep link from Rental's "Set Maintenance" button (/dashboard/rental) — see toggleMaintenance()
   // there. Opens the new-ticket form pre-filled with the Fixed Asset linked to that rental unit
@@ -430,7 +430,7 @@ function MaintenancePageInner() {
                   )}
                 </td>
                 <td><Badge status={STATUS_BADGE[ticket.status]}>{STATUS_LABEL[ticket.status]}</Badge></td>
-                <td className="text-xs whitespace-nowrap">{new Date(ticket.maintenanceDate).toLocaleDateString("id-ID")}</td>
+                <td className="text-xs whitespace-nowrap">{new Date(ticket.maintenanceDate).toLocaleDateString(DATE_LOCALE[lang])}</td>
                 <td className="text-right">
                   <div className="flex flex-col items-end gap-1">
                     {canManage && editingId === ticket.id ? (
@@ -511,7 +511,7 @@ function MaintenancePageInner() {
                                 value={partForm[ticket.id]?.productId ?? ""}
                                 onChange={(v) => setPartForm((prev) => ({ ...prev, [ticket.id]: { productId: v, qty: prev[ticket.id]?.qty ?? 1 } }))}
                                 placeholder={t("maintenance.parts.selectPlaceholder", "Pilih sparepart...")}
-                                options={spareParts.map((p: any) => ({ value: p.id, label: `${p.name} (stok ${p.stockQty})`, disabled: p.stockQty <= 0 }))}
+                                options={spareParts.map((p: any) => ({ value: p.id, label: t("maintenance.parts.optionLabel", "{name} (stok {qty})").replace("{name}", p.name).replace("{qty}", String(p.stockQty)), disabled: p.stockQty <= 0 }))}
                               />
                             </div>
                             <input

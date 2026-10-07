@@ -14,6 +14,9 @@ import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-devices";
 import { DeviceSetupGuide } from "./setup-guide";
+import { LocalControlCard } from "./local-control-card";
+import "@/lib/i18n/dict-local-control";
+import { parseTasmotaLocalIp } from "@/lib/relay/local-control";
 
 interface Device {
   id: string;
@@ -112,6 +115,7 @@ const emptyForm = {
   tvPort: "5555",
   tvAdbPath: "",
   relayAgentId: "",
+  tasmotaLocalIp: "", // IP plug di WiFi outlet — dipakai NexbillAgent saat internet putus (Kontrol Lokal)
 };
 
 export default function DevicesPage() {
@@ -203,6 +207,9 @@ export default function DevicesPage() {
         switchCode: f.tuyaSwitchCode.trim() || undefined,
         accountId: f.tuyaAccountId || undefined,
       });
+    }
+    if (f.protocol === "tasmota_mqtt" && f.tasmotaLocalIp.trim()) {
+      return JSON.stringify({ localIp: f.tasmotaLocalIp.trim() });
     }
     if (f.protocol === "android_tv_adb" && f.tvIp) {
       return JSON.stringify({ ip: f.tvIp, port: Number(f.tvPort) || 5555, adbPath: f.tvAdbPath || undefined });
@@ -337,6 +344,7 @@ export default function DevicesPage() {
       tvPort: tvCfg.port || "5555",
       tvAdbPath: tvCfg.adbPath,
       relayAgentId: tvCfg.relayAgentId,
+      tasmotaLocalIp: d.protocol === "tasmota_mqtt" ? parseTasmotaLocalIp(d.config) ?? "" : "",
     });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(emptyForm); };
@@ -403,6 +411,8 @@ export default function DevicesPage() {
       )}
 
       {canManage && <DeviceSetupGuide />}
+
+      <LocalControlCard canManage={canManage} reloadSignal={devices} onDeviceChanged={load} />
 
       {canManage && (
         <Card className="border border-amber-700/40 bg-amber-950/10">
@@ -474,6 +484,7 @@ export default function DevicesPage() {
                 <div className="text-xs text-neutral-500">
                   {PROTOCOL_LABEL_KEYS[d.protocol] ? t(PROTOCOL_LABEL_KEYS[d.protocol].key, PROTOCOL_LABEL_KEYS[d.protocol].fallback) : d.protocol}
                   {d.mqttTopic ? ` · ${d.mqttTopic}` : ""}
+                  {d.protocol === "tasmota_mqtt" && parseTasmotaLocalIp(d.config) ? ` · IP ${parseTasmotaLocalIp(d.config)}` : ""}
                   {d.protocol === "tuya" && parseTuyaConfig(d.config).deviceId ? ` · ${parseTuyaConfig(d.config).deviceId}` : ""}
                   {d.protocol === "tuya" && tuyaAccounts.length > 1
                     ? ` · ${tuyaAccounts.find((a) => a.id === parseTuyaConfig(d.config).accountId)?.label ?? tuyaAccounts[0].label}`
@@ -589,7 +600,15 @@ function DeviceFormFields({
         )}
       </select>
       {form.protocol === "tasmota_mqtt" && (
-        <input className={cls} placeholder={t("devices.form.mqttTopicPlaceholder", "MQTT Topic (mis. plug_bilik1)")} value={form.mqttTopic} onChange={(e) => setForm({ ...form, mqttTopic: e.target.value })} />
+        <>
+          <input className={cls} placeholder={t("devices.form.mqttTopicPlaceholder", "MQTT Topic (mis. plug_bilik1)")} value={form.mqttTopic} onChange={(e) => setForm({ ...form, mqttTopic: e.target.value })} />
+          <input
+            className={cls}
+            placeholder={t("devices.local.ipPlaceholder", "IP lokal plug (opsional, mis. 192.168.1.23)")}
+            value={form.tasmotaLocalIp}
+            onChange={(e) => setForm({ ...form, tasmotaLocalIp: e.target.value })}
+          />
+        </>
       )}
       {form.protocol === "http_generic" && (
         <>
@@ -655,6 +674,14 @@ function DeviceFormFields({
         {t(
           "devices.form.tuyaAccountHint",
           "Outlet ini punya beberapa akun Tuya. Biarkan \"Otomatis\" supaya sistem mencari sendiri akun yang memiliki Device ID ini, atau pilih akunnya kalau sudah tahu."
+        )}
+      </p>
+    )}
+    {form.protocol === "tasmota_mqtt" && (
+      <p className="text-[11px] text-neutral-500 mt-1">
+        {t(
+          "devices.local.ipHint",
+          "IP lokal dipakai NexbillAgent untuk menyalakan/mematikan plug lewat WiFi saat internet putus. Kosongkan lalu pakai \"Deteksi IP otomatis\" di kartu Kontrol Lokal, dan atur IP tetap (DHCP reservation) untuk plug di router supaya tidak berubah."
         )}
       </p>
     )}

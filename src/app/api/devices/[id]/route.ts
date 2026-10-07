@@ -7,6 +7,7 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { assertDeviceAllowed } from "@/lib/subscription/service";
 import { resolveTuyaDeviceConfig } from "@/lib/devices/tuya-accounts-service";
+import { hasInvalidTasmotaLocalIp } from "@/lib/relay/local-control";
 
 /** Mirrors the same check in POST /api/devices — see that file's doc comment for why mqttTopic
  * must be unique across every outlet, not just this one (all outlets share one MQTT broker). */
@@ -46,6 +47,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const effectiveTopic = (patch.mqttTopic as string | undefined) ?? existing.mqttTopic;
     if (effectiveProtocol === "tasmota_mqtt" && effectiveTopic) {
       await assertMqttTopicGloballyUnique(effectiveTopic, id);
+    }
+    if (effectiveProtocol === "tasmota_mqtt" && patch.config !== undefined && hasInvalidTasmotaLocalIp(patch.config as string | null)) {
+      return NextResponse.json({ error: "IP lokal smart plug harus alamat jaringan lokal, mis. 192.168.1.23 (10.x.x.x, 172.16-31.x.x, atau 192.168.x.x)." }, { status: 400 });
     }
     // Tuya: tentukan akun Tuya pemilik perangkat ini bila config berubah (outlet bisa punya beberapa akun).
     let tuyaWarning: string | undefined;

@@ -10,15 +10,15 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 
 const inputCls = "rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm";
 
-const COLUMNS: { value: ExpenseSearchColumn; key: string; fallback: string; placeholder: string }[] = [
-  { value: "all", key: "expenses.filter.col.all", fallback: "Semua kolom", placeholder: "Cari no., deskripsi, akun, penerima..." },
-  { value: "number", key: "expenses.filter.col.number", fallback: "No. Expense", placeholder: "mis. EXP-2026" },
-  { value: "description", key: "expenses.filter.col.description", fallback: "Deskripsi / Kategori", placeholder: "mis. listrik, galon" },
-  { value: "account", key: "expenses.filter.col.account", fallback: "Akun Beban", placeholder: "mis. Gaji, Listrik" },
-  { value: "payee", key: "expenses.filter.col.payee", fallback: "Penerima / Supplier", placeholder: "nama penerima atau supplier" },
-  { value: "costCenter", key: "expenses.filter.col.costCenter", fallback: "Divisi (Cost Center)", placeholder: "mis. Dapur" },
-  { value: "staff", key: "expenses.filter.col.staff", fallback: "Diinput Oleh", placeholder: "nama staf" },
-  { value: "amount", key: "expenses.filter.col.amount", fallback: "Nominal", placeholder: "mis. 50000" },
+const COLUMNS: { value: ExpenseSearchColumn; key: string; fallback: string; placeholderKey: string; placeholder: string }[] = [
+  { value: "all", key: "expenses.filter.col.all", fallback: "Semua kolom", placeholderKey: "expenses.filter.placeholder.all", placeholder: "Cari no., deskripsi, akun, penerima..." },
+  { value: "number", key: "expenses.filter.col.number", fallback: "No. Expense", placeholderKey: "expenses.filter.placeholder.number", placeholder: "mis. EXP-2026" },
+  { value: "description", key: "expenses.filter.col.description", fallback: "Deskripsi / Kategori", placeholderKey: "expenses.filter.placeholder.description", placeholder: "mis. listrik, galon" },
+  { value: "account", key: "expenses.filter.col.account", fallback: "Akun Beban", placeholderKey: "expenses.filter.placeholder.account", placeholder: "mis. Gaji, Listrik" },
+  { value: "payee", key: "expenses.filter.col.payee", fallback: "Penerima / Supplier", placeholderKey: "expenses.filter.placeholder.payee", placeholder: "nama penerima atau supplier" },
+  { value: "costCenter", key: "expenses.filter.col.costCenter", fallback: "Divisi (Cost Center)", placeholderKey: "expenses.filter.placeholder.costCenter", placeholder: "mis. Dapur" },
+  { value: "staff", key: "expenses.filter.col.staff", fallback: "Diinput Oleh", placeholderKey: "expenses.filter.placeholder.staff", placeholder: "nama staf" },
+  { value: "amount", key: "expenses.filter.col.amount", fallback: "Nominal", placeholderKey: "expenses.filter.placeholder.amount", placeholder: "mis. 50000" },
 ];
 
 const PERIOD_MODES: { value: ExpensePeriodMode; key: string; fallback: string }[] = [
@@ -29,7 +29,9 @@ const PERIOD_MODES: { value: ExpensePeriodMode; key: string; fallback: string }[
   { value: "year", key: "expenses.filter.period.year", fallback: "Per tahun" },
 ];
 
-const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const LOCALE: Record<string, string> = { id: "id-ID", en: "en-US", ms: "ms-MY", th: "th-TH", fil: "fil-PH", vi: "vi-VN" };
+/** Nama bulan dalam bahasa dashboard, dari Intl (bukan daftar tetap berbahasa Indonesia). */
+const monthNames = (lang: string) => Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(LOCALE[lang] ?? "id-ID", { month: "long" }));
 
 export function ExpenseFilterBar({
   filter,
@@ -48,7 +50,7 @@ export function ExpenseFilterBar({
   years: number[];
   todayYmd: string;
 }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const col = COLUMNS.find((c) => c.value === filter.column) ?? COLUMNS[0];
   const p = filter.period;
   const setPeriod = (patch: Partial<ExpenseListFilter["period"]>) => onChange({ ...filter, period: { ...p, ...patch } });
@@ -88,12 +90,12 @@ export function ExpenseFilterBar({
           <input
             className={`${inputCls} w-full pl-8 pr-8`}
             inputMode={filter.column === "amount" ? "numeric" : undefined}
-            placeholder={t(`${col.key}.placeholder`, col.placeholder)}
+            placeholder={t(col.placeholderKey, col.placeholder)}
             value={filter.query}
             onChange={(e) => onChange({ ...filter, query: e.target.value })}
           />
           {filter.query && (
-            <button className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300" onClick={() => onChange({ ...filter, query: "" })} aria-label="Hapus kata kunci">
+            <button className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300" onClick={() => onChange({ ...filter, query: "" })} aria-label={t("expenses.filter.clearKeyword", "Hapus kata kunci")}>
               <X size={14} />
             </button>
           )}
@@ -130,7 +132,7 @@ export function ExpenseFilterBar({
           <div className="text-[11px] text-neutral-500">{t("expenses.filter.month", "Bulan")}</div>
           <select className={inputCls} value={p.month ?? 0} onChange={(e) => setPeriod({ month: Number(e.target.value) || undefined })}>
             <option value={0}>{t("expenses.filter.allMonths", "Semua bulan")}</option>
-            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{t(`expenses.filter.monthName.${i + 1}`, m)}</option>)}
+            {monthNames(lang).map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
           </select>
         </label>
       )}

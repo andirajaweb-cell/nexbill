@@ -21,4 +21,8 @@ registerDict({
   "push.cat.fraud": { id: "Shift ditandai berisiko (anti-fraud)", en: "Shift flagged as risky (anti-fraud)", ms: "Syif ditanda berisiko (anti-penipuan)", th: "กะถูกทำเครื่องหมายว่าเสี่ยง (ป้องกันทุจริต)", fil: "Shift na may risk flag (anti-fraud)", vi: "Ca bị gắn cờ rủi ro (chống gian lận)" },
   "push.cat.low_stock": { id: "Stok menipis", en: "Low stock", ms: "Stok rendah", th: "สต็อกใกล้หมด", fil: "Paubos na stock", vi: "Sắp hết hàng" },
   "push.cat.shift_summary": { id: "Ringkasan omzet saat tutup shift", en: "Revenue summary when a shift closes", ms: "Ringkasan hasil semasa syif ditutup", th: "สรุปยอดขายเมื่อปิดกะ", fil: "Buod ng kita kapag isinara ang shift", vi: "Tóm tắt doanh thu khi đóng ca" },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "push.testFailed": { id: "Gagal mengirim notifikasi uji.", en: "Failed to send the test notification.", ms: "Gagal menghantar pemberitahuan ujian.", th: "ส่งการแจ้งเตือนทดสอบไม่สำเร็จ", fil: "Hindi naipadala ang test notification.", vi: "Không gửi được thông báo thử." },
+  "push.subscribeFailed": { id: "Gagal menyimpan langganan notifikasi.", en: "Failed to save the notification subscription.", ms: "Gagal menyimpan langganan pemberitahuan.", th: "บันทึกการสมัครรับการแจ้งเตือนไม่สำเร็จ", fil: "Hindi na-save ang subscription sa notification.", vi: "Không lưu được đăng ký thông báo." },
 });

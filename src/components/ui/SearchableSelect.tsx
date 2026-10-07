@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { computePanelPosition, isTriggerOffscreen, type PanelPosition, type Viewport } from "./searchable-select-position";
+import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 
 function readViewport(): Viewport {
   return {
@@ -52,14 +53,20 @@ export function SearchableSelect({
   value,
   onChange,
   options,
-  placeholder = "Pilih...",
-  searchPlaceholder = "Cari...",
-  emptyText = "Tidak ada hasil",
+  placeholder,
+  searchPlaceholder,
+  emptyText,
   className,
   disabled,
   allowClear = false,
-  clearLabel = "-- Kosongkan --",
+  clearLabel,
 }: SearchableSelectProps) {
+  // Teks bawaan mengikuti bahasa dashboard; pemanggil yang mengirim teks sendiri tetap menang.
+  const { t } = useDashboardLang();
+  placeholder ??= t("select.placeholder", "Pilih...");
+  searchPlaceholder ??= t("select.search", "Cari...");
+  emptyText ??= t("select.empty", "Tidak ada hasil");
+  clearLabel ??= t("select.clear", "-- Kosongkan --");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);

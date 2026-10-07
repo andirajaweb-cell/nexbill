@@ -100,4 +100,11 @@ registerDict({
   "booking.popup.receivedAt": { id: "Masuk {time}", en: "Received {time}", ms: "Diterima {time}", th: "ได้รับเมื่อ {time}", fil: "Natanggap {time}", vi: "Nhận lúc {time}" },
   "booking.popup.dismissAll": { id: "Tutup semua", en: "Dismiss all", ms: "Tutup semua", th: "ปิดทั้งหมด", fil: "Isara lahat", vi: "Đóng tất cả" },
   "booking.popup.later": { id: "Nanti", en: "Later", ms: "Nanti", th: "ภายหลัง", fil: "Mamaya", vi: "Để sau" },
+
+  // --- Booking (terjemahan yang sebelumnya hilang) ---
+  "booking.transferButton": { id: "Pindahkan", en: "Move", ms: "Pindahkan", th: "ย้าย", fil: "Ilipat", vi: "Chuyển" },
+  "booking.keepBooking": { id: "Jangan batalkan", en: "Don't cancel", ms: "Jangan batalkan", th: "ไม่ยกเลิก", fil: "Huwag kanselahin", vi: "Không hủy" },
+
+  // --- Popup booking (terjemahan yang sebelumnya hilang) ---
+  "booking.popup.failed": { id: "Gagal", en: "Failed", ms: "Gagal", th: "ไม่สำเร็จ", fil: "Nabigo", vi: "Thất bại" },
 });

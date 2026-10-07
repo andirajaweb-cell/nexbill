@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { uiText } from "@/lib/i18n/client-text";
 import "@/lib/i18n/dict-unit-qr";
 
 /**
@@ -23,7 +24,7 @@ export function UnitQrModal({ unit, onClose }: { unit: { id: string; name: strin
         if (!r.ok) throw new Error(d.error);
         setQr(d);
       })
-      .catch((e) => showAlert(e instanceof Error ? e.message : "Gagal memuat QR."));
+      .catch((e) => showAlert(e instanceof Error ? e.message : uiText("unitQr.loadFailed", "Gagal memuat QR.")));
     fetch("/api/tv/settings")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setSettings({ unitQrOrderEnabled: !!d.unitQrOrderEnabled, unitQrExtendEnabled: !!d.unitQrExtendEnabled }))
@@ -50,7 +51,7 @@ export function UnitQrModal({ unit, onClose }: { unit: { id: string; name: strin
   const toggle = async (key: "unitQrOrderEnabled" | "unitQrExtendEnabled", value: boolean) => {
     const res = await fetch("/api/tv/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [key]: value }) });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok) return showAlert(d.error ?? "Gagal menyimpan.");
+    if (!res.ok) return showAlert(d.error ?? t("unitQr.saveFailed", "Gagal menyimpan."));
     setSettings({ unitQrOrderEnabled: !!d.unitQrOrderEnabled, unitQrExtendEnabled: !!d.unitQrExtendEnabled });
   };
 

@@ -7,7 +7,8 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import "@/lib/i18n/dict-accounting";
 import type { listAssetPurchases } from "@/lib/accounting/asset-purchase";
 
 /**
@@ -18,25 +19,25 @@ import type { listAssetPurchases } from "@/lib/accounting/asset-purchase";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const inputCls = "rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm w-full";
-const CATEGORY_OPTIONS: { value: string; label: string; life: number }[] = [
-  { value: "playstation", label: "PlayStation", life: 48 },
-  { value: "tv", label: "TV", life: 48 },
-  { value: "controller", label: "Controller", life: 12 },
-  { value: "furniture", label: "Furniture", life: 48 },
-  { value: "vehicle", label: "Kendaraan", life: 96 },
-  { value: "other", label: "Lainnya", life: 48 },
+const CATEGORY_OPTIONS: { value: string; labelKey: string; label: string; life: number }[] = [
+  { value: "playstation", labelKey: "assets.category.playstation", label: "PlayStation", life: 48 },
+  { value: "tv", labelKey: "assets.category.tv", label: "TV", life: 48 },
+  { value: "controller", labelKey: "assets.category.controller", label: "Controller", life: 12 },
+  { value: "furniture", labelKey: "assets.category.furniture", label: "Furniture", life: 48 },
+  { value: "vehicle", labelKey: "assets.category.vehicle", label: "Kendaraan", life: 96 },
+  { value: "other", labelKey: "assets.category.other", label: "Lainnya", life: 48 },
 ];
-const STATUS: Record<string, { badge: string; label: string }> = {
-  unpaid: { badge: "failed", label: "Belum Dibayar" },
-  partial: { badge: "pending", label: "Sebagian" },
-  paid: { badge: "success", label: "Lunas" },
-  cancelled: { badge: "unknown", label: "Dibatalkan" },
+const STATUS: Record<string, { badge: string; labelKey: string; label: string }> = {
+  unpaid: { badge: "failed", labelKey: "assets.purchase.status.unpaid", label: "Belum Dibayar" },
+  partial: { badge: "pending", labelKey: "assets.purchase.status.partial", label: "Sebagian" },
+  paid: { badge: "success", labelKey: "assets.purchase.status.paid", label: "Lunas" },
+  cancelled: { badge: "unknown", labelKey: "assets.purchase.status.cancelled", label: "Dibatalkan" },
 };
 const FUNDING = [
-  { value: "paid", label: "Lunas sekarang" },
-  { value: "partial", label: "Uang muka (DP), sisanya utang" },
-  { value: "payable", label: "Utang — bayar nanti" },
-  { value: "opening_balance", label: "Saldo awal (aset yang sudah dimiliki)" },
+  { value: "paid", labelKey: "assets.purchase.funding.paid", label: "Lunas sekarang" },
+  { value: "partial", labelKey: "assets.purchase.funding.partial", label: "Uang muka (DP), sisanya utang" },
+  { value: "payable", labelKey: "assets.purchase.funding.payable", label: "Utang — bayar nanti" },
+  { value: "opening_balance", labelKey: "assets.purchase.funding.openingBalance", label: "Saldo awal (aset yang sudah dimiliki)" },
 ] as const;
 
 type PurchaseRow = Awaited<ReturnType<typeof listAssetPurchases>>[number];
@@ -54,7 +55,7 @@ const emptyForm = () => ({
 });
 
 export function AssetPurchaseTab({ role, onChanged }: { role: StaffRole; onChanged?: () => void }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const canManage = hasPermission(role, "manage_assets");
   const canCancel = canManage && hasPermission(role, "approve_expenses");
   const [lookups, setLookups] = useState<Lookups>({ suppliers: [], rentalUnits: [], cashBankAccounts: [] });
@@ -224,7 +225,7 @@ export function AssetPurchaseTab({ role, onChanged }: { role: StaffRole; onChang
                       value={it.category}
                       onChange={(e) => setItem(idx, { category: e.target.value, usefulLifeMonths: String(CATEGORY_OPTIONS.find((c) => c.value === e.target.value)?.life ?? 48) })}
                     >
-                      {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{t(c.labelKey, c.label)}</option>)}
                     </select>
                   </label>
                   <label className="sm:col-span-1 text-xs text-neutral-500 space-y-1">
@@ -270,7 +271,7 @@ export function AssetPurchaseTab({ role, onChanged }: { role: StaffRole; onChang
             <label className="text-xs text-neutral-400 space-y-1 sm:col-span-2">
               <span>{t("assets.purchase.funding", "Cara pembayaran")}</span>
               <select className={inputCls} value={form.funding} onChange={(e) => setForm({ ...form, funding: e.target.value })}>
-                {FUNDING.map((f) => <option key={f.value} value={f.value}>{t(`assets.purchase.funding.${f.value}`, f.label)}</option>)}
+                {FUNDING.map((f) => <option key={f.value} value={f.value}>{t(f.labelKey, f.label)}</option>)}
               </select>
             </label>
             {needsCash && (
@@ -362,14 +363,14 @@ export function AssetPurchaseTab({ role, onChanged }: { role: StaffRole; onChang
                     <button className="hover:underline" onClick={() => setOpenId(openId === p.id ? null : p.id)}>{p.purchaseNumber}</button>
                     {p.invoiceNumber && <div className="text-neutral-500">{p.invoiceNumber}</div>}
                   </td>
-                  <td className="text-xs">{new Date(p.purchaseDate).toLocaleDateString("id-ID")}</td>
+                  <td className="text-xs">{new Date(p.purchaseDate).toLocaleDateString(DATE_LOCALE[lang])}</td>
                   <td className="text-xs">{p.supplierName ?? "—"}</td>
                   <td className="text-xs">{p.items.map((i) => `${i.name} ×${i.qty}`).join(", ")}</td>
                   <td className="text-xs text-right">{rupiah(p.total)}</td>
                   <td className="text-xs text-right">{p.outstanding > 0 ? <span className="text-amber-400">{rupiah(p.outstanding)}</span> : "—"}</td>
                   <td>
                     <Badge status={STATUS[p.status]?.badge ?? "unknown"}>
-                      {p.paymentMethod === "opening_balance" ? t("assets.purchase.status.opening", "Saldo Awal") : t(`assets.purchase.status.${p.status}`, STATUS[p.status]?.label ?? p.status)}
+                      {p.paymentMethod === "opening_balance" ? t("assets.purchase.status.opening", "Saldo Awal") : (STATUS[p.status] ? t(STATUS[p.status].labelKey, STATUS[p.status].label) : p.status)}
                     </Badge>
                   </td>
                   <td className="text-right">
@@ -396,7 +397,7 @@ export function AssetPurchaseTab({ role, onChanged }: { role: StaffRole; onChang
                         <div className="font-medium text-neutral-300 mb-1">{t("assets.purchase.items", "Barang yang dibeli")}</div>
                         {p.items.map((i) => (
                           <div key={i.id} className="flex justify-between">
-                            <span>{i.name} · {i.qty} × {rupiah(i.unitCost)} ({t("assets.purchase.landed", "Harga perolehan/unit")} {rupiah(i.landedUnitCost)}, {i.usefulLifeMonths} bln)</span>
+                            <span>{i.name} · {i.qty} × {rupiah(i.unitCost)} ({t("assets.purchase.landed", "Harga perolehan/unit")} {rupiah(i.landedUnitCost)}, {t("assets.purchase.monthsShort", "{n} bln").replace("{n}", String(i.usefulLifeMonths))})</span>
                             <span>{rupiah(i.qty * i.unitCost)}</span>
                           </div>
                         ))}
@@ -417,13 +418,13 @@ export function AssetPurchaseTab({ role, onChanged }: { role: StaffRole; onChang
                         <div className="font-medium text-neutral-300 mb-1">{t("assets.purchase.payments", "Pembayaran")}</div>
                         {p.paymentMethod !== "opening_balance" && initialPaid(p) > 0 && (
                           <div className="flex justify-between">
-                            <span>{new Date(p.purchaseDate).toLocaleDateString("id-ID")} · {t("assets.purchase.initialPayment", "Dibayar saat pembelian")} ({p.cashBankName ?? p.paymentMethod})</span>
+                            <span>{new Date(p.purchaseDate).toLocaleDateString(DATE_LOCALE[lang])} · {t("assets.purchase.initialPayment", "Dibayar saat pembelian")} ({p.cashBankName ?? p.paymentMethod})</span>
                             <span>{rupiah(initialPaid(p))}</span>
                           </div>
                         )}
                         {p.payments.map((x) => (
                           <div key={x.id} className={`flex justify-between ${x.status === "voided" ? "line-through text-neutral-500" : ""}`}>
-                            <span>{new Date(x.paidAt).toLocaleDateString("id-ID")} · {x.cashBankName ?? x.method}</span>
+                            <span>{new Date(x.paidAt).toLocaleDateString(DATE_LOCALE[lang])} · {x.cashBankName ?? x.method}</span>
                             <span>{rupiah(x.amount)}</span>
                           </div>
                         ))}

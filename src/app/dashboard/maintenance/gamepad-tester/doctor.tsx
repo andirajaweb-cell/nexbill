@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import "@/lib/i18n/dict-maintenance";
 import {
   analisaDiam,
   analisaPutar,
@@ -8,6 +10,7 @@ import {
   analisaTrigger,
   susunLaporan,
   namaTombol,
+  namaStick,
   STICK,
   AMBANG,
   type Sampel,
@@ -41,7 +44,13 @@ const WARNA_TINGKAT: Record<Tingkat, string> = {
   berat: "border-red-500/40 bg-red-500/10 text-red-300",
   belum: "border-neutral-600 bg-neutral-800/40 text-neutral-300",
 };
-const LABEL_TINGKAT: Record<Tingkat, string> = { ok: "Baik", ringan: "Ringan", sedang: "Sedang", berat: "Berat", belum: "Belum sah" };
+const LABEL_TINGKAT: Record<Tingkat, [string, string]> = {
+  ok: ["maintenance.doctor.level.ok", "Baik"],
+  ringan: ["maintenance.doctor.level.light", "Ringan"],
+  sedang: ["maintenance.doctor.level.medium", "Sedang"],
+  berat: ["maintenance.doctor.level.heavy", "Berat"],
+  belum: ["maintenance.doctor.level.incomplete", "Belum sah"],
+};
 
 /* ================= INDIKATOR LIVE ================= */
 
@@ -112,6 +121,7 @@ function BarSumbu({ label, value, min, max }: { label: string; value: number; mi
 }
 
 export function IndikatorLive({ snap, standar }: { snap: SnapshotLive; standar: boolean }) {
+  const { t } = useDashboardLang();
   const jejak = useRef<{ t: number; a: number[] }[]>([]);
   const tepi = useRef<number[][]>([new Array(32).fill(0), new Array(32).fill(0)]);
   const ekstrem = useRef<{ min: number; max: number }[]>([0, 1, 2, 3].map(() => ({ min: 0, max: 0 })));
@@ -144,8 +154,8 @@ export function IndikatorLive({ snap, standar }: { snap: SnapshotLive; standar: 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-neutral-200">Indikator live</h4>
-        <button className="text-[11px] text-neutral-500 hover:text-neutral-300" onClick={reset}>Reset garis-tepi</button>
+        <h4 className="text-sm font-medium text-neutral-200">{t("maintenance.doctor.ui.liveTitle", "Indikator live")}</h4>
+        <button className="text-[11px] text-neutral-500 hover:text-neutral-300" onClick={reset}>{t("maintenance.doctor.ui.resetEdge", "Reset garis-tepi")}</button>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {STICK.map((s, k) => (
@@ -155,34 +165,39 @@ export function IndikatorLive({ snap, standar }: { snap: SnapshotLive; standar: 
             y={snap.axes[s.y] ?? 0}
             jejak={jejak.current.map((j) => [j.a[s.x] ?? 0, j.a[s.y] ?? 0] as [number, number])}
             tepi={tepi.current[k]}
-            label={s.nama}
+            label={namaStick(s, t)}
           />
         ))}
       </div>
       <p className="text-[10px] text-neutral-600 text-center">
-        Lingkaran putus-putus hijau = batas toleransi titik tengah. Garis oranye = tepi terjauh yang pernah dicapai; putar stick mentok melingkar — garisnya harus membulat penuh tanpa lekukan.
+        {t(
+          "maintenance.doctor.ui.plotLegend",
+          "Lingkaran putus-putus hijau = batas toleransi titik tengah. Garis oranye = tepi terjauh yang pernah dicapai; putar stick mentok melingkar — garisnya harus membulat penuh tanpa lekukan."
+        )}
       </p>
 
       <div className="space-y-1">
-        <div className="text-[10px] uppercase tracking-wide text-neutral-500">Keseimbangan analog (nilai sekarang · jangkauan terjauh kiri/atas vs kanan/bawah)</div>
-        <BarSumbu label="Kiri X (kiri↔kanan)" value={snap.axes[0] ?? 0} {...ekstrem.current[0]} />
-        <BarSumbu label="Kiri Y (atas↔bawah)" value={snap.axes[1] ?? 0} {...ekstrem.current[1]} />
-        <BarSumbu label="Kanan X (kiri↔kanan)" value={snap.axes[2] ?? 0} {...ekstrem.current[2]} />
-        <BarSumbu label="Kanan Y (atas↔bawah)" value={snap.axes[3] ?? 0} {...ekstrem.current[3]} />
+        <div className="text-[10px] uppercase tracking-wide text-neutral-500">{t("maintenance.doctor.ui.balanceTitle", "Keseimbangan analog (nilai sekarang · jangkauan terjauh kiri/atas vs kanan/bawah)")}</div>
+        <BarSumbu label={t("maintenance.doctor.ui.axisLeftX", "Kiri X (kiri↔kanan)")} value={snap.axes[0] ?? 0} {...ekstrem.current[0]} />
+        <BarSumbu label={t("maintenance.doctor.ui.axisLeftY", "Kiri Y (atas↔bawah)")} value={snap.axes[1] ?? 0} {...ekstrem.current[1]} />
+        <BarSumbu label={t("maintenance.doctor.ui.axisRightX", "Kanan X (kiri↔kanan)")} value={snap.axes[2] ?? 0} {...ekstrem.current[2]} />
+        <BarSumbu label={t("maintenance.doctor.ui.axisRightY", "Kanan Y (atas↔bawah)")} value={snap.axes[3] ?? 0} {...ekstrem.current[3]} />
       </div>
 
       <div className="space-y-1">
-        <div className="text-[10px] uppercase tracking-wide text-neutral-500">Tingkat tekanan tombol (garis hijau = batas tekanan penuh {pct(AMBANG.TEKANAN_PENUH)})</div>
+        <div className="text-[10px] uppercase tracking-wide text-neutral-500">
+          {t("maintenance.doctor.ui.pressureTitle", "Tingkat tekanan tombol (garis hijau = batas tekanan penuh {pct})").replace("{pct}", pct(AMBANG.TEKANAN_PENUH))}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
           {snap.buttons.map((b, i) => (
-            <Bar key={i} label={namaTombol(i, standar)} value={b.value || (b.pressed ? 1 : 0)} tanda={b.pressed} />
+            <Bar key={i} label={namaTombol(i, standar, t)} value={b.value || (b.pressed ? 1 : 0)} tanda={b.pressed} />
           ))}
         </div>
         {sumbuTambahan.length > 0 && (
           <div className="mt-2 space-y-1">
-            <div className="text-[10px] uppercase tracking-wide text-neutral-500">Sumbu tambahan (tekanan tombol PS3 pada mode driver tertentu, sensor, dsb.)</div>
+            <div className="text-[10px] uppercase tracking-wide text-neutral-500">{t("maintenance.doctor.ui.extraAxesTitle", "Sumbu tambahan (tekanan tombol PS3 pada mode driver tertentu, sensor, dsb.)")}</div>
             {sumbuTambahan.map((v, i) => (
-              <Bar key={i} label={`Sumbu #${i + 4}`} value={Math.abs(v)} />
+              <Bar key={i} label={t("maintenance.doctor.ui.axisNumbered", "Sumbu #{n}").replace("{n}", String(i + 4))} value={Math.abs(v)} />
             ))}
           </div>
         )}
@@ -195,11 +210,34 @@ export function IndikatorLive({ snap, standar }: { snap: SnapshotLive; standar: 
 
 type Langkah = "siap" | "diam" | "putar" | "tombol" | "trigger" | "hasil";
 
-const INFO_LANGKAH: Record<Exclude<Langkah, "siap" | "hasil">, { judul: string; instruksi: string; detik?: number }> = {
-  diam: { judul: "1. Uji diam", instruksi: "Letakkan stik di meja. JANGAN sentuh stick maupun tombol sampai hitungan selesai.", detik: 5 },
-  putar: { judul: "2. Uji putar", instruksi: "Putar KEDUA stick mentok ke tepi, melingkar pelan, minimal 3 putaran searah jarum jam lalu 3 putaran berlawanan.", detik: 10 },
-  tombol: { judul: "3. Uji tombol & tekanan", instruksi: "Tekan SETIAP tombol satu per satu sampai mentok (termasuk D-pad, L3/R3, Select, Start, tombol PS). Tombol yang sudah terbaca berubah hijau. Tekan Selesai bila semua sudah." },
-  trigger: { judul: "4. Uji trigger L2/R2", instruksi: "Tarik L2 dan R2 PERLAHAN dari lepas sampai mentok, lalu lepas pelan. Ulangi 3 kali.", detik: 8 },
+const INFO_LANGKAH: Record<Exclude<Langkah, "siap" | "hasil">, { judulKey: string; judul: string; instruksiKey: string; instruksi: string; detik?: number }> = {
+  diam: {
+    judulKey: "maintenance.doctor.step.idle",
+    judul: "1. Uji diam",
+    instruksiKey: "maintenance.doctor.step.idleHelp",
+    instruksi: "Letakkan stik di meja. JANGAN sentuh stick maupun tombol sampai hitungan selesai.",
+    detik: 5,
+  },
+  putar: {
+    judulKey: "maintenance.doctor.step.rotate",
+    judul: "2. Uji putar",
+    instruksiKey: "maintenance.doctor.step.rotateHelp",
+    instruksi: "Putar KEDUA stick mentok ke tepi, melingkar pelan, minimal 3 putaran searah jarum jam lalu 3 putaran berlawanan.",
+    detik: 10,
+  },
+  tombol: {
+    judulKey: "maintenance.doctor.step.buttons",
+    judul: "3. Uji tombol & tekanan",
+    instruksiKey: "maintenance.doctor.step.buttonsHelp",
+    instruksi: "Tekan SETIAP tombol satu per satu sampai mentok (termasuk D-pad, L3/R3, Select, Start, tombol PS). Tombol yang sudah terbaca berubah hijau. Tekan Selesai bila semua sudah.",
+  },
+  trigger: {
+    judulKey: "maintenance.doctor.step.trigger",
+    judul: "4. Uji trigger L2/R2",
+    instruksiKey: "maintenance.doctor.step.triggerHelp",
+    instruksi: "Tarik L2 dan R2 PERLAHAN dari lepas sampai mentok, lalu lepas pelan. Ulangi 3 kali.",
+    detik: 8,
+  },
 };
 
 function useRekaman(indexGamepad: number) {
@@ -228,6 +266,7 @@ function useRekaman(indexGamepad: number) {
 }
 
 export function PemeriksaanTerpandu({ snap, standar, labelController }: { snap: SnapshotLive; standar: boolean; labelController: string }) {
+  const { t: tr, lang } = useDashboardLang();
   const [langkah, setLangkah] = useState<Langkah>("siap");
   const [sisa, setSisa] = useState(0);
   const [hasil, setHasil] = useState<Temuan[]>([]);
@@ -241,21 +280,21 @@ export function PemeriksaanTerpandu({ snap, standar, labelController }: { snap: 
   const selesaiLangkah = (l: Langkah) => {
     const s = rek.berhenti();
     let t: Temuan[] = [];
-    if (l === "diam") t = analisaDiam(s, standar).temuan;
+    if (l === "diam") t = analisaDiam(s, standar, tr).temuan;
     if (l === "putar") {
-      const p = analisaPutar(s);
+      const p = analisaPutar(s, tr);
       t = p.temuan;
       setPutar(p.stick);
     }
-    if (l === "tombol") t = analisaTombol(s, standar).temuan;
-    if (l === "trigger") t = analisaTrigger(s, standar).temuan;
+    if (l === "tombol") t = analisaTombol(s, standar, tr).temuan;
+    if (l === "trigger") t = analisaTrigger(s, standar, tr).temuan;
     kumpul.current = [...kumpul.current, ...t];
     const i = URUTAN.indexOf(l);
     const berikut = URUTAN[i + 1];
     if (berikut) jalankan(berikut);
     else {
       setHasil(kumpul.current);
-      setLaporan(susunLaporan(kumpul.current));
+      setLaporan(susunLaporan(kumpul.current, tr));
       setLangkah("hasil");
     }
   };
@@ -290,12 +329,20 @@ export function PemeriksaanTerpandu({ snap, standar, labelController }: { snap: 
   if (langkah === "siap") {
     return (
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-neutral-200">Pemeriksaan terpandu (Dokter Stik)</h4>
+        <h4 className="text-sm font-medium text-neutral-200">{tr("maintenance.doctor.ui.guidedTitle", "Pemeriksaan terpandu (Dokter Stik)")}</h4>
         <p className="text-xs text-neutral-400">
-          4 langkah ± 1 menit: uji diam (drift & jitter), uji putar (jangkauan, keseimbangan, dead spot), uji tombol (respons, tekanan, bouncing){standar ? ", dan uji trigger L2/R2" : ""}. Hasilnya skor, analisa kerusakan, dan rekomendasi servis.
+          {standar
+            ? tr(
+                "maintenance.doctor.ui.guidedIntroStandard",
+                "4 langkah ± 1 menit: uji diam (drift & jitter), uji putar (jangkauan, keseimbangan, dead spot), uji tombol (respons, tekanan, bouncing), dan uji trigger L2/R2. Hasilnya skor, analisa kerusakan, dan rekomendasi servis."
+              )
+            : tr(
+                "maintenance.doctor.ui.guidedIntro",
+                "3 langkah ± 1 menit: uji diam (drift & jitter), uji putar (jangkauan, keseimbangan, dead spot), uji tombol (respons, tekanan, bouncing). Hasilnya skor, analisa kerusakan, dan rekomendasi servis."
+              )}
         </p>
-        {!standar && <p className="text-[11px] text-amber-400">Mapping non-standar: uji trigger dilewati dan nama tombol ditampilkan sebagai nomor.</p>}
-        <Button className="text-xs" onClick={mulaiSemua}>Mulai Pemeriksaan</Button>
+        {!standar && <p className="text-[11px] text-amber-400">{tr("maintenance.doctor.ui.nonStandard", "Mapping non-standar: uji trigger dilewati dan nama tombol ditampilkan sebagai nomor.")}</p>}
+        <Button className="text-xs" onClick={mulaiSemua}>{tr("maintenance.doctor.ui.start", "Mulai Pemeriksaan")}</Button>
       </div>
     );
   }
@@ -307,23 +354,23 @@ export function PemeriksaanTerpandu({ snap, standar, labelController }: { snap: 
     return (
       <div className="space-y-3 rounded-lg border border-sky-500/30 bg-sky-500/5 p-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-sky-300">{info.judul}</h4>
+          <h4 className="text-sm font-medium text-sky-300">{tr(info.judulKey, info.judul)}</h4>
           {info.detik && <span className="font-mono text-2xl text-sky-200">{sisa}</span>}
         </div>
-        <p className="text-sm text-neutral-200">{info.instruksi}</p>
+        <p className="text-sm text-neutral-200">{tr(info.instruksiKey, info.instruksi)}</p>
         {langkah === "tombol" && (
           <>
             <div className="flex flex-wrap gap-1.5">
               {snap.buttons.map((_, i) => (
                 <span key={i} className={`rounded px-2 py-0.5 text-[11px] ${sudah.has(i) ? "bg-emerald-500/20 text-emerald-300" : "bg-neutral-800 text-neutral-500"}`}>
-                  {namaTombol(i, standar)}
+                  {namaTombol(i, standar, tr)}
                 </span>
               ))}
             </div>
-            <Button className="text-xs" onClick={() => selesaiLangkah("tombol")}>Selesai</Button>
+            <Button className="text-xs" onClick={() => selesaiLangkah("tombol")}>{tr("maintenance.doctor.ui.done", "Selesai")}</Button>
           </>
         )}
-        <button className="text-[11px] text-neutral-500 hover:text-neutral-300" onClick={() => { rek.berhenti(); setLangkah("siap"); }}>Batalkan pemeriksaan</button>
+        <button className="text-[11px] text-neutral-500 hover:text-neutral-300" onClick={() => { rek.berhenti(); setLangkah("siap"); }}>{tr("maintenance.doctor.ui.cancel", "Batalkan pemeriksaan")}</button>
       </div>
     );
   }
@@ -337,12 +384,14 @@ export function PemeriksaanTerpandu({ snap, standar, labelController }: { snap: 
       <div className={`rounded-lg border p-3 ${warnaVonis}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-neutral-500">Hasil pemeriksaan · {labelController} · {new Date().toLocaleString("id-ID")}</div>
+            <div className="text-[10px] uppercase tracking-wide text-neutral-500">
+              {tr("maintenance.doctor.ui.resultTitle", "Hasil pemeriksaan")} · {labelController} · {new Date().toLocaleString(DATE_LOCALE[lang])}
+            </div>
             <div className="text-lg font-semibold">{laporan.judulVonis}</div>
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold">{laporan.skor}</div>
-            <div className="text-[10px] text-neutral-500">skor kesehatan / 100</div>
+            <div className="text-[10px] text-neutral-500">{tr("maintenance.doctor.ui.scoreLabel", "skor kesehatan / 100")}</div>
           </div>
         </div>
         <p className="mt-1 text-xs text-neutral-300">{laporan.saranVonis}</p>
@@ -352,38 +401,43 @@ export function PemeriksaanTerpandu({ snap, standar, labelController }: { snap: 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
           {putar.map((p) => (
             <div key={p.nama} className="rounded-lg bg-black/30 px-3 py-2">
-              <div className="font-medium text-neutral-300">{p.nama} — jangkauan & keseimbangan</div>
+              <div className="font-medium text-neutral-300">{tr("maintenance.doctor.ui.rangeTitle", "{name} — jangkauan & keseimbangan").replace("{name}", p.nama)}</div>
               <div className="mt-1 grid grid-cols-4 gap-1 text-center font-mono">
-                <div><div className="text-neutral-500">Kiri</div>{pct(p.kiri)}</div>
-                <div><div className="text-neutral-500">Kanan</div>{pct(p.kanan)}</div>
-                <div><div className="text-neutral-500">Atas</div>{pct(p.atas)}</div>
-                <div><div className="text-neutral-500">Bawah</div>{pct(p.bawah)}</div>
+                <div><div className="text-neutral-500">{tr("maintenance.doctor.ui.left", "Kiri")}</div>{pct(p.kiri)}</div>
+                <div><div className="text-neutral-500">{tr("maintenance.doctor.ui.right", "Kanan")}</div>{pct(p.kanan)}</div>
+                <div><div className="text-neutral-500">{tr("maintenance.doctor.ui.up", "Atas")}</div>{pct(p.atas)}</div>
+                <div><div className="text-neutral-500">{tr("maintenance.doctor.ui.down", "Bawah")}</div>{pct(p.bawah)}</div>
               </div>
-              <div className="mt-1 text-neutral-500">Arah tersentuh {p.sektorTersentuh}/{AMBANG.SEKTOR} · radius tepi rata-rata {pct(p.rataRadiusLuar)}</div>
+              <div className="mt-1 text-neutral-500">
+                {tr("maintenance.doctor.ui.sectorSummary", "Arah tersentuh {n}/{total} · radius tepi rata-rata {pct}")
+                  .replace("{n}", String(p.sektorTersentuh))
+                  .replace("{total}", String(AMBANG.SEKTOR))
+                  .replace("{pct}", pct(p.rataRadiusLuar))}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {laporan.masalah.length === 0 && laporan.vonis !== "belum_lengkap" && <p className="text-sm text-emerald-300">Tidak ditemukan kerusakan.</p>}
+      {laporan.masalah.length === 0 && laporan.vonis !== "belum_lengkap" && <p className="text-sm text-emerald-300">{tr("maintenance.doctor.ui.noDamage", "Tidak ditemukan kerusakan.")}</p>}
 
       <div className="space-y-2">
         {laporan.temuan.filter((t) => t.tingkat !== "ok").map((t, i) => (
           <div key={i} className={`rounded-lg border px-3 py-2 ${WARNA_TINGKAT[t.tingkat]}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-medium">{t.komponen}: {t.judul}</span>
-              <span className="rounded bg-black/30 px-1.5 py-0.5 text-[10px]">{LABEL_TINGKAT[t.tingkat]}</span>
+              <span className="rounded bg-black/30 px-1.5 py-0.5 text-[10px]">{tr(LABEL_TINGKAT[t.tingkat][0], LABEL_TINGKAT[t.tingkat][1])}</span>
             </div>
             <div className="text-xs text-neutral-300">{t.detail}</div>
-            {t.penyebab && <div className="mt-1 text-xs text-neutral-400"><span className="text-neutral-500">Kemungkinan penyebab:</span> {t.penyebab}</div>}
-            {t.rekomendasi && <div className="mt-0.5 text-xs text-neutral-200"><span className="text-neutral-500">Rekomendasi:</span> {t.rekomendasi}</div>}
+            {t.penyebab && <div className="mt-1 text-xs text-neutral-400"><span className="text-neutral-500">{tr("maintenance.doctor.ui.likelyCause", "Kemungkinan penyebab:")}</span> {t.penyebab}</div>}
+            {t.rekomendasi && <div className="mt-0.5 text-xs text-neutral-200"><span className="text-neutral-500">{tr("maintenance.doctor.ui.recommendation", "Rekomendasi:")}</span> {t.rekomendasi}</div>}
           </div>
         ))}
       </div>
 
       {baik.length > 0 && (
         <details className="text-xs text-neutral-400">
-          <summary className="cursor-pointer text-neutral-500">Bagian yang normal ({baik.length})</summary>
+          <summary className="cursor-pointer text-neutral-500">{tr("maintenance.doctor.ui.normalParts", "Bagian yang normal ({n})").replace("{n}", String(baik.length))}</summary>
           <ul className="mt-1 space-y-0.5 pl-4 list-disc">
             {baik.map((t, i) => <li key={i}>{t.komponen}: {t.judul} — {t.detail}</li>)}
           </ul>
@@ -391,14 +445,16 @@ export function PemeriksaanTerpandu({ snap, standar, labelController }: { snap: 
       )}
 
       <p className="text-[10px] text-neutral-600">
-        Diukur dari nilai yang dilaporkan controller ke browser (bukan alat ukur listrik). Tidak mencakup baterai, getaran, sensor gerak, dan port charge. Stik PS3 lewat driver mode XInput tidak
-        melaporkan tekanan tombol wajah/D-pad. Ambang adalah ambang praktis servis stik rental, bukan standar pabrik.
+        {tr(
+          "maintenance.doctor.ui.disclaimer",
+          "Diukur dari nilai yang dilaporkan controller ke browser (bukan alat ukur listrik). Tidak mencakup baterai, getaran, sensor gerak, dan port charge. Stik PS3 lewat driver mode XInput tidak melaporkan tekanan tombol wajah/D-pad. Ambang adalah ambang praktis servis stik rental, bukan standar pabrik."
+        )}
       </p>
 
       <div className="flex flex-wrap gap-2">
-        <Button className="text-xs" onClick={mulaiSemua}>Ulangi Pemeriksaan</Button>
-        <Button variant="ghost" className="text-xs" onClick={() => window.print()}>Cetak / Simpan PDF</Button>
-        <button className="text-xs text-neutral-500" onClick={() => setLangkah("siap")}>Tutup</button>
+        <Button className="text-xs" onClick={mulaiSemua}>{tr("maintenance.doctor.ui.repeat", "Ulangi Pemeriksaan")}</Button>
+        <Button variant="ghost" className="text-xs" onClick={() => window.print()}>{tr("maintenance.doctor.ui.print", "Cetak / Simpan PDF")}</Button>
+        <button className="text-xs text-neutral-500" onClick={() => setLangkah("siap")}>{tr("maintenance.doctor.ui.close", "Tutup")}</button>
       </div>
     </div>
   );

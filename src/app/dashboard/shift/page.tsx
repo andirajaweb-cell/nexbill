@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getCashDenominations, denominationLabel } from "@/lib/shift/denominations";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { useOutletFormat } from "@/lib/format/client";
 import "@/lib/i18n/dict-shift";
@@ -516,7 +516,7 @@ export default function ShiftPage() {
                 ? t("shift.closingOthersTitle", "Menutup Shift {name}").replace("{name}", supervisedShift.staffName ?? "-")
                 : t("shift.activeShiftTitle", "Shift Aktif")}
             </h2>
-            <Badge status="occupied">{t("shift.runningSince", "Berjalan sejak {time}").replace("{time}", new Date(closingShift.openedAt).toLocaleTimeString("id-ID"))}</Badge>
+            <Badge status="occupied">{t("shift.runningSince", "Berjalan sejak {time}").replace("{time}", new Date(closingShift.openedAt).toLocaleTimeString(DATE_LOCALE[lang]))}</Badge>
           </div>
           {supervisedShift && (
             <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">

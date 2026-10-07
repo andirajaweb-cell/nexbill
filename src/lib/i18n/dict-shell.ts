@@ -305,4 +305,48 @@ registerDict({
   // --- Akun demo publik ---
   "demo.banner": { id: "Anda memakai AKUN DEMO publik — dipakai bersama banyak orang. Jangan masukkan data asli; data bisa berubah atau direset sewaktu-waktu. Password & data akun tidak bisa diubah.", en: "You're using the public DEMO ACCOUNT — shared by many people. Don't enter real data; data may change or be reset at any time. Password & account details can't be changed.", ms: "Anda menggunakan AKAUN DEMO awam — dikongsi ramai orang. Jangan masukkan data sebenar; data boleh berubah atau ditetapkan semula bila-bila masa. Kata laluan & butiran akaun tidak boleh diubah.", th: "คุณกำลังใช้บัญชีเดโมสาธารณะ — ใช้ร่วมกับหลายคน อย่าใส่ข้อมูลจริง ข้อมูลอาจเปลี่ยนหรือถูกรีเซ็ตได้ตลอดเวลา เปลี่ยนรหัสผ่านและข้อมูลบัญชีไม่ได้", fil: "Gumagamit ka ng pampublikong DEMO ACCOUNT — ginagamit ng maraming tao. Huwag maglagay ng totoong data; maaaring magbago o ma-reset ang data anumang oras. Hindi mababago ang password at detalye ng account.", vi: "Bạn đang dùng TÀI KHOẢN DEMO công khai — nhiều người dùng chung. Đừng nhập dữ liệu thật; dữ liệu có thể thay đổi hoặc bị đặt lại bất cứ lúc nào. Không thể đổi mật khẩu & thông tin tài khoản." },
   "demo.bannerCta": { id: "Daftar gratis", en: "Sign up free", ms: "Daftar percuma", th: "สมัครฟรี", fil: "Mag-sign up nang libre", vi: "Đăng ký miễn phí" },
+
+  // --- Komponen bersama (dialog) (terjemahan yang sebelumnya hilang) ---
+  "dialog.required": { id: "Wajib diisi.", en: "Required.", ms: "Wajib diisi.", th: "จำเป็นต้องกรอก", fil: "Kailangan.", vi: "Bắt buộc." },
+  "dialog.cancel": { id: "Batal", en: "Cancel", ms: "Batal", th: "ยกเลิก", fil: "Kanselahin", vi: "Hủy" },
+  "dialog.save": { id: "Simpan", en: "Save", ms: "Simpan", th: "บันทึก", fil: "I-save", vi: "Lưu" },
+  "dialog.confirm": { id: "Ya, Lanjutkan", en: "Yes, Continue", ms: "Ya, Teruskan", th: "ใช่ ดำเนินการต่อ", fil: "Oo, Ituloy", vi: "Có, tiếp tục" },
+  "dialog.ok": { id: "OK", en: "OK", ms: "OK", th: "ตกลง", fil: "OK", vi: "OK" },
+
+  // --- Komponen bersama (select) (terjemahan yang sebelumnya hilang) ---
+  "select.placeholder": { id: "Pilih...", en: "Choose...", ms: "Pilih...", th: "เลือก...", fil: "Pumili...", vi: "Chọn..." },
+  "select.search": { id: "Cari...", en: "Search...", ms: "Cari...", th: "ค้นหา...", fil: "Maghanap...", vi: "Tìm..." },
+  "select.empty": { id: "Tidak ada hasil", en: "No results", ms: "Tiada hasil", th: "ไม่พบผลลัพธ์", fil: "Walang resulta", vi: "Không có kết quả" },
+  "select.clear": { id: "-- Kosongkan --", en: "-- Clear --", ms: "-- Kosongkan --", th: "-- ล้าง --", fil: "-- I-clear --", vi: "-- Xóa chọn --" },
+
+  // --- Komponen bersama (password) (terjemahan yang sebelumnya hilang) ---
+  "password.hide": { id: "Sembunyikan password", en: "Hide password", ms: "Sembunyikan kata laluan", th: "ซ่อนรหัสผ่าน", fil: "Itago ang password", vi: "Ẩn mật khẩu" },
+  "password.show": { id: "Tampilkan password", en: "Show password", ms: "Tunjukkan kata laluan", th: "แสดงรหัสผ่าน", fil: "Ipakita ang password", vi: "Hiện mật khẩu" },
+
+  // --- Pemilih periode (terjemahan yang sebelumnya hilang) ---
+  "period.today": { id: "Hari Ini", en: "Today", ms: "Hari Ini", th: "วันนี้", fil: "Ngayon", vi: "Hôm nay" },
+  "period.yesterday": { id: "Kemarin", en: "Yesterday", ms: "Semalam", th: "เมื่อวาน", fil: "Kahapon", vi: "Hôm qua" },
+  "period.thisWeek": { id: "Minggu Ini", en: "This Week", ms: "Minggu Ini", th: "สัปดาห์นี้", fil: "Ngayong Linggo", vi: "Tuần này" },
+  "period.lastWeek": { id: "Minggu Lalu", en: "Last Week", ms: "Minggu Lepas", th: "สัปดาห์ที่แล้ว", fil: "Nakaraang Linggo", vi: "Tuần trước" },
+  "period.thisMonth": { id: "Bulan Ini", en: "This Month", ms: "Bulan Ini", th: "เดือนนี้", fil: "Ngayong Buwan", vi: "Tháng này" },
+  "period.lastMonth": { id: "Bulan Lalu", en: "Last Month", ms: "Bulan Lepas", th: "เดือนที่แล้ว", fil: "Nakaraang Buwan", vi: "Tháng trước" },
+  "period.thisYear": { id: "Tahun Ini", en: "This Year", ms: "Tahun Ini", th: "ปีนี้", fil: "Ngayong Taon", vi: "Năm nay" },
+  "period.lastYear": { id: "Tahun Lalu", en: "Last Year", ms: "Tahun Lepas", th: "ปีที่แล้ว", fil: "Nakaraang Taon", vi: "Năm trước" },
+  "period.custom": { id: "Custom / Tanggal Tertentu", en: "Custom / Specific Dates", ms: "Tersuai / Tarikh Tertentu", th: "กำหนดเอง / วันที่เจาะจง", fil: "Custom / Partikular na Petsa", vi: "Tùy chỉnh / Ngày cụ thể" },
+  "period.singleDateHint": { id: "(kosongkan untuk tanggal tunggal)", en: "(leave empty for a single date)", ms: "(kosongkan untuk satu tarikh)", th: "(เว้นว่างสำหรับวันเดียว)", fil: "(iwanang blangko para sa iisang petsa)", vi: "(để trống nếu chỉ một ngày)" },
+  "period.allTime": { id: "Sepanjang Waktu", en: "All Time", ms: "Sepanjang Masa", th: "ตลอดเวลา", fil: "Lahat ng Panahon", vi: "Toàn thời gian" },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "stat.paidTransactions": { id: "{n} transaksi lunas", en: "{n} paid transactions", ms: "{n} transaksi berbayar", th: "{n} รายการที่ชำระแล้ว", fil: "{n} bayad na transaksyon", vi: "{n} giao dịch đã thanh toán" },
+  "shell.saving.hint": { id: "Jangan tutup atau muat ulang halaman ini.", en: "Don't close or reload this page.", ms: "Jangan tutup atau muat semula halaman ini.", th: "อย่าปิดหรือรีโหลดหน้านี้", fil: "Huwag isara o i-reload ang pahinang ito.", vi: "Đừng đóng hoặc tải lại trang này." },
+  "shell.saving.badResponse": { id: "Server tidak merespons dengan benar. Cek daftar sebelum mencoba lagi.", en: "The server did not respond properly. Check the list before trying again.", ms: "Pelayan tidak memberi respons dengan betul. Semak senarai sebelum mencuba lagi.", th: "เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง ตรวจสอบรายการก่อนลองอีกครั้ง", fil: "Hindi maayos ang tugon ng server. Tingnan ang listahan bago subukan muli.", vi: "Máy chủ phản hồi không đúng. Kiểm tra danh sách trước khi thử lại." },
+
+  // --- Nama role (TopBar, Sidebar, halaman Staff — lib/auth/permissions.ts roleLabel) ---
+  "staff.role.manager": { id: "Manager", en: "Manager", ms: "Pengurus", th: "ผู้จัดการ", fil: "Manager", vi: "Quản lý" },
+  "staff.role.cashier": { id: "Kasir", en: "Cashier", ms: "Juruwang", th: "แคชเชียร์", fil: "Cashier", vi: "Thu ngân" },
+  "staff.role.accountant": { id: "Akuntan", en: "Accountant", ms: "Akauntan", th: "นักบัญชี", fil: "Accountant", vi: "Kế toán" },
+  "staff.role.kitchen": { id: "Dapur", en: "Kitchen", ms: "Dapur", th: "ครัว", fil: "Kusina", vi: "Bếp" },
+  "staff.role.supervisor": { id: "Supervisor", en: "Supervisor", ms: "Penyelia", th: "หัวหน้างาน", fil: "Supervisor", vi: "Giám sát" },
+  "staff.role.superuser": { id: "Superuser", en: "Superuser", ms: "Superuser", th: "Superuser", fil: "Superuser", vi: "Superuser" },
+  "staff.role.owner": { id: "Owner", en: "Owner", ms: "Pemilik", th: "เจ้าของ", fil: "May-ari", vi: "Chủ cửa hàng" },
 });

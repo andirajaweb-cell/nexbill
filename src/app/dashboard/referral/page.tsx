@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { Share2, Copy, Users, Wallet, Check, AlertTriangle, CalendarClock } from "lucide-react";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-referral";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
@@ -65,7 +65,7 @@ interface Data {
 }
 
 export default function ReferralPage() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -101,7 +101,7 @@ export default function ReferralPage() {
 
   const { partner, referrals, commissions, payouts, nextPayoutDate, bankInfoComplete } = data;
   const tierMeta = TIER_LABEL_KEYS[partner.tier] ?? TIER_LABEL_KEYS.customer;
-  const nextPayoutLabel = new Date(nextPayoutDate + "T00:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const nextPayoutLabel = new Date(nextPayoutDate + "T00:00:00").toLocaleDateString(DATE_LOCALE[lang], { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="space-y-6">
@@ -200,7 +200,7 @@ export default function ReferralPage() {
                 <div key={r.id} className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
                   <div className="text-sm text-neutral-200">{r.refereeOutletName}</div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-neutral-500">{new Date(r.createdAt).toLocaleDateString("id-ID")}</span>
+                    <span className="text-xs text-neutral-500">{new Date(r.createdAt).toLocaleDateString(DATE_LOCALE[lang])}</span>
                     <Badge status={CONVERSION_STATUS_BADGE[r.status]}>{t(meta.key, meta.fallback)}</Badge>
                   </div>
                 </div>
@@ -222,7 +222,7 @@ export default function ReferralPage() {
                   {c.commissionPercent}% {t("referral.of", "dari")} {rupiah(c.sourceInvoiceAmount)}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-neutral-500">{new Date(c.createdAt).toLocaleDateString("id-ID")}</span>
+                  <span className="text-xs text-neutral-500">{new Date(c.createdAt).toLocaleDateString(DATE_LOCALE[lang])}</span>
                   <span className="font-semibold text-emerald-300">+{rupiah(c.amount)}</span>
                 </div>
               </div>
@@ -239,7 +239,7 @@ export default function ReferralPage() {
               <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-sm">
                 <div className="text-neutral-300">{p.method ?? "-"}</div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-neutral-500">{new Date(p.createdAt).toLocaleDateString("id-ID")}</span>
+                  <span className="text-xs text-neutral-500">{new Date(p.createdAt).toLocaleDateString(DATE_LOCALE[lang])}</span>
                   <span className="font-semibold text-neutral-100">-{rupiah(p.amount)}</span>
                 </div>
               </div>

@@ -12,7 +12,7 @@ import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
 import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-home-rental";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
@@ -302,7 +302,7 @@ function addDays(d: Date, n: number) {
 
 /** "Peta Tanggal Sewa" — a monthly calendar (which days have bookings) and a per-product timeline (which product is booked on which dates), both driven by the same rentals list. No external charting library — plain CSS grid, consistent with the rest of this file. */
 function RentalCalendarTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [view, setView] = useState<"calendar" | "timeline">("calendar");
   const [rentals, setRentals] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -354,7 +354,7 @@ function RentalCalendarTab({ outletId }: { outletId: string }) {
           <Card className="md:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
               <button className="text-xs text-neutral-400 hover:text-neutral-200" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>&larr; {t("homeRental.calendar.prevMonth", "Sebelumnya")}</button>
-              <div className="font-medium text-sm">{month.toLocaleDateString("id-ID", { month: "long", year: "numeric" })}</div>
+              <div className="font-medium text-sm">{month.toLocaleDateString(DATE_LOCALE[lang], { month: "long", year: "numeric" })}</div>
               <button className="text-xs text-neutral-400 hover:text-neutral-200" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>{t("homeRental.calendar.nextMonth", "Berikutnya")} &rarr;</button>
             </div>
             <div className="grid grid-cols-7 gap-1 text-center text-xs text-neutral-500">
@@ -378,7 +378,7 @@ function RentalCalendarTab({ outletId }: { outletId: string }) {
             </div>
           </Card>
           <Card className="space-y-2">
-            <div className="text-xs font-medium text-neutral-400">{selectedDay ? selectedDay.toLocaleDateString("id-ID", { dateStyle: "full" }) : t("homeRental.calendar.clickDateHint", "Klik tanggal untuk lihat booking")}</div>
+            <div className="text-xs font-medium text-neutral-400">{selectedDay ? selectedDay.toLocaleDateString(DATE_LOCALE[lang], { dateStyle: "full" }) : t("homeRental.calendar.clickDateHint", "Klik tanggal untuk lihat booking")}</div>
             {selectedDayRentals.map((r) => (
               <div key={r.id} className="text-sm border-b border-neutral-900 pb-1">
                 <div className="font-medium">{r.rentalCode} <Badge status={RENTAL_STATUS_BADGE[r.status] ?? "unknown"}>{RENTAL_STATUS_LABEL_KEYS[r.status] ? t(RENTAL_STATUS_LABEL_KEYS[r.status].key, RENTAL_STATUS_LABEL_KEYS[r.status].fallback) : r.status}</Badge></div>
@@ -392,7 +392,7 @@ function RentalCalendarTab({ outletId }: { outletId: string }) {
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <button className="text-xs text-neutral-400 hover:text-neutral-200" onClick={() => setTimelineStart(addDays(timelineStart, -TIMELINE_DAYS))}>&larr; {t("homeRental.calendar.prevDays", "{n} hari sebelumnya").replace("{n}", String(TIMELINE_DAYS))}</button>
-            <div className="font-medium text-sm">{timelineDays[0].toLocaleDateString("id-ID", { dateStyle: "medium" })} — {timelineDays[TIMELINE_DAYS - 1].toLocaleDateString("id-ID", { dateStyle: "medium" })}</div>
+            <div className="font-medium text-sm">{timelineDays[0].toLocaleDateString(DATE_LOCALE[lang], { dateStyle: "medium" })} — {timelineDays[TIMELINE_DAYS - 1].toLocaleDateString(DATE_LOCALE[lang], { dateStyle: "medium" })}</div>
             <button className="text-xs text-neutral-400 hover:text-neutral-200" onClick={() => setTimelineStart(addDays(timelineStart, TIMELINE_DAYS))}>{t("homeRental.calendar.nextDays", "{n} hari berikutnya").replace("{n}", String(TIMELINE_DAYS))} &rarr;</button>
           </div>
           <div className="overflow-x-auto">
@@ -770,7 +770,7 @@ function PackagesTab({ outletId, canManage }: { outletId: string; canManage: boo
 }
 
 function BookingTab({ outletId, canManage, canApprove }: { outletId: string; canManage: boolean; canApprove: boolean }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [rentals, setRentals] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
@@ -1001,9 +1001,9 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
                   {r.packageId ? packages.find((p) => p.id === r.packageId)?.name : products.find((p) => p.id === r.productId)?.name ?? "—"}
                 </td>
                 <td className="py-2 pr-3 text-neutral-500 text-xs">
-                  {new Date(r.scheduledStart).toLocaleDateString("id-ID")} → {new Date(r.scheduledEnd).toLocaleDateString("id-ID")}
+                  {new Date(r.scheduledStart).toLocaleDateString(DATE_LOCALE[lang])} → {new Date(r.scheduledEnd).toLocaleDateString(DATE_LOCALE[lang])}
                 </td>
-                <td className="py-2 pr-3">{rupiah(r.totalAmount)}{r.depositAmount > 0 && <span className="text-neutral-500"> (+dep {rupiah(r.depositAmount)})</span>}</td>
+                <td className="py-2 pr-3">{rupiah(r.totalAmount)}{r.depositAmount > 0 && <span className="text-neutral-500"> {t("homeRental.booking.plusDeposit", "(+dep {amount})").replace("{amount}", rupiah(r.depositAmount))}</span>}</td>
                 <td className="py-2 pr-3 space-x-1">
                   <Badge status={RENTAL_STATUS_BADGE[r.status] ?? "unknown"}>{RENTAL_STATUS_LABEL_KEYS[r.status] ? t(RENTAL_STATUS_LABEL_KEYS[r.status].key, RENTAL_STATUS_LABEL_KEYS[r.status].fallback) : r.status}</Badge>
                   {r.approvalStatus === "pending" && <Badge status="failed">{t("homeRental.booking.pendingApproval", "Menunggu Approval")}</Badge>}
@@ -1162,12 +1162,6 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
     </div>
   );
 }
-
-const IDENTITY_DOC_FIELDS: { key: string; numberKey: string; label: string }[] = [
-  { key: "customerIdentityImageUrl", numberKey: "customerIdentityNumber", label: "KTP Pelanggan" },
-  { key: "studentIdImageUrl", numberKey: "studentIdNumber", label: "Kartu Pelajar" },
-  { key: "parentIdentityImageUrl", numberKey: "parentIdentityNumber", label: "KTP Orang Tua/Wali" },
-];
 
 /** Detail/verification panel for one rental — Dokumen (view + attach ID photos), Perlengkapan (itemized packing list CRUD), and the staff Verifikasi checklist (KTP/Kartu Pelajar/KTP Ortu/GetContact). */
 function RentalDetailModal({ rental, canManage, onClose }: { rental: any; canManage: boolean; onClose: () => void }) {
@@ -1363,7 +1357,7 @@ const IDENTITY_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }
 };
 
 function RiskTab({ outletId, canManage, canApprove }: { outletId: string; canManage: boolean; canApprove: boolean }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   // Aturan Kerusakan is now the outlet's own editable "damage_rule" policy (see Kebijakan tab /
   // lib/home-rental/policy.ts) instead of a hardcoded list — reference only, not auto-charged.
   const [damageRules, setDamageRules] = useState<any[]>([]);
@@ -1599,7 +1593,7 @@ function RiskTab({ outletId, canManage, canApprove }: { outletId: string; canMan
                     <td className="py-1.5 pr-3 font-medium">{h.rentalCode}</td>
                     <td className="py-1.5 pr-3 text-neutral-400">{h.outletName}{h.isOwnOutlet && <span className="ml-1 text-[9px] text-cyan-300">{t("homeRental.risk.meTag", "(saya)")}</span>}</td>
                     <td className="py-1.5 pr-3 text-neutral-400">{h.itemName}</td>
-                    <td className="py-1.5 pr-3 text-neutral-500">{new Date(h.scheduledStart).toLocaleDateString("id-ID")} → {new Date(h.scheduledEnd).toLocaleDateString("id-ID")}</td>
+                    <td className="py-1.5 pr-3 text-neutral-500">{new Date(h.scheduledStart).toLocaleDateString(DATE_LOCALE[lang])} → {new Date(h.scheduledEnd).toLocaleDateString(DATE_LOCALE[lang])}</td>
                     <td className="py-1.5 pr-3"><Badge status={RENTAL_STATUS_BADGE[h.status] ?? "unknown"}>{RENTAL_STATUS_LABEL_KEYS[h.status] ? t(RENTAL_STATUS_LABEL_KEYS[h.status].key, RENTAL_STATUS_LABEL_KEYS[h.status].fallback) : h.status}</Badge></td>
                     <td className="py-1.5 pr-3">{h.status === "returned" ? (h.returnChecklistOk ? "✅" : "❌") : "—"}</td>
                     <td className="py-1.5 pr-3">{h.returnRating ? <StarRating value={h.returnRating} readOnly size="xs" /> : "—"}</td>
@@ -1784,8 +1778,8 @@ function PolicyRuleSection({
           {showChargeFullDay && (
             <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={newRule.chargeFullDay} onChange={(e) => setNewRule({ ...newRule, chargeFullDay: e.target.checked })} /> {t("homeRental.policy.extraDayCheckbox", "1 hari tambahan")}</label>
           )}
-          {showNote && <input className="flex-1 min-w-[180px] rounded-lg bg-neutral-800 border border-neutral-700 px-2.5 py-1.5 text-xs" placeholder={notePlaceholder ?? "Catatan"} value={newRule.note} onChange={(e) => setNewRule({ ...newRule, note: e.target.value })} />}
-          <Button variant="secondary" className="text-xs" onClick={addRule}>+ Tambah</Button>
+          {showNote && <input className="flex-1 min-w-[180px] rounded-lg bg-neutral-800 border border-neutral-700 px-2.5 py-1.5 text-xs" placeholder={notePlaceholder ?? t("homeRental.policy.notePlaceholder", "Catatan")} value={newRule.note} onChange={(e) => setNewRule({ ...newRule, note: e.target.value })} />}
+          <Button variant="secondary" className="text-xs" onClick={addRule}>{t("homeRental.policy.addRule", "+ Tambah")}</Button>
         </div>
       )}
     </Card>

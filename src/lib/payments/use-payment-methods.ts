@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { uiText } from "@/lib/i18n/client-text";
+import "@/lib/i18n/dict-payments";
 
 /** One active method from the outlet's own Pembayaran catalog, ready for a checkout picker. */
 export interface PaymentMethodOption {
@@ -19,10 +21,10 @@ export interface PaymentMethodOption {
  * which used to include NEXBILL's own iPaymu channels and would have routed a customer's money to
  * NEXBILL instead of the outlet.
  */
-const OFFLINE_FALLBACK: PaymentMethodOption[] = [
-  { value: "cash", label: "Tunai (Cash)", kind: "cash" },
+const offlineFallback = (): PaymentMethodOption[] => [
+  { value: "cash", label: uiText("payments.offline.cash", "Tunai (Cash)"), kind: "cash" },
   { value: "qris", label: "QRIS", kind: "info_only" },
-  { value: "transfer", label: "Transfer Bank", kind: "info_only" },
+  { value: "transfer", label: uiText("payments.offline.transfer", "Transfer Bank"), kind: "info_only" },
 ];
 
 /**
@@ -58,9 +60,9 @@ export function usePaymentMethods() {
             bankAccountHolder: m.bankAccountHolder,
             customerNote: m.customerNote,
           }));
-        setMethods(active.length ? active : OFFLINE_FALLBACK);
+        setMethods(active.length ? active : offlineFallback());
       })
-      .catch(() => alive && setMethods(OFFLINE_FALLBACK))
+      .catch(() => alive && setMethods(offlineFallback()))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;

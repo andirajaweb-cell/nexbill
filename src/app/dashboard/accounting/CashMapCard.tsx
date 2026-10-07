@@ -13,12 +13,14 @@ import type { CashIssue, CashMapRow } from "@/lib/accounting/audit/cash-accounts
  * masuk ke sana, saldo buku besar, dan dari transaksi apa saja uangnya datang/pergi.
  */
 
-const FAMILY: Record<string, { label: string; cls: string }> = {
-  kas: { label: "Kas 111x", cls: "bg-emerald-500/15 text-emerald-300" },
-  bank: { label: "Bank 112x", cls: "bg-sky-500/15 text-sky-300" },
-  digital: { label: "Digital/QRIS 113x", cls: "bg-violet-500/15 text-violet-300" },
-  deposit: { label: "Deposit PPOB 115x", cls: "bg-amber-500/15 text-amber-300" },
-  other: { label: "Bukan kas/bank", cls: "bg-rose-500/15 text-rose-300" },
+// labelKey literal (bukan `accounting.audit.cm.fam.${family}`) supaya setiap kunci bisa diaudit
+// (lib/i18n/hardcoded-text.test.ts).
+const FAMILY: Record<string, { label: string; labelKey: string; cls: string }> = {
+  kas: { label: "Kas 111x", labelKey: "accounting.audit.cm.fam.kas", cls: "bg-emerald-500/15 text-emerald-300" },
+  bank: { label: "Bank 112x", labelKey: "accounting.audit.cm.fam.bank", cls: "bg-sky-500/15 text-sky-300" },
+  digital: { label: "Digital/QRIS 113x", labelKey: "accounting.audit.cm.fam.digital", cls: "bg-violet-500/15 text-violet-300" },
+  deposit: { label: "Deposit PPOB 115x", labelKey: "accounting.audit.cm.fam.deposit", cls: "bg-amber-500/15 text-amber-300" },
+  other: { label: "Bukan kas/bank", labelKey: "accounting.audit.cm.fam.other", cls: "bg-rose-500/15 text-rose-300" },
 };
 
 export function CashMapCard({ reloadKey }: { reloadKey: number }) {
@@ -71,7 +73,7 @@ export function CashMapCard({ reloadKey }: { reloadKey: number }) {
                       {r.kind && <span className="ml-1 text-[10px] text-neutral-500">({r.kind === "cash" ? t("accounting.audit.cm.kindCash", "tunai") : t("accounting.audit.cm.kindNonCash", "non-tunai")}{r.isDefault ? `, ${t("accounting.audit.cm.primary", "utama")}` : ""})</span>}
                     </td>
                     <td>{r.accountCode ? `${r.accountCode} ${coaAccountName(t, { code: r.accountCode, name: r.accountName ?? "" })}` : "—"}</td>
-                    <td><span className={`rounded px-1.5 py-0.5 text-[10px] ${fam.cls}`}>{t(`accounting.audit.cm.fam.${FAMILY[r.family] ? r.family : "other"}`, fam.label)}</span></td>
+                    <td><span className={`rounded px-1.5 py-0.5 text-[10px] ${fam.cls}`}>{t(fam.labelKey, fam.label)}</span></td>
                     <td className="text-xs text-neutral-400">{r.methods.join(", ") || "—"}</td>
                     <td className="text-right text-emerald-300">{rupiah(r.totalIn)}</td>
                     <td className="text-right text-rose-300">{rupiah(r.totalOut)}</td>

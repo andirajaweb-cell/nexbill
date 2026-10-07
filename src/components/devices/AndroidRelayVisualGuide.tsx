@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
-import { RelayIllustration, type RelayIllustrationKind } from "./AndroidRelayIllustrations";
+import { RelayIllustration, relayIllustrationLang, type RelayIllustrationKind } from "./AndroidRelayIllustrations";
 import "@/lib/i18n/dict-devices-guide";
 
 /** Panduan cetak/bergambar lengkap (6 bahasa) — dibangun oleh scripts/build-android-guide.tsx. */
@@ -29,7 +29,7 @@ export function AndroidRelayVisualGuide() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {STEPS.map((s, i) => (
           <figure key={s.kind} className="rounded-lg border border-neutral-800 bg-white/[0.02] p-1.5">
-            <RelayIllustration kind={s.kind} />
+            <RelayIllustration kind={s.kind} lang={relayIllustrationLang(lang)} />
             <figcaption className="px-1 pt-1.5 text-[11px] leading-snug text-neutral-300">
               <span className="mr-1 font-semibold text-cyan-300">{i}.</span>
               {t(s.key, s.fallback)}

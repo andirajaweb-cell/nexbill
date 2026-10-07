@@ -39,4 +39,8 @@ registerDict({
   "unitQr.loading": { id: "Memuat QR...", en: "Loading QR codes...", ms: "Memuatkan QR...", th: "กำลังโหลด QR...", fil: "Naglo-load ng QR...", vi: "Đang tải QR..." },
   "unitQr.stickerLine1": { id: "Scan untuk cek sisa waktu", en: "Scan to check your time left", ms: "Imbas untuk semak baki masa", th: "สแกนเพื่อดูเวลาที่เหลือ", fil: "I-scan para makita ang natitirang oras", vi: "Quét để xem thời gian còn lại" },
   "unitQr.stickerLine2": { id: "Pesan makanan · Tambah waktu · Panggil kasir", en: "Order food · Add time · Call cashier", ms: "Pesan makanan · Tambah masa · Panggil juruwang", th: "สั่งอาหาร · เพิ่มเวลา · เรียกแคชเชียร์", fil: "Mag-order · Magdagdag ng oras · Tawagin ang cashier", vi: "Gọi món · Thêm giờ · Gọi thu ngân" },
+
+  // --- Teks yang sebelumnya ditulis langsung di kode (audit i18n) ---
+  "unitQr.loadFailed": { id: "Gagal memuat QR.", en: "Failed to load the QR code.", ms: "Gagal memuatkan kod QR.", th: "โหลด QR ไม่สำเร็จ", fil: "Hindi na-load ang QR.", vi: "Không tải được mã QR." },
+  "unitQr.saveFailed": { id: "Gagal menyimpan.", en: "Failed to save.", ms: "Gagal menyimpan.", th: "บันทึกไม่สำเร็จ", fil: "Hindi na-save.", vi: "Lưu thất bại." },
 });

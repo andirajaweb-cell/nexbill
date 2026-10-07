@@ -1,5 +1,7 @@
 "use client";
 import { showAlert, showPrompt } from "@/lib/ui/dialog";
+import { uiText } from "@/lib/i18n/client-text";
+import "@/lib/i18n/dict-payments";
 
 /**
  * Client side of "Tandai Diterima" for any payment. Cash confirms straight away; any other method
@@ -15,8 +17,16 @@ export async function confirmPaymentReceived(
   let reference: string | null = null;
   if (method !== "cash") {
     reference = await showPrompt(
-      `Masukkan nomor referensi ${opts.methodLabel ?? method}${opts.amountLabel ? ` (${opts.amountLabel})` : ""} — mis. 4–6 digit terakhir kode transaksi di aplikasi merchant QRIS atau mutasi bank. Pastikan dananya benar-benar sudah masuk.`,
-      { title: "Konfirmasi Pembayaran Diterima", required: true, placeholder: "No. referensi / 4–6 digit terakhir", confirmLabel: "Tandai Diterima" }
+      uiText(
+        "payments.confirm.prompt",
+        "Masukkan nomor referensi {method} — mis. 4–6 digit terakhir kode transaksi di aplikasi merchant QRIS atau mutasi bank. Pastikan dananya benar-benar sudah masuk."
+      ).replace("{method}", `${opts.methodLabel ?? method}${opts.amountLabel ? ` (${opts.amountLabel})` : ""}`),
+      {
+        title: uiText("payments.confirm.title", "Konfirmasi Pembayaran Diterima"),
+        required: true,
+        placeholder: uiText("payments.confirm.placeholder", "No. referensi / 4–6 digit terakhir"),
+        confirmLabel: uiText("payments.confirm.button", "Tandai Diterima"),
+      }
     );
     if (!reference) return false;
   }
@@ -29,12 +39,12 @@ export async function confirmPaymentReceived(
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      await showAlert(err?.error ?? `Gagal menandai pembayaran diterima (HTTP ${res.status}).`);
+      await showAlert(err?.error ?? uiText("payments.confirm.failed", "Gagal menandai pembayaran diterima (HTTP {status}).").replace("{status}", String(res.status)));
       return false;
     }
     return true;
   } catch (err) {
-    await showAlert(`Gagal menghubungi server: ${err instanceof Error ? err.message : String(err)}`);
+    await showAlert(uiText("payments.confirm.networkFailed", "Gagal menghubungi server: {error}").replace("{error}", err instanceof Error ? err.message : String(err)));
     return false;
   }
 }

@@ -10,6 +10,15 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { featureForDashboardPath, type PlanFeature } from "@/lib/subscription/pricing";
 import "@/lib/i18n/dict-plan";
 
+const FEATURE_LABEL_KEY: Record<PlanFeature, string> = {
+  accounting: "plan.feature.accounting",
+  assets: "plan.feature.assets",
+  ppob: "plan.feature.ppob",
+  anti_fraud: "plan.feature.anti_fraud",
+  multi_outlet: "plan.feature.multi_outlet",
+  home_rental: "plan.feature.home_rental",
+};
+
 /**
  * Kunci halaman per paket (struktur harga 2026-10): halaman modul Pro (Akuntansi, Pengeluaran,
  * Pendapatan Lain, Aset, PPOB, Rental ke Rumah, Semua Outlet) menampilkan kartu upgrade untuk
@@ -32,7 +41,7 @@ export function PlanFeatureGate({ children }: { children: React.ReactNode }) {
   // Belum dimuat / status terkunci (sudah ditangani SubscriptionGate) → jangan tampilkan apa-apa ekstra.
   if (!features || data?.isLocked || features.includes(feature)) return <>{children}</>;
 
-  const featureLabel = t(`plan.feature.${feature}`, feature);
+  const featureLabel = t(FEATURE_LABEL_KEY[feature], feature);
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4">
       <div className="max-w-md w-full rounded-2xl border border-amber-400/30 bg-[#0f1426]/80 backdrop-blur-md p-8 text-center space-y-4 shadow-[0_0_40px_-10px_rgba(251,191,36,0.35)]">

@@ -1,10 +1,8 @@
 import { db } from "@/db/client";
 import { pricingRules, customers, membershipTiers, rentalUnits } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { outletDay, outletTimeHHmm } from "@/lib/time/outlet-time";
+import { pickPricingRule, ruleRateFor } from "./rate-rules";
 import { isMembershipActive } from "@/lib/membership/tier-benefits";
-
-const DAY_CODES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 export interface RateBreakdown {
   baseRate: number;
@@ -13,32 +11,6 @@ export interface RateBreakdown {
   memberTierName: string | null;
   memberDiscountPercent: number;
   finalRate: number;
-}
-
-/**
- * True if `nowTime` falls inside a rule's [startTime, endTime] window on the day it applies to.
- * Handles overnight windows that cross midnight (e.g. "22:00"–"02:00" for a jam malam rate that
- * runs past 12) as well as ordinary same-day windows:
- *
- *  - Same-day window (startTime <= endTime, e.g. "08:00"–"17:00"): matches when the rule's day is
- *    today AND nowTime falls between start and end, same as before.
- *  - Overnight window (startTime > endTime, e.g. "22:00"–"02:00"): the rule's daysOfWeek names the
- *    day the window STARTS on (so "Jumat 22:00–02:00" naturally covers Friday night through
- *    Saturday 2am, without also having to list Saturday). It matches in two situations: the
- *    evening portion (rule's day is today, nowTime >= startTime), or the early-morning tail
- *    portion (rule's day was YESTERDAY, nowTime <= endTime) — that second case is what the old
- *    single `nowTime >= start && nowTime <= end` check could never satisfy, since no time string
- *    is both >= "22:00" and <= "02:00".
- */
-function ruleMatchesNow(rule: { daysOfWeek: string; startTime: string; endTime: string }, dayCode: string, prevDayCode: string, nowTime: string): boolean {
-  const days = rule.daysOfWeek.split(",").map((d) => d.trim());
-  const overnight = rule.startTime > rule.endTime;
-  if (!overnight) {
-    return days.includes(dayCode) && nowTime >= rule.startTime && nowTime <= rule.endTime;
-  }
-  const eveningPortion = days.includes(dayCode) && nowTime >= rule.startTime;
-  const morningPortion = days.includes(prevDayCode) && nowTime <= rule.endTime;
-  return eveningPortion || morningPortion;
 }
 
 /**
@@ -57,7 +29,7 @@ function ruleMatchesNow(rule: { daysOfWeek: string; startTime: string; endTime: 
  * bug is what made the dashboard's busy-hours charts show the wrong hour; the fix here is the
  * same one, applied to pricing rule matching (happy hour / jam malam / weekend rates) so a wrong
  * server timezone can't silently apply the wrong rate window too. Overnight windows that cross
- * midnight (e.g. 22:00–02:00) ARE supported — see ruleMatchesNow() above; a rule's daysOfWeek
+ * midnight (e.g. 22:00–02:00) ARE supported — see ruleMatchesNow() in rate-rules.ts; a rule's daysOfWeek
  * names the day the window starts on.
  */
 export async function computeEffectiveHourlyRate(
@@ -70,22 +42,16 @@ export async function computeEffectiveHourlyRate(
   if (!unit) throw new Error("Unit rental tidak ditemukan.");
 
   const baseRate = unit.hourlyRate;
-  const dayCode = DAY_CODES[outletDay(at)];
-  const prevDayCode = DAY_CODES[(outletDay(at) + 6) % 7];
-  const nowTime = outletTimeHHmm(at);
 
   const rules = await db
     .select()
     .from(pricingRules)
     .where(and(eq(pricingRules.outletId, outletId), eq(pricingRules.isActive, true)));
 
-  const matching = rules
-    .filter((r) => r.consoleType === "any" || r.consoleType === unit.consoleType)
-    .filter((r) => ruleMatchesNow(r, dayCode, prevDayCode, nowTime))
-    .sort((a, b) => b.priority - a.priority);
-
-  const bestRule = matching[0];
-  const ruleRate = bestRule ? (bestRule.rateType === "fixed" ? bestRule.rateValue : Math.round(baseRate * bestRule.rateValue)) : baseRate;
+  // Rule matching is pure (rate-rules.ts) so the offline cashier mode computes the
+  // exact same rate on the device while the internet is down.
+  const bestRule = pickPricingRule(unit, rules, at);
+  const ruleRate = ruleRateFor(baseRate, bestRule);
 
   let memberTierName: string | null = null;
   let memberDiscountPercent = 0;

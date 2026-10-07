@@ -2,13 +2,13 @@
 import { useState } from "react";
 import { BookOpen, ChevronDown, ChevronUp, Lightbulb, AlertTriangle, ListChecks, Target, Route, X } from "lucide-react";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
-import "@/lib/i18n/dict-accounting";
-import { getAccountingGuides } from "./guides-i18n";
+import { getAccountingGuideBook } from "./guides-book";
 
 /**
  * Panduan yang bisa dibuka-tutup di atas setiap tab Accounting, plus panel "Panduan Alur Kerja".
  * Status buka/tutup disimpan per penampil di localStorage (kenyamanan saja — kalau storage tidak
  * tersedia, panduan tetap tampil dalam keadaan tertutup). Disembunyikan saat mencetak.
+ * Isi & label panduan mengikuti bahasa dashboard (guides-book.ts).
  */
 
 const STORAGE_KEY = "nexbill.accounting.guideOpen";
@@ -49,8 +49,10 @@ function Section({ icon, title, items, tone }: { icon: React.ReactNode; title: s
 }
 
 export function TabGuide({ tab, label }: { tab: string; label?: string }) {
-  const { t, lang } = useDashboardLang();
-  const guide = getAccountingGuides(lang).tabs[tab];
+  const { lang } = useDashboardLang();
+  const book = getAccountingGuideBook(lang);
+  const guide = book.tabs[tab];
+  const ui = book.ui;
   const [open, setOpen] = useState<boolean>(() => (typeof window === "undefined" ? false : Boolean(readOpenMap()[tab])));
   if (!guide) return null;
 
@@ -66,48 +68,60 @@ export function TabGuide({ tab, label }: { tab: string; label?: string }) {
       <button onClick={toggle} className="flex w-full items-start gap-3 px-4 py-3 text-left" aria-expanded={open}>
         <BookOpen size={18} className="mt-0.5 shrink-0 text-sky-400" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-sky-300">{t("accounting.guide.prefix", "Panduan: {tab}").replace("{tab}", label ?? tab)}</div>
+          <div className="text-sm font-medium text-sky-300">
+            {ui.guidePrefix}: {label ?? tab}
+          </div>
           <div className="text-xs text-neutral-400">{guide.summary}</div>
         </div>
         <span className="flex shrink-0 items-center gap-1 text-xs text-sky-400">
-          {open ? t("accounting.guide.close", "Tutup") : t("accounting.guide.read", "Baca panduan")}
+          {open ? ui.close : ui.open}
           {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </span>
       </button>
       {open && (
         <div className="grid gap-5 border-t border-sky-500/20 px-4 py-4 md:grid-cols-2">
-          <Section icon={<Lightbulb size={14} />} title={t("accounting.guide.concept", "Konsep akuntansinya")} items={guide.concept} tone="text-sky-300" />
-          <Section icon={<Target size={14} />} title={t("accounting.guide.uses", "Kegunaan")} items={guide.uses} tone="text-emerald-300" />
-          <Section icon={<AlertTriangle size={14} />} title={t("accounting.guide.watch", "Yang harus diperhatikan")} items={guide.watch} tone="text-amber-300" />
-          <Section icon={<ListChecks size={14} />} title={t("accounting.guide.steps", "Langkah kerja")} items={guide.steps} tone="text-violet-300" />
+          <Section icon={<Lightbulb size={14} />} title={ui.concept} items={guide.concept} tone="text-sky-300" />
+          <Section icon={<Target size={14} />} title={ui.uses} items={guide.uses} tone="text-emerald-300" />
+          <Section icon={<AlertTriangle size={14} />} title={ui.watch} items={guide.watch} tone="text-amber-300" />
+          <Section icon={<ListChecks size={14} />} title={ui.steps} items={guide.steps} tone="text-violet-300" />
         </div>
       )}
     </div>
   );
 }
 
-export function WorkflowGuide({ onClose, onOpenTab, shortcuts = [], tabLabel = (tb) => tb }: { onClose: () => void; onOpenTab?: (tab: string) => void; shortcuts?: string[]; tabLabel?: (tab: string) => string }) {
-  const { t, lang } = useDashboardLang();
-  const guides = getAccountingGuides(lang);
+export function WorkflowGuide({
+  onClose,
+  onOpenTab,
+  shortcuts = [],
+  tabLabel = (tb) => tb,
+}: {
+  onClose: () => void;
+  onOpenTab?: (tab: string) => void;
+  shortcuts?: string[];
+  /** Nama tab dalam bahasa dashboard (tombol pintasan "Mulai dari"). */
+  tabLabel?: (tab: string) => string;
+}) {
+  const { lang } = useDashboardLang();
+  const book = getAccountingGuideBook(lang);
+  const ui = book.ui;
   return (
     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-4 print:hidden">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2">
           <Route size={18} className="mt-0.5 text-emerald-400" />
           <div>
-            <div className="font-semibold text-emerald-300">{t("accounting.guide.workflowTitle", "Panduan Alur Kerja Akuntansi Outlet")}</div>
-            <div className="text-xs text-neutral-400">
-              {t("accounting.guide.workflowIntro", "Hampir semua jurnal dibuat otomatis dari kasir, rental, expense, belanja supplier, dan aset. Tugas Anda: memastikan setiap transaksi tercatat di menunya, lalu memeriksa dan menutup buku secara rutin.")}
-            </div>
+            <div className="font-semibold text-emerald-300">{ui.workflowTitle}</div>
+            <div className="text-xs text-neutral-400">{ui.workflowIntro}</div>
           </div>
         </div>
-        <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300" aria-label={t("accounting.guide.closeAria", "Tutup panduan")}>
+        <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300" aria-label={ui.closeAria}>
           <X size={18} />
         </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {guides.workflow.map((stage, i) => (
+        {book.workflow.map((stage, i) => (
           <div key={stage.when} className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[11px] text-emerald-300">{i + 1}</span>
@@ -126,9 +140,9 @@ export function WorkflowGuide({ onClose, onOpenTab, shortcuts = [], tabLabel = (
       </div>
 
       <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3">
-        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-300">{t("accounting.guide.golden", "Aturan emas pembukuan")}</div>
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-300">{ui.goldenRules}</div>
         <ul className="space-y-1 text-sm text-neutral-300">
-          {guides.golden.map((r) => (
+          {book.goldenRules.map((r) => (
             <li key={r} className="flex gap-2">
               <span className="text-amber-400">✓</span>
               <span>{r}</span>
@@ -139,7 +153,7 @@ export function WorkflowGuide({ onClose, onOpenTab, shortcuts = [], tabLabel = (
 
       {onOpenTab && shortcuts.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400">
-          <span>{t("accounting.guide.startFrom", "Mulai dari:")}</span>
+          <span>{ui.startFrom}</span>
           {shortcuts.map((tb) => (
             <button key={tb} onClick={() => onOpenTab(tb)} className="rounded-full border border-neutral-700 px-2.5 py-1 hover:border-emerald-500 hover:text-emerald-300">
               {tabLabel(tb)}

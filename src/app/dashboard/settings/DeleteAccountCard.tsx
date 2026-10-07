@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-account-deletion";
 
 interface DeletionStatus {
@@ -21,7 +21,7 @@ const inputCls = "w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 
  * dihapus/dianonimkan paling lambat 30 hari. Staf non-Owner hanya melihat petunjuk.
  */
 export function DeleteAccountCard() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const [status, setStatus] = useState<DeletionStatus | null>(null);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -44,7 +44,7 @@ export function DeleteAccountCard() {
     try {
       const res = await fetch("/api/account/deletion", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
       const out = await res.json();
-      if (!res.ok) return showAlert(out.error ?? "Gagal.");
+      if (!res.ok) return showAlert(out.error ?? t("delAcc.requestFailed", "Gagal mengirim kode konfirmasi."));
       setSentTo(out.email);
       await load();
     } finally {
@@ -58,8 +58,8 @@ export function DeleteAccountCard() {
     try {
       const res = await fetch("/api/account/deletion/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: code.trim(), phrase }) });
       const out = await res.json();
-      if (!res.ok) return showAlert(out.error ?? "Gagal.");
-      const date = new Date(out.scheduledPurgeAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+      if (!res.ok) return showAlert(out.error ?? t("delAcc.confirmFailed", "Gagal menghapus akun."));
+      const date = new Date(out.scheduledPurgeAt).toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "long", year: "numeric" });
       await showAlert(t("delAcc.done", "Akun dinonaktifkan. Data dihapus paling lambat {date}.").replace("{date}", date));
       window.location.href = "/login";
     } finally {
