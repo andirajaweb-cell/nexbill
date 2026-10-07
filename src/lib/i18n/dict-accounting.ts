@@ -1,4 +1,5 @@
 import { registerDict } from "./registry";
+import "./dict-accounting-ui";
 
 /**
  * Translations for the /dashboard/accounting page — full double-entry bookkeeping: Chart of
@@ -618,6 +619,8 @@ registerDict({
     vi: "(* bắt buộc — chi tiết ở trang tính {sheet}. Tên cột đúng như trong tệp mẫu.)",
   },
   "accounting.migration.templateLangNote": {
+    // Hanya tampil saat template berbahasa Inggris (bahasa dasbor selain Indonesia).
+    id: "",
     en: "The template and its column names are in English. Indonesian templates are also accepted.",
     ms: "Templat dan nama lajurnya dalam Bahasa Inggeris. Templat Bahasa Indonesia juga diterima.",
     th: "เทมเพลตและชื่อคอลัมน์เป็นภาษาอังกฤษ รองรับเทมเพลตภาษาอินโดนีเซียด้วย",

@@ -90,7 +90,7 @@ export default function AccountingPage() {
         <WorkflowGuide
           onClose={() => setShowWorkflow(false)}
           shortcuts={(["Neraca Saldo", "Audit", "Laba Rugi", "Tutup Periode"] as Tab[]).filter((tb) => visibleTabs.includes(tb))}
-          tabLabel={(tb) => t(TAB_LABEL_KEYS[tb as Tab].key, TAB_LABEL_KEYS[tb as Tab].fallback)}
+          tabLabel={(tb) => (TAB_LABEL_KEYS[tb as Tab] ? t(TAB_LABEL_KEYS[tb as Tab].key, TAB_LABEL_KEYS[tb as Tab].fallback) : tb)}
           onOpenTab={(tb) => {
             setTab(tb as Tab);
             setShowWorkflow(false);
@@ -1075,7 +1075,7 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
       const payment = await res.json();
       if (!res.ok) {
         return showAlert(
-          t("accounting.receivables.collectFailedCreate", "Gagal mencatat pembayaran: {pesan}").replace("{pesan}", payment?.error ?? "penyebab tidak diketahui")
+          t("accounting.receivables.collectFailedCreate", "Gagal mencatat pembayaran: {pesan}").replace("{pesan}", payment?.error ?? t("accounting.common.unknownCause", "penyebab tidak diketahui"))
         );
       }
 

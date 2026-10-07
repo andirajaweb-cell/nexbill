@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-maintenance";
 import { IndikatorLive, PemeriksaanTerpandu } from "./doctor";
+import { detectGamepadFamily, isAndroidUserAgent, type GamepadFamily } from "@/lib/maintenance/gamepad-family";
 import { bukaKunciAudio, bunyiTerhubung, bunyiTerputus, siapBerbunyi } from "./sound";
 
 const KUNCI_SUARA = "nexbill.gamepadTester.suara";
@@ -60,22 +61,10 @@ function readGamepads(): Snapshot[] {
   return out;
 }
 
-type Family = "ps3" | "ps4" | "ps5" | "sony_other" | "generic";
-
-function detectFamily(id: string): Family {
-  const s = id.toLowerCase();
-  if (s.includes("054c")) {
-    // Sony USB vendor ID — product IDs below are the common DS3/DS4/DualSense ones.
-    if (s.includes("0268")) return "ps3";
-    if (s.includes("05c4") || s.includes("09cc")) return "ps4";
-    if (s.includes("0ce6")) return "ps5";
-    return "sony_other";
-  }
-  if (s.includes("dualsense")) return "ps5";
-  if (s.includes("dualshock 4") || s.includes("dualshock4")) return "ps4";
-  if (s.includes("dualshock 3") || s.includes("dualshock3")) return "ps3";
-  return "generic";
-}
+type Family = GamepadFamily;
+// Deteksi jenis stik ada di lib/maintenance/gamepad-family.ts (teruji) — termasuk nama perangkat
+// versi Chrome Android, yang tidak menyertakan vendor/product id seperti Chrome desktop.
+const detectFamily = detectGamepadFamily;
 
 const FAMILY_LABEL: Record<Family, string> = {
   ps3: "PS3 (DualShock 3)",
@@ -185,7 +174,7 @@ function GamepadDiagram({ snap, family, t }: { snap: Snapshot; family: Family; t
   );
 }
 
-function GamepadCard({ snap, t }: { snap: Snapshot; t: (k: string, f: string) => string }) {
+function GamepadCard({ snap, t, android }: { snap: Snapshot; t: (k: string, f: string) => string; android: boolean }) {
   const family = detectFamily(snap.id);
   const nonStandard = snap.mapping !== "standard";
 
@@ -198,7 +187,9 @@ function GamepadCard({ snap, t }: { snap: Snapshot; t: (k: string, f: string) =>
         </div>
         {nonStandard && (
           <span className="text-[11px] px-2 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
-            {t("maintenance.gamepad.nonStandardMapping", "Mapping non-standar — cek driver controller")}
+            {android
+              ? t("maintenance.gamepad.nonStandardMappingAndroid", "Mapping non-standar — label tombol bisa tertukar; coba sambung ulang pakai kabel")
+              : t("maintenance.gamepad.nonStandardMapping", "Mapping non-standar — cek driver controller")}
           </span>
         )}
       </div>
@@ -302,10 +293,60 @@ function BantuanPs3({ t, terbuka }: { t: (k: string, f: string) => string; terbu
   );
 }
 
+/**
+ * Panduan menyambungkan stik PS3/PS4/PS5 ke HP Android. Chrome Android (dan aplikasi NEXBILL, yang
+ * berjalan di atas Chrome) membaca stik lewat Gamepad API seperti di PC; yang sering membuat bingung
+ * adalah cara memasangkannya: DS4/DualSense lewat Bluetooth, DS3 hanya lewat kabel OTG (Android
+ * tidak bisa memasangkan DS3 lewat Bluetooth tanpa alat khusus). Juga: stik yang dipasangkan ke HP
+ * harus disambungkan ulang ke konsol pakai kabel sebelum dipakai main lagi.
+ */
+function BantuanAndroid({ t, terbuka }: { t: (k: string, f: string) => string; terbuka: boolean }) {
+  const [buka, setBuka] = useState<boolean | null>(null);
+  const tampil = buka ?? terbuka;
+  const langkah: { judul: string; isi: string }[] = [
+    { judul: "PS4 (DualShock 4)", isi: t("maintenance.gamepad.android.ps4", "Bluetooth: tahan tombol SHARE + PS sekitar 3 detik sampai lampu berkedip cepat. Di HP buka Pengaturan → Bluetooth → pilih \"Wireless Controller\". Atau colok kabel micro-USB lewat adaptor OTG.") },
+    { judul: "PS5 (DualSense)", isi: t("maintenance.gamepad.android.ps5", "Bluetooth: tahan tombol CREATE + PS sampai lampu di sekitar touchpad berkedip cepat. Di HP buka Pengaturan → Bluetooth → pilih \"DualSense Wireless Controller\" (paling stabil di Android 12 ke atas). Atau colok kabel USB-C langsung ke HP.") },
+    { judul: "PS3 (DualShock 3)", isi: t("maintenance.gamepad.android.ps3", "Hanya lewat kabel: Android tidak bisa memasangkan stik PS3 lewat Bluetooth. Colok kabel mini-USB (kabel data) + adaptor OTG ke HP, lalu tekan tombol PS. Stik PS3 KW sering tidak terbaca.") },
+  ];
+  return (
+    <Card className={`space-y-2 border ${terbuka ? "border-cyan-500/30 bg-cyan-500/5" : "border-white/10"}`}>
+      <button type="button" onClick={() => setBuka(!tampil)} className="flex w-full items-center justify-between text-left">
+        <h2 className="font-medium text-sm text-cyan-300">{t("maintenance.gamepad.android.heading", "Cara menyambungkan stik PS ke HP Android")}</h2>
+        <span className="text-xs text-neutral-500">{tampil ? "▲" : "▼"}</span>
+      </button>
+      {tampil && (
+        <>
+          <p className="text-xs text-neutral-300 leading-relaxed">
+            {t("maintenance.gamepad.android.intro", "Biarkan halaman ini tetap terbuka di Chrome atau aplikasi NEXBILL. Setelah stik tersambung, tekan sembarang tombol sekali — kartu stik akan muncul di atas.")}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {langkah.map((l) => (
+              <div key={l.judul} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                <div className="text-xs font-semibold text-neutral-100">{l.judul}</div>
+                <p className="mt-1 text-xs text-neutral-400 leading-relaxed">{l.isi}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-neutral-400 leading-relaxed">
+            {t("maintenance.gamepad.android.otg", "Lewat kabel tidak terdeteksi? Pastikan HP mendukung OTG (sebagian HP perlu menyalakan OTG di Pengaturan) dan kabelnya kabel data, bukan kabel cas saja.")}
+          </p>
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200 leading-relaxed">
+            {t("maintenance.gamepad.android.repair", "Penting: stik yang dites lewat Bluetooth akan tersambung ke HP. Sebelum dipakai main lagi, hapus stik dari daftar Bluetooth HP, lalu colok stik ke konsol pakai kabel USB dan tekan tombol PS supaya tersambung kembali ke konsol.")}
+          </p>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export default function GamepadTesterPage() {
   const { t } = useDashboardLang();
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [supported, setSupported] = useState(true);
+  // HP/tablet Android (Chrome atau aplikasi NEXBILL): panduan sambung lewat Bluetooth/OTG
+  // menggantikan panduan driver PS3 yang khusus Windows.
+  const [android, setAndroid] = useState(false);
+  useEffect(() => setAndroid(isAndroidUserAgent(navigator.userAgent)), []);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -417,7 +458,7 @@ export default function GamepadTesterPage() {
         <p className="text-sm text-neutral-500">
           {t(
             "maintenance.gamepad.subtitle",
-            "Sambungkan controller lewat USB atau Bluetooth ke PC/laptop yang membuka halaman ini, lalu tekan tombol/gerakkan stick — hasil dibaca langsung dari hardware, bukan simulasi."
+            "Sambungkan controller lewat USB atau Bluetooth ke PC/laptop atau HP Android yang membuka halaman ini, lalu tekan tombol/gerakkan stick — hasil dibaca langsung dari hardware, bukan simulasi."
           )}
         </p>
       </div>
@@ -503,11 +544,13 @@ export default function GamepadTesterPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {snapshots.map((s) => (
-          <GamepadCard key={s.index} snap={s} t={t} />
+          <GamepadCard key={s.index} snap={s} t={t} android={android} />
         ))}
       </div>
 
-      {supported && (
+      {supported && android && <BantuanAndroid t={t} terbuka={snapshots.length === 0} />}
+
+      {supported && !android && (
         <BantuanPs3
           t={t}
           // Terbuka otomatis saat belum ada controller sama sekali, atau saat stik PS3 terbaca tapi mapping-nya
