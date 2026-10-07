@@ -158,7 +158,7 @@ export function NewBookingPopup() {
       const res = await fetch(`/api/bookings/${current.id}/confirm`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setQueue((q) => q.map((b) => (b.id === current.id ? { ...b, notes: `⚠ ${data.error ?? "Gagal"}${b.notes ? ` · ${b.notes}` : ""}` } : b)));
+        setQueue((q) => q.map((b) => (b.id === current.id ? { ...b, notes: `⚠ ${data.error ?? t("booking.popup.failed", "Gagal")}${b.notes ? ` · ${b.notes}` : ""}` } : b)));
         return;
       }
       dismiss([current.id]);

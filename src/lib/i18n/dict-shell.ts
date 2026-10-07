@@ -305,4 +305,34 @@ registerDict({
   // --- Akun demo publik ---
   "demo.banner": { id: "Anda memakai AKUN DEMO publik — dipakai bersama banyak orang. Jangan masukkan data asli; data bisa berubah atau direset sewaktu-waktu. Password & data akun tidak bisa diubah.", en: "You're using the public DEMO ACCOUNT — shared by many people. Don't enter real data; data may change or be reset at any time. Password & account details can't be changed.", ms: "Anda menggunakan AKAUN DEMO awam — dikongsi ramai orang. Jangan masukkan data sebenar; data boleh berubah atau ditetapkan semula bila-bila masa. Kata laluan & butiran akaun tidak boleh diubah.", th: "คุณกำลังใช้บัญชีเดโมสาธารณะ — ใช้ร่วมกับหลายคน อย่าใส่ข้อมูลจริง ข้อมูลอาจเปลี่ยนหรือถูกรีเซ็ตได้ตลอดเวลา เปลี่ยนรหัสผ่านและข้อมูลบัญชีไม่ได้", fil: "Gumagamit ka ng pampublikong DEMO ACCOUNT — ginagamit ng maraming tao. Huwag maglagay ng totoong data; maaaring magbago o ma-reset ang data anumang oras. Hindi mababago ang password at detalye ng account.", vi: "Bạn đang dùng TÀI KHOẢN DEMO công khai — nhiều người dùng chung. Đừng nhập dữ liệu thật; dữ liệu có thể thay đổi hoặc bị đặt lại bất cứ lúc nào. Không thể đổi mật khẩu & thông tin tài khoản." },
   "demo.bannerCta": { id: "Daftar gratis", en: "Sign up free", ms: "Daftar percuma", th: "สมัครฟรี", fil: "Mag-sign up nang libre", vi: "Đăng ký miễn phí" },
+
+  // --- Komponen bersama (dialog) (terjemahan yang sebelumnya hilang) ---
+  "dialog.required": { id: "Wajib diisi.", en: "Required.", ms: "Wajib diisi.", th: "จำเป็นต้องกรอก", fil: "Kailangan.", vi: "Bắt buộc." },
+  "dialog.cancel": { id: "Batal", en: "Cancel", ms: "Batal", th: "ยกเลิก", fil: "Kanselahin", vi: "Hủy" },
+  "dialog.save": { id: "Simpan", en: "Save", ms: "Simpan", th: "บันทึก", fil: "I-save", vi: "Lưu" },
+  "dialog.confirm": { id: "Ya, Lanjutkan", en: "Yes, Continue", ms: "Ya, Teruskan", th: "ใช่ ดำเนินการต่อ", fil: "Oo, Ituloy", vi: "Có, tiếp tục" },
+  "dialog.ok": { id: "OK", en: "OK", ms: "OK", th: "ตกลง", fil: "OK", vi: "OK" },
+
+  // --- Komponen bersama (select) (terjemahan yang sebelumnya hilang) ---
+  "select.placeholder": { id: "Pilih...", en: "Choose...", ms: "Pilih...", th: "เลือก...", fil: "Pumili...", vi: "Chọn..." },
+  "select.search": { id: "Cari...", en: "Search...", ms: "Cari...", th: "ค้นหา...", fil: "Maghanap...", vi: "Tìm..." },
+  "select.empty": { id: "Tidak ada hasil", en: "No results", ms: "Tiada hasil", th: "ไม่พบผลลัพธ์", fil: "Walang resulta", vi: "Không có kết quả" },
+  "select.clear": { id: "-- Kosongkan --", en: "-- Clear --", ms: "-- Kosongkan --", th: "-- ล้าง --", fil: "-- I-clear --", vi: "-- Xóa chọn --" },
+
+  // --- Komponen bersama (password) (terjemahan yang sebelumnya hilang) ---
+  "password.hide": { id: "Sembunyikan password", en: "Hide password", ms: "Sembunyikan kata laluan", th: "ซ่อนรหัสผ่าน", fil: "Itago ang password", vi: "Ẩn mật khẩu" },
+  "password.show": { id: "Tampilkan password", en: "Show password", ms: "Tunjukkan kata laluan", th: "แสดงรหัสผ่าน", fil: "Ipakita ang password", vi: "Hiện mật khẩu" },
+
+  // --- Pemilih periode (terjemahan yang sebelumnya hilang) ---
+  "period.today": { id: "Hari Ini", en: "Today", ms: "Hari Ini", th: "วันนี้", fil: "Ngayon", vi: "Hôm nay" },
+  "period.yesterday": { id: "Kemarin", en: "Yesterday", ms: "Semalam", th: "เมื่อวาน", fil: "Kahapon", vi: "Hôm qua" },
+  "period.thisWeek": { id: "Minggu Ini", en: "This Week", ms: "Minggu Ini", th: "สัปดาห์นี้", fil: "Ngayong Linggo", vi: "Tuần này" },
+  "period.lastWeek": { id: "Minggu Lalu", en: "Last Week", ms: "Minggu Lepas", th: "สัปดาห์ที่แล้ว", fil: "Nakaraang Linggo", vi: "Tuần trước" },
+  "period.thisMonth": { id: "Bulan Ini", en: "This Month", ms: "Bulan Ini", th: "เดือนนี้", fil: "Ngayong Buwan", vi: "Tháng này" },
+  "period.lastMonth": { id: "Bulan Lalu", en: "Last Month", ms: "Bulan Lepas", th: "เดือนที่แล้ว", fil: "Nakaraang Buwan", vi: "Tháng trước" },
+  "period.thisYear": { id: "Tahun Ini", en: "This Year", ms: "Tahun Ini", th: "ปีนี้", fil: "Ngayong Taon", vi: "Năm nay" },
+  "period.lastYear": { id: "Tahun Lalu", en: "Last Year", ms: "Tahun Lepas", th: "ปีที่แล้ว", fil: "Nakaraang Taon", vi: "Năm trước" },
+  "period.custom": { id: "Custom / Tanggal Tertentu", en: "Custom / Specific Dates", ms: "Tersuai / Tarikh Tertentu", th: "กำหนดเอง / วันที่เจาะจง", fil: "Custom / Partikular na Petsa", vi: "Tùy chỉnh / Ngày cụ thể" },
+  "period.singleDateHint": { id: "(kosongkan untuk tanggal tunggal)", en: "(leave empty for a single date)", ms: "(kosongkan untuk satu tarikh)", th: "(เว้นว่างสำหรับวันเดียว)", fil: "(iwanang blangko para sa iisang petsa)", vi: "(để trống nếu chỉ một ngày)" },
+  "period.allTime": { id: "Sepanjang Waktu", en: "All Time", ms: "Sepanjang Masa", th: "ตลอดเวลา", fil: "Lahat ng Panahon", vi: "Toàn thời gian" },
 });

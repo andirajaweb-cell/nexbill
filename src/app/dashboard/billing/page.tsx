@@ -1190,7 +1190,7 @@ export default function BillingPage() {
                         {/* Menampilkan Jangka Waktu Pembayaran (Countdown) jika expiresAt tersedia */}
                         {inv.method !== "cash" && inv.expiresAt && (
                           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-400 text-xs font-medium mr-2">
-                            <Timer size={14} /> Sisa Waktu: {formatCountdown(inv.expiresAt)}
+                            <Timer size={14} /> {t("billing.invoice.timeLeft", "Sisa Waktu:")} {formatCountdown(inv.expiresAt)}
                           </div>
                         )}
 

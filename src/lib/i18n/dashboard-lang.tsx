@@ -47,6 +47,20 @@ export function DashboardLangProvider({ children }: { children: ReactNode }) {
   return <LangContext.Provider value={{ lang, setLang, t }}>{children}</LangContext.Provider>;
 }
 
+/**
+ * Bahasa dashboard yang tersimpan, untuk komponen yang dipasang DI LUAR DashboardLangProvider
+ * (mis. DialogHost di root layout). Hanya untuk dipanggil di browser setelah ada interaksi.
+ */
+export function readStoredLang(): LangCode {
+  try {
+    const saved = window.localStorage.getItem(LANG_STORAGE_KEY);
+    if (saved && LANG_OPTIONS.some((o) => o.code === saved)) return saved as LangCode;
+  } catch {
+    // storage diblokir — pakai Bahasa Indonesia
+  }
+  return "id";
+}
+
 export function useDashboardLang(): Ctx {
   const ctx = useContext(LangContext);
   if (!ctx) {

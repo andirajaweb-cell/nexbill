@@ -104,4 +104,7 @@ registerDict({
   // --- Booking (terjemahan yang sebelumnya hilang) ---
   "booking.transferButton": { id: "Pindahkan", en: "Move", ms: "Pindahkan", th: "ย้าย", fil: "Ilipat", vi: "Chuyển" },
   "booking.keepBooking": { id: "Jangan batalkan", en: "Don't cancel", ms: "Jangan batalkan", th: "ไม่ยกเลิก", fil: "Huwag kanselahin", vi: "Không hủy" },
+
+  // --- Popup booking (terjemahan yang sebelumnya hilang) ---
+  "booking.popup.failed": { id: "Gagal", en: "Failed", ms: "Gagal", th: "ไม่สำเร็จ", fil: "Nabigo", vi: "Thất bại" },
 });

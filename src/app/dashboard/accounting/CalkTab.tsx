@@ -14,7 +14,7 @@ import type { Calk, CalkGroup } from "@/lib/accounting/calk";
  * Laba Rugi (tab Laba Rugi), dan CALK ini. Bisa dicetak / disimpan sebagai PDF dari browser.
  */
 export function CalkTab() {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [preset, setPreset] = useState<PeriodPreset>("this_year");
   const [customFrom, setCustomFrom] = useState("");
@@ -76,7 +76,7 @@ export function CalkTab() {
           <div className="text-center space-y-0.5">
             <div className="text-lg font-bold">{calk.entity.name}</div>
             <div className="font-semibold">{t("accounting.calk.title", "Catatan atas Laporan Keuangan")}</div>
-            <div className="text-xs text-neutral-500">{describePeriod(preset, from, to)}</div>
+            <div className="text-xs text-neutral-500">{describePeriod(preset, from, to, lang)}</div>
           </div>
 
           {heading(t("accounting.calk.general", "Umum"))}
