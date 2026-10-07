@@ -1,6 +1,7 @@
 import { computeSessionCharge } from "@/lib/rental/charge";
 import { pickPricingRule, ruleRateFor, type PricingRuleInput } from "@/lib/rental/rate-rules";
 import type { OfflineAction } from "./protocol";
+import type { OfflineLocalControl } from "@/lib/relay/local-control";
 
 /**
  * Mode Offline — keadaan papan kasir rental di perangkat saat internet putus. MURNI: snapshot
@@ -57,6 +58,8 @@ export interface OfflineSnapshot {
   products: { id: string; name: string; price: number; category: string | null }[];
   /** Per active session id: F&B already on its open bill and money already received (DP). */
   bills: Record<string, { items: BillLine[]; paidTotal: number }>;
+  /** NexbillAgent di LAN outlet yang bisa menyalakan/mematikan perangkat unit saat offline (lib/relay/local-control.ts). */
+  localControl?: OfflineLocalControl;
 }
 
 export interface LocalSession extends SnapSession {

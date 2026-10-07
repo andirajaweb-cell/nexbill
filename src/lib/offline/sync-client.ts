@@ -1,5 +1,6 @@
 import { applySyncResults, deviceLabel, getClock, getQueue, saveSnapshot, saveSyncReport, setLastOutletId, saveClock, type SyncReportNote } from "./store";
 import { probe } from "./connectivity";
+import { sentDevicesKey } from "./local-devices";
 import { SYNC_BATCH_LIMIT, type SyncResponse } from "./protocol";
 import type { OfflineSnapshot } from "./engine";
 
@@ -66,6 +67,13 @@ export async function syncQueue(outletId: string): Promise<SyncOutcome> {
         }
         const progressed = body.results.some((r) => r.status !== "failed");
         if (!progressed || batch.length < SYNC_BATCH_LIMIT) break;
+      }
+      if (getQueue(outletId).length === 0) {
+        try {
+          localStorage.removeItem(sentDevicesKey(outletId));
+        } catch {
+          /* tidak apa-apa */
+        }
       }
       if (done + failed > 0 || notes.length) {
         saveSyncReport(outletId, { at: new Date().toISOString(), done, failed, notes, clockFlagged });

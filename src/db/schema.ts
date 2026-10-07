@@ -259,6 +259,21 @@ export const relayAgents = pgTable("relay_agents", {
 });
 
 /**
+ * Alamat LAN halaman Kontrol Lokal (NexbillAgent v1.4+, lib/relay/local-control.ts) yang dilaporkan
+ * agent saat tersambung ke Relay Hub: JSON { addresses: string[], port }. Tabel terpisah (migrasi
+ * 0033), BUKAN kolom baru di relay_agents, supaya setiap select()/returning() polos pada relay_agents
+ * tetap jalan walau migrasi ini belum dijalankan. Semua pembaca/penulisnya menoleransi tabel yang
+ * belum ada.
+ */
+export const relayAgentLocalInfo = pgTable("relay_agent_local_info", {
+  relayAgentId: text("relay_agent_id")
+    .primaryKey()
+    .references(() => relayAgents.id, { onDelete: "cascade" }),
+  localInfo: text("local_info").notNull(),
+  updatedAt: text("updated_at").notNull().$defaultFn(nowIso),
+});
+
+/**
  * NEXBILL-branded smart plug program (private-label ESP8266/Tasmota hardware — added 2026-09-15,
  * see the "masuk ke bisnis hardware" decision) — each physical unit is pre-flashed BEFORE shipping
  * with a deterministic MQTT topic derived from its own serialNumber (see mqttTopicFor() in

@@ -31,7 +31,7 @@ import { createServer } from "http";
 import { randomUUID } from "crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { db } from "../src/db/client";
-import { relayAgents, outlets } from "../src/db/schema";
+import { relayAgents, relayAgentLocalInfo, outlets } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { describeError } from "../src/lib/api/error";
 import {
@@ -56,6 +56,8 @@ import {
   RelayDispatchRequest,
   RelayDispatchResponse,
 } from "../src/lib/relay/config";
+import { parseLocalInfo } from "../src/lib/relay/local-control";
+import { buildLocalConfigForAgent } from "../src/lib/relay/local-config-service";
 
 interface ConnectedAgent {
   ws: WebSocket;
@@ -71,7 +73,12 @@ interface ConnectedAgent {
    */
   agentVersion: string;
   capabilities: RelayCapability[];
+  /** Kapan local_config terakhir dikirim — permintaan lebih rapat dari LOCAL_CONFIG_MIN_INTERVAL_MS diabaikan. */
+  lastLocalConfigAt: number;
 }
+
+/** Agent v1.4 meminta local_config tiap 30 detik; batas bawah ini melindungi database dari agent yang rusak. */
+const LOCAL_CONFIG_MIN_INTERVAL_MS = 10_000;
 
 interface PendingCommand {
   resolve: (res: RelayDispatchResponse) => void;
@@ -169,6 +176,38 @@ async function authOkExtras(relayAgentId: string, outletId: string): Promise<{ l
   return extras;
 }
 
+/**
+ * Alamat LAN halaman Kontrol Lokal yang dilaporkan agent v1.4+ (lib/relay/local-control.ts). Tabel
+ * dari migrasi 0033 — kegagalan hanya dicatat, kontrol TV lewat hub tidak terpengaruh.
+ */
+async function recordLocalInfo(relayAgentId: string, raw: unknown) {
+  const info = parseLocalInfo(raw ? JSON.stringify(raw) : null);
+  if (!info) return;
+  try {
+    const row = { relayAgentId, localInfo: JSON.stringify(info), updatedAt: new Date().toISOString() };
+    await db
+      .insert(relayAgentLocalInfo)
+      .values(row)
+      .onConflictDoUpdate({ target: relayAgentLocalInfo.relayAgentId, set: { localInfo: row.localInfo, updatedAt: row.updatedAt } });
+  } catch (err) {
+    console.warn(`[relay-hub] Alamat LAN agent tidak tersimpan (${describeError(err)}). Jalankan supabase/migrations/0033_relay_agent_local_control.sql.`);
+  }
+}
+
+/** Kirim daftar unit + sesi server untuk Kontrol Lokal saat internet putus (lib/relay/local-config-service.ts). */
+async function sendLocalConfig(agent: ConnectedAgent) {
+  if (!agent.capabilities.includes("local_control")) return;
+  const now = Date.now();
+  if (now - agent.lastLocalConfigAt < LOCAL_CONFIG_MIN_INTERVAL_MS) return;
+  agent.lastLocalConfigAt = now;
+  try {
+    const { message } = await buildLocalConfigForAgent(agent.relayAgentId, agent.outletId);
+    send(agent.ws, message);
+  } catch (err) {
+    console.warn(`[relay-hub] local_config gagal dibuat untuk agent ${agent.relayAgentId}: ${describeError(err)}`);
+  }
+}
+
 // ---- WebSocket server: agents connect here ----
 // Bound to RELAY_WS_BIND_HOST (127.0.0.1 by default) — a Cloudflare Tunnel
 // or reverse proxy running on this same machine connects in over loopback;
@@ -217,6 +256,7 @@ wss.on("connection", (ws) => {
         lastPingAt: Date.now(),
         agentVersion: handshake.agentVersion,
         capabilities: handshake.capabilities,
+        lastLocalConfigAt: 0,
       };
       connectedByToken.set(msg.token, agent);
       // Dibatasi 2 detik: auth_ok dulu dikirim seketika setelah token cocok. Kolom tambahannya
@@ -229,6 +269,10 @@ wss.on("connection", (ws) => {
       send(ws, { type: "auth_ok", ...extras });
       await markStatus(row.id, "online");
       await recordHandshake(row.id, handshake.agentVersion, handshake.capabilities);
+      if (handshake.capabilities.includes("local_control")) {
+        await recordLocalInfo(row.id, msg.local);
+        await sendLocalConfig(agent);
+      }
       console.log(
         `[relay-hub] Agent "${row.name}" (outlet ${row.outletId}) terhubung — versi ${handshake.agentVersion}${
           handshake.reported ? "" : " (tidak melapor, dianggap v1.1)"
@@ -242,6 +286,11 @@ wss.on("connection", (ws) => {
     if (msg.type === "ping") {
       agent.lastPingAt = Date.now();
       send(ws, { type: "pong" });
+      return;
+    }
+
+    if (msg.type === "local_config_request") {
+      await sendLocalConfig(agent);
       return;
     }
 

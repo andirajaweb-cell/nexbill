@@ -18,9 +18,10 @@ import { AndroidRelayGuide } from "./android-relay-guide";
  * ikut memasukkan config.json, agent.lock, atau agent.log — config.json berisi TOKEN relay agent
  * outlet yang menjalankannya, dan file di public/ bisa diunduh siapa saja yang tahu alamatnya.
  *
- * Zip v1.0 lama masih ada di folder yang sama tapi sudah tidak ditautkan dari sini.
+ * Zip v1.0 & v1.2 lama masih ada di folder yang sama tapi sudah tidak ditautkan dari sini.
+ * v1.4 (Kontrol Lokal saat internet putus) dibangun dengan scripts/build-agent-exe.sh.
  */
-const AGENT_DOWNLOAD_URL = "/downloads/nexbill-agent/NexbillRelay-v1.2.zip";
+const AGENT_DOWNLOAD_URL = "/downloads/nexbill-agent/NexbillRelay-v1.4.zip";
 const DOWNLOAD_BY_LANG: Record<LangCode, string> = {
   id: AGENT_DOWNLOAD_URL,
   en: AGENT_DOWNLOAD_URL,

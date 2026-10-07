@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { WifiOff, RefreshCw, Play, Pause, PlayCircle, Square, Plus, Minus, UtensilsCrossed, AlertTriangle, Trash2 } from "lucide-react";
+import { WifiOff, RefreshCw, Play, Pause, PlayCircle, Square, Plus, Minus, UtensilsCrossed, AlertTriangle, Trash2, Tv, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -14,6 +14,8 @@ import { deriveLocalState, estimateSession, type LocalUnit, type FinishedLocal }
 import { discardActions, enqueue, getClock, newUuid, serverNowMs } from "@/lib/offline/store";
 import { syncQueue } from "@/lib/offline/sync-client";
 import type { OfflineAction } from "@/lib/offline/protocol";
+import { localControlPageUrls } from "@/lib/offline/local-devices";
+import { useLocalDeviceSync, type DeviceSyncStatus } from "@/lib/offline/use-local-devices";
 
 /**
  * Papan kasir rental Mode Offline — tampil menggantikan halaman Rental PS biasa selama internet
@@ -44,6 +46,8 @@ export function OfflineRentalBoard({ outletId, online }: { outletId: string | nu
   const actions = useMemo(() => queue.map((q) => q.action), [queue]);
   const state = useMemo(() => (snapshot ? deriveLocalState(snapshot, actions) : null), [snapshot, actions]);
   const failed = queue.filter((q) => q.error);
+  const localControl = snapshot?.localControl;
+  const deviceStatus = useLocalDeviceSync(outletId, localControl, state?.units ?? null, now);
 
   const record = (input: ActionInput) => {
     if (!outletId) return false;
@@ -120,7 +124,21 @@ export function OfflineRentalBoard({ outletId, online }: { outletId: string | nu
         <ul className="list-disc pl-5 text-xs text-neutral-400 space-y-0.5">
           <li>{t("offline.info.saved", "Semua transaksi disimpan di perangkat ini dan dikirim otomatis begitu internet kembali. Jangan hapus data browser/aplikasi sebelum terkirim.")}</li>
           <li>{t("offline.info.cashOnly", "Hanya pembayaran tunai yang bisa dicatat. QRIS/transfer bisa diterima setelah online di halaman Kasir.")}</li>
-          <li>{t("offline.info.tv", "TV/konsol tidak bisa dinyalakan atau dimatikan otomatis selama offline — lakukan manual. Saat online kembali, status TV diselaraskan otomatis.")}</li>
+          {localControl && Object.keys(localControl.units).length > 0 ? (
+            <li>
+              {t(
+                "offline.info.localControl",
+                "TV & smart plug {n} unit dinyalakan/dimatikan lewat NexbillAgent di WiFi outlet, dan dimatikan otomatis saat waktunya habis. Unit lain: nyalakan/matikan manual."
+              ).replace("{n}", String(Object.keys(localControl.units).length))}
+              {localControlPageUrls(localControl).slice(0, 1).map((url) => (
+                <a key={url} href={url} target="_blank" rel="noreferrer" className="ml-1 inline-flex items-center gap-0.5 text-emerald-300 underline">
+                  {t("offline.openLocalControl", "Buka Kontrol Lokal")} <ExternalLink size={11} />
+                </a>
+              ))}
+            </li>
+          ) : (
+            <li>{t("offline.info.tv", "TV/konsol tidak bisa dinyalakan atau dimatikan otomatis selama offline — lakukan manual. Saat online kembali, status TV diselaraskan otomatis.")}</li>
+          )}
           <li>{t("offline.info.estimate", "Tagihan di layar adalah perkiraan dengan tarif yang sama; total final dihitung server saat sinkron. Member & aksesori dihitung setelah online.")}</li>
           <li>{t("offline.info.snapshot", "Data terakhir dari server: {time}").replace("{time}", snapshotAge)}</li>
         </ul>
@@ -146,6 +164,7 @@ export function OfflineRentalBoard({ outletId, online }: { outletId: string | nu
             rounding={rounding}
             formatMoney={formatMoney}
             presets={snapshot.durationPresets}
+            localDevice={localControl?.units[u.id] ? deviceStatus[u.id] ?? null : undefined}
             onStart={() => setStartFor(startFor === u.id ? null : u.id)}
             onExtend={(minutes) => u.session && record({ kind: "extend", sessionId: u.session.id, minutes })}
             onPause={() => u.session && record({ kind: "pause", sessionId: u.session.id })}
@@ -199,6 +218,8 @@ function UnitCard(props: {
   rounding: number;
   formatMoney: (n: number) => string;
   presets: { minutes: number; label: string }[];
+  /** undefined = unit tidak dikontrol NexbillAgent lewat LAN; null = belum ada perintah yang dikirim. */
+  localDevice?: DeviceSyncStatus | null;
   onStart: () => void;
   onExtend: (minutes: number) => void;
   onPause: () => void;
@@ -279,6 +300,19 @@ function UnitCard(props: {
           </>
         )}
       </div>
+      {props.localDevice !== undefined && (
+        <div
+          className={`flex items-center gap-1 text-[11px] ${props.localDevice?.state === "failed" ? "text-rose-300" : "text-neutral-500"}`}
+        >
+          <Tv size={12} />
+          {props.localDevice?.state === "failed"
+            ? t("offline.device.failed", "NexbillAgent tidak terjangkau{reason} — nyalakan/matikan perangkat manual. Dicoba lagi otomatis.").replace(
+                "{reason}",
+                props.localDevice.message ? ` (${props.localDevice.message})` : ""
+              )
+            : t("offline.device.local", "Perangkat dikontrol lewat WiFi outlet (NexbillAgent)")}
+        </div>
+      )}
       {props.children}
     </Card>
   );

@@ -5,6 +5,7 @@ import { orderItems, orders, outlets, payments, pricingRules, products, promos, 
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 import type { OfflineSnapshot } from "@/lib/offline/engine";
+import { offlineLocalControlFor } from "@/lib/relay/local-config-service";
 
 /**
  * Data yang disimpan perangkat kasir untuk Mode Offline (lib/offline/store.ts): unit, sesi aktif
@@ -92,6 +93,9 @@ export async function GET() {
       durationPresets: presetRows.map((d) => ({ minutes: d.minutes, label: d.label })).sort((a, b) => a.minutes - b.minutes),
       products: productRows.map((p) => ({ id: p.id, name: p.name, price: p.price, category: p.category ?? null })),
       bills,
+      // Kontrol Lokal (NexbillAgent v1.4): TV & plug tetap dinyalakan/dimatikan lewat WiFi outlet saat
+      // internet putus. Gagal dibaca = papan kasir offline tetap jalan, hanya tanpa kontrol perangkat.
+      localControl: await offlineLocalControlFor(outlet.id).catch(() => undefined),
     };
     return NextResponse.json(snapshot, { headers: { "Cache-Control": "no-store" } });
   } catch (err: unknown) {

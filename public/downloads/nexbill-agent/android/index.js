@@ -29,6 +29,12 @@
  *   7. Enam bahasa, mengikuti bahasa outlet di NEXBILL.
  *   8. Log ke agent.log di folder ini — supaya masalah di outlet bisa dilacak tanpa harus ada
  *      orang yang kebetulan melihat jendela konsolnya.
+ *
+ * YANG BARU DI v1.4 — KONTROL LOKAL SAAT INTERNET PUTUS (bagian "Kontrol Lokal" di bawah):
+ *   Selama WiFi/router outlet masih menyala, TV Android (ADB) dan smart plug Tasmota tetap bisa
+ *   dinyalakan/dimatikan walau internet putus: dari papan kasir Mode Offline NEXBILL (otomatis), dan
+ *   dari halaman http://<ip-agent>:8737 (PIN 6 angka). Agent juga mematikan perangkat saat waktu
+ *   sesi habis. Nonaktifkan dengan "localControl": false di config.json; ganti port dengan "localPort".
  */
 
 const fs = require('fs');
@@ -37,10 +43,21 @@ const https = require('https');
 const crypto = require('crypto');
 const readline = require('readline');
 const { execFile, execFileSync, spawn } = require('child_process');
+const http = require('http');
+const os = require('os');
 
-const AGENT_VERSION = '1.3.0';
+const AGENT_VERSION = '1.4.0';
 
-const IS_PKG = !!process.pkg;
+// .exe Windows: dulu dibangun dengan `pkg` (process.pkg), sejak v1.4 sebagai Node Single Executable
+// Application (node:sea). Keduanya diperlakukan sama: folder kerja = folder .exe, autostart & update aktif.
+function isSingleExecutable() {
+  try {
+    return require('node:sea').isSea();
+  } catch (err) {
+    return false;
+  }
+}
+const IS_PKG = !!process.pkg || isSingleExecutable();
 // Saat dibangun jadi .exe, folder kerja = folder tempat .exe berada. Saat dijalankan lewat
 // `node index.js` (pengujian), folder file ini. v1.1 selalu memakai folder process.execPath, yang
 // saat dijalankan lewat node menunjuk ke folder instalasi Node — config.json tersimpan di sana.
@@ -124,6 +141,13 @@ const MESSAGES = {
     updateInstalled: 'Update ke versi {version} berhasil.',
     rollback: 'Versi {version} gagal berjalan — kembali ke versi sebelumnya.',
     languageSaved: 'Bahasa: {language}. Untuk menggantinya nanti, jalankan: NexbillAgent.exe --lang',
+    localReady: 'Kontrol Lokal (dipakai saat internet putus): buka {url} dari HP/PC yang satu WiFi dengan outlet — PIN: {pin}',
+    localOfflineNow: 'Internet ke server NEXBILL terputus — Kontrol Lokal tetap aktif di {url}. Waktu sesi dipantau agent ini dan perangkat dimatikan saat waktunya habis.',
+    localAutoOff: 'Waktu sesi {unit} habis — perangkat dimatikan oleh Kontrol Lokal.',
+    localCommand: 'Kontrol Lokal: {unit} → {state}',
+    localFailed: 'Kontrol Lokal gagal untuk {unit}: {error}',
+    localPortBusy: 'Kontrol Lokal tidak bisa dibuka: port {port} sudah dipakai program lain. Ubah "localPort" di config.json lalu jalankan ulang.',
+    localNoConfig: 'Kontrol Lokal belum punya daftar unit — biarkan agent tersambung ke internet sebentar supaya daftar TV & smart plug terunduh.',
   },
   en: {
     askToken: 'Enter the Agent Token from the NEXBILL Device Control page: ',
@@ -149,6 +173,13 @@ const MESSAGES = {
     updateInstalled: 'Updated to version {version} successfully.',
     rollback: 'Version {version} failed to run — reverting to the previous version.',
     languageSaved: 'Language: {language}. To change it later, run: NexbillAgent.exe --lang',
+    localReady: 'Local Control (used when the internet is down): open {url} from a phone/PC on the outlet WiFi — PIN: {pin}',
+    localOfflineNow: 'Internet connection to the NEXBILL server lost — Local Control stays available at {url}. This agent keeps tracking session time and turns devices off when time is up.',
+    localAutoOff: 'Session time for {unit} is up — device turned off by Local Control.',
+    localCommand: 'Local Control: {unit} → {state}',
+    localFailed: 'Local Control failed for {unit}: {error}',
+    localPortBusy: 'Local Control could not start: port {port} is used by another program. Change "localPort" in config.json and restart.',
+    localNoConfig: 'Local Control has no unit list yet — keep the agent online for a moment so the TV & smart plug list can be downloaded.',
   },
   ms: {
     askToken: 'Masukkan Token Ejen dari halaman Kawalan Peranti NEXBILL: ',
@@ -174,6 +205,13 @@ const MESSAGES = {
     updateInstalled: 'Kemas kini ke versi {version} berjaya.',
     rollback: 'Versi {version} gagal berjalan — kembali ke versi sebelumnya.',
     languageSaved: 'Bahasa: {language}. Untuk menukarnya kemudian, jalankan: NexbillAgent.exe --lang',
+    localReady: 'Kawalan Setempat (digunakan apabila internet terputus): buka {url} dari telefon/PC pada WiFi outlet — PIN: {pin}',
+    localOfflineNow: 'Sambungan internet ke pelayan NEXBILL terputus — Kawalan Setempat masih tersedia di {url}. Ejen ini terus memantau masa sesi dan mematikan peranti apabila masa tamat.',
+    localAutoOff: 'Masa sesi {unit} tamat — peranti dimatikan oleh Kawalan Setempat.',
+    localCommand: 'Kawalan Setempat: {unit} → {state}',
+    localFailed: 'Kawalan Setempat gagal untuk {unit}: {error}',
+    localPortBusy: 'Kawalan Setempat tidak dapat dibuka: port {port} digunakan oleh program lain. Tukar "localPort" dalam config.json dan mulakan semula.',
+    localNoConfig: 'Kawalan Setempat belum mempunyai senarai unit — biarkan ejen dalam talian seketika supaya senarai TV & palam pintar dimuat turun.',
   },
   th: {
     askToken: 'ใส่ Agent Token จากหน้าควบคุมอุปกรณ์ของ NEXBILL: ',
@@ -199,6 +237,13 @@ const MESSAGES = {
     updateInstalled: 'อัปเดตเป็นเวอร์ชัน {version} สำเร็จ',
     rollback: 'เวอร์ชัน {version} ทำงานไม่สำเร็จ กำลังกลับไปใช้เวอร์ชันก่อนหน้า',
     languageSaved: 'ภาษา: {language} หากต้องการเปลี่ยนภายหลัง ให้รัน: NexbillAgent.exe --lang',
+    localReady: 'การควบคุมภายใน (ใช้เมื่ออินเทอร์เน็ตหลุด): เปิด {url} จากมือถือ/PC ที่ใช้ WiFi เดียวกับร้าน — PIN: {pin}',
+    localOfflineNow: 'การเชื่อมต่ออินเทอร์เน็ตไปยังเซิร์ฟเวอร์ NEXBILL ขาดหาย — การควบคุมภายในยังใช้งานได้ที่ {url} เอเจนต์นี้ยังคงจับเวลาเซสชันและปิดอุปกรณ์เมื่อหมดเวลา',
+    localAutoOff: 'เวลาเซสชันของ {unit} หมดแล้ว — การควบคุมภายในปิดอุปกรณ์แล้ว',
+    localCommand: 'การควบคุมภายใน: {unit} → {state}',
+    localFailed: 'การควบคุมภายในล้มเหลวสำหรับ {unit}: {error}',
+    localPortBusy: 'เปิดการควบคุมภายในไม่ได้: พอร์ต {port} ถูกโปรแกรมอื่นใช้อยู่ เปลี่ยน "localPort" ใน config.json แล้วเริ่มใหม่',
+    localNoConfig: 'การควบคุมภายในยังไม่มีรายการยูนิต — ให้เอเจนต์ออนไลน์สักครู่เพื่อดาวน์โหลดรายการทีวีและปลั๊กอัจฉริยะ',
   },
   fil: {
     askToken: 'Ilagay ang Agent Token mula sa pahina ng Device Control ng NEXBILL: ',
@@ -224,6 +269,13 @@ const MESSAGES = {
     updateInstalled: 'Matagumpay ang update sa bersyon {version}.',
     rollback: 'Pumalya ang bersyon {version} — bumabalik sa naunang bersyon.',
     languageSaved: 'Wika: {language}. Para palitan ito sa ibang pagkakataon, patakbuhin: NexbillAgent.exe --lang',
+    localReady: 'Local Control (gamit kapag walang internet): buksan ang {url} mula sa phone/PC na nasa WiFi ng outlet — PIN: {pin}',
+    localOfflineNow: 'Nawala ang koneksyon sa NEXBILL server — available pa rin ang Local Control sa {url}. Patuloy na binabantayan ng agent na ito ang oras ng session at pinapatay ang device kapag ubos na ang oras.',
+    localAutoOff: 'Ubos na ang oras ng session sa {unit} — pinatay ng Local Control ang device.',
+    localCommand: 'Local Control: {unit} → {state}',
+    localFailed: 'Pumalya ang Local Control para sa {unit}: {error}',
+    localPortBusy: 'Hindi mabuksan ang Local Control: ginagamit ng ibang program ang port {port}. Palitan ang "localPort" sa config.json at i-restart.',
+    localNoConfig: 'Wala pang listahan ng unit ang Local Control — hayaang naka-online sandali ang agent para ma-download ang listahan ng TV at smart plug.',
   },
   vi: {
     askToken: 'Nhập Agent Token từ trang Điều khiển thiết bị của NEXBILL: ',
@@ -249,6 +301,13 @@ const MESSAGES = {
     updateInstalled: 'Đã cập nhật lên phiên bản {version} thành công.',
     rollback: 'Phiên bản {version} chạy không thành công — quay lại phiên bản trước.',
     languageSaved: 'Ngôn ngữ: {language}. Để đổi sau này, hãy chạy: NexbillAgent.exe --lang',
+    localReady: 'Điều khiển cục bộ (dùng khi mất internet): mở {url} từ điện thoại/PC dùng chung WiFi của cửa hàng — PIN: {pin}',
+    localOfflineNow: 'Mất kết nối internet tới máy chủ NEXBILL — Điều khiển cục bộ vẫn hoạt động tại {url}. Agent này vẫn theo dõi thời gian phiên và tắt thiết bị khi hết giờ.',
+    localAutoOff: 'Hết giờ phiên của {unit} — Điều khiển cục bộ đã tắt thiết bị.',
+    localCommand: 'Điều khiển cục bộ: {unit} → {state}',
+    localFailed: 'Điều khiển cục bộ thất bại cho {unit}: {error}',
+    localPortBusy: 'Không mở được Điều khiển cục bộ: cổng {port} đang được chương trình khác dùng. Đổi "localPort" trong config.json rồi khởi động lại.',
+    localNoConfig: 'Điều khiển cục bộ chưa có danh sách máy — để agent trực tuyến một lúc để tải danh sách TV và ổ cắm thông minh.',
   },
 };
 
@@ -665,6 +724,28 @@ async function adbShell(adb, serial, command) {
 
 let activeCommands = 0;
 
+/** Menjalankan langkah-langkah dari buildCommandPlan. Dipakai perintah hub DAN Kontrol Lokal. */
+async function runPlan(adb, serial, plan) {
+  const outputs = [];
+  for (let i = 0; i < plan.steps.length; i++) {
+    const step = plan.steps[i];
+    if (typeof step === 'object') {
+      await sleep(step.sleepMs);
+      continue;
+    }
+    if (plan.optionalFrom !== undefined && i >= plan.optionalFrom) {
+      try {
+        outputs.push(await adbShell(adb, serial, step));
+      } catch (err) {
+        outputs.push(null);
+      }
+    } else {
+      outputs.push(await adbShell(adb, serial, step));
+    }
+  }
+  return outputs;
+}
+
 async function handleCommand(msg, config) {
   const id = msg && typeof msg.id === 'string' ? msg.id : '';
   const fail = (error) => ({ type: 'result', id, ok: false, error });
@@ -690,23 +771,7 @@ async function handleCommand(msg, config) {
 
   activeCommands++;
   try {
-    const outputs = [];
-    for (let i = 0; i < plan.steps.length; i++) {
-      const step = plan.steps[i];
-      if (typeof step === 'object') {
-        await sleep(step.sleepMs);
-        continue;
-      }
-      if (plan.optionalFrom !== undefined && i >= plan.optionalFrom) {
-        try {
-          outputs.push(await adbShell(adb, serial, step));
-        } catch (err) {
-          outputs.push(null);
-        }
-      } else {
-        outputs.push(await adbShell(adb, serial, step));
-      }
-    }
+    const outputs = await runPlan(adb, serial, plan);
 
     if (action === 'getState') return { type: 'result', id, ok: true, state: parsePowerState(outputs[0].stdout) };
 
@@ -732,6 +797,621 @@ async function handleCommand(msg, config) {
   } finally {
     activeCommands--;
   }
+}
+
+// =====================================================================================
+// Kontrol Lokal — TV & smart plug tetap bisa dikontrol saat INTERNET outlet putus (v1.4)
+// =====================================================================================
+//
+// Rancangan lengkap: pos-rental-ps/src/lib/relay/local-control.ts. Ringkasnya:
+//   - Selama online, hub mengirim `local_config` (unit → IP Android TV / IP lokal plug Tasmota, dan
+//     sesi yang berjalan di server). Disimpan di config.json supaya tetap ada saat internet putus
+//     atau setelah PC/HP dinyalakan ulang.
+//   - Agent membuka server HTTP di LAN (port 8737): halaman Kontrol Lokal (login PIN 6 angka) dan
+//     API untuk papan kasir Mode Offline NEXBILL (kunci panjang). PIN & kunci diturunkan dari token
+//     agent dengan HMAC — rumusnya SAMA PERSIS dengan src/lib/relay/local-control-secrets.ts.
+//   - Timer: sesi berdurasi tetap dimatikan agent ini saat waktunya habis. Timer sesi server hanya
+//     ditegakkan selama hub TERPUTUS (saat online server sendiri yang mematikan perangkat); timer
+//     sesi yang dimulai di Mode Offline ditegakkan selalu sampai server mengambil alih sesinya.
+//   - Perintah ke perangkat hanya ke IP jaringan lokal yang lolos validator yang sama dengan
+//     perintah hub. Plug Tasmota dikontrol lewat API HTTP bawaannya: /cm?cmnd=Power%20On.
+
+const LOCAL_CONTROL_PORT = 8737;
+const LOCAL_CONFIG_REFRESH_MS = 30 * 1000;
+const LOCAL_TIMER_TICK_MS = 5 * 1000;
+const LOCAL_RETRY_MS = 30 * 1000;
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_MS = 10 * 60 * 1000;
+const LOCAL_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const LOCAL_BODY_LIMIT = 4096;
+const LOCAL_MAX_TIMER_MS = 24 * 60 * 60 * 1000;
+const TASMOTA_TIMEOUT_MS = 4000;
+const DEFAULT_ALLOWED_ORIGINS = ['https://nexbill.id', 'https://www.nexbill.id'];
+
+/** Kunci API (40 heks) & PIN (6 angka) Kontrol Lokal dari token agent. Sama dengan deriveLocalSecrets di repo NEXBILL. */
+function deriveLocalSecrets(token) {
+  const key = crypto.createHmac('sha256', String(token)).update('nexbill-local-key-v1').digest('hex').slice(0, 40);
+  const pinNum = crypto.createHmac('sha256', String(token)).update('nexbill-local-pin-v1').digest().readUInt32BE(0) % 1000000;
+  return { key, pin: String(pinNum).padStart(6, '0') };
+}
+
+/** MURNI: local_config kiriman hub → bentuk yang aman disimpan, atau null. IP/port divalidasi ULANG di sini. */
+function sanitizeLocalConfig(msg) {
+  if (!msg || typeof msg !== 'object' || !Array.isArray(msg.units)) return null;
+  const units = [];
+  for (const u of msg.units.slice(0, 300)) {
+    if (!u || typeof u.id !== 'string' || !u.id || u.id.length > 64 || typeof u.name !== 'string') continue;
+    const d = u.device || {};
+    const name = u.name.slice(0, 60);
+    if (d.kind === 'android_tv' && isPrivateLanIPv4(d.ip)) {
+      const port = validateAdbPort(d.port);
+      if (port === null) continue;
+      units.push({ id: u.id, name, device: { kind: 'android_tv', ip: d.ip.trim(), port, hdmiPort: validateHdmiPort(d.hdmiPort) } });
+    } else if (d.kind === 'tasmota' && isPrivateLanIPv4(d.ip)) {
+      units.push({ id: u.id, name, device: { kind: 'tasmota', ip: d.ip.trim() } });
+    }
+  }
+  const sessions = [];
+  for (const s of Array.isArray(msg.serverSessions) ? msg.serverSessions : []) {
+    if (!s || typeof s.unitId !== 'string') continue;
+    const end = s.endsAt === null || s.endsAt === undefined ? null : Date.parse(s.endsAt);
+    if (end !== null && !Number.isFinite(end)) continue;
+    sessions.push({ unitId: s.unitId, endsAt: end, paused: !!s.paused });
+  }
+  const allowedOrigins = (Array.isArray(msg.allowedOrigins) ? msg.allowedOrigins : [])
+    .filter((o) => typeof o === 'string' && /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(o))
+    .slice(0, 10);
+  return { outletName: typeof msg.outletName === 'string' ? msg.outletName.slice(0, 80) : 'NEXBILL', units, sessions, allowedOrigins };
+}
+
+/**
+ * MURNI: timer lokal digabung dengan sesi yang diketahui server.
+ * timers: { [unitId]: { until: number|null, source: 'server'|'local' } }
+ *   - unit dengan sesi server → mengikuti server (null = main bebas / dijeda);
+ *   - timer 'server' yang sesinya sudah tidak ada di server → dihapus (server sudah menghentikannya);
+ *   - timer 'local' (sesi Mode Offline yang belum tersinkron) → dipertahankan.
+ */
+function mergeServerSessions(timers, sessions, unitIds) {
+  const next = {};
+  const byUnit = new Map(sessions.map((s) => [s.unitId, s]));
+  for (const id of unitIds) {
+    const s = byUnit.get(id);
+    const cur = timers && timers[id];
+    if (s) next[id] = { until: s.paused ? null : s.endsAt, source: 'server' };
+    else if (cur && cur.source === 'local') next[id] = cur;
+  }
+  return next;
+}
+
+/** MURNI: unit yang waktunya habis dan harus dimatikan sekarang. */
+function dueTimers(timers, nowMs, hubConnected) {
+  return Object.keys(timers || {}).filter((id) => {
+    const tm = timers[id];
+    if (!tm || typeof tm.until !== 'number' || nowMs < tm.until) return false;
+    return tm.source === 'local' || !hubConnected;
+  });
+}
+
+/** MURNI: status daya dari balasan JSON Tasmota ({"POWER":"ON"} atau {"POWER1":"OFF"}). */
+function parseTasmotaPower(body) {
+  try {
+    const j = JSON.parse(String(body || ''));
+    const v = j && (j.POWER !== undefined ? j.POWER : j.POWER1);
+    if (typeof v === 'string') return v.toUpperCase() === 'ON' ? 'on' : 'off';
+  } catch (err) {
+    /* bukan JSON */
+  }
+  return 'unknown';
+}
+
+/** MURNI: perubahan yang diminta (body POST /api/units/:id), atau { error }. */
+function parseUnitCommand(body, nowMs) {
+  if (!body || typeof body !== 'object') return { error: 'Body tidak valid.' };
+  const out = {};
+  if (body.power !== undefined) {
+    if (body.power !== 'on' && body.power !== 'off') return { error: 'power harus "on" atau "off".' };
+    out.power = body.power;
+  }
+  // Sisa waktu RELATIF (ms), bukan jam absolut: jam HP kasir, jam server, dan jam PC agent bisa
+  // berbeda beberapa menit — "sisa 45 menit" berarti sama di ketiganya. null = tanpa batas waktu.
+  if (body.remainingMs !== undefined) {
+    if (body.remainingMs === null) out.until = null;
+    else if (typeof body.remainingMs === 'number' && Number.isFinite(body.remainingMs) && body.remainingMs > -60 * 60 * 1000 && body.remainingMs < LOCAL_MAX_TIMER_MS) out.until = nowMs + Math.round(body.remainingMs);
+    else return { error: 'remainingMs tidak valid.' };
+  }
+  if (out.power === undefined && out.until === undefined) return { error: 'Tidak ada perubahan.' };
+  return out;
+}
+
+function lanAddresses() {
+  const found = [];
+  try {
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      for (const a of ifaces[name] || []) {
+        if (a && (a.family === 'IPv4' || a.family === 4) && !a.internal && isPrivateLanIPv4(a.address) && !found.includes(a.address)) found.push(a.address);
+      }
+    }
+  } catch (err) {
+    /* Android tanpa izin membaca antarmuka jaringan — alamat tidak dilaporkan, halaman tetap jalan */
+  }
+  return found.slice(0, 8);
+}
+
+const localRuntime = {
+  enabled: false,
+  port: LOCAL_CONTROL_PORT,
+  secrets: null,
+  hubConnected: false,
+  offlineNoticeShown: false,
+  sessions: new Map(), // token halaman → kedaluwarsa (ms)
+  fails: new Map(), // IP → { count, lockedUntil }
+  power: {}, // unitId → 'on' | 'off' | 'unknown'
+  lastAttempt: {}, // unitId → ms percobaan mematikan terakhir oleh timer
+  queues: {}, // unitId → Promise (perintah per unit dijalankan berurutan)
+};
+
+function localUnits(config) {
+  return (config.local && Array.isArray(config.local.units) && config.local.units) || [];
+}
+
+function localTimers(config) {
+  if (!config.localTimers || typeof config.localTimers !== 'object') config.localTimers = {};
+  return config.localTimers;
+}
+
+function localUrl(address) {
+  return `http://${address}:${localRuntime.port}`;
+}
+
+/** Menyimpan config hanya bila bagian Kontrol Lokal benar-benar berubah (local_config datang tiap 30 detik). */
+function saveLocalState(config, before) {
+  const after = JSON.stringify([config.local, config.localTimers]);
+  if (after !== before) saveConfig(config);
+}
+
+function applyLocalConfig(config, msg) {
+  const clean = sanitizeLocalConfig(msg);
+  if (!clean) return;
+  const before = JSON.stringify([config.local, config.localTimers]);
+  config.local = { outletName: clean.outletName, units: clean.units, allowedOrigins: clean.allowedOrigins };
+  config.localTimers = mergeServerSessions(localTimers(config), clean.sessions, clean.units.map((u) => u.id));
+  for (const s of clean.sessions) if (localRuntime.power[s.unitId] === undefined) localRuntime.power[s.unitId] = 'on';
+  saveLocalState(config, before);
+}
+
+function tasmotaCommand(config, ip, cmnd) {
+  let url = `http://${ip}/cm?cmnd=${encodeURIComponent(cmnd)}`;
+  // Plug yang diberi "Web Admin Password" di Tasmota: isi "tasmotaPassword" di config.json agent.
+  if (typeof config.tasmotaPassword === 'string' && config.tasmotaPassword) url += `&user=admin&password=${encodeURIComponent(config.tasmotaPassword)}`;
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, { timeout: TASMOTA_TIMEOUT_MS }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => {
+        if (body.length < 8192) body += c;
+      });
+      res.on('end', () => {
+        if (res.statusCode === 401) reject(new Error(`Smart plug ${ip} meminta password — isi "tasmotaPassword" di config.json agent.`));
+        else if (res.statusCode !== 200) reject(new Error(`Smart plug ${ip} membalas HTTP ${res.statusCode}.`));
+        else resolve(body);
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error(`Smart plug ${ip} tidak merespon. Pastikan plug menyala dan satu WiFi dengan agent ini.`)));
+    req.on('error', (err) => reject(err));
+  });
+}
+
+async function setUnitPower(config, unit, on) {
+  const d = unit.device;
+  if (d.kind === 'tasmota') {
+    const state = parseTasmotaPower(await tasmotaCommand(config, d.ip, on ? 'Power On' : 'Power Off'));
+    if (state === 'unknown') throw new Error(`Smart plug ${d.ip} tidak membalas status daya.`);
+    return state;
+  }
+  // Menyala: bangunkan TV lalu pindah ke HDMI konsol (bila otomatisasi HDMI unit ini aktif di NEXBILL).
+  // Mati: TV ditidurkan — screensaver NEXBILL butuh internet, jadi tidak dibuka saat offline.
+  const plan = on ? (d.hdmiPort ? buildCommandPlan('switchHdmi', { hdmiPort: d.hdmiPort }) : buildCommandPlan('turnOn')) : buildCommandPlan('turnOff');
+  activeCommands++;
+  try {
+    await runPlan(adbExecutable(config), `${d.ip}:${d.port}`, plan);
+  } finally {
+    activeCommands--;
+  }
+  return on ? 'on' : 'off';
+}
+
+async function readUnitPower(config, unit) {
+  const d = unit.device;
+  if (d.kind === 'tasmota') return parseTasmotaPower(await tasmotaCommand(config, d.ip, 'Power'));
+  const outputs = await runPlan(adbExecutable(config), `${d.ip}:${d.port}`, buildCommandPlan('getState'));
+  return parsePowerState(outputs[0].stdout);
+}
+
+/** Perintah untuk satu unit dijalankan berurutan — "nyalakan" lalu "matikan" yang ditekan cepat tidak boleh tertukar. */
+function serialized(unitId, fn) {
+  const prev = localRuntime.queues[unitId] || Promise.resolve();
+  const next = prev.catch(() => undefined).then(fn);
+  localRuntime.queues[unitId] = next.catch(() => undefined);
+  return next;
+}
+
+function unitView(config, unit) {
+  const tm = localTimers(config)[unit.id];
+  return {
+    id: unit.id,
+    name: unit.name,
+    kind: unit.device.kind,
+    power: localRuntime.power[unit.id] || 'unknown',
+    until: tm && typeof tm.until === 'number' ? tm.until : null,
+    remainingMs: tm && typeof tm.until === 'number' ? tm.until - Date.now() : null,
+    session: !!tm,
+  };
+}
+
+async function applyUnitCommand(config, unitId, cmd) {
+  const unit = localUnits(config).find((u) => u.id === unitId);
+  if (!unit) {
+    const err = new Error('Unit tidak dikenal agent ini.');
+    err.statusCode = 404;
+    throw err;
+  }
+  return serialized(unitId, async () => {
+    const timers = localTimers(config);
+    if (cmd.until !== undefined) timers[unitId] = { until: cmd.until, source: 'local' };
+    if (cmd.power === 'off') delete timers[unitId];
+    saveConfig(config);
+    if (cmd.power) {
+      try {
+        localRuntime.power[unitId] = await setUnitPower(config, unit, cmd.power === 'on');
+        log('INFO', t('localCommand', { unit: unit.name, state: cmd.power.toUpperCase() }));
+      } catch (err) {
+        log('WARN', t('localFailed', { unit: unit.name, error: (err && err.message) || err }));
+        throw err;
+      }
+    }
+    return unitView(config, unit);
+  });
+}
+
+async function runLocalTimers(config) {
+  const timers = localTimers(config);
+  const now = Date.now();
+  for (const unitId of dueTimers(timers, now, localRuntime.hubConnected)) {
+    const unit = localUnits(config).find((u) => u.id === unitId);
+    if (!unit) {
+      delete timers[unitId];
+      saveConfig(config);
+      continue;
+    }
+    if (localRuntime.lastAttempt[unitId] && now - localRuntime.lastAttempt[unitId] < LOCAL_RETRY_MS) continue;
+    localRuntime.lastAttempt[unitId] = now;
+    try {
+      await serialized(unitId, async () => {
+        const cur = localTimers(config)[unitId];
+        if (!cur || typeof cur.until !== 'number' || Date.now() < cur.until) return; // diperpanjang saat menunggu antrean
+        localRuntime.power[unitId] = await setUnitPower(config, unit, false);
+        delete localTimers(config)[unitId];
+        saveConfig(config);
+        log('INFO', t('localAutoOff', { unit: unit.name }));
+      });
+    } catch (err) {
+      log('WARN', t('localFailed', { unit: unit.name, error: (err && err.message) || err }));
+    }
+  }
+}
+
+function allowedOrigins(config) {
+  const fromHub = (config.local && Array.isArray(config.local.allowedOrigins) && config.local.allowedOrigins) || [];
+  return DEFAULT_ALLOWED_ORIGINS.concat(fromHub);
+}
+
+function safeEqual(a, b) {
+  const x = Buffer.from(String(a || ''));
+  const y = Buffer.from(String(b || ''));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+function sendJson(res, status, body) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(body));
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (c) => {
+      body += c;
+      if (body.length > LOCAL_BODY_LIMIT) {
+        reject(new Error('Body terlalu besar.'));
+        req.destroy();
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (err) {
+        reject(new Error('Body bukan JSON.'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function isAuthorized(req) {
+  const key = req.headers['x-nexbill-key'];
+  if (key && localRuntime.secrets && safeEqual(key, localRuntime.secrets.key)) return true;
+  const m = String(req.headers.authorization || '').match(/^Bearer ([a-f0-9]{48})$/);
+  if (!m) return false;
+  const exp = localRuntime.sessions.get(m[1]);
+  if (!exp) return false;
+  if (Date.now() > exp) {
+    localRuntime.sessions.delete(m[1]);
+    return false;
+  }
+  return true;
+}
+
+async function handleLocalRequest(req, res, config) {
+  const url = new URL(req.url || '/', 'http://local');
+  const origin = req.headers.origin;
+  const sameOrigin = origin && origin === `http://${req.headers.host}`;
+  const corsOk = origin && allowedOrigins(config).includes(origin);
+  if (corsOk) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') {
+    if (!corsOk) return sendJson(res, 403, { error: 'Origin tidak diizinkan.' });
+    res.writeHead(204, {
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'content-type, x-nexbill-key, authorization',
+      // Chrome (Private/Local Network Access): halaman https NEXBILL memanggil agent di jaringan lokal.
+      'Access-Control-Allow-Private-Network': 'true',
+      'Access-Control-Max-Age': '600',
+    });
+    return res.end();
+  }
+  // Situs lain di browser kasir tidak boleh menyuruh agent menyalakan TV.
+  if (origin && !sameOrigin && !corsOk) return sendJson(res, 403, { error: 'Origin tidak diizinkan.' });
+
+  if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Frame-Options': 'DENY',
+      'Content-Security-Policy': "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'",
+    });
+    return res.end(localPageHtml(currentLang));
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/info') {
+    return sendJson(res, 200, {
+      agent: 'nexbill-agent',
+      version: AGENT_VERSION,
+      outletName: (config.local && config.local.outletName) || null,
+      hubConnected: localRuntime.hubConnected,
+      units: localUnits(config).length,
+    });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/login') {
+    const ip = req.socket.remoteAddress || '?';
+    const f = localRuntime.fails.get(ip) || { count: 0, lockedUntil: 0 };
+    if (f.lockedUntil > Date.now()) return sendJson(res, 429, { error: 'locked', retryInMs: f.lockedUntil - Date.now() });
+    let body;
+    try {
+      body = await readBody(req);
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+    if (!localRuntime.secrets || !safeEqual(String(body.pin || '').trim(), localRuntime.secrets.pin)) {
+      f.count += 1;
+      if (f.count >= LOGIN_MAX_FAILS) {
+        f.count = 0;
+        f.lockedUntil = Date.now() + LOGIN_LOCK_MS;
+      }
+      localRuntime.fails.set(ip, f);
+      return sendJson(res, 401, { error: 'wrong_pin' });
+    }
+    localRuntime.fails.delete(ip);
+    const token = crypto.randomBytes(24).toString('hex');
+    localRuntime.sessions.set(token, Date.now() + LOCAL_SESSION_TTL_MS);
+    return sendJson(res, 200, { token });
+  }
+
+  if (!url.pathname.startsWith('/api/')) return sendJson(res, 404, { error: 'Tidak ditemukan.' });
+  if (!isAuthorized(req)) return sendJson(res, 401, { error: 'unauthorized' });
+
+  if (req.method === 'GET' && url.pathname === '/api/units') {
+    return sendJson(res, 200, {
+      outletName: (config.local && config.local.outletName) || null,
+      hubConnected: localRuntime.hubConnected,
+      now: Date.now(),
+      units: localUnits(config).map((u) => unitView(config, u)),
+    });
+  }
+
+  const m = url.pathname.match(/^\/api\/units\/([A-Za-z0-9_-]{1,64})(\/refresh)?$/);
+  if (req.method === 'POST' && m) {
+    const unitId = m[1];
+    try {
+      if (m[2]) {
+        const unit = localUnits(config).find((u) => u.id === unitId);
+        if (!unit) return sendJson(res, 404, { error: 'Unit tidak dikenal agent ini.' });
+        localRuntime.power[unitId] = await serialized(unitId, () => readUnitPower(config, unit));
+        return sendJson(res, 200, unitView(config, unit));
+      }
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
+      const cmd = parseUnitCommand(body, Date.now());
+      if (cmd.error) return sendJson(res, 400, { error: cmd.error });
+      return sendJson(res, 200, await applyUnitCommand(config, unitId, cmd));
+    } catch (err) {
+      return sendJson(res, err && err.statusCode ? err.statusCode : 502, { error: (err && err.message) || 'Perintah gagal.' });
+    }
+  }
+  return sendJson(res, 404, { error: 'Tidak ditemukan.' });
+}
+
+function startLocalControl(config) {
+  if (config.localControl === false || !config.token) return;
+  const port = Number.isInteger(config.localPort) && config.localPort > 0 && config.localPort <= 65535 ? config.localPort : LOCAL_CONTROL_PORT;
+  localRuntime.port = port;
+  localRuntime.secrets = deriveLocalSecrets(config.token);
+  localRuntime.enabled = true;
+  const server = http.createServer((req, res) => {
+    handleLocalRequest(req, res, config).catch((err) => {
+      try {
+        sendJson(res, 500, { error: (err && err.message) || 'Galat.' });
+      } catch (e) {
+        /* respons sudah terkirim */
+      }
+    });
+  });
+  server.on('error', (err) => {
+    localRuntime.enabled = false;
+    if (err && err.code === 'EADDRINUSE') log('ERROR', t('localPortBusy', { port }));
+    else log('ERROR', `Kontrol Lokal: ${err && err.message ? err.message : err}`);
+  });
+  server.listen(port, '0.0.0.0', () => {
+    const addrs = lanAddresses();
+    log('INFO', t('localReady', { url: addrs.length ? addrs.map(localUrl).join(' / ') : localUrl('127.0.0.1'), pin: localRuntime.secrets.pin }));
+    if (localUnits(config).length === 0) log('INFO', t('localNoConfig'));
+  });
+  setInterval(() => {
+    runLocalTimers(config).catch((err) => log('WARN', `Timer Kontrol Lokal: ${err && err.message ? err.message : err}`));
+  }, LOCAL_TIMER_TICK_MS);
+}
+
+const LOCAL_PAGE_TEXT = {
+  id: {
+    title: 'Kontrol Lokal', subtitle: 'Nyalakan/matikan TV & smart plug saat internet outlet putus.', pin: 'PIN Kontrol Lokal',
+    pinHint: 'PIN 6 angka tertulis di jendela NexbillAgent dan di NEXBILL → Kontrol Perangkat.', login: 'Masuk', wrongPin: 'PIN salah.',
+    locked: 'Terlalu banyak percobaan. Coba lagi dalam {min} menit.', online: 'Internet tersambung — pakai NEXBILL seperti biasa; halaman ini cadangan.',
+    offline: 'Internet terputus — mode lokal aktif. Waktu sesi tetap dipantau agent.', on: 'Nyala', off: 'Mati', unknown: 'Belum diketahui',
+    turnOn: 'Nyalakan', turnOff: 'Matikan', withTimer: 'Nyalakan + timer', minutes: '{n} mnt', remaining: 'Sisa {time}', check: 'Cek status',
+    tv: 'Android TV', plug: 'Smart plug', empty: 'Belum ada unit. Biarkan agent tersambung ke internet sebentar supaya daftar TV & smart plug terunduh.',
+    failed: 'Gagal: {error}', logout: 'Keluar', note: 'Tetap catat sesi & pembayaran di NEXBILL (Kasir Rental → Mode Offline) supaya tagihan tercatat.',
+    confirmOff: 'Matikan {unit}?', agentUnreachable: 'Agent tidak terjangkau. Pastikan HP/PC ini tersambung ke WiFi outlet.',
+  },
+  en: {
+    title: 'Local Control', subtitle: 'Turn TVs & smart plugs on/off while the outlet internet is down.', pin: 'Local Control PIN',
+    pinHint: 'The 6-digit PIN is shown in the NexbillAgent window and in NEXBILL → Device Control.', login: 'Sign in', wrongPin: 'Wrong PIN.',
+    locked: 'Too many attempts. Try again in {min} minutes.', online: 'Internet connected — use NEXBILL as usual; this page is a backup.',
+    offline: 'Internet down — local mode is on. The agent keeps tracking session time.', on: 'On', off: 'Off', unknown: 'Unknown',
+    turnOn: 'Turn on', turnOff: 'Turn off', withTimer: 'Turn on + timer', minutes: '{n} min', remaining: '{time} left', check: 'Check status',
+    tv: 'Android TV', plug: 'Smart plug', empty: 'No units yet. Keep the agent online for a moment so the TV & smart plug list can be downloaded.',
+    failed: 'Failed: {error}', logout: 'Sign out', note: 'Still record sessions & payments in NEXBILL (Rental Cashier → Offline Mode) so the bill is kept.',
+    confirmOff: 'Turn off {unit}?', agentUnreachable: 'The agent cannot be reached. Make sure this phone/PC is on the outlet WiFi.',
+  },
+  ms: {
+    title: 'Kawalan Setempat', subtitle: 'Hidupkan/matikan TV & palam pintar semasa internet outlet terputus.', pin: 'PIN Kawalan Setempat',
+    pinHint: 'PIN 6 digit dipaparkan dalam tetingkap NexbillAgent dan dalam NEXBILL → Kawalan Peranti.', login: 'Log masuk', wrongPin: 'PIN salah.',
+    locked: 'Terlalu banyak cubaan. Cuba lagi dalam {min} minit.', online: 'Internet bersambung — guna NEXBILL seperti biasa; halaman ini sandaran.',
+    offline: 'Internet terputus — mod setempat aktif. Ejen terus memantau masa sesi.', on: 'Hidup', off: 'Mati', unknown: 'Tidak diketahui',
+    turnOn: 'Hidupkan', turnOff: 'Matikan', withTimer: 'Hidupkan + pemasa', minutes: '{n} min', remaining: 'Baki {time}', check: 'Semak status',
+    tv: 'Android TV', plug: 'Palam pintar', empty: 'Belum ada unit. Biarkan ejen dalam talian seketika supaya senarai TV & palam pintar dimuat turun.',
+    failed: 'Gagal: {error}', logout: 'Log keluar', note: 'Tetap rekod sesi & bayaran dalam NEXBILL (Juruwang Sewaan → Mod Luar Talian) supaya bil direkodkan.',
+    confirmOff: 'Matikan {unit}?', agentUnreachable: 'Ejen tidak dapat dicapai. Pastikan telefon/PC ini bersambung ke WiFi outlet.',
+  },
+  th: {
+    title: 'การควบคุมภายใน', subtitle: 'เปิด/ปิดทีวีและปลั๊กอัจฉริยะขณะอินเทอร์เน็ตของร้านหลุด', pin: 'PIN การควบคุมภายใน',
+    pinHint: 'PIN 6 หลักแสดงอยู่ในหน้าต่าง NexbillAgent และใน NEXBILL → ควบคุมอุปกรณ์', login: 'เข้าสู่ระบบ', wrongPin: 'PIN ไม่ถูกต้อง',
+    locked: 'ลองผิดหลายครั้งเกินไป ลองใหม่ใน {min} นาที', online: 'อินเทอร์เน็ตเชื่อมต่ออยู่ — ใช้ NEXBILL ตามปกติ หน้านี้เป็นสำรอง',
+    offline: 'อินเทอร์เน็ตหลุด — เปิดโหมดภายในแล้ว เอเจนต์ยังจับเวลาเซสชันอยู่', on: 'เปิด', off: 'ปิด', unknown: 'ไม่ทราบ',
+    turnOn: 'เปิด', turnOff: 'ปิด', withTimer: 'เปิด + ตั้งเวลา', minutes: '{n} นาที', remaining: 'เหลือ {time}', check: 'ตรวจสถานะ',
+    tv: 'Android TV', plug: 'ปลั๊กอัจฉริยะ', empty: 'ยังไม่มียูนิต ให้เอเจนต์ออนไลน์สักครู่เพื่อดาวน์โหลดรายการทีวีและปลั๊กอัจฉริยะ',
+    failed: 'ล้มเหลว: {error}', logout: 'ออกจากระบบ', note: 'ยังคงบันทึกเซสชันและการชำระเงินใน NEXBILL (แคชเชียร์เช่า → โหมดออฟไลน์) เพื่อให้บิลถูกบันทึก',
+    confirmOff: 'ปิด {unit}?', agentUnreachable: 'ติดต่อเอเจนต์ไม่ได้ ตรวจสอบว่ามือถือ/PC นี้เชื่อมต่อ WiFi ของร้าน',
+  },
+  fil: {
+    title: 'Local Control', subtitle: 'I-on/i-off ang TV at smart plug habang walang internet ang outlet.', pin: 'PIN ng Local Control',
+    pinHint: 'Makikita ang 6-digit na PIN sa window ng NexbillAgent at sa NEXBILL → Device Control.', login: 'Mag-sign in', wrongPin: 'Maling PIN.',
+    locked: 'Masyadong maraming subok. Subukan ulit pagkalipas ng {min} minuto.', online: 'May internet — gamitin ang NEXBILL gaya ng dati; backup lang ang page na ito.',
+    offline: 'Walang internet — naka-on ang local mode. Patuloy na binabantayan ng agent ang oras ng session.', on: 'On', off: 'Off', unknown: 'Hindi alam',
+    turnOn: 'I-on', turnOff: 'I-off', withTimer: 'I-on + timer', minutes: '{n} min', remaining: '{time} na lang', check: 'Tingnan ang status',
+    tv: 'Android TV', plug: 'Smart plug', empty: 'Wala pang unit. Hayaang naka-online sandali ang agent para ma-download ang listahan ng TV at smart plug.',
+    failed: 'Pumalya: {error}', logout: 'Mag-sign out', note: 'Itala pa rin ang session at bayad sa NEXBILL (Rental Cashier → Offline Mode) para maitala ang bill.',
+    confirmOff: 'I-off ang {unit}?', agentUnreachable: 'Hindi maabot ang agent. Siguraduhing nakakonekta ang phone/PC na ito sa WiFi ng outlet.',
+  },
+  vi: {
+    title: 'Điều khiển cục bộ', subtitle: 'Bật/tắt TV và ổ cắm thông minh khi cửa hàng mất internet.', pin: 'PIN điều khiển cục bộ',
+    pinHint: 'Mã PIN 6 số hiển thị trong cửa sổ NexbillAgent và trong NEXBILL → Điều khiển thiết bị.', login: 'Đăng nhập', wrongPin: 'Sai PIN.',
+    locked: 'Thử quá nhiều lần. Thử lại sau {min} phút.', online: 'Đã có internet — dùng NEXBILL như bình thường; trang này là dự phòng.',
+    offline: 'Mất internet — chế độ cục bộ đang bật. Agent vẫn theo dõi thời gian phiên.', on: 'Bật', off: 'Tắt', unknown: 'Chưa rõ',
+    turnOn: 'Bật', turnOff: 'Tắt', withTimer: 'Bật + hẹn giờ', minutes: '{n} phút', remaining: 'Còn {time}', check: 'Kiểm tra',
+    tv: 'Android TV', plug: 'Ổ cắm thông minh', empty: 'Chưa có máy nào. Để agent trực tuyến một lúc để tải danh sách TV và ổ cắm thông minh.',
+    failed: 'Thất bại: {error}', logout: 'Đăng xuất', note: 'Vẫn ghi phiên và thanh toán trong NEXBILL (Thu ngân cho thuê → Chế độ ngoại tuyến) để hóa đơn được lưu.',
+    confirmOff: 'Tắt {unit}?', agentUnreachable: 'Không kết nối được agent. Hãy chắc chắn điện thoại/PC này dùng WiFi của cửa hàng.',
+  },
+};
+
+/** Halaman Kontrol Lokal (satu file, tanpa sumber luar — harus jalan tanpa internet). */
+function localPageHtml(lang) {
+  const text = LOCAL_PAGE_TEXT[lang] || LOCAL_PAGE_TEXT.id;
+  const json = JSON.stringify(text).replace(/</g, '\\u003c');
+  return `<!doctype html>
+<html lang="${lang === 'vi' ? 'vi' : lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXBILL — ${text.title.replace(/[<&]/g, '')}</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0f17;color:#e5e7eb}
+main{max-width:960px;margin:0 auto;padding:16px}h1{font-size:20px;margin:0}p{margin:4px 0;color:#9ca3af;font-size:13px}
+.bar{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:12px}
+.status{border-radius:10px;padding:8px 12px;font-size:13px;margin:12px 0}.ok{background:#064e3b55;border:1px solid #10b98155;color:#a7f3d0}
+.down{background:#78350f55;border:1px solid #f59e0b66;color:#fde68a}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.card{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:12px}.name{font-weight:600}.kind{font-size:12px;color:#9ca3af}
+.pw{display:inline-block;font-size:12px;border-radius:999px;padding:2px 8px;margin-top:6px}.pw.on{background:#065f46;color:#d1fae5}.pw.off{background:#374151;color:#d1d5db}.pw.unknown{background:#1f2937;color:#9ca3af}
+.row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}button,select,input{font:inherit;border-radius:8px;border:1px solid #374151;background:#1f2937;color:#e5e7eb;padding:8px 10px}
+button{cursor:pointer}button.primary{background:#059669;border-color:#059669;color:#fff}button.danger{background:#7f1d1d;border-color:#991b1b}button:disabled{opacity:.5}
+.err{color:#fca5a5;font-size:12px;margin-top:6px}.timer{font-size:12px;color:#fcd34d;margin-top:4px}form{max-width:320px;margin:40px auto;display:grid;gap:8px}
+input{font-size:22px;letter-spacing:6px;text-align:center}.note{font-size:12px;color:#9ca3af;margin-top:16px}
+</style></head><body><main id="app"></main>
+<script>
+const T=${json};
+const tr=(k,v)=>String(T[k]||k).replace(/\\{(\\w+)\\}/g,(m,n)=>v&&v[n]!==undefined?v[n]:m);
+let token=null;try{token=localStorage.getItem('nexbill-local-token')}catch(e){}
+let data=null,busy={},errors={},sel={},skew=0,loginError='';
+const app=document.getElementById('app');
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},token?{Authorization:'Bearer '+token}:{}),body:body?JSON.stringify(body):undefined});
+ const j=await r.json().catch(()=>({}));if(r.status===401&&path!=='/api/login'){logout();throw new Error('unauthorized')}if(!r.ok){const e=new Error(j.error||('HTTP '+r.status));e.body=j;e.status=r.status;throw e}return j}
+function logout(){token=null;try{localStorage.removeItem('nexbill-local-token')}catch(e){}data=null;render()}
+function fmt(ms){const s=Math.max(0,Math.round(ms/1000));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')}
+function render(){
+ if(!token){app.innerHTML='<form id="f"><h1>'+esc(T.title)+'</h1><p>'+esc(T.subtitle)+'</p><label>'+esc(T.pin)+'</label><input id="pin" inputmode="numeric" maxlength="6" autocomplete="off"><button class="primary">'+esc(T.login)+'</button><div class="err">'+esc(loginError)+'</div><p>'+esc(T.pinHint)+'</p></form>';
+  document.getElementById('f').onsubmit=async e=>{e.preventDefault();try{const j=await api('/api/login',{pin:document.getElementById('pin').value});token=j.token;try{localStorage.setItem('nexbill-local-token',token)}catch(e){}loginError='';load()}catch(err){loginError=err.status===429?tr('locked',{min:Math.ceil((err.body.retryInMs||600000)/60000)}):err.status===401?T.wrongPin:T.agentUnreachable;render()}};return}
+ if(!data){app.innerHTML='<p>…</p>';return}
+ const now=Date.now()+skew;
+ let h='<div class="bar"><div><h1>'+esc(T.title)+'</h1><p>'+esc(data.outletName||'')+'</p></div><button id="lo">'+esc(T.logout)+'</button></div>';
+ h+='<div class="status '+(data.hubConnected?'ok':'down')+'">'+esc(data.hubConnected?T.online:T.offline)+'</div>';
+ if(!data.units.length)h+='<p>'+esc(T.empty)+'</p>';
+ h+='<div class="grid">';for(const u of data.units){const b=!!busy[u.id];
+  h+='<div class="card"><div class="name">'+esc(u.name)+'</div><div class="kind">'+esc(u.kind==='tasmota'?T.plug:T.tv)+'</div><span class="pw '+u.power+'">'+esc(T[u.power]||T.unknown)+'</span>';
+  if(u.until)h+='<div class="timer" data-until="'+u.until+'">'+esc(tr('remaining',{time:fmt(u.until-now)}))+'</div>';
+  h+='<div class="row"><button class="primary" data-a="on" data-u="'+esc(u.id)+'" '+(b?'disabled':'')+'>'+esc(T.turnOn)+'</button><button class="danger" data-a="off" data-u="'+esc(u.id)+'" '+(b?'disabled':'')+'>'+esc(T.turnOff)+'</button></div>';
+  h+='<div class="row"><select data-s="'+esc(u.id)+'">'+[30,60,90,120,180].map(n=>'<option value="'+n+'"'+(Number(sel[u.id]||60)===n?' selected':'')+'>'+esc(tr('minutes',{n}))+'</option>').join('')+'</select><button data-a="timer" data-u="'+esc(u.id)+'" '+(b?'disabled':'')+'>'+esc(T.withTimer)+'</button><button data-a="check" data-u="'+esc(u.id)+'" '+(b?'disabled':'')+'>'+esc(T.check)+'</button></div>';
+  if(errors[u.id])h+='<div class="err">'+esc(tr('failed',{error:errors[u.id]}))+'</div>';h+='</div>'}
+ h+='</div><p class="note">'+esc(T.note)+'</p>';app.innerHTML=h;
+ document.getElementById('lo').onclick=logout;
+ app.querySelectorAll('button[data-a]').forEach(btn=>btn.onclick=()=>act(btn.dataset.a,btn.dataset.u));
+ app.querySelectorAll('select[data-s]').forEach(s=>s.onchange=()=>{sel[s.dataset.s]=s.value});
+}
+async function act(a,id){const u=data.units.find(x=>x.id===id);if(!u)return;
+ if(a==='off'&&!confirm(tr('confirmOff',{unit:u.name})))return;
+ busy[id]=true;errors[id]='';render();
+ try{let r;if(a==='check')r=await api('/api/units/'+id+'/refresh',{});
+  else if(a==='timer'){const n=Number(app.querySelector('select[data-s="'+id+'"]').value);r=await api('/api/units/'+id,{power:'on',remainingMs:n*60000})}
+  else r=await api('/api/units/'+id,{power:a});Object.assign(u,r)}catch(err){errors[id]=err.message}
+ busy[id]=false;render()}
+async function load(){if(!token)return render();try{const j=await api('/api/units');skew=j.now-Date.now();data=j}catch(e){if(e.message!=='unauthorized'&&!data)app.innerHTML='<p class="err">'+esc(T.agentUnreachable)+'</p>'}if(data&&!(document.activeElement&&document.activeElement.tagName==='SELECT'))render()}
+render();load();setInterval(load,5000);setInterval(()=>{const now=Date.now()+skew;app.querySelectorAll('.timer[data-until]').forEach(el=>{el.textContent=tr('remaining',{time:fmt(Number(el.dataset.until)-now)})})},1000);
+</script></body></html>`;
 }
 
 // =====================================================================================
@@ -765,6 +1445,7 @@ function restartAgent(args) {
 function capabilities() {
   const caps = ['power', 'open_screensaver', 'switch_hdmi', 'tv_info'];
   if (updatesEnabled()) caps.push('self_update');
+  if (localRuntime.enabled) caps.push('local_control');
   return caps;
 }
 
@@ -772,18 +1453,30 @@ function connect(config) {
   // Dimuat di sini, bukan di atas file, supaya tools/selftest.js bisa memuat file ini untuk menguji
   // fungsi-fungsi murninya tanpa membutuhkan modul jaringan.
   const WebSocket = require('ws');
-  const hubUrl = typeof config.hubUrl === 'string' && config.hubUrl.startsWith('wss://') ? config.hubUrl : DEFAULT_HUB_URL;
+  // ws:// hanya untuk hub di komputer ini sendiri (pengujian/pengembangan); selain itu wajib wss://.
+  const hubUrl =
+    typeof config.hubUrl === 'string' && (config.hubUrl.startsWith('wss://') || /^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/.test(config.hubUrl))
+      ? config.hubUrl
+      : DEFAULT_HUB_URL;
   log('INFO', t('connecting', { url: hubUrl }));
 
   const ws = new WebSocket(hubUrl);
   let heartbeat = null;
+  let localRefresh = null;
   const send = (msg) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   };
 
   ws.on('open', () => {
     wsOpenedOnce = true;
-    send({ type: 'auth', token: config.token, agentVersion: AGENT_VERSION, capabilities: capabilities(), os: `${process.platform}-${process.arch}` });
+    send({
+      type: 'auth',
+      token: config.token,
+      agentVersion: AGENT_VERSION,
+      capabilities: capabilities(),
+      os: `${process.platform}-${process.arch}`,
+      ...(localRuntime.enabled ? { local: { addresses: lanAddresses(), port: localRuntime.port } } : {}),
+    });
   });
 
   ws.on('message', async (raw) => {
@@ -812,6 +1505,11 @@ function connect(config) {
         onFirstAuthentication(config);
       }
       heartbeat = setInterval(() => send({ type: 'ping' }), HEARTBEAT_INTERVAL_MS);
+      localRuntime.hubConnected = true;
+      localRuntime.offlineNoticeShown = false;
+      // Hub mengirim local_config sendiri sesaat setelah auth; setelah itu agent memintanya berkala
+      // supaya daftar unit & sesi server yang tersimpan tetap segar saat internet tiba-tiba putus.
+      if (localRuntime.enabled) localRefresh = setInterval(() => send({ type: 'local_config_request' }), LOCAL_CONFIG_REFRESH_MS);
       return;
     }
     if (msg.type === 'auth_error') {
@@ -824,11 +1522,22 @@ function connect(config) {
       return;
     }
     if (msg.type === 'pong') return;
+    if (msg.type === 'local_config') {
+      applyLocalConfig(config, msg);
+      return;
+    }
     if (msg.type === 'command') send(await handleCommand(msg, config));
   });
 
   ws.on('close', () => {
     if (heartbeat) clearInterval(heartbeat);
+    if (localRefresh) clearInterval(localRefresh);
+    localRuntime.hubConnected = false;
+    if (localRuntime.enabled && authenticatedOnce && !localRuntime.offlineNoticeShown && !tokenRejected) {
+      localRuntime.offlineNoticeShown = true;
+      const addrs = lanAddresses();
+      log('WARN', t('localOfflineNow', { url: addrs.length ? localUrl(addrs[0]) : localUrl('127.0.0.1') }));
+    }
     if (tokenRejected) return;
     log('INFO', t('disconnected', { seconds: Math.round(reconnectDelayMs / 1000) }));
     setTimeout(() => connect(config), reconnectDelayMs);
@@ -1155,6 +1864,8 @@ async function main() {
   configureAutostart(config);
   if (IS_PKG && !updatesEnabled()) log('INFO', t('updateDisabled'));
 
+  // Sebelum connect(): kemampuan "local_control" dilaporkan di pesan auth hanya bila server lokalnya aktif.
+  startLocalControl(config);
   connect(config);
 
   if (updatesEnabled()) {
@@ -1164,7 +1875,7 @@ async function main() {
   }
 }
 
-if (require.main === module) {
+if (require.main === module || isSingleExecutable()) {
   main().catch((err) => {
     log('ERROR', `Agent berhenti karena galat: ${err && err.stack ? err.stack : err}`);
     setTimeout(() => process.exit(1), 10000);
@@ -1193,4 +1904,13 @@ module.exports = {
   parseLanguageChoice,
   LANGUAGE_CHOICES,
   MESSAGES,
+  LOCAL_CONTROL_PORT,
+  deriveLocalSecrets,
+  sanitizeLocalConfig,
+  mergeServerSessions,
+  dueTimers,
+  parseTasmotaPower,
+  parseUnitCommand,
+  localPageHtml,
+  LOCAL_PAGE_TEXT,
 };

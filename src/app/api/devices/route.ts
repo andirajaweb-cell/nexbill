@@ -7,6 +7,7 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { assertDeviceAllowed } from "@/lib/subscription/service";
 import { resolveTuyaDeviceConfig } from "@/lib/devices/tuya-accounts-service";
+import { hasInvalidTasmotaLocalIp } from "@/lib/relay/local-control";
 
 /**
  * All outlets share ONE physical MQTT broker (single global MQTT_BROKER_URL env var — see
@@ -57,6 +58,9 @@ export async function POST(req: NextRequest) {
     await assertDeviceAllowed(session.outletId, body.protocol, undefined, session.role);
     if (body.protocol === "tasmota_mqtt" && body.mqttTopic) {
       await assertMqttTopicGloballyUnique(body.mqttTopic);
+    }
+    if (body.protocol === "tasmota_mqtt" && hasInvalidTasmotaLocalIp(body.config)) {
+      return NextResponse.json({ error: "IP lokal smart plug harus alamat jaringan lokal, mis. 192.168.1.23 (10.x.x.x, 172.16-31.x.x, atau 192.168.x.x)." }, { status: 400 });
     }
     // Tuya: tentukan akun Tuya mana yang memiliki perangkat ini (outlet bisa punya beberapa akun).
     let tuyaWarning: string | undefined;
