@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { importHistoricalRows, type HistoricalCategory } from "@/lib/accounting/historical-import";
+import { templateLangFor } from "@/lib/accounting/historical-import-columns";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 
@@ -25,9 +26,11 @@ export async function POST(req: NextRequest) {
 
     const mode = form.get("mode") === "saldo_awal" ? "saldo_awal" : "kas";
     const dryRun = form.get("dryRun") === "1";
+    // Language of row errors/preview only — the file itself may use either template language.
+    const lang = templateLangFor(String(form.get("lang") ?? "id"));
     if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "File terlalu besar (maks 5 MB). Rekap per hari agar baris lebih sedikit." }, { status: 400 });
     const arrayBuffer = await file.arrayBuffer();
-    const summary = await importHistoricalRows(session.outletId, category as HistoricalCategory, Buffer.from(arrayBuffer), session.sub, { mode, dryRun });
+    const summary = await importHistoricalRows(session.outletId, category as HistoricalCategory, Buffer.from(arrayBuffer), session.sub, { mode, dryRun, lang });
     return NextResponse.json(summary);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

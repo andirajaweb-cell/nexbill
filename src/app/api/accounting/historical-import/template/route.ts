@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateHistoricalImportTemplate, type HistoricalCategory } from "@/lib/accounting/historical-import";
+import { templateLangFor, type TemplateLang } from "@/lib/accounting/historical-import-columns";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 
-const FILE_NAME: Record<HistoricalCategory, string> = {
-  penjualan: "template-impor-penjualan-historis.xlsx",
-  pembelian: "template-impor-pembelian-historis.xlsx",
-  pendapatan_lain: "template-impor-pendapatan-lain-historis.xlsx",
-  pengeluaran: "template-impor-pengeluaran-historis.xlsx",
+const FILE_NAME: Record<HistoricalCategory, Record<TemplateLang, string>> = {
+  penjualan: { id: "template-impor-penjualan-historis.xlsx", en: "historical-sales-import-template.xlsx" },
+  pembelian: { id: "template-impor-pembelian-historis.xlsx", en: "historical-purchases-import-template.xlsx" },
+  pendapatan_lain: { id: "template-impor-pendapatan-lain-historis.xlsx", en: "historical-other-income-import-template.xlsx" },
+  pengeluaran: { id: "template-impor-pengeluaran-historis.xlsx", en: "historical-expenses-import-template.xlsx" },
 };
 
 export async function GET(req: NextRequest) {
@@ -18,12 +19,15 @@ export async function GET(req: NextRequest) {
     const category = req.nextUrl.searchParams.get("category") as HistoricalCategory | null;
     if (!category || !FILE_NAME[category]) return NextResponse.json({ error: "Kategori tidak dikenali." }, { status: 400 });
 
-    const buffer = await generateHistoricalImportTemplate(session.outletId, category);
+    // ?lang= is the dashboard language; Indonesian gets the Indonesian template, every other
+    // language the English one. No param (old links) keeps the Indonesian template.
+    const lang = templateLangFor(req.nextUrl.searchParams.get("lang") ?? "id");
+    const buffer = await generateHistoricalImportTemplate(session.outletId, category, lang);
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${FILE_NAME[category]}"`,
+        "Content-Disposition": `attachment; filename="${FILE_NAME[category][lang]}"`,
       },
     });
   } catch (err: unknown) {
