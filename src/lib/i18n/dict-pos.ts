@@ -37,4 +37,7 @@ registerDict({
   "pos.voucherOk": { id: "Voucher OK: -{amount}", en: "Voucher OK: -{amount}", ms: "Baucar OK: -{amount}", th: "คูปองใช้ได้: -{amount}", fil: "OK ang Voucher: -{amount}", vi: "Voucher hợp lệ: -{amount}" },
   "pos.openOrder.hourUnit": { id: "j", en: "h", ms: "j", th: "ชม.", fil: "o", vi: "g" },
   "pos.openOrder.minuteUnit": { id: "m", en: "m", ms: "m", th: "น.", fil: "m", vi: "p" },
+
+  // --- POS (terjemahan yang sebelumnya hilang) ---
+  "pos.markReceived": { id: "Tandai Diterima", en: "Mark Received", ms: "Tandakan Diterima", th: "ทำเครื่องหมายว่าได้รับแล้ว", fil: "Markahan bilang Natanggap", vi: "Đánh dấu đã nhận" },
 });

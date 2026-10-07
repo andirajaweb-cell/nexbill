@@ -191,4 +191,13 @@ registerDict({
     fil: "Dapat laging naka-on para hindi ma-lock out ang Superuser sa page na ito.",
     vi: "Phải luôn bật để Superuser không bị khóa khỏi trang này.",
   },
+
+  // --- Staff (terjemahan yang sebelumnya hilang) ---
+  "staff.singleDevice.title": { id: "Keamanan login: satu akun = satu perangkat", en: "Login security: one account = one device", ms: "Keselamatan log masuk: satu akaun = satu peranti", th: "ความปลอดภัยการเข้าสู่ระบบ: หนึ่งบัญชี = หนึ่งอุปกรณ์", fil: "Seguridad ng login: isang account = isang device", vi: "Bảo mật đăng nhập: một tài khoản = một thiết bị" },
+  "staff.singleDevice.onDesc": { id: "AKTIF — akun yang sedang dipakai di satu browser tidak bisa login di browser/PC lain sampai logout, {n} menit tidak dipakai, atau dikeluarkan di bawah.", en: "ON — an account in use in one browser can't log in on another browser/PC until it logs out, is idle for {n} minutes, or is signed out below.", ms: "AKTIF — akaun yang sedang digunakan dalam satu pelayar tidak boleh log masuk di pelayar/PC lain sehingga log keluar, {n} minit tidak digunakan, atau dikeluarkan di bawah.", th: "เปิด — บัญชีที่ใช้อยู่ในเบราว์เซอร์หนึ่งจะเข้าสู่ระบบในเบราว์เซอร์/PC อื่นไม่ได้ จนกว่าจะออกจากระบบ ไม่ได้ใช้งาน {n} นาที หรือถูกบังคับออกด้านล่าง", fil: "NAKA-ON — hindi makakapag-login sa ibang browser/PC ang account na ginagamit sa isang browser hanggang mag-logout, {n} minutong hindi ginamit, o i-sign out sa ibaba.", vi: "BẬT — tài khoản đang dùng trên một trình duyệt không thể đăng nhập trên trình duyệt/PC khác cho đến khi đăng xuất, không dùng {n} phút, hoặc bị buộc đăng xuất bên dưới." },
+  "staff.singleDevice.offDesc": { id: "NONAKTIF — satu akun bisa login di beberapa browser/PC sekaligus.", en: "OFF — one account can log in on several browsers/PCs at once.", ms: "TIDAK AKTIF — satu akaun boleh log masuk di beberapa pelayar/PC serentak.", th: "ปิด — บัญชีเดียวเข้าสู่ระบบได้หลายเบราว์เซอร์/PC พร้อมกัน", fil: "NAKA-OFF — puwedeng mag-login ang isang account sa ilang browser/PC nang sabay.", vi: "TẮT — một tài khoản có thể đăng nhập trên nhiều trình duyệt/PC cùng lúc." },
+  "staff.singleDevice.turnOff": { id: "Matikan", en: "Turn off", ms: "Matikan", th: "ปิด", fil: "I-off", vi: "Tắt" },
+  "staff.singleDevice.turnOn": { id: "Aktifkan", en: "Turn on", ms: "Aktifkan", th: "เปิด", fil: "I-on", vi: "Bật" },
+  "staff.table.device": { id: "Perangkat aktif", en: "Active device", ms: "Peranti aktif", th: "อุปกรณ์ที่ใช้งานอยู่", fil: "Aktibong device", vi: "Thiết bị đang dùng" },
+  "staff.action.revokeSession": { id: "Keluarkan", en: "Sign out", ms: "Keluarkan", th: "บังคับออก", fil: "I-sign out", vi: "Đăng xuất" },
 });
