@@ -2,6 +2,20 @@
 import { clsx } from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { computePanelPosition, isTriggerOffscreen, type PanelPosition, type Viewport } from "./searchable-select-position";
+
+function readViewport(): Viewport {
+  return {
+    layoutHeight: window.innerHeight,
+    visibleHeight: window.visualViewport?.height ?? window.innerHeight,
+    width: window.innerWidth,
+  };
+}
+
+/** Phones/tablets: auto-focusing the search box would pop the soft keyboard over the option list. */
+function isTouchPrimary(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+}
 
 export interface SearchableSelectOption {
   value: string;
@@ -51,7 +65,7 @@ export function SearchableSelect({
   const [highlight, setHighlight] = useState(0);
   // Where to render the portaled panel: viewport coordinates computed from the trigger button's
   // own bounding rect (see openDropdown()), not CSS — see the comment above the portal below for why.
-  const [panelPos, setPanelPos] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null);
+  const [panelPos, setPanelPos] = useState<PanelPosition | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -82,50 +96,58 @@ export function SearchableSelect({
   useEffect(() => {
     if (open) {
       setHighlight(0);
-      requestAnimationFrame(() => inputRef.current?.focus());
+      // Desktop only. On Android the focus opened the soft keyboard, which scrolled/resized the
+      // page and (with the old close-on-scroll rule) shut the list before an option could be tapped.
+      // Touch users can still tap the search box themselves.
+      if (!isTouchPrimary()) requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
 
-  // Closing on scroll/resize (rather than tracking and repositioning) keeps this simple and safe:
-  // a fixed-position portal has no way to know a container scrolled short of a scroll listener,
-  // and for a short-lived search popover, closing is a perfectly normal UX (same as most native
-  // comboboxes) instead of risking a dropdown that's silently drifted away from its button.
+  // Scroll/resize handling. This used to CLOSE the panel on any scroll or resize — which broke
+  // every SearchableSelect on Android (PPOB "Diambil dari"/"Masuk ke" closed by itself right after
+  // being tapped): opening the panel, or tapping its search box, brings up the soft keyboard, and
+  // the browser then resizes the viewport and scrolls the focused field into view. Now the panel
+  // follows its trigger button (and resizes its list to the space left above the keyboard), and
+  // only closes once the trigger has actually left the screen.
   //
-  // Listening in the capture phase is what lets this catch scrolling on ANY ancestor container
-  // (scroll events don't bubble, so a plain bubble-phase window listener would miss them) — but
-  // that same capture-phase listener also fires for scrolling the option list's own internal
-  // `overflow-y-auto` div, since capture happens on the way down to the target regardless of
-  // bubbling. Without excluding that case, scrolling the list itself instantly closed the
-  // dropdown before the scroll could register — the "can't scroll the options" bug. Guard by
-  // ignoring scroll events whose target is inside the panel itself.
+  // Capture phase so scrolling of ANY ancestor container is seen (scroll doesn't bubble); scroll
+  // events from inside the panel (its own option list) are ignored.
   useEffect(() => {
     if (!open) return;
-    function onScrollOrResize(e: Event) {
-      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
-      setOpen(false);
-      setQuery("");
+    let frame = 0;
+    function reposition(e?: Event) {
+      if (e && panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const rect = rootRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const vp = readViewport();
+        if (isTriggerOffscreen(rect, vp)) {
+          setOpen(false);
+          setQuery("");
+          return;
+        }
+        setPanelPos(computePanelPosition(rect, vp));
+      });
     }
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
+    const vv = window.visualViewport;
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    vv?.addEventListener("resize", reposition);
+    vv?.addEventListener("scroll", reposition);
     return () => {
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+      vv?.removeEventListener("resize", reposition);
+      vv?.removeEventListener("scroll", reposition);
     };
   }, [open]);
 
   function openDropdown() {
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect) return;
-    // Flip above the button when there isn't room below (search box + up to ~8 rows, ~300px) but
-    // there IS more room above — otherwise keep the normal below placement.
-    const estimatedHeight = 300;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const placeAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
-    setPanelPos({
-      left: rect.left,
-      width: Math.max(rect.width, 220),
-      ...(placeAbove ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
-    });
+    setPanelPos(computePanelPosition(rect, readViewport()));
     setOpen(true);
   }
 
@@ -216,12 +238,12 @@ export function SearchableSelect({
                 className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/60"
               />
             </div>
-            <div className="max-h-56 overflow-y-auto py-1">
+            <div className="overflow-y-auto overscroll-contain py-1" style={{ maxHeight: panelPos.listMaxHeight }}>
               {allowClear && (
                 <button
                   type="button"
                   onClick={() => choose("")}
-                  className="w-full text-left px-3 py-1.5 text-sm text-neutral-500 hover:bg-white/5"
+                  className="w-full text-left px-3 py-2 sm:py-1.5 text-sm text-neutral-500 hover:bg-white/5"
                 >
                   {clearLabel}
                 </button>
@@ -237,7 +259,7 @@ export function SearchableSelect({
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => choose(o.value)}
                   className={clsx(
-                    "w-full text-left px-3 py-1.5 text-sm truncate disabled:opacity-40 disabled:cursor-not-allowed",
+                    "w-full text-left px-3 py-2 sm:py-1.5 text-sm truncate disabled:opacity-40 disabled:cursor-not-allowed",
                     i === highlight ? "bg-cyan-500/20 text-cyan-100" : "hover:bg-white/5",
                     o.value === value && i !== highlight && "text-cyan-300"
                   )}
