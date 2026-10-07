@@ -158,7 +158,12 @@ function BookingLinkShare({
     // setOutletSlug's doc comment). This link may already be printed on receipts or shared on
     // social media, so a manual, explicit confirmation is required before rewriting it.
     const ok = await showConfirm(
-      `Ganti link booking jadi "/book/${draft}"? Link lama ("/book/${slug}") akan langsung berhenti berfungsi — pastikan belum dibagikan ke pelanggan, atau update dulu di tempat lain kamu memasangnya.`,
+      t(
+        "settings.bookingLink.confirmChange",
+        "Ganti link booking jadi \"/book/{new}\"? Link lama (\"/book/{old}\") akan langsung berhenti berfungsi — pastikan belum dibagikan ke pelanggan, atau update dulu di tempat lain kamu memasangnya."
+      )
+        .replace("{new}", draft)
+        .replace("{old}", slug ?? ""),
       { tone: "danger" }
     );
     if (!ok) return;
@@ -188,11 +193,11 @@ function BookingLinkShare({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             className={inputCls + " flex-1"}
-            placeholder="nama-outlet-kamu"
+            placeholder={t("settings.bookingLink.slugPlaceholder", "nama-outlet-kamu")}
           />
         </div>
         <div className="flex gap-2">
-          <Button onClick={saveSlug} disabled={saving || !draft.trim()}>{saving ? "Menyimpan..." : "Simpan Link Baru"}</Button>
+          <Button onClick={saveSlug} disabled={saving || !draft.trim()}>{saving ? t("settings.common.saving", "Menyimpan...") : t("settings.bookingLink.saveNew", "Simpan Link Baru")}</Button>
           <Button variant="ghost" onClick={() => setEditing(false)} disabled={saving}>{t("settings.common.cancel", "Batal")}</Button>
         </div>
       </div>
@@ -212,7 +217,7 @@ function BookingLinkShare({
         {copied ? t("settings.bookingLink.copied", "Tersalin!") : t("settings.bookingLink.copyButton", "Salin Link")}
       </Button>
       {canManage && (
-        <Button variant="ghost" onClick={startEdit}>Ganti</Button>
+        <Button variant="ghost" onClick={startEdit}>{t("settings.bookingLink.change", "Ganti")}</Button>
       )}
     </div>
   );
@@ -1841,6 +1846,7 @@ const TV_ELIGIBILITY_BADGE: Record<TvEligibilityData["level"], string> = { ready
  * tempat lalu bingung kenapa masih menyala.
  */
 function TvScreensaverTab({ canManage }: { canManage: boolean }) {
+  const { t } = useDashboardLang();
   const [settings, setSettings] = useState<TvSettingsData | null>(null);
   const [screens, setScreens] = useState<TvScreenData[] | null>(null);
   const [units, setUnits] = useState<TvUnitCompatData[]>([]);
@@ -1873,7 +1879,7 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
     try {
       const res = await fetch("/api/tv/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
-      if (!res.ok) return showAlert(data.error ?? "Gagal menyimpan.");
+      if (!res.ok) return showAlert(data.error ?? t("settings.tv.saveFailed", "Gagal menyimpan."));
       await loadSettings();
     } finally {
       setBusy(false);
@@ -1881,7 +1887,7 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
   };
 
   const addScreen = async () => {
-    if (!newName.trim()) return showAlert("Nama layar wajib diisi.");
+    if (!newName.trim()) return showAlert(t("settings.tv.nameRequired", "Nama layar wajib diisi."));
     setBusy(true);
     try {
       const res = await fetch("/api/tv/screens", {
@@ -1890,7 +1896,7 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
         body: JSON.stringify({ name: newName.trim(), rentalUnitId: newUnitId || null }),
       });
       const data = await res.json();
-      if (!res.ok) return showAlert(data.error ?? "Gagal menambah layar.");
+      if (!res.ok) return showAlert(data.error ?? t("settings.tv.addFailed", "Gagal menambah layar."));
       setNewName("");
       setNewUnitId("");
       await loadScreens();
@@ -1904,7 +1910,7 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
     try {
       const res = await fetch(`/api/tv/screens/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
-      if (!res.ok) return showAlert(data.error ?? "Gagal memperbarui layar.");
+      if (!res.ok) return showAlert(data.error ?? t("settings.tv.updateFailed", "Gagal memperbarui layar."));
       await loadScreens();
     } finally {
       setBusy(false);
@@ -1912,20 +1918,22 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
   };
 
   const removeScreen = async (screen: TvScreenData) => {
-    const ok = await showConfirm(`Hapus layar "${screen.name}"? TV yang sudah terpasang akan langsung berhenti dan harus dipasangkan ulang dengan kode baru.`);
+    const ok = await showConfirm(
+      t("settings.tv.confirmRemove", "Hapus layar \"{name}\"? TV yang sudah terpasang akan langsung berhenti dan harus dipasangkan ulang dengan kode baru.").replace("{name}", screen.name)
+    );
     if (!ok) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/tv/screens/${screen.id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) return showAlert(data.error ?? "Gagal menghapus layar.");
+      if (!res.ok) return showAlert(data.error ?? t("settings.tv.removeFailed", "Gagal menghapus layar."));
       await loadScreens();
     } finally {
       setBusy(false);
     }
   };
 
-  if (!settings || !screens) return <div className="text-sm text-neutral-500">Memuat...</div>;
+  if (!settings || !screens) return <div className="text-sm text-neutral-500">{t("settings.common.loading", "Memuat...")}</div>;
 
   const unitsByLevel = {
     ready: units.filter((u) => u.eligibility.level === "ready"),
@@ -1936,17 +1944,16 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
   return (
     <div className="space-y-4">
       <Card className="space-y-2">
-        <h2 className="font-medium">TV Screensaver — Layar Bilik (khusus TV Android)</h2>
+        <h2 className="font-medium">{t("settings.tv.heading", "TV Screensaver — Layar Bilik (khusus TV Android)")}</h2>
         <p className="text-xs text-neutral-500">
-          TV Android / Google TV di bilik menampilkan nama outlet, harga sewa, QR booking, jam, dan status unit saat menganggur — lalu bisa dibuka staf dengan PIN.
-          Buka <span className="text-neutral-300">nexbill.id/tv</span> di browser TV, masukkan kode pairing, selesai. Tidak perlu memasang aplikasi apa pun.
-          <span className="text-neutral-400"> TV analog dan Smart TV non-Android tidak didukung.</span>
+          {t("settings.tv.intro", "TV Android / Google TV di bilik menampilkan nama outlet, harga sewa, QR booking, jam, dan status unit saat menganggur — lalu bisa dibuka staf dengan PIN.")}{" "}
+          {t("settings.tv.introSetup", "Buka nexbill.id/tv di browser TV, masukkan kode pairing, selesai. Tidak perlu memasang aplikasi apa pun.")}
+          <span className="text-neutral-400"> {t("settings.tv.introUnsupported", "TV analog dan Smart TV non-Android tidak didukung.")}</span>
         </p>
 
         {!settings.moduleEnabled && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-            Modul ini sedang <span className="font-semibold">nonaktif</span>. Semua setelan di bawah tetap tersimpan, tapi layar tidak akan menampilkan apa pun sampai
-            saklarnya dinyalakan di tab <span className="font-semibold">Feature Management</span> (khusus Superuser).
+            {t("settings.tv.moduleOff", "Modul ini sedang nonaktif. Semua setelan di bawah tetap tersimpan, tapi layar tidak akan menampilkan apa pun sampai saklarnya dinyalakan di tab Feature Management (khusus Superuser).")}
           </div>
         )}
 
@@ -1960,12 +1967,12 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
         */}
         {units.length > 0 && (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3 text-xs space-y-3">
-            <div className="font-medium text-neutral-300">Kompatibilitas unit di outlet ini</div>
+            <div className="font-medium text-neutral-300">{t("settings.tv.compatTitle", "Kompatibilitas unit di outlet ini")}</div>
             {(
               [
-                ["ready", "Siap dipakai"],
-                ["warning", "Bisa dipasang, tapi perlu dicek"],
-                ["unsupported", "Tidak didukung"],
+                ["ready", t("settings.tv.compatReady", "Siap dipakai")],
+                ["warning", t("settings.tv.compatWarning", "Bisa dipasang, tapi perlu dicek")],
+                ["unsupported", t("settings.tv.compatUnsupported", "Tidak didukung")],
               ] as const
             ).map(([level, heading]) =>
               unitsByLevel[level].length === 0 ? null : (
@@ -1988,35 +1995,33 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
         )}
 
         <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3 text-xs text-neutral-400 space-y-1">
-          <div className="font-medium text-neutral-300">Soal listrik</div>
+          <div className="font-medium text-neutral-300">{t("settings.tv.powerTitle", "Soal listrik")}</div>
           <p>
-            Screensaver hanya tampil selama layar TV menyala. Satu TV LED menyala menganggur ±50-100 watt — delapan jam sehari ≈{" "}
-            <span className="text-neutral-200">Rp25.000-50.000 per TV per bulan</span>. Gunakan <span className="text-neutral-200">Mode Malam</span> di bawah untuk
-            menekannya di jam sepi.
+            {t("settings.tv.powerText", "Screensaver hanya tampil selama layar TV menyala. Satu TV LED menyala menganggur ±50-100 watt — delapan jam sehari ≈ Rp25.000-50.000 per TV per bulan. Gunakan Mode Malam di bawah untuk menekannya di jam sepi.")}
           </p>
         </div>
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-medium">Tampilan Layar</h2>
+        <h2 className="font-medium">{t("settings.tv.displayTitle", "Tampilan Layar")}</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Judul besar (mis. Mau Main?)">
+          <Field label={t("settings.tv.field.headline", "Judul besar (mis. Mau Main?)")}>
             <input className={inputCls} disabled={!canManage} defaultValue={settings.headline ?? ""} onBlur={(e) => patch({ headline: e.target.value })} />
           </Field>
-          <Field label="Baris konsol (mis. PS5 • PS4 • PS3)">
+          <Field label={t("settings.tv.field.tagline", "Baris konsol (mis. PS5 • PS4 • PS3)")}>
             <input className={inputCls} disabled={!canManage} defaultValue={settings.tagline ?? ""} onBlur={(e) => patch({ tagline: e.target.value })} />
           </Field>
-          <Field label="Baris harga (mis. Mulai dari Rp5.000/jam)">
+          <Field label={t("settings.tv.field.priceLine", "Baris harga (mis. Mulai dari Rp5.000/jam)")}>
             <input className={inputCls} disabled={!canManage} defaultValue={settings.priceText ?? ""} onBlur={(e) => patch({ priceText: e.target.value })} />
           </Field>
-          <Field label="Baris tambahan (promo, jam buka, nomor WA)">
+          <Field label={t("settings.tv.field.footerLine", "Baris tambahan (promo, jam buka, nomor WA)")}>
             <input className={inputCls} disabled={!canManage} defaultValue={settings.footerText ?? ""} onBlur={(e) => patch({ footerText: e.target.value })} />
           </Field>
-          <Field label="Warna aksen">
+          <Field label={t("settings.tv.field.accentColor", "Warna aksen")}>
             <input type="color" className={inputCls} disabled={!canManage} defaultValue={settings.accentColor} onBlur={(e) => patch({ accentColor: e.target.value })} />
           </Field>
-          <Field label="Muncul setelah diam berapa menit">
+          <Field label={t("settings.tv.field.idleMinutes", "Muncul setelah diam berapa menit")}>
             <input
               type="number"
               min={1}
@@ -2031,10 +2036,10 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
           {([
-            ["showClock", "Tampilkan jam & tanggal"],
-            ["showUnitStatus", "Tampilkan status unit (TERSEDIA / sisa waktu)"],
-            ["showBookingQr", "Tampilkan QR booking"],
-            ["showWifi", "Tampilkan nama WiFi outlet"],
+            ["showClock", t("settings.tv.showClock", "Tampilkan jam & tanggal")],
+            ["showUnitStatus", t("settings.tv.showUnitStatus", "Tampilkan status unit (TERSEDIA / sisa waktu)")],
+            ["showBookingQr", t("settings.tv.showBookingQr", "Tampilkan QR booking")],
+            ["showWifi", t("settings.tv.showWifi", "Tampilkan nama WiFi outlet")],
           ] as const).map(([key, label]) => (
             <label key={key} className="flex items-center gap-2 text-sm">
               <input type="checkbox" disabled={!canManage} checked={settings[key]} onChange={(e) => patch({ [key]: e.target.checked })} />
@@ -2047,18 +2052,17 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
           nama jaringannya. Itu keputusan yang diambil sadar di lib/tv/service.ts, bukan kelalaian:
           layar ini sering terlihat dari luar bilik, bahkan dari jalan.
         */}
-        <p className="text-xs text-neutral-600">Hanya nama WiFi yang ditampilkan, tidak pernah kata sandinya.</p>
+        <p className="text-xs text-neutral-600">{t("settings.tv.wifiNameOnly", "Hanya nama WiFi yang ditampilkan, tidak pernah kata sandinya.")}</p>
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-medium">PIN Staf</h2>
+        <h2 className="font-medium">{t("settings.tv.pinTitle", "PIN Staf")}</h2>
         <p className="text-xs text-neutral-500">
-          Tanpa PIN, siapa pun yang menekan tombol remote bisa menutup screensaver. PIN 4-6 digit, dan hanya dipakai untuk menutup screensaver — ia{" "}
-          <span className="text-neutral-300">tidak</span> memberi akses ke transaksi, pelanggan, atau kasir.
-          {settings.hasPin && <span className="text-emerald-400"> PIN sudah diatur.</span>}
+          {t("settings.tv.pinText", "Tanpa PIN, siapa pun yang menekan tombol remote bisa menutup screensaver. PIN 4-6 digit, dan hanya dipakai untuk menutup screensaver — ia tidak memberi akses ke transaksi, pelanggan, atau kasir.")}
+          {settings.hasPin && <span className="text-emerald-400"> {t("settings.tv.pinSet", "PIN sudah diatur.")}</span>}
         </p>
         <div className="flex flex-wrap gap-2 items-end">
-          <Field label={settings.hasPin ? "Ganti PIN" : "Atur PIN"}>
+          <Field label={settings.hasPin ? t("settings.tv.changePin", "Ganti PIN") : t("settings.tv.setPin", "Atur PIN")}>
             <input
               inputMode="numeric"
               maxLength={6}
@@ -2066,7 +2070,7 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
               disabled={!canManage}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-              placeholder="4-6 digit"
+              placeholder={t("settings.tv.pinPlaceholder", "4-6 digit")}
             />
           </Field>
           <Button
@@ -2076,91 +2080,87 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
               setPin("");
             }}
           >
-            Simpan PIN
+            {t("settings.tv.savePin", "Simpan PIN")}
           </Button>
           {settings.hasPin && (
             <Button
               variant="ghost"
               disabled={!canManage || busy}
               onClick={async () => {
-                const ok = await showConfirm("Hapus PIN? Screensaver jadi bisa ditutup siapa saja yang menekan remote.");
+                const ok = await showConfirm(t("settings.tv.confirmRemovePin", "Hapus PIN? Screensaver jadi bisa ditutup siapa saja yang menekan remote."));
                 if (ok) await patch({ unlockPin: "" });
               }}
             >
-              Hapus PIN
+              {t("settings.tv.removePin", "Hapus PIN")}
             </Button>
           )}
         </div>
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-medium">Mode Malam</h2>
+        <h2 className="font-medium">{t("settings.tv.nightTitle", "Mode Malam")}</h2>
         <p className="text-xs text-neutral-500">
-          Meredupkan layar di jam sepi supaya tidak menyilaukan dan lebih hemat. Jam mengikuti waktu outlet (WIB). Rentang yang melewati tengah malam — misalnya 23 sampai
-          6 — memang seharusnya begitu.
+          {t("settings.tv.nightText", "Meredupkan layar di jam sepi supaya tidak menyilaukan dan lebih hemat. Jam mengikuti waktu outlet (WIB). Rentang yang melewati tengah malam — misalnya 23 sampai 6 — memang seharusnya begitu.")}
         </p>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" disabled={!canManage} checked={settings.nightModeEnabled} onChange={(e) => patch({ nightModeEnabled: e.target.checked })} />
-          <span>Aktifkan mode malam</span>
+          <span>{t("settings.tv.nightEnable", "Aktifkan mode malam")}</span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field label="Mulai jam">
+          <Field label={t("settings.tv.field.nightStart", "Mulai jam")}>
             <input type="number" min={0} max={23} className={inputCls} disabled={!canManage || !settings.nightModeEnabled} defaultValue={settings.nightStartHour} onBlur={(e) => patch({ nightStartHour: Number(e.target.value) })} />
           </Field>
-          <Field label="Sampai jam">
+          <Field label={t("settings.tv.field.nightEnd", "Sampai jam")}>
             <input type="number" min={0} max={23} className={inputCls} disabled={!canManage || !settings.nightModeEnabled} defaultValue={settings.nightEndHour} onBlur={(e) => patch({ nightEndHour: Number(e.target.value) })} />
           </Field>
-          <Field label="Tingkat redup (%)">
+          <Field label={t("settings.tv.field.nightDim", "Tingkat redup (%)")}>
             <input type="number" min={0} max={90} className={inputCls} disabled={!canManage || !settings.nightModeEnabled} defaultValue={settings.nightDimPercent} onBlur={(e) => patch({ nightDimPercent: Number(e.target.value) })} />
           </Field>
         </div>
-        <p className="text-xs text-neutral-600">Maksimal 90% — layar tidak pernah dibuat hitam total, supaya tidak dikira TV-nya mati lalu dicabut.</p>
+        <p className="text-xs text-neutral-600">{t("settings.tv.nightMax", "Maksimal 90% — layar tidak pernah dibuat hitam total, supaya tidak dikira TV-nya mati lalu dicabut.")}</p>
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-medium">Peringatan Waktu &amp; Layar Waktu Habis</h2>
+        <h2 className="font-medium">{t("settings.tv.timeTitle", "Peringatan Waktu & Layar Waktu Habis")}</h2>
         <p className="text-xs text-neutral-500">
-          Berlaku untuk TV Android yang otomatisasinya sudah aktif &amp; terverifikasi (lihat Layar Terpasang di bawah). Butuh NexbillAgent v1.2 dan penjadwal NEXBILL
-          berjalan (sama seperti penghentian sesi otomatis).
+          {t("settings.tv.timeText", "Berlaku untuk TV Android yang otomatisasinya sudah aktif & terverifikasi (lihat Layar Terpasang di bawah). Butuh NexbillAgent v1.2 dan penjadwal NEXBILL berjalan (sama seperti penghentian sesi otomatis).")}
         </p>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" disabled={!canManage} checked={!!settings.timeWarningEnabled} onChange={(e) => patch({ timeWarningEnabled: e.target.checked })} />
-          <span>Tampilkan peringatan sisa waktu di TV</span>
+          <span>{t("settings.tv.warnEnable", "Tampilkan peringatan sisa waktu di TV")}</span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Berapa menit sebelum habis">
+          <Field label={t("settings.tv.field.warnMinutes", "Berapa menit sebelum habis")}>
             <input type="number" min={1} max={30} className={inputCls} disabled={!canManage || !settings.timeWarningEnabled} defaultValue={settings.timeWarningMinutes ?? 5} onBlur={(e) => patch({ timeWarningMinutes: Number(e.target.value) })} />
           </Field>
-          <Field label="Lama tampil (detik), lalu kembali ke game">
+          <Field label={t("settings.tv.field.warnSeconds", "Lama tampil (detik), lalu kembali ke game")}>
             <input type="number" min={4} max={20} className={inputCls} disabled={!canManage || !settings.timeWarningEnabled} defaultValue={settings.timeWarningSeconds ?? 7} onBlur={(e) => patch({ timeWarningSeconds: Number(e.target.value) })} />
           </Field>
         </div>
         <p className="text-xs text-neutral-600">
-          TV berpindah sebentar ke layar besar &quot;SISA WAKTU&quot; berisi QR bilik (pelanggan bisa minta tambah waktu dari HP), lalu otomatis kembali ke HDMI PlayStation. Permainan
-          terjeda beberapa detik — karena itu fitur ini mati secara bawaan. Dikirim sekali per sesi, dan berlaku lagi setelah waktu ditambah.
+          {t("settings.tv.warnHint", "TV berpindah sebentar ke layar besar \"SISA WAKTU\" berisi QR bilik (pelanggan bisa minta tambah waktu dari HP), lalu otomatis kembali ke HDMI PlayStation. Permainan terjeda beberapa detik — karena itu fitur ini mati secara bawaan. Dikirim sekali per sesi, dan berlaku lagi setelah waktu ditambah.")}
         </p>
         <label className="flex items-center gap-2 text-sm pt-2 border-t border-neutral-800">
           <input type="checkbox" disabled={!canManage} checked={settings.timeUpScreenEnabled ?? true} onChange={(e) => patch({ timeUpScreenEnabled: e.target.checked })} />
-          <span>Tampilkan layar &quot;WAKTU HABIS&quot; setelah sesi berakhir otomatis (tagihan belum dibayar)</span>
+          <span>{t("settings.tv.timeUpEnable", "Tampilkan layar \"WAKTU HABIS\" setelah sesi berakhir otomatis (tagihan belum dibayar)")}</span>
         </label>
-        <p className="text-xs text-neutral-600">Tampil sampai tagihan dibayar atau 15 menit. Tanpa nominal di TV — rinciannya bisa dilihat pelanggan lewat QR bilik di HP.</p>
+        <p className="text-xs text-neutral-600">{t("settings.tv.timeUpHint", "Tampil sampai tagihan dibayar atau 15 menit. Tanpa nominal di TV — rinciannya bisa dilihat pelanggan lewat QR bilik di HP.")}</p>
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-medium">Layar Terpasang</h2>
+        <h2 className="font-medium">{t("settings.tv.screensTitle", "Layar Terpasang")}</h2>
         <p className="text-xs text-neutral-500">
-          Tambahkan satu layar per TV, lalu buka <span className="text-neutral-300">nexbill.id/tv</span> di TV itu dan ketik kode 6 digitnya dengan tombol angka remote.
-          Kode berlaku 30 menit dan hangus sekali pakai.
+          {t("settings.tv.screensText", "Tambahkan satu layar per TV, lalu buka nexbill.id/tv di TV itu dan ketik kode 6 digitnya dengan tombol angka remote. Kode berlaku 30 menit dan hangus sekali pakai.")}
         </p>
 
         {canManage && (
           <div className="flex flex-wrap gap-2 items-end rounded-lg border border-neutral-800 p-3">
-            <Field label="Nama layar">
-              <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="mis. TV Bilik 5" />
+            <Field label={t("settings.tv.field.screenName", "Nama layar")}>
+              <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("settings.tv.screenNamePlaceholder", "mis. TV Bilik 5")} />
             </Field>
-            <Field label="Unit rental (TV Android)">
+            <Field label={t("settings.tv.field.rentalUnit", "Unit rental (TV Android)")}>
               <select className={inputCls} value={newUnitId} onChange={(e) => setNewUnitId(e.target.value)}>
-                <option value="">— tanpa unit (branding saja) —</option>
+                <option value="">{t("settings.tv.noUnitOption", "— tanpa unit (branding saja) —")}</option>
                 {/*
                   Unit yang tidak didukung tetap DITAMPILKAN tapi dinonaktifkan, bukan disembunyikan:
                   merchant yang mencari "PS 03" lalu tidak menemukannya akan mengira ada yang rusak.
@@ -2171,16 +2171,16 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
                   <option key={u.id} value={u.id} disabled={u.eligibility.level === "unsupported"}>
                     {u.name}
                     {u.eligibility.level === "unsupported"
-                      ? ` — ${u.tvType === "analog_tv" ? "TV analog" : u.tvType === "smart_tv" ? "Smart TV" : "tipe TV kosong"}, tidak didukung`
+                      ? ` — ${u.tvType === "analog_tv" ? t("settings.tv.typeAnalog", "TV analog") : u.tvType === "smart_tv" ? "Smart TV" : t("settings.tv.typeEmpty", "tipe TV kosong")}, ${t("settings.tv.notSupportedLower", "tidak didukung")}`
                       : u.eligibility.level === "warning"
-                        ? " — smart plug, perlu dicek"
+                        ? ` — ${t("settings.tv.smartPlugCheck", "smart plug, perlu dicek")}`
                         : ""}
                   </option>
                 ))}
               </select>
             </Field>
             <Button disabled={busy || !newName.trim()} onClick={addScreen}>
-              Tambah Layar
+              {t("settings.tv.addScreen", "Tambah Layar")}
             </Button>
           </div>
         )}
@@ -2188,11 +2188,11 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
           <p className="text-xs text-amber-300/80">{units.find((u) => u.id === newUnitId)?.eligibility.reason}</p>
         )}
         <p className="text-xs text-neutral-600">
-          &ldquo;Tanpa unit&rdquo; untuk TV Android yang bukan bilik — area tunggu atau etalase — dan hanya menampilkan branding, harga, dan QR booking.
+          {t("settings.tv.noUnitHint", "\"Tanpa unit\" untuk TV Android yang bukan bilik — area tunggu atau etalase — dan hanya menampilkan branding, harga, dan QR booking.")}
         </p>
 
         {screens.length === 0 ? (
-          <p className="text-sm text-neutral-500">Belum ada layar terpasang.</p>
+          <p className="text-sm text-neutral-500">{t("settings.tv.noScreens", "Belum ada layar terpasang.")}</p>
         ) : (
           <div className="space-y-2">
             {screens.map((s) => (
@@ -2200,36 +2200,36 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
                 <div className="space-y-0.5">
                   <div className="font-medium flex items-center gap-2">
                     {s.name}
-                    {!s.isActive && <Badge status="off">Nonaktif</Badge>}
-                    {s.isPaired ? <Badge status="success">Terpasang</Badge> : <Badge status="pending">Belum dipasangkan</Badge>}
+                    {!s.isActive && <Badge status="off">{t("settings.tv.inactive", "Nonaktif")}</Badge>}
+                    {s.isPaired ? <Badge status="success">{t("settings.tv.paired", "Terpasang")}</Badge> : <Badge status="pending">{t("settings.tv.notPaired", "Belum dipasangkan")}</Badge>}
                   </div>
                   <div className="text-xs text-neutral-500">
-                    {s.unitName ? `Unit: ${s.unitName}` : "Tanpa unit — hanya branding"}
-                    {s.lastSeenAt && ` · Terakhir aktif ${formatDate(s.lastSeenAt)}`}
+                    {s.unitName ? `${t("settings.tv.unitPrefix", "Unit:")} ${s.unitName}` : t("settings.tv.noUnitBranding", "Tanpa unit — hanya branding")}
+                    {s.lastSeenAt && ` · ${t("settings.tv.lastSeen", "Terakhir aktif")} ${formatDate(s.lastSeenAt)}`}
                   </div>
                   {/* Layar lama yang unitnya kini tidak didukung / perlu dicek — misalnya tipe TV-nya diganti setelah layar dipasang. */}
                   {s.eligibility && s.eligibility.level !== "ready" && (
                     <div className={`text-xs ${s.eligibility.level === "unsupported" ? "text-rose-300/90" : "text-amber-300/80"}`}>
-                      {s.eligibility.level === "unsupported" ? "Tidak tampil: " : "Perlu dicek: "}
+                      {s.eligibility.level === "unsupported" ? `${t("settings.tv.notShown", "Tidak tampil:")} ` : `${t("settings.tv.needsCheck", "Perlu dicek:")} `}
                       {s.eligibility.reason}
                     </div>
                   )}
                   {s.pairingCode && (
                     <div className="text-sm mt-1">
-                      Kode pairing: <span className="font-mono text-xl tracking-[0.3em] text-emerald-400">{s.pairingCode}</span>
+                      {t("settings.tv.pairingCode", "Kode pairing:")} <span className="font-mono text-xl tracking-[0.3em] text-emerald-400">{s.pairingCode}</span>
                     </div>
                   )}
                 </div>
                 {canManage && (
                   <div className="flex flex-wrap gap-2">
                     <Button variant="ghost" disabled={busy} onClick={() => screenAction(s.id, { action: "regenerate_code" })}>
-                      Kode Baru
+                      {t("settings.tv.newCode", "Kode Baru")}
                     </Button>
                     <Button variant="ghost" disabled={busy} onClick={() => screenAction(s.id, { isActive: !s.isActive })}>
-                      {s.isActive ? "Nonaktifkan" : "Aktifkan"}
+                      {s.isActive ? t("settings.tv.deactivate", "Nonaktifkan") : t("settings.tv.activate", "Aktifkan")}
                     </Button>
                     <Button variant="danger" disabled={busy} onClick={() => removeScreen(s)}>
-                      Hapus
+                      {t("settings.tv.remove", "Hapus")}
                     </Button>
                   </div>
                 )}
@@ -2290,6 +2290,7 @@ function ScreenAutomationPanel({
   canManage: boolean;
   onChanged: () => Promise<unknown>;
 }) {
+  const { t } = useDashboardLang();
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Partial<Record<TvTestKind, TvTestResult>>>({});
   const [browserDraft, setBrowserDraft] = useState(status.browserPackage ?? "");
@@ -2302,7 +2303,7 @@ function ScreenAutomationPanel({
   if (!r.viaRelay) {
     return (
       <div className="basis-full text-xs text-neutral-600">
-        Otomatisasi mulai/selesai sesi: tidak tersedia — {r.blocker}
+        {t("settings.tv.auto.unavailable", "Otomatisasi mulai/selesai sesi: tidak tersedia —")} {r.blocker}
       </div>
     );
   }
@@ -2317,7 +2318,7 @@ function ScreenAutomationPanel({
       });
       const data = await res.json();
       if (!res.ok) {
-        await showAlert(data.error ?? "Gagal menyimpan.");
+        await showAlert(data.error ?? t("settings.tv.saveFailed", "Gagal menyimpan."));
         return false;
       }
       // Mengganti port HDMI atau browser membatalkan verifikasi di server — hasil tes di layar ini
@@ -2332,7 +2333,7 @@ function ScreenAutomationPanel({
 
   const runTest = async (kind: TvTestKind) => {
     if (kind !== "getTvInfo") {
-      const ok = await showConfirm("Tes ini benar-benar mengubah tampilan TV. Pastikan bilik ini sedang TIDAK dipakai pelanggan. Lanjutkan?");
+      const ok = await showConfirm(t("settings.tv.auto.confirmTest", "Tes ini benar-benar mengubah tampilan TV. Pastikan bilik ini sedang TIDAK dipakai pelanggan. Lanjutkan?"));
       if (!ok) return;
     }
     setBusy(true);
@@ -2343,11 +2344,11 @@ function ScreenAutomationPanel({
         body: JSON.stringify({ kind }),
       });
       const data = await res.json();
-      const result: TvTestResult = res.ok ? { ok: !!data.ok, error: data.error } : { ok: false, error: data.error ?? "Tes gagal dijalankan." };
+      const result: TvTestResult = res.ok ? { ok: !!data.ok, error: data.error } : { ok: false, error: data.error ?? t("settings.tv.auto.testFailed", "Tes gagal dijalankan.") };
       setResults((prev) => ({ ...prev, [kind]: result }));
       if (kind === "getTvInfo" && result.ok) await onChanged();
     } catch {
-      setResults((prev) => ({ ...prev, [kind]: { ok: false, error: "Tidak bisa menghubungi server." } }));
+      setResults((prev) => ({ ...prev, [kind]: { ok: false, error: t("settings.tv.auto.serverUnreachable", "Tidak bisa menghubungi server.") } }));
     } finally {
       setBusy(false);
     }
@@ -2362,22 +2363,28 @@ function ScreenAutomationPanel({
     return res.ok ? (
       <div className="text-emerald-300/90">{successText}</div>
     ) : (
-      <div className="text-rose-300/90">Gagal: {res.error}</div>
+      <div className="text-rose-300/90">
+        {t("settings.tv.auto.failedPrefix", "Gagal:")} {res.error}
+      </div>
     );
   };
 
   return (
     <div className="basis-full mt-2 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3 space-y-3 text-xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="font-medium text-sm text-neutral-200">Otomatisasi sesi (Relay Agent)</div>
+        <div className="font-medium text-sm text-neutral-200">{t("settings.tv.auto.title", "Otomatisasi sesi (Relay Agent)")}</div>
         <div className="text-neutral-500">
-          {r.agentName ?? "Agent"} · versi {r.agentVersion ?? "—"} · {r.agentOnline ? <span className="text-emerald-400">online</span> : <span className="text-amber-400">offline</span>}
+          {r.agentName ?? "Agent"} · {t("settings.tv.auto.version", "versi")} {r.agentVersion ?? "—"} ·{" "}
+          {r.agentOnline ? (
+            <span className="text-emerald-400">{t("settings.tv.auto.online", "online")}</span>
+          ) : (
+            <span className="text-amber-400">{t("settings.tv.auto.offline", "offline")}</span>
+          )}
         </div>
       </div>
 
       <p className="text-neutral-500">
-        Saat aktif: sesi <span className="text-neutral-300">selesai</span> → TV membuka screensaver NEXBILL; sesi <span className="text-neutral-300">mulai</span> → TV
-        pindah ke HDMI PlayStation. Kalau salah satu gagal, sesi tetap jalan dan kasir mendapat peringatan.
+        {t("settings.tv.auto.howItWorks", "Saat aktif: sesi selesai → TV membuka screensaver NEXBILL; sesi mulai → TV pindah ke HDMI PlayStation. Kalau salah satu gagal, sesi tetap jalan dan kasir mendapat peringatan.")}
       </p>
 
       {r.blocker ? (
@@ -2385,14 +2392,14 @@ function ScreenAutomationPanel({
       ) : (
         <>
           <div className="flex flex-wrap items-end gap-3">
-            <Field label="1. PlayStation dicolok di HDMI">
+            <Field label={t("settings.tv.field.hdmiPort", "1. PlayStation dicolok di HDMI")}>
               <select
                 className={inputCls}
                 disabled={!canManage || busy}
                 value={status.hdmiPort ?? ""}
                 onChange={(e) => patch({ hdmiPort: e.target.value === "" ? null : Number(e.target.value) })}
               >
-                <option value="">— pilih —</option>
+                <option value="">{t("settings.tv.auto.choose", "— pilih —")}</option>
                 {[1, 2, 3, 4].map((p) => (
                   <option key={p} value={p}>
                     HDMI {p}
@@ -2401,7 +2408,7 @@ function ScreenAutomationPanel({
               </select>
             </Field>
 
-            <Field label="Browser di TV (opsional)">
+            <Field label={t("settings.tv.field.browser", "Browser di TV (opsional)")}>
               {info?.browsers && info.browsers.length > 0 ? (
                 <select
                   className={inputCls}
@@ -2409,7 +2416,7 @@ function ScreenAutomationPanel({
                   value={status.browserPackage ?? ""}
                   onChange={(e) => patch({ browserPackage: e.target.value || null })}
                 >
-                  <option value="">Browser bawaan TV</option>
+                  <option value="">{t("settings.tv.auto.defaultBrowser", "Browser bawaan TV")}</option>
                   {info.browsers.map((b) => (
                     <option key={b} value={b}>
                       {b}
@@ -2420,7 +2427,7 @@ function ScreenAutomationPanel({
                 <input
                   className={inputCls}
                   disabled={!canManage || busy}
-                  placeholder="kosongkan = browser bawaan"
+                  placeholder={t("settings.tv.auto.browserPlaceholder", "kosongkan = browser bawaan")}
                   value={browserDraft}
                   onChange={(e) => setBrowserDraft(e.target.value)}
                   onBlur={() => {
@@ -2432,47 +2439,50 @@ function ScreenAutomationPanel({
 
             {r.canReadTvInfo && (
               <Button variant="secondary" disabled={!canManage || busy} onClick={() => runTest("getTvInfo")}>
-                Deteksi TV
+                {t("settings.tv.auto.detect", "Deteksi TV")}
               </Button>
             )}
           </div>
 
           {info && (info.brand || info.model) && (
             <div className="text-neutral-500">
-              TV terdeteksi: <span className="text-neutral-300">{[info.brand, info.model].filter(Boolean).join(" ")}</span>
+              {t("settings.tv.auto.detected", "TV terdeteksi:")} <span className="text-neutral-300">{[info.brand, info.model].filter(Boolean).join(" ")}</span>
               {info.android ? ` · Android ${info.android}` : ""}
             </div>
           )}
-          {results.getTvInfo && !results.getTvInfo.ok && <div className="text-rose-300/90">Deteksi gagal: {results.getTvInfo.error}</div>}
+          {results.getTvInfo && !results.getTvInfo.ok && (
+            <div className="text-rose-300/90">
+              {t("settings.tv.auto.detectFailed", "Deteksi gagal:")} {results.getTvInfo.error}
+            </div>
+          )}
           <p className="text-neutral-600">
-            Pilih browser yang SAMA dengan yang dipakai saat pairing di <span className="text-neutral-400">nexbill.id/tv</span> — kalau berbeda, TV akan meminta kode pairing
-            lagi setiap kali sesi selesai.
+            {t("settings.tv.auto.sameBrowser", "Pilih browser yang SAMA dengan yang dipakai saat pairing di nexbill.id/tv — kalau berbeda, TV akan meminta kode pairing lagi setiap kali sesi selesai.")}
           </p>
 
           <div className="space-y-2">
-            <div className="text-neutral-400">2. Tes di TV sungguhan — jalankan saat bilik kosong, lalu LIHAT layar TV-nya.</div>
+            <div className="text-neutral-400">{t("settings.tv.auto.step2", "2. Tes di TV sungguhan — jalankan saat bilik kosong, lalu LIHAT layar TV-nya.")}</div>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" disabled={!canManage || busy} onClick={() => runTest("openScreensaver")}>
-                Tes buka screensaver
+                {t("settings.tv.auto.testScreensaver", "Tes buka screensaver")}
               </Button>
               <Button variant="secondary" disabled={!canManage || busy || !status.hdmiPort} onClick={() => runTest("switchHdmi")}>
-                Tes pindah ke HDMI {status.hdmiPort ?? "?"}
+                {t("settings.tv.auto.testHdmi", "Tes pindah ke HDMI {port}").replace("{port}", String(status.hdmiPort ?? "?"))}
               </Button>
             </div>
-            {resultLine("openScreensaver", "Perintah terkirim. Lihat TV-nya: apakah screensaver NEXBILL terbuka, tanpa diminta kode pairing?")}
-            {resultLine("switchHdmi", `Perintah terkirim. Lihat TV-nya: apakah sekarang menampilkan HDMI ${status.hdmiPort}?`)}
+            {resultLine("openScreensaver", t("settings.tv.auto.screensaverSent", "Perintah terkirim. Lihat TV-nya: apakah screensaver NEXBILL terbuka, tanpa diminta kode pairing?"))}
+            {resultLine("switchHdmi", t("settings.tv.auto.hdmiSent", "Perintah terkirim. Lihat TV-nya: apakah sekarang menampilkan HDMI {port}?").replace("{port}", String(status.hdmiPort)))}
           </div>
 
           <div className="space-y-2">
-            <div className="text-neutral-400">3. Konfirmasi dan nyalakan</div>
+            <div className="text-neutral-400">{t("settings.tv.auto.step3", "3. Konfirmasi dan nyalakan")}</div>
             {status.verifiedAt ? (
-              <div className="text-emerald-300/90">Terverifikasi {formatDate(status.verifiedAt)}.</div>
+              <div className="text-emerald-300/90">{t("settings.tv.auto.verifiedOn", "Terverifikasi {date}.").replace("{date}", formatDate(status.verifiedAt))}</div>
             ) : bothTestsPassed ? (
               <Button disabled={!canManage || busy} onClick={() => patch({ confirmVerified: true })}>
-                Saya sudah melihat di TV: screensaver terbuka & pindah ke HDMI berhasil
+                {t("settings.tv.auto.confirmSeen", "Saya sudah melihat di TV: screensaver terbuka & pindah ke HDMI berhasil")}
               </Button>
             ) : (
-              <div className="text-neutral-600">Jalankan kedua tes di atas dulu. Mengganti port HDMI atau browser mengharuskan tes diulang.</div>
+              <div className="text-neutral-600">{t("settings.tv.auto.runTestsFirst", "Jalankan kedua tes di atas dulu. Mengganti port HDMI atau browser mengharuskan tes diulang.")}</div>
             )}
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -2481,7 +2491,7 @@ function ScreenAutomationPanel({
                 checked={status.autoSwitchEnabled}
                 onChange={(e) => patch({ autoSwitchEnabled: e.target.checked })}
               />
-              <span>Otomatis saat sesi mulai & selesai</span>
+              <span>{t("settings.tv.auto.enable", "Otomatis saat sesi mulai & selesai")}</span>
             </label>
           </div>
         </>
