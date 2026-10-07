@@ -1,4 +1,5 @@
 import { registerDict } from "./registry";
+import "./dict-accounting-ui";
 
 /**
  * Translations for the /dashboard/accounting page — full double-entry bookkeeping: Chart of

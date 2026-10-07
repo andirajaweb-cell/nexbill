@@ -395,3 +395,12 @@ export const GOLDEN_RULES: string[] = [
   "Setiap selisih (kas laci, saldo bank, stok) harus dijelaskan, bukan dibiarkan.",
   "Laporan hanya seakurat input: harga modal produk, penyusutan, dan expense yang lengkap menentukan laba yang benar.",
 ];
+
+/** Satu set panduan dalam satu bahasa. Kunci `tabs` = id tab (sama di semua bahasa). */
+export interface AccountingGuideSet {
+  tabs: Record<string, TabGuideContent>;
+  workflow: WorkflowStage[];
+  golden: string[];
+}
+
+export const GUIDES_ID: AccountingGuideSet = { tabs: ACCOUNTING_TAB_GUIDES, workflow: ACCOUNTING_WORKFLOW, golden: GOLDEN_RULES };

@@ -68,10 +68,10 @@ export function CashMapCard({ reloadKey }: { reloadKey: number }) {
                     <td className="py-1.5">
                       {flagged(r) && <span className="mr-1">⚠️</span>}
                       {r.name}
-                      {r.kind && <span className="ml-1 text-[10px] text-neutral-500">({r.kind === "cash" ? "tunai" : "non-tunai"}{r.isDefault ? ", utama" : ""})</span>}
+                      {r.kind && <span className="ml-1 text-[10px] text-neutral-500">({r.kind === "cash" ? t("accounting.audit.cm.kindCash", "tunai") : t("accounting.audit.cm.kindNonCash", "non-tunai")}{r.isDefault ? `, ${t("accounting.audit.cm.primary", "utama")}` : ""})</span>}
                     </td>
                     <td>{r.accountCode ? `${r.accountCode} ${coaAccountName(t, { code: r.accountCode, name: r.accountName ?? "" })}` : "—"}</td>
-                    <td><span className={`rounded px-1.5 py-0.5 text-[10px] ${fam.cls}`}>{fam.label}</span></td>
+                    <td><span className={`rounded px-1.5 py-0.5 text-[10px] ${fam.cls}`}>{t(`accounting.audit.cm.fam.${FAMILY[r.family] ? r.family : "other"}`, fam.label)}</span></td>
                     <td className="text-xs text-neutral-400">{r.methods.join(", ") || "—"}</td>
                     <td className="text-right text-emerald-300">{rupiah(r.totalIn)}</td>
                     <td className="text-right text-rose-300">{rupiah(r.totalOut)}</td>

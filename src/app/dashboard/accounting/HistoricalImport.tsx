@@ -136,6 +136,7 @@ export function HistoricalImportSection() {
 
 function ImportCard({ category, mode }: { category: (typeof CATEGORIES)[number]; mode: Mode }) {
   const { t } = useDashboardLang();
+  const catTitle = (c: (typeof CATEGORIES)[number]) => t(`accounting.migration.cat.${c.value}.title`, c.title);
   const { formatMoney: rupiah } = useCurrency();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState<null | "check" | "import">(null);
@@ -144,7 +145,7 @@ function ImportCard({ category, mode }: { category: (typeof CATEGORIES)[number];
 
   const send = async (dryRun: boolean) => {
     if (!file) return showAlert(t("accounting.historicalImport.alertChooseFile", "Pilih file Excel (.xlsx) dulu."));
-    if (!dryRun && !(await showConfirm(t("accounting.migration.confirmImport", "Impor {title} dengan mode \"{mode}\"? Setiap baris menjadi jurnal bertanggal asli.").replace("{title}", category.title).replace("{mode}", mode === "kas" ? "Kas/Bank" : "Hanya riwayat Laba Rugi")))) return;
+    if (!dryRun && !(await showConfirm(t("accounting.migration.confirmImport", "Impor {title} dengan mode \"{mode}\"? Setiap baris menjadi jurnal bertanggal asli.").replace("{title}", catTitle(category)).replace("{mode}", mode === "kas" ? t("accounting.migration.modeCashTitle", "Kas/Bank (riwayat lengkap)") : t("accounting.migration.modeHistoryTitle", "Hanya riwayat Laba Rugi"))))) return;
     setBusy(dryRun ? "check" : "import");
     try {
       const fd = new FormData();
@@ -154,7 +155,7 @@ function ImportCard({ category, mode }: { category: (typeof CATEGORIES)[number];
       fd.append("file", file);
       const res = await fetch("/api/accounting/historical-import", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return showAlert(data.error ?? "Gagal memproses file.");
+      if (!res.ok) return showAlert(data.error ?? t("accounting.migration.processFailed", "Gagal memproses file."));
       setResult(data);
     } finally {
       setBusy(null);
@@ -174,12 +175,12 @@ function ImportCard({ category, mode }: { category: (typeof CATEGORIES)[number];
         />
       )}
       <div>
-        <h3 className="text-sm font-medium">{category.title}</h3>
-        <p className="text-xs text-neutral-500">{category.desc}</p>
+        <h3 className="text-sm font-medium">{catTitle(category)}</h3>
+        <p className="text-xs text-neutral-500">{t(`accounting.migration.cat.${category.value}.desc`, category.desc)}</p>
         <button className="text-[11px] text-sky-400 hover:underline" onClick={() => setShowCols((s) => !s)}>
           {showCols ? t("accounting.migration.hideColumns", "Sembunyikan kolom") : t("accounting.migration.showColumns", "Lihat kolom template")}
         </button>
-        {showCols && <p className="text-[11px] text-neutral-400">{category.columns} <span className="text-neutral-500">(* wajib — rincian di sheet Petunjuk)</span></p>}
+        {showCols && <p className="text-[11px] text-neutral-400">{category.columns} <span className="text-neutral-500">{t("accounting.migration.columnsNote", "(* wajib — rincian di sheet Petunjuk)")}</span></p>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <a href={`/api/accounting/historical-import/template?category=${category.value}`} className="inline-flex items-center gap-1 text-xs rounded-lg bg-neutral-800 hover:bg-neutral-700 px-3 py-2 font-medium transition">

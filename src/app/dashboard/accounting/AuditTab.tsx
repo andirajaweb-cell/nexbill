@@ -41,7 +41,7 @@ export function AuditTab() {
       fetch("/api/accounting/audit")
         .then(async (res) => {
           const body = await res.json();
-          if (!res.ok) return showAlert(body.error ?? "Gagal menjalankan audit.");
+          if (!res.ok) return showAlert(body.error ?? t("accounting.audit.runFailed", "Gagal menjalankan audit."));
           setData(body);
         })
         .finally(() => setLoading(false)),
@@ -64,7 +64,7 @@ export function AuditTab() {
     try {
       const res = await fetch("/api/accounting/audit/fix", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: c.code }) });
       const body = await res.json();
-      if (!res.ok) return showAlert(body.error ?? "Perbaikan gagal.");
+      if (!res.ok) return showAlert(body.error ?? t("accounting.audit.fixFailed", "Perbaikan gagal."));
       await showAlert(body.message);
       await run();
     } finally {

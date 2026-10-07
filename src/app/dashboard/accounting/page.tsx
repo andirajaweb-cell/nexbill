@@ -89,6 +89,7 @@ export default function AccountingPage() {
         <WorkflowGuide
           onClose={() => setShowWorkflow(false)}
           shortcuts={(["Neraca Saldo", "Audit", "Laba Rugi", "Tutup Periode"] as Tab[]).filter((tb) => visibleTabs.includes(tb))}
+          tabLabel={(tb) => (TAB_LABEL_KEYS[tb as Tab] ? t(TAB_LABEL_KEYS[tb as Tab].key, TAB_LABEL_KEYS[tb as Tab].fallback) : tb)}
           onOpenTab={(tb) => {
             setTab(tb as Tab);
             setShowWorkflow(false);
@@ -801,7 +802,7 @@ function usePeriodState(defaultPreset: PeriodPreset = "this_month") {
 }
 
 function TrialBalanceTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [rows, setRows] = useState<any[]>([]);
   const [showZero, setShowZero] = useState(false);
@@ -913,7 +914,7 @@ function TrialBalanceTab({ outletId }: { outletId: string }) {
       </div>
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-1 text-xs text-neutral-400"><input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> {t("accounting.trialBalance.showZeroLabel", "Tampilkan akun bersaldo nol (terinci lengkap)")}</label>
-        <span className="text-xs text-neutral-500">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, period.to)}</span>
+        <span className="text-xs text-neutral-500">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, period.to, lang)}</span>
       </div>
       <p className="text-[11px] text-neutral-600">{t("accounting.trialBalance.drillDownHint", "Klik baris akun mana pun untuk melihat jurnal yang menyusun angkanya pada periode ini (audit trail). Akun induk yang dicetak tebal hanya menjumlahkan turunannya, jadi tidak bisa diklik.")}</p>
 
@@ -988,7 +989,7 @@ function TrialBalanceTab({ outletId }: { outletId: string }) {
         balance={drillDown.balance}
         from={period.from}
         to={period.to}
-        periodLabel={describePeriod(period.preset, period.from, period.to)}
+        periodLabel={describePeriod(period.preset, period.from, period.to, lang)}
         totalLabel={t("accounting.trialBalance.drillDownTotal", "Saldo (sesuai Neraca Saldo)")}
         onClose={() => setDrillDown(null)}
       />
@@ -1073,7 +1074,7 @@ function ReceivablesTab({ outletId }: { outletId: string }) {
       const payment = await res.json();
       if (!res.ok) {
         return showAlert(
-          t("accounting.receivables.collectFailedCreate", "Gagal mencatat pembayaran: {pesan}").replace("{pesan}", payment?.error ?? "penyebab tidak diketahui")
+          t("accounting.receivables.collectFailedCreate", "Gagal mencatat pembayaran: {pesan}").replace("{pesan}", payment?.error ?? t("accounting.common.unknownCause", "penyebab tidak diketahui"))
         );
       }
 
@@ -1381,7 +1382,7 @@ function PayablesTab({ outletId }: { outletId: string }) {
 const newPeriodEntry = () => ({ preset: "this_month" as PeriodPreset, customFrom: "", customTo: "" });
 
 function ProfitLossTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [pl, setPl] = useState<any>(null);
   const period = usePeriodState("this_month");
@@ -1405,7 +1406,7 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
         const { from, to } = resolvePeriodPreset(p.preset, p.customFrom, p.customTo);
         const qs = new URLSearchParams({ outletId, ...(from ? { from } : {}), ...(to ? { to } : {}) });
         const data = await fetchJsonObject<any>(`/api/accounting/profit-loss?${qs}`);
-        return { label: describePeriod(p.preset, from, to), from, to, data };
+        return { label: describePeriod(p.preset, from, to, lang), from, to, data };
       })
     );
     setCompareData(results);
@@ -1516,7 +1517,7 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
           )}
 
           <Card className="col-span-2 lg:col-span-4">
-            <div className="text-xs text-neutral-500 mb-2">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, period.to)}</div>
+            <div className="text-xs text-neutral-500 mb-2">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, period.to, lang)}</div>
 
             {pl.totalDiscount > 0 && (
               <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-sm space-y-1">
@@ -1545,7 +1546,7 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
           balance={drillDown.balance}
           from={period.from}
           to={period.to}
-          periodLabel={describePeriod(period.preset, period.from, period.to)}
+          periodLabel={describePeriod(period.preset, period.from, period.to, lang)}
           totalLabel={t("accounting.pl.drillDownTotal", "Total (sesuai Laba Rugi)")}
           onClose={() => setDrillDown(null)}
         />
@@ -2045,7 +2046,7 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-medium text-neutral-300">{t("accounting.bs.positionAsOf", "Posisi per {date}").replace("{date}", asOfLabel)}</span>
-        <span className="text-neutral-500">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, asOfIso ?? period.to)}</span>
+        <span className="text-neutral-500">{t("accounting.common.periodPrefix", "Periode:")} {describePeriod(period.preset, period.from, asOfIso ?? period.to, lang)}</span>
       </div>
       <div className={`rounded-lg border px-3 py-2 text-xs ${bs.asOfPeriodClosed ? "border-emerald-700/60 bg-emerald-500/10 text-emerald-300" : bs.closedThroughPeriod ? "border-sky-700/60 bg-sky-500/10 text-sky-300" : "border-neutral-700 bg-neutral-800/40 text-neutral-400"}`}>
         {bs.asOfPeriodClosed
@@ -2095,7 +2096,7 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
     </div>
       {bs.periodNetProfit !== null && bs.periodNetProfit !== undefined && (
         <Card>
-          <div className="flex justify-between text-sm"><span>{t("accounting.bs.periodProfit", "Laba (rugi) periode terpilih")} — {describePeriod(period.preset, period.from, asOfIso ?? period.to)}</span><span className={`font-semibold ${bs.periodNetProfit < 0 ? "text-red-400" : "text-emerald-400"}`}>{rupiah(bs.periodNetProfit)}</span></div>
+          <div className="flex justify-between text-sm"><span>{t("accounting.bs.periodProfit", "Laba (rugi) periode terpilih")} — {describePeriod(period.preset, period.from, asOfIso ?? period.to, lang)}</span><span className={`font-semibold ${bs.periodNetProfit < 0 ? "text-red-400" : "text-emerald-400"}`}>{rupiah(bs.periodNetProfit)}</span></div>
           <p className="text-[11px] text-neutral-600 mt-1">{t("accounting.bs.periodProfitNote", "Informasi saja — sudah termasuk dalam laba di Neraca, tidak dijumlahkan lagi.")}</p>
         </Card>
       )}
@@ -2120,7 +2121,7 @@ function BalanceSheetTab({ outletId }: { outletId: string }) {
 
 
 function CashFlowTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
   const { formatMoney: rupiah } = useCurrency();
   const [cf, setCf] = useState<any>(null);
   const period = usePeriodState("this_month");
@@ -2142,7 +2143,7 @@ function CashFlowTab({ outletId }: { outletId: string }) {
           <PeriodBar preset={period.preset} setPreset={period.setPreset} customFrom={period.customFrom} setCustomFrom={period.setCustomFrom} customTo={period.customTo} setCustomTo={period.setCustomTo} />
           <DownloadButtons outletId={outletId} reportType="cash-flow" from={period.from} to={period.to} />
         </div>
-        <div className="text-xs text-neutral-500 mt-2">{describePeriod(period.preset, period.from, period.to)}</div>
+        <div className="text-xs text-neutral-500 mt-2">{describePeriod(period.preset, period.from, period.to, lang)}</div>
         {/* Sejak Arus Kas dihitung dari mutasi akun Kas/Bank di jurnal (bukan lagi dari tabel
             pembayaran), angka di halaman ini pasti sama dengan pergerakan akun yang sama di Neraca
             Saldo. Akunnya disebutkan supaya pemilik bisa membuktikan sendiri, bukan harus percaya. */}
