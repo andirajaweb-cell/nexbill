@@ -34,10 +34,8 @@ export const SUPPORTED_SYSTEMS: { key: string; label: string; file?: string }[] 
   { key: "tuya", label: "Tuya Smart / Smart Life", file: "/brands/tuya.svg" },
   { key: "tasmota", label: "Tasmota (MQTT)", file: "/brands/tasmota.svg" },
   { key: "ipaymu", label: "iPaymu", file: "/brands/ipaymu.png" },
-  // Belum ada berkas logo resmi → chip teks. Tambahkan file: "/brands/<nama>.svg" setelah berkasnya ada.
-  { key: "android-tv", label: "Android TV / Google TV" },
-  { key: "qris", label: "QRIS" },
-  { key: "bluetooth-printer", label: "Printer Thermal Bluetooth (ESC/POS)" },
+  { key: "google-tv", label: "Google TV / Android TV", file: "/brands/google-tv.svg" },
+  { key: "qris", label: "QRIS", file: "/brands/qris.svg" },
 ];
 
 /** Logo resmi bila berkasnya ada di public/brands, selain itu chip teks. */
