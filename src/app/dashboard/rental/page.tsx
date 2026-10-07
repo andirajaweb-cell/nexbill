@@ -37,6 +37,9 @@ import { scaledGain } from "@/lib/ui/notification-sound";
 import { NotificationVolumeControl } from "@/components/dashboard/NotificationVolumeControl";
 import { UnitRequestsPanel } from "./UnitRequestsPanel";
 import { UnitQrModal } from "./UnitQrModal";
+import { OfflineRentalBoard } from "./OfflineRentalBoard";
+import { useConnectivity, useOfflineData } from "@/lib/offline/hooks";
+import { getLastOutletId } from "@/lib/offline/store";
 
 // recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
 const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
@@ -317,7 +320,7 @@ function consoleLabel(type: string) {
   return CONSOLE_TYPES.find((c) => c.value === type)?.label ?? type.toUpperCase();
 }
 
-export default function RentalPage() {
+function OnlineRentalPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { t, lang } = useDashboardLang();
@@ -1915,4 +1918,21 @@ export default function RentalPage() {
       </Card>
     </div>
   );
+}
+
+/**
+ * Mode Offline: while the outlet's internet is down — and until every transaction recorded
+ * offline has reached the server — the cashier works on the offline board (OfflineRentalBoard),
+ * whose actions are queued on this device. The normal board only comes back once the queue holds
+ * nothing but actions the server rejected (shown for review above it), so nobody can act online on
+ * a unit whose offline history hasn't been replayed yet.
+ */
+export default function RentalPage() {
+  const { user } = useAuth();
+  const online = useConnectivity();
+  const outletId = user?.outletId ?? getLastOutletId();
+  const { queue } = useOfflineData(outletId);
+  const unsent = queue.some((q) => !q.error);
+  if (!online || unsent) return <OfflineRentalBoard outletId={outletId} online={online} />;
+  return <OnlineRentalPage />;
 }

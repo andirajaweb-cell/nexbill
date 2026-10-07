@@ -3102,3 +3102,34 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   lastSuccessAt: text("last_success_at"),
   ...timestamps,
 });
+
+/**
+ * Mode Offline kasir rental (migrasi 0032, lib/offline/server-sync.ts). Satu baris per aksi yang
+ * direkam perangkat kasir saat internet putus lalu dikirim lewat POST /api/offline/sync. `id` =
+ * UUID buatan perangkat → kunci idempotensi: aksi yang sudah "done" tidak pernah diproses ulang,
+ * jadi mengirim ulang antrean tidak menggandakan sesi atau pembayaran. Sekaligus jejak audit:
+ * kapan aksi terjadi menurut perangkat (occurred_at), kapan sampai di server (created_at), siapa
+ * yang menyinkronkan, dan apakah jam perangkat terdeteksi berubah selama offline (clock_flagged).
+ * Sengaja tabel terpisah (bukan kolom baru di rental_sessions) supaya fitur lain tidak ikut rusak
+ * bila kode ter-deploy sebelum migrasi dijalankan.
+ */
+export const offlineSyncActions = pgTable(
+  "offline_sync_actions",
+  {
+    id: text("id").primaryKey(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    staffUserId: text("staff_user_id").references(() => staffUsers.id),
+    kind: text("kind").notNull(),
+    rentalSessionId: text("rental_session_id"),
+    occurredAt: text("occurred_at").notNull(),
+    payloadJson: text("payload_json").notNull(),
+    status: text("status", { enum: ["processing", "done", "failed"] }).notNull().default("processing"),
+    resultJson: text("result_json"),
+    error: text("error"),
+    clockFlagged: boolean("clock_flagged").notNull().default(false),
+    deviceLabel: text("device_label"),
+    attempts: integer("attempts").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [index("offline_sync_actions_outlet_idx").on(t.outletId, t.createdAt), index("offline_sync_actions_session_idx").on(t.rentalSessionId)]
+);

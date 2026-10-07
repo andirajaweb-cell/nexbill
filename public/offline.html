@@ -12,7 +12,8 @@
   img{width:72px;height:72px;border-radius:18px}
   h1{font-size:19px;margin:16px 0 8px;color:#a5f3fc}
   p{font-size:14px;line-height:1.5;color:#9ca3af;margin:0 0 18px}
-  button{width:100%;border:0;border-radius:12px;padding:12px;font-size:15px;font-weight:600;color:#fff;background:linear-gradient(90deg,#06b6d4,#2563eb)}
+  button,.btn{display:block;box-sizing:border-box;width:100%;border:0;border-radius:12px;padding:12px;font-size:15px;font-weight:600;color:#fff;background:linear-gradient(90deg,#06b6d4,#2563eb);text-decoration:none;margin-bottom:10px}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,.15);color:#e5e7eb}
   small{display:block;margin-top:12px;color:#6b7280;font-size:12px}
 </style>
 </head>
@@ -20,9 +21,10 @@
 <div class="wrap"><div class="card">
   <img src="/icons/icon-192.png" alt="NEXBILL" />
   <h1>Tidak ada koneksi internet</h1>
-  <p>NEXBILL butuh internet supaya tagihan, timer, dan kasir selalu sinkron. Periksa Wi-Fi atau data seluler, lalu coba lagi.</p>
-  <button onclick="location.reload()">Coba Lagi</button>
-  <small>No internet connection — check Wi-Fi or mobile data, then try again.</small>
+  <p>Halaman ini belum tersimpan untuk dipakai offline. Kasir rental tetap bisa berjalan lewat <b>Mode Offline</b>: transaksi disimpan di perangkat ini dan dikirim otomatis saat internet kembali.</p>
+  <a class="btn" href="/dashboard/rental">Buka Kasir Rental (Offline)</a>
+  <button class="ghost" onclick="location.reload()">Coba Lagi</button>
+  <small>No internet connection. This page isn't saved for offline use — the rental cashier still works in <b>Offline Mode</b> (open it above); transactions are stored on this device and sent automatically when you're back online.</small>
 </div></div>
 <script>window.addEventListener('online',function(){location.reload()});</script>
 </body>

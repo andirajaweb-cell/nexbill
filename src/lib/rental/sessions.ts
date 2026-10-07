@@ -122,6 +122,16 @@ export interface StartSessionInput {
   //    what it recognizes as cash at the final total — the excess is change
   //    handed back to the customer, not tracked as revenue or a liability.
   prepay?: { amount: number; method: string } | null;
+  /**
+   * Mode Offline (lib/offline/server-sync.ts) only: the session id the cashier's device generated
+   * while the internet was down (later offline actions already reference it), the moment the
+   * session really started, and skipDevices — device commands are NOT sent per replayed action
+   * (a start replayed an hour late must not switch on a TV another queued session already
+   * finished with); the sync reconciles each unit's device once, after the whole batch.
+   */
+  id?: string;
+  startedAt?: string;
+  skipDevices?: boolean;
 }
 
 export async function startRentalSession(input: StartSessionInput) {
@@ -139,7 +149,7 @@ export async function startRentalSession(input: StartSessionInput) {
   // through checkInBooking() (which passes bookingId), so that path always
   // skips this check; only genuine walk-ins hit it.
   if (!input.bookingId) {
-    const nowIso = new Date().toISOString();
+    const nowIso = input.startedAt ?? new Date().toISOString();
     const conflicting = await db
       .select()
       .from(bookings)
@@ -157,7 +167,7 @@ export async function startRentalSession(input: StartSessionInput) {
   }
 
   const outletId = unit.outletId;
-  const rate = await computeEffectiveHourlyRate(outletId, input.rentalUnitId, input.customerId ?? undefined);
+  const rate = await computeEffectiveHourlyRate(outletId, input.rentalUnitId, input.customerId ?? undefined, input.startedAt ? new Date(input.startedAt) : undefined);
 
   let plannedMinutes = input.plannedMinutes ?? null;
   let ratePerHour = rate.finalRate;
@@ -205,6 +215,8 @@ export async function startRentalSession(input: StartSessionInput) {
     [session] = await db
       .insert(rentalSessions)
       .values({
+        ...(input.id ? { id: input.id } : {}),
+        ...(input.startedAt ? { startedAt: input.startedAt } : {}),
         outletId,
         rentalUnitId: input.rentalUnitId,
         customerId: input.customerId,
@@ -234,7 +246,9 @@ export async function startRentalSession(input: StartSessionInput) {
   // silently did nothing, which was undiagnosable from the cashier's side) or because the linked
   // device's own command failed (offline, wrong credentials, etc — see runDeviceCommand above).
   let deviceWarning: string | null = null;
-  if (unit.deviceId) {
+  if (input.skipDevices) {
+    // Mode Offline replay — see StartSessionInput.skipDevices.
+  } else if (unit.deviceId) {
     const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
     if (device) {
       deviceWarning = await runDeviceOnCommand(device as any, `Gagal menyalakan device untuk unit ${unit.name}:`);
@@ -314,25 +328,27 @@ export async function startRentalSession(input: StartSessionInput) {
   return { session, rate, unit, bill, prepayment, deviceWarning };
 }
 
-export async function pauseRentalSession(sessionId: string) {
+/** `at` (Mode Offline replay only): when the pause really happened; defaults to now. */
+export async function pauseRentalSession(sessionId: string, at?: string) {
   const [session] = await db.select().from(rentalSessions).where(eq(rentalSessions.id, sessionId)).limit(1);
   if (!session) throw new Error("Sesi tidak ditemukan.");
   if (session.status !== "running") throw new Error("Sesi tidak sedang berjalan.");
 
   const [updated] = await db
     .update(rentalSessions)
-    .set({ status: "paused", pausedAt: new Date().toISOString() })
+    .set({ status: "paused", pausedAt: at ?? new Date().toISOString() })
     .where(eq(rentalSessions.id, sessionId))
     .returning();
   return updated;
 }
 
-export async function resumeRentalSession(sessionId: string) {
+/** `at` (Mode Offline replay only): when the resume really happened; defaults to now. */
+export async function resumeRentalSession(sessionId: string, at?: string) {
   const [session] = await db.select().from(rentalSessions).where(eq(rentalSessions.id, sessionId)).limit(1);
   if (!session) throw new Error("Sesi tidak ditemukan.");
   if (session.status !== "paused" || !session.pausedAt) throw new Error("Sesi tidak sedang dijeda.");
 
-  const pauseDurationMs = Date.now() - new Date(session.pausedAt).getTime();
+  const pauseDurationMs = Math.max(0, (at ? Date.parse(at) : Date.now()) - new Date(session.pausedAt).getTime());
 
   const [updated] = await db
     .update(rentalSessions)
@@ -370,7 +386,12 @@ export async function extendRentalSession(sessionId: string, additionalMinutes: 
  * it. The kasir applies discount/voucher/tax at checkout via updateBillCheckoutOptions(), then takes
  * payment against this one order.
  */
-export async function stopRentalSession(sessionId: string) {
+/**
+ * `opts` is for Mode Offline replay only (lib/offline/server-sync.ts): `endedAt` = when the cashier
+ * really stopped the session while the internet was down (billing is computed up to that moment,
+ * not up to whenever the device reconnected), and `skipDevices` — see StartSessionInput.skipDevices.
+ */
+export async function stopRentalSession(sessionId: string, opts: { endedAt?: string; skipDevices?: boolean } = {}) {
   const [session] = await db.select().from(rentalSessions).where(eq(rentalSessions.id, sessionId)).limit(1);
   if (!session) throw new Error("Sesi tidak ditemukan.");
   if (session.status === "finished" || session.status === "cancelled") throw new Error("Sesi sudah selesai.");
@@ -379,7 +400,8 @@ export async function stopRentalSession(sessionId: string) {
   const [outlet] = await db.select().from(outlets).where(eq(outlets.id, session.outletId)).limit(1);
   const roundingMinutes = outlet?.billingRoundingMinutes ?? 1;
 
-  const now = Date.now();
+  const now = opts.endedAt ? Date.parse(opts.endedAt) : Date.now();
+  if (Number.isNaN(now) || now < new Date(session.startedAt).getTime()) throw new Error("Waktu selesai sesi lebih awal dari waktu mulai.");
   let accumulatedPauseMs = session.accumulatedPauseMs;
   if (session.status === "paused" && session.pausedAt) {
     accumulatedPauseMs += now - new Date(session.pausedAt).getTime();
@@ -436,7 +458,7 @@ export async function stopRentalSession(sessionId: string) {
     // transferRentalSession below: if the session was transferred mid-play, the whole elapsed
     // duration is attributed to whichever unit it finishes on, not split across units.
     await db.update(rentalUnits).set({ status: "available", totalUsageMinutes: unit.totalUsageMinutes + elapsedMinutesRaw }).where(eq(rentalUnits.id, unit.id));
-    if (unit.deviceId) {
+    if (unit.deviceId && !opts.skipDevices) {
       const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
       if (device) {
         const label = `Gagal mematikan device untuk unit ${unit.name}:`;
@@ -597,4 +619,34 @@ export async function changeSessionCustomer(sessionId: string, params: { custome
   }
 
   return { session: updated, orderId: bill?.id ?? null };
+}
+
+/**
+ * Mode Offline: after a batch of offline actions has been replayed (with skipDevices), bring each
+ * touched unit's TV/console to the state its CURRENT session status calls for — on (+ HDMI to the
+ * console for relay TVs) if a session is running/paused on it, off (or screensaver) otherwise.
+ * Done once per unit at the end rather than per replayed action, so a stop-then-start sequence
+ * recorded an hour ago doesn't flicker the TV or leave it off under a customer still playing.
+ * Returns a warning string (same wording style as start/stop) or null.
+ */
+export async function syncUnitDeviceToSessions(rentalUnitId: string): Promise<string | null> {
+  const [unit] = await db.select().from(rentalUnits).where(eq(rentalUnits.id, rentalUnitId)).limit(1);
+  if (!unit?.deviceId) return null;
+  const [device] = await db.select().from(devices).where(eq(devices.id, unit.deviceId)).limit(1);
+  if (!device) return null;
+  const [active] = await db
+    .select({ id: rentalSessions.id })
+    .from(rentalSessions)
+    .where(and(eq(rentalSessions.rentalUnitId, rentalUnitId), inArray(rentalSessions.status, ["running", "paused"] as const)))
+    .limit(1);
+  if (active) {
+    let warning = await runDeviceOnCommand(device, `Gagal menyalakan device untuk unit ${unit.name}:`);
+    if (isRelayTv(device)) {
+      const hdmiWarning = await switchRelayTvToConsole(unit, device);
+      if (hdmiWarning) warning = warning ? `${warning} ${hdmiWarning}` : hdmiWarning;
+    }
+    return warning;
+  }
+  const label = `Gagal mematikan device untuk unit ${unit.name}:`;
+  return isRelayTv(device) ? await releaseRelayTv(unit, device, label) : await runDeviceCommand(turnDeviceOff(device), label);
 }

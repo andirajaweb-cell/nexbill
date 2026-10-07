@@ -9,6 +9,7 @@ import { GracePaymentReminderPopup } from "@/components/dashboard/GracePaymentRe
 import { NewBookingPopup } from "@/components/dashboard/NewBookingPopup";
 import { EmailVerificationBanner } from "@/components/dashboard/EmailVerificationBanner";
 import { DemoAccountBanner } from "@/components/dashboard/DemoAccountBanner";
+import { OfflineStatusBanner } from "@/components/offline/OfflineStatusBanner";
 import { DashboardFooter } from "@/components/dashboard/DashboardFooter";
 import { DashboardLangProvider } from "@/lib/i18n/dashboard-lang";
 import { DashboardThemeProvider, ANTI_FLASH_SCRIPT } from "@/lib/ui/dashboard-theme";
@@ -37,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   overflow-x-clip (bukan hidden) supaya elemen sticky di halaman (keranjang Kasir,
                   ringkasan Langganan) tetap menempel saat halaman di-scroll. */}
               <main className="dash-main flex-1 p-3 sm:p-4 lg:p-6 overflow-x-clip">
+                <OfflineStatusBanner />
                 <DemoAccountBanner />
                 <EmailVerificationBanner />
                 <SubscriptionGate>

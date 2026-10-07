@@ -71,12 +71,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const data: AuthUser | null = res.ok ? await res.json() : null;
         setUser(data);
+        rememberUserForOffline(data);
         // Warms this tab's in-memory permission cache (see permissions.ts) so
         // hasPermission() checks made directly in client-component render
         // reflect the DB-edited matrix, not just the hardcoded defaults.
         if (data?.permissions) setEffectivePermissions(data.role as StaffRole, data.permissions);
       })
-      .catch(() => setUser(null))
+      // Network failure (not a 401): the outlet's internet is down. Keep the last account known on
+      // this device so the dashboard — above all the Mode Offline cashier board — keeps working;
+      // nothing is trusted from this server-side, every synced action is re-authorized there.
+      .catch(() => {
+        const cached = cachedOfflineUser();
+        setUser(cached);
+        if (cached?.permissions) setEffectivePermissions(cached.role as StaffRole, cached.permissions);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -106,11 +114,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
+    rememberUserForOffline(null);
+    // Saved dashboard pages (Mode Offline, public/sw.js) belong to this account — drop them.
+    navigator.serviceWorker?.controller?.postMessage({ type: "clear-pages" });
     setUser(null);
     window.location.href = "/login";
   }, []);
 
   return <AuthContext.Provider value={{ user, loading, logout, refresh: load }}>{children}</AuthContext.Provider>;
+}
+
+const OFFLINE_USER_KEY = "nexbill_offline_user";
+
+/** Last signed-in account on this device — Mode Offline fallback only (see load() above). */
+function rememberUserForOffline(user: AuthUser | null) {
+  try {
+    if (user) window.localStorage.setItem(OFFLINE_USER_KEY, JSON.stringify(user));
+    else window.localStorage.removeItem(OFFLINE_USER_KEY);
+  } catch {
+    // storage blocked — offline fallback simply unavailable
+  }
+}
+
+function cachedOfflineUser(): AuthUser | null {
+  try {
+    const raw = window.localStorage.getItem(OFFLINE_USER_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function useAuth() {
