@@ -811,7 +811,7 @@ function LandingPageInner() {
       <div className="showcase-card-label">{t.showcase.bookingLabel}</div>
     </div>,
     <div key="stat" className="showcase-card size-square showcase-stat">
-      <div className="showcase-stat-num">500+</div>
+      <div className="showcase-stat-num">{t.showcase.statNum}</div>
       <p>{t.showcase.statLabel}</p>
     </div>,
     <div key="kasir" className="showcase-card size-wide showcase-media-card">
@@ -937,8 +937,8 @@ function LandingPageInner() {
               <p className="hero-note" style={{ color: '#cbd5e1' }}>{t.intro.note}</p>
 
               <div className="trust-badge">
-                <span className="stars" aria-hidden="true">★★★★★</span>
-                <span className="trust-text"><strong>4.9/5</strong> {t.intro.trustSuffix}</span>
+                <span className="stars" aria-hidden="true">✓</span>
+                <span className="trust-text"><strong>{t.intro.trustStrong}</strong> {t.intro.trustSuffix}</span>
               </div>
             </div>
 

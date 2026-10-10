@@ -44,7 +44,7 @@ export interface LandingCopy {
   intro: {
     headlinePre: string; headlineHighlight: string; sub: string;
     ctaPrimary: string; ctaGhost: string; note: string;
-    trustSuffix: string; mediaBadge: string; stats: Stat[];
+    trustStrong: string; trustSuffix: string; mediaBadge: string; stats: Stat[];
     floatingUnits: { label: string; value: string };
     floatingBooking: { label: string; value: string };
     floatingRevenue: { label: string; value: string };
@@ -54,7 +54,7 @@ export interface LandingCopy {
     dashboardLabel: string; unitLabel: string; unitHint: string;
     quote: string; quoteAuthor: string;
     bookingLabel: string; screenshotHint: string;
-    statLabel: string; kasirLabel: string; videoHint: string; laporanLabel: string;
+    statNum: string; statLabel: string; kasirLabel: string; videoHint: string; laporanLabel: string;
   };
   solusi: { kicker: string; title: string; sub: string; points: PainPoint[] };
   fitur: { kicker: string; title: string; sub: string; catalogCta: string; catalogNote: string; items: Feature[] };
@@ -113,7 +113,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ctaPrimary: "Coba NEXBILL Gratis 30 Hari →",
       ctaGhost: "Lihat Cara Kerjanya",
       note: "Tanpa kartu kredit • Setup dibantu • Bisa berhenti kapan saja",
-      trustSuffix: "— dipercaya 500+ outlet rental PS di Asia Tenggara",
+      trustStrong: "Pembukuan standar SAK EMKM",
+      trustSuffix: "— dibangun dan dipakai setiap hari di outlet rental PS kami sendiri",
       mediaBadge: "Dashboard Real-Time",
       floatingUnits: { label: "UNIT AKTIF", value: "12" },
       floatingBooking: { label: "BOOKING", value: "19:00" },
@@ -121,7 +122,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       stats: [
         { num: "Support", label: "Kompatibel untuk TV Analog, TV Smart OS & TV Android OS" },
         { num: "Real-Time", label: "Pantau omzet & unit jalan dari HP" },
-        { num: "0% Bocor", label: "Sistem hitung otomatis per detik" },
+        { num: "Per Detik", label: "Tagihan dihitung otomatis, tanpa hitung manual" },
         { num: "24 Jam", label: "Sistem booking online mandiri" },
       ],
     },
@@ -132,7 +133,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       unitLabel: "Kontrol Unit Otomatis", unitHint: "Drag untuk geser →",
       quote: "Sejak pakai NEXBILL, tutup shift cuma 5 menit — dulu bisa satu jam.", quoteAuthor: "— Outlet Gaming Corner, Jakarta",
       bookingLabel: "Booking Online 24 Jam", screenshotHint: "Ganti dengan screenshot",
-      statLabel: "Outlet rental PS di Asia Tenggara",
+      statNum: "Tanpa PC",
+      statLabel: "Kontrol TV lewat HP Android, tanpa komputer kasir",
       kasirLabel: "Video Demo Kasir", videoHint: "Ganti dengan video",
       laporanLabel: "Laporan Keuangan Otomatis",
     },
@@ -284,8 +286,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       heroTitle: "Kami bangun tulang punggung bisnis rental PlayStation.",
       heroLede: "NEXBILL lahir dari pengalaman langsung mengelola outlet rental PS — bukan software generik yang dipaksakan ke industri ini, tapi sistem yang dirancang dari lantai kasir sampai laporan laba rugi, supaya pemilik outlet bisa fokus melayani pelanggan, bukan pusing hitung manual di buku kas.",
       stats: [
-        { num: "500+", label: "Outlet rental PS di Asia Tenggara" },
-        { num: "0% Bocor", label: "Sistem hitung otomatis per detik" },
+        { num: "SAK EMKM", label: "Neraca, laba rugi & arus kas otomatis" },
+        { num: "Per Detik", label: "Tagihan dihitung otomatis, tanpa hitung manual" },
         { num: "24 Jam", label: "Sistem booking online mandiri" },
         { num: "Support", label: "Prioritas via WhatsApp, kapan saja" },
       ],
@@ -321,7 +323,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ctaPrimary: "Try Free for 30 Days →",
       ctaGhost: "See All Features",
       note: "No long-term contract · Setup handled by our team · Cancel anytime",
-      trustSuffix: "— trusted by 500+ PS rental outlets across Southeast Asia",
+      trustStrong: "Full double-entry bookkeeping",
+      trustSuffix: "— built and used every day at our own PS rental outlet",
       mediaBadge: "Real-Time Dashboard",
       floatingUnits: { label: "ACTIVE UNITS", value: "12" },
       floatingBooking: { label: "BOOKING", value: "7:00 PM" },
@@ -329,7 +332,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       stats: [
         { num: "Support", label: "Works with Analog, Smart OS & Android TV" },
         { num: "Real-Time", label: "Track revenue & units running from your phone" },
-        { num: "0% Leakage", label: "Automatic per-second billing" },
+        { num: "Per Second", label: "Bills calculated automatically, no manual counting" },
         { num: "24/7", label: "Self-service online booking" },
       ],
     },
@@ -340,7 +343,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       unitLabel: "Automatic Unit Control", unitHint: "Drag to scroll →",
       quote: "Since switching to NEXBILL, closing a shift takes 5 minutes — it used to take an hour.", quoteAuthor: "— Gaming Corner Outlet, Jakarta",
       bookingLabel: "24/7 Online Booking", screenshotHint: "Screenshot coming soon",
-      statLabel: "PS rental outlets across Southeast Asia",
+      statNum: "No PC",
+      statLabel: "Control TVs from an Android phone, no cashier computer",
       kasirLabel: "POS Demo Video", videoHint: "Video coming soon",
       laporanLabel: "Automated Financial Reports",
     },
@@ -492,8 +496,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       heroTitle: "We build the backbone of the PlayStation rental business.",
       heroLede: "NEXBILL was born from hands-on experience running a PS rental outlet — not generic software forced onto this industry, but a system designed from the register floor up to the P&L report, so outlet owners can focus on serving customers instead of manual bookkeeping.",
       stats: [
-        { num: "500+", label: "PS rental outlets across Southeast Asia" },
-        { num: "0% Leakage", label: "Automatic per-second billing" },
+        { num: "Full Books", label: "Automatic balance sheet, P&L and cash flow" },
+        { num: "Per Second", label: "Bills calculated automatically, no manual counting" },
         { num: "24/7", label: "Self-service online booking" },
         { num: "Support", label: "Priority via WhatsApp, anytime" },
       ],
@@ -529,7 +533,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ctaPrimary: "Cuba Percuma 30 Hari →",
       ctaGhost: "Lihat Semua Ciri",
       note: "Tiada kontrak jangka panjang · Persediaan dibantu pasukan kami · Boleh berhenti bila-bila masa",
-      trustSuffix: "— dipercayai oleh 500+ outlet sewa PS di Asia Tenggara",
+      trustStrong: "Perakaunan lengkap automatik",
+      trustSuffix: "— dibina dan digunakan setiap hari di outlet sewa PS kami sendiri",
       mediaBadge: "Papan Pemuka Masa Nyata",
       floatingUnits: { label: "UNIT AKTIF", value: "12" },
       floatingBooking: { label: "TEMPAHAN", value: "7:00 PTG" },
@@ -537,7 +542,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       stats: [
         { num: "Sokongan", label: "Serasi dengan TV Analog, Smart OS & Android TV" },
         { num: "Masa Nyata", label: "Pantau hasil jualan & unit yang berjalan dari telefon" },
-        { num: "0% Bocor", label: "Sistem kira automatik sesaat" },
+        { num: "Sesaat", label: "Bil dikira automatik, tanpa kiraan manual" },
         { num: "24 Jam", label: "Sistem tempahan atas talian sendiri" },
       ],
     },
@@ -548,7 +553,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       unitLabel: "Kawalan Unit Automatik", unitHint: "Seret untuk skrol →",
       quote: "Sejak guna NEXBILL, tutup syif cuma ambil masa 5 minit — dulu boleh sampai sejam.", quoteAuthor: "— Outlet Gaming Corner, Jakarta",
       bookingLabel: "Tempahan Atas Talian 24 Jam", screenshotHint: "Tangkapan skrin akan datang",
-      statLabel: "Outlet sewa PS di Asia Tenggara",
+      statNum: "Tanpa PC",
+      statLabel: "Kawal TV melalui telefon Android, tanpa komputer juruwang",
       kasirLabel: "Video Demo Kaunter Jualan", videoHint: "Video akan datang",
       laporanLabel: "Laporan Kewangan Automatik",
     },
@@ -700,8 +706,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       heroTitle: "Kami membina tulang belakang perniagaan sewa PlayStation.",
       heroLede: "NEXBILL lahir daripada pengalaman langsung menguruskan outlet sewa PS — bukan perisian generik yang dipaksakan ke industri ini, tetapi sistem yang direka dari lantai kaunter jualan sehingga laporan untung rugi, supaya pemilik outlet boleh fokus melayan pelanggan, bukan pening kira manual dalam buku tunai.",
       stats: [
-        { num: "500+", label: "Outlet sewa PS di Asia Tenggara" },
-        { num: "0% Bocor", label: "Sistem kira automatik sesaat" },
+        { num: "Akaun Lengkap", label: "Kunci kira-kira, untung rugi & aliran tunai automatik" },
+        { num: "Sesaat", label: "Bil dikira automatik, tanpa kiraan manual" },
         { num: "24 Jam", label: "Sistem tempahan atas talian sendiri" },
         { num: "Sokongan", label: "Keutamaan melalui WhatsApp, bila-bila masa" },
       ],
@@ -740,7 +746,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ctaPrimary: "ทดลองใช้ฟรี 30 วัน →",
       ctaGhost: "ดูฟีเจอร์ทั้งหมด",
       note: "ไม่มีสัญญาผูกมัดระยะยาว · ทีมงานช่วยติดตั้งให้ · ยกเลิกได้ทุกเมื่อ",
-      trustSuffix: "— ได้รับความไว้วางใจจากร้านเช่า PS กว่า 500 แห่งทั่วเอเชียตะวันออกเฉียงใต้",
+      trustStrong: "ระบบบัญชีคู่ครบถ้วนอัตโนมัติ",
+      trustSuffix: "— สร้างและใช้งานทุกวันในร้านเช่า PS ของเราเอง",
       mediaBadge: "แดชบอร์ดเรียลไทม์",
       floatingUnits: { label: "เครื่องที่ใช้งานอยู่", value: "12" },
       floatingBooking: { label: "การจอง", value: "19:00 น." },
@@ -748,7 +755,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       stats: [
         { num: "รองรับ", label: "ใช้ได้กับทีวีอนาล็อก, Smart OS และ Android TV" },
         { num: "เรียลไทม์", label: "ดูยอดขายและสถานะเครื่องผ่านมือถือ" },
-        { num: "0% รั่วไหล", label: "ระบบคำนวณอัตโนมัติทุกวินาที" },
+        { num: "ทุกวินาที", label: "คำนวณบิลอัตโนมัติ ไม่ต้องนับเอง" },
         { num: "24 ชม.", label: "ระบบจองออนไลน์ด้วยตัวเอง" },
       ],
     },
@@ -759,7 +766,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       unitLabel: "ควบคุมเครื่องอัตโนมัติ", unitHint: "ลากเพื่อเลื่อน →",
       quote: "ตั้งแต่ใช้ NEXBILL ปิดกะใช้เวลาแค่ 5 นาที — เมื่อก่อนใช้เวลาเป็นชั่วโมง", quoteAuthor: "— ร้าน Gaming Corner, จาการ์ตา",
       bookingLabel: "จองออนไลน์ 24 ชั่วโมง", screenshotHint: "ภาพหน้าจอเร็วๆ นี้",
-      statLabel: "ร้านเช่า PS ทั่วเอเชียตะวันออกเฉียงใต้",
+      statNum: "ไม่ต้องใช้ PC",
+      statLabel: "ควบคุมทีวีผ่านมือถือ Android ไม่ต้องมีคอมพิวเตอร์แคชเชียร์",
       kasirLabel: "วิดีโอสาธิตแคชเชียร์", videoHint: "วิดีโอเร็วๆ นี้",
       laporanLabel: "รายงานการเงินอัตโนมัติ",
     },
@@ -911,8 +919,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       heroTitle: "เราสร้างกระดูกสันหลังของธุรกิจร้านเช่า PlayStation",
       heroLede: "NEXBILL เกิดจากประสบการณ์ตรงในการบริหารร้านเช่า PS — ไม่ใช่ซอฟต์แวร์ทั่วไปที่ยัดเยียดให้กับอุตสาหกรรมนี้ แต่เป็นระบบที่ออกแบบตั้งแต่หน้าแคชเชียร์ไปจนถึงรายงานกำไรขาดทุน เพื่อให้เจ้าของร้านโฟกัสกับการบริการลูกค้า แทนที่จะปวดหัวกับการคำนวณมือในสมุดบัญชี",
       stats: [
-        { num: "500+", label: "ร้านเช่า PS ทั่วเอเชียตะวันออกเฉียงใต้" },
-        { num: "0% รั่วไหล", label: "ระบบคำนวณอัตโนมัติทุกวินาที" },
+        { num: "บัญชีครบ", label: "งบดุล งบกำไรขาดทุน และกระแสเงินสดอัตโนมัติ" },
+        { num: "ทุกวินาที", label: "คำนวณบิลอัตโนมัติ ไม่ต้องนับเอง" },
         { num: "24 ชม.", label: "ระบบจองออนไลน์ด้วยตัวเอง" },
         { num: "ซัพพอร์ต", label: "ให้ความสำคัญผ่าน WhatsApp ได้ทุกเมื่อ" },
       ],
@@ -951,7 +959,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ctaPrimary: "Dùng thử miễn phí 30 ngày →",
       ctaGhost: "Xem tất cả tính năng",
       note: "Không hợp đồng dài hạn · Đội ngũ hỗ trợ cài đặt · Hủy bất cứ lúc nào",
-      trustSuffix: "— được hơn 500 cửa hàng cho thuê PS ở Đông Nam Á tin dùng",
+      trustStrong: "Sổ sách kế toán kép tự động",
+      trustSuffix: "— được xây dựng và dùng mỗi ngày tại cửa hàng cho thuê PS của chính chúng tôi",
       mediaBadge: "Bảng điều khiển thời gian thực",
       floatingUnits: { label: "THIẾT BỊ ĐANG HOẠT ĐỘNG", value: "12" },
       floatingBooking: { label: "ĐẶT CHỖ", value: "19:00" },
@@ -959,7 +968,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       stats: [
         { num: "Hỗ trợ", label: "Tương thích TV analog, Smart OS & Android TV" },
         { num: "Thời gian thực", label: "Theo dõi doanh thu & thiết bị đang chạy từ điện thoại" },
-        { num: "0% Thất thoát", label: "Hệ thống tính tiền tự động theo từng giây" },
+        { num: "Từng giây", label: "Tự động tính tiền, không cần tính tay" },
         { num: "24/7", label: "Hệ thống đặt chỗ trực tuyến tự phục vụ" },
       ],
     },
@@ -970,7 +979,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       unitLabel: "Điều khiển thiết bị tự động", unitHint: "Kéo để cuộn →",
       quote: "Từ khi dùng NEXBILL, đóng ca chỉ mất 5 phút — trước đây mất cả tiếng đồng hồ.", quoteAuthor: "— Cửa hàng Gaming Corner, Jakarta",
       bookingLabel: "Đặt chỗ trực tuyến 24/7", screenshotHint: "Ảnh chụp màn hình sắp ra mắt",
-      statLabel: "Cửa hàng cho thuê PS ở Đông Nam Á",
+      statNum: "Không cần PC",
+      statLabel: "Điều khiển TV bằng điện thoại Android, không cần máy tính thu ngân",
       kasirLabel: "Video demo thu ngân", videoHint: "Video sắp ra mắt",
       laporanLabel: "Báo cáo tài chính tự động",
     },
@@ -1122,8 +1132,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       heroTitle: "Chúng tôi xây dựng nền tảng cho ngành cho thuê PlayStation.",
       heroLede: "NEXBILL ra đời từ kinh nghiệm trực tiếp vận hành cửa hàng cho thuê PS — không phải phần mềm chung chung áp đặt lên ngành này, mà là hệ thống được thiết kế từ quầy thu ngân đến báo cáo lãi lỗ, để chủ cửa hàng có thể tập trung phục vụ khách hàng thay vì đau đầu tính toán thủ công trong sổ sách.",
       stats: [
-        { num: "500+", label: "Cửa hàng cho thuê PS ở Đông Nam Á" },
-        { num: "0% Thất thoát", label: "Hệ thống tính tiền tự động theo từng giây" },
+        { num: "Sổ sách đủ", label: "Bảng cân đối, lãi lỗ và dòng tiền tự động" },
+        { num: "Từng giây", label: "Tự động tính tiền, không cần tính tay" },
         { num: "24/7", label: "Hệ thống đặt chỗ trực tuyến tự phục vụ" },
         { num: "Hỗ trợ", label: "Ưu tiên qua WhatsApp, bất cứ lúc nào" },
       ],
@@ -1162,7 +1172,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ctaPrimary: "Subukan Nang Libre sa 30 Araw →",
       ctaGhost: "Tingnan Lahat ng Feature",
       note: "Walang long-term contract · Tutulungan kami sa setup · Puwedeng mag-cancel anumang oras",
-      trustSuffix: "— pinagkakatiwalaan ng 500+ PS rental outlet sa buong Timog-Silangang Asya",
+      trustStrong: "Kumpletong double-entry bookkeeping",
+      trustSuffix: "— binuo at ginagamit araw-araw sa sarili naming PS rental outlet",
       mediaBadge: "Real-Time Dashboard",
       floatingUnits: { label: "ACTIVE NA UNIT", value: "12" },
       floatingBooking: { label: "BOOKING", value: "7:00 PM" },
@@ -1170,7 +1181,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       stats: [
         { num: "Support", label: "Compatible sa Analog TV, Smart OS & Android TV" },
         { num: "Real-Time", label: "Subaybayan ang kita & unit gamit ang phone" },
-        { num: "0% Tulo", label: "Automatic na pagbibilang bawat segundo" },
+        { num: "Bawat Segundo", label: "Awtomatikong bill, walang manwal na bilang" },
         { num: "24 Oras", label: "Self-service na online booking system" },
       ],
     },
@@ -1181,7 +1192,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       unitLabel: "Automatic na Unit Control", unitHint: "I-drag para mag-scroll →",
       quote: "Simula nang gamitin ang NEXBILL, 5 minuto na lang ang pag-close ng shift — dati isang oras.", quoteAuthor: "— Gaming Corner Outlet, Jakarta",
       bookingLabel: "24 Oras na Online Booking", screenshotHint: "Screenshot, malapit na",
-      statLabel: "PS rental outlet sa buong Timog-Silangang Asya",
+      statNum: "Walang PC",
+      statLabel: "Kontrolin ang TV gamit ang Android phone, walang cashier computer",
       kasirLabel: "Demo Video ng Cashier", videoHint: "Video, malapit na",
       laporanLabel: "Automated na Financial Reports",
     },
@@ -1333,8 +1345,8 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       heroTitle: "Binubuo namin ang gulugod ng negosyong PlayStation rental.",
       heroLede: "Ipinanganak ang NEXBILL mula sa aktwal na karanasan sa pagpapatakbo ng PS rental outlet — hindi generic na software na ipinilit sa industriyang ito, kundi isang sistema na dinisenyo mula sa cashier floor hanggang sa profit-and-loss report, para makapag-focus ang may-ari ng outlet sa pagsisilbi sa customer, hindi sa manual na pagkukuwenta sa cash book.",
       stats: [
-        { num: "500+", label: "PS rental outlet sa buong Timog-Silangang Asya" },
-        { num: "0% Tulo", label: "Automatic na pagbibilang bawat segundo" },
+        { num: "Buong Libro", label: "Awtomatikong balance sheet, P&L at cash flow" },
+        { num: "Bawat Segundo", label: "Awtomatikong bill, walang manwal na bilang" },
         { num: "24 Oras", label: "Self-service na online booking system" },
         { num: "Support", label: "Priority sa WhatsApp, anumang oras" },
       ],
