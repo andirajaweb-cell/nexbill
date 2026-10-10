@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_title">NEXBILL TV กำลังทำงาน</string>
+    <string name="notif_text">ซิงค์ตัวจับเวลาห้องกับแคชเชียร์</string>
+    <string name="timer_staff">โหมดพนักงาน</string>
+    <string name="timer_paused">หยุดชั่วคราว</string>
+    <string name="waiting_signal">กำลังรอสัญญาณ HDMI… ตรวจสอบว่าเครื่องเกมเปิดอยู่</string>
+    <string name="no_hdmi_hint">ไม่พบอินพุต HDMI กดปุ่ม OK ค้าง 3 วินาที → เลือกอินพุต HDMI</string>
+    <string name="no_hdmi">ไม่พบอินพุต HDMI บนทีวีนี้</string>
+    <string name="disabled_hint">NEXBILL TV ไม่ได้เปิดใช้งาน:</string>
+    <string name="fallback_toast">ทีวีนี้แสดง HDMI ภายในแอปไม่ได้ จึงเปลี่ยนเป็นโหมดสลับอินพุตทีวี — อนุญาตการแสดงทับแอปอื่นจากเมนูพนักงาน</string>
+    <string name="not_supported">ทีวีนี้ไม่มีการตั้งค่านี้</string>
+    <string name="overlay_needed">โหมดนี้ต้องได้รับอนุญาตให้แสดงทับแอปอื่น เปิดเมนูพนักงาน → แสดงทับแอปอื่น</string>
+    <string name="pin_title">ใส่ PIN พนักงาน</string>
+    <string name="pin_wrong">PIN ไม่ถูกต้อง</string>
+    <string name="pin_error">ตรวจสอบ PIN ไม่ได้ โปรดตรวจการเชื่อมต่ออินเทอร์เน็ต</string>
+    <string name="ok">ตกลง</string>
+    <string name="cancel">ยกเลิก</string>
+    <string name="yes">ใช่</string>
+    <string name="no">ไม่</string>
+    <string name="menu_title">เมนูพนักงาน</string>
+    <string name="menu_show_game">เปิดหน้าจอเกม 10 นาที</string>
+    <string name="menu_end_staff">จบโหมดพนักงาน</string>
+    <string name="menu_pick_hdmi">เลือกอินพุต HDMI</string>
+    <string name="menu_mode">โหมดแสดงผล HDMI</string>
+    <string name="mode_inapp">ภายในแอป (แนะนำ)</string>
+    <string name="mode_switch">สลับอินพุตทีวี</string>
+    <string name="menu_overlay">แสดงทับแอปอื่น</string>
+    <string name="menu_home">ตั้งเป็นแอปหลักของทีวี</string>
+    <string name="menu_reload">โหลดหน้าจอใหม่</string>
+    <string name="menu_info">ข้อมูลอุปกรณ์</string>
+    <string name="pick_hdmi_title">เลือกอินพุต HDMI ที่เสียบเครื่องเกมไว้</string>
+    <string name="info_version">เวอร์ชันแอป: %1$s</string>
+    <string name="info_paired">จับคู่กับห้อง: %1$s</string>
+    <string name="info_unpaired">ยังไม่จับคู่ — ใส่รหัสจากแดชบอร์ด</string>
+    <string name="info_input">อินพุต HDMI: %1$s</string>
+    <string name="info_mode">โหมด: %1$s</string>
+    <string name="info_overlay">แสดงทับแอปอื่น: %1$s</string>
+</resources>

@@ -46,6 +46,11 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("Business & Tax");
   const [outletId, setOutletId] = useState<string | null>(null);
+  // Tautan langsung ke tab tertentu, mis. /dashboard/settings?tab=tv dari panduan Aplikasi NEXBILL TV.
+  useEffect(() => {
+    const want = new URLSearchParams(window.location.search).get("tab");
+    if (want === "tv") setTab("TV Screensaver");
+  }, []);
   const { user } = useAuth();
   const { t } = useDashboardLang();
   const role = (user?.role ?? "cashier") as StaffRole;

@@ -1,0 +1,5 @@
+// NEXBILL TV — aplikasi Android TV untuk layar bilik rental PS (lihat README.md).
+// Versi AGP/Gradle sama dengan proyek TWA di ../android supaya satu JDK 17 cukup untuk keduanya.
+plugins {
+    id 'com.android.application' version '8.9.1' apply false
+}

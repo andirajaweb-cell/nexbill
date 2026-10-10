@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_title">NEXBILL TV đang chạy</string>
+    <string name="notif_text">Đồng bộ đồng hồ phòng với thu ngân</string>
+    <string name="timer_staff">CHẾ ĐỘ NHÂN VIÊN</string>
+    <string name="timer_paused">TẠM DỪNG</string>
+    <string name="waiting_signal">Đang chờ tín hiệu HDMI… hãy bật máy chơi game.</string>
+    <string name="no_hdmi_hint">Không tìm thấy cổng HDMI. Giữ nút OK 3 giây → Chọn cổng HDMI.</string>
+    <string name="no_hdmi">Không tìm thấy cổng HDMI trên TV này.</string>
+    <string name="disabled_hint">NEXBILL TV đang không hoạt động:</string>
+    <string name="fallback_toast">TV này không hiển thị được HDMI bên trong ứng dụng. Chuyển sang chế độ Chuyển cổng TV — cho phép hiển thị trên ứng dụng khác trong menu nhân viên.</string>
+    <string name="not_supported">TV này không có cài đặt này.</string>
+    <string name="overlay_needed">Chế độ này cần quyền hiển thị trên ứng dụng khác. Mở menu nhân viên → Hiển thị trên ứng dụng khác.</string>
+    <string name="pin_title">Nhập PIN nhân viên</string>
+    <string name="pin_wrong">Sai PIN</string>
+    <string name="pin_error">Không kiểm tra được PIN. Kiểm tra kết nối internet.</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Hủy</string>
+    <string name="yes">Có</string>
+    <string name="no">Không</string>
+    <string name="menu_title">Menu nhân viên</string>
+    <string name="menu_show_game">Mở màn hình game 10 phút</string>
+    <string name="menu_end_staff">Kết thúc chế độ nhân viên</string>
+    <string name="menu_pick_hdmi">Chọn cổng HDMI</string>
+    <string name="menu_mode">Chế độ hiển thị HDMI</string>
+    <string name="mode_inapp">Bên trong ứng dụng (khuyên dùng)</string>
+    <string name="mode_switch">Chuyển cổng TV</string>
+    <string name="menu_overlay">Hiển thị trên ứng dụng khác</string>
+    <string name="menu_home">Đặt làm ứng dụng chính của TV</string>
+    <string name="menu_reload">Tải lại màn hình</string>
+    <string name="menu_info">Thông tin thiết bị</string>
+    <string name="pick_hdmi_title">Chọn cổng HDMI đang cắm máy chơi game</string>
+    <string name="info_version">Phiên bản: %1$s</string>
+    <string name="info_paired">Đã ghép với phòng: %1$s</string>
+    <string name="info_unpaired">Chưa ghép — nhập mã từ bảng điều khiển</string>
+    <string name="info_input">Cổng HDMI: %1$s</string>
+    <string name="info_mode">Chế độ: %1$s</string>
+    <string name="info_overlay">Hiển thị trên ứng dụng khác: %1$s</string>
+</resources>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_title">NEXBILL TV is running</string>
+    <string name="notif_text">Keeping the booth timer in sync with the cashier</string>
+    <string name="timer_staff">STAFF MODE</string>
+    <string name="timer_paused">PAUSED</string>
+    <string name="waiting_signal">Waiting for HDMI signal… make sure the console is on.</string>
+    <string name="no_hdmi_hint">No HDMI input found. Hold OK for 3 seconds → Choose HDMI input.</string>
+    <string name="no_hdmi">No HDMI input found on this TV.</string>
+    <string name="disabled_hint">NEXBILL TV is not active:</string>
+    <string name="fallback_toast">This TV cannot show HDMI inside the app. Switching to Switch TV input mode — allow display over other apps from the staff menu.</string>
+    <string name="not_supported">This setting is not available on this TV.</string>
+    <string name="overlay_needed">This mode needs permission to display over other apps. Open the staff menu → Display over other apps.</string>
+    <string name="pin_title">Enter staff PIN</string>
+    <string name="pin_wrong">Wrong PIN</string>
+    <string name="pin_error">Could not check the PIN. Check the internet connection.</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="menu_title">Staff menu</string>
+    <string name="menu_show_game">Open game screen for 10 minutes</string>
+    <string name="menu_end_staff">End staff mode</string>
+    <string name="menu_pick_hdmi">Choose HDMI input</string>
+    <string name="menu_mode">HDMI display mode</string>
+    <string name="mode_inapp">Inside the app (recommended)</string>
+    <string name="mode_switch">Switch TV input</string>
+    <string name="menu_overlay">Display over other apps</string>
+    <string name="menu_home">Make this the main TV app</string>
+    <string name="menu_reload">Reload screen</string>
+    <string name="menu_info">Device info</string>
+    <string name="pick_hdmi_title">Choose the HDMI input the console is plugged into</string>
+    <string name="info_version">App version: %1$s</string>
+    <string name="info_paired">Paired to unit: %1$s</string>
+    <string name="info_unpaired">Not paired yet — enter the code from the dashboard</string>
+    <string name="info_input">HDMI input: %1$s</string>
+    <string name="info_mode">Mode: %1$s</string>
+    <string name="info_overlay">Display over other apps: %1$s</string>
+</resources>

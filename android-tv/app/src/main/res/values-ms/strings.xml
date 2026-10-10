@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_title">NEXBILL TV sedang berjalan</string>
+    <string name="notif_text">Menyelaraskan pemasa bilik dengan juruwang</string>
+    <string name="timer_staff">MOD STAF</string>
+    <string name="timer_paused">DIJEDA</string>
+    <string name="waiting_signal">Menunggu isyarat HDMI… pastikan konsol hidup.</string>
+    <string name="no_hdmi_hint">Input HDMI tidak ditemui. Tahan butang OK 3 saat → Pilih input HDMI.</string>
+    <string name="no_hdmi">Input HDMI tidak ditemui pada TV ini.</string>
+    <string name="disabled_hint">NEXBILL TV tidak aktif:</string>
+    <string name="fallback_toast">TV ini tidak boleh memaparkan HDMI di dalam aplikasi. Bertukar ke mod Tukar input TV — benarkan paparan di atas aplikasi lain melalui menu staf.</string>
+    <string name="not_supported">Tetapan ini tidak tersedia pada TV ini.</string>
+    <string name="overlay_needed">Mod ini perlukan kebenaran paparan di atas aplikasi lain. Buka menu staf → Paparan di atas aplikasi lain.</string>
+    <string name="pin_title">Masukkan PIN staf</string>
+    <string name="pin_wrong">PIN salah</string>
+    <string name="pin_error">Tidak dapat menyemak PIN. Semak sambungan internet.</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Batal</string>
+    <string name="yes">Ya</string>
+    <string name="no">Tidak</string>
+    <string name="menu_title">Menu staf</string>
+    <string name="menu_show_game">Buka skrin permainan 10 minit</string>
+    <string name="menu_end_staff">Tamatkan mod staf</string>
+    <string name="menu_pick_hdmi">Pilih input HDMI</string>
+    <string name="menu_mode">Mod paparan HDMI</string>
+    <string name="mode_inapp">Di dalam aplikasi (disyorkan)</string>
+    <string name="mode_switch">Tukar input TV</string>
+    <string name="menu_overlay">Paparan di atas aplikasi lain</string>
+    <string name="menu_home">Jadikan aplikasi utama TV</string>
+    <string name="menu_reload">Muat semula skrin</string>
+    <string name="menu_info">Maklumat peranti</string>
+    <string name="pick_hdmi_title">Pilih input HDMI tempat konsol dipasang</string>
+    <string name="info_version">Versi aplikasi: %1$s</string>
+    <string name="info_paired">Dipasangkan ke unit: %1$s</string>
+    <string name="info_unpaired">Belum dipasangkan — masukkan kod dari papan pemuka</string>
+    <string name="info_input">Input HDMI: %1$s</string>
+    <string name="info_mode">Mod: %1$s</string>
+    <string name="info_overlay">Paparan di atas aplikasi lain: %1$s</string>
+</resources>

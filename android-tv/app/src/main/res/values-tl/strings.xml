@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_title">Tumatakbo ang NEXBILL TV</string>
+    <string name="notif_text">Itinutugma ang timer ng booth sa cashier</string>
+    <string name="timer_staff">STAFF MODE</string>
+    <string name="timer_paused">NAKA-PAUSE</string>
+    <string name="waiting_signal">Hinihintay ang HDMI signal… siguraduhing naka-on ang console.</string>
+    <string name="no_hdmi_hint">Walang nakitang HDMI input. Pindutin nang matagal ang OK nang 3 segundo → Piliin ang HDMI input.</string>
+    <string name="no_hdmi">Walang nakitang HDMI input sa TV na ito.</string>
+    <string name="disabled_hint">Hindi aktibo ang NEXBILL TV:</string>
+    <string name="fallback_toast">Hindi kayang ipakita ng TV na ito ang HDMI sa loob ng app. Lilipat sa mode na Palitan ang input ng TV — payagan ang pagpapakita sa ibabaw ng ibang app mula sa staff menu.</string>
+    <string name="not_supported">Walang ganitong setting sa TV na ito.</string>
+    <string name="overlay_needed">Kailangan ng mode na ito ang pahintulot na magpakita sa ibabaw ng ibang app. Buksan ang staff menu → Ipakita sa ibabaw ng ibang app.</string>
+    <string name="pin_title">Ilagay ang staff PIN</string>
+    <string name="pin_wrong">Mali ang PIN</string>
+    <string name="pin_error">Hindi masuri ang PIN. Suriin ang internet.</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Kanselahin</string>
+    <string name="yes">Oo</string>
+    <string name="no">Hindi</string>
+    <string name="menu_title">Staff menu</string>
+    <string name="menu_show_game">Buksan ang game screen nang 10 minuto</string>
+    <string name="menu_end_staff">Tapusin ang staff mode</string>
+    <string name="menu_pick_hdmi">Piliin ang HDMI input</string>
+    <string name="menu_mode">HDMI display mode</string>
+    <string name="mode_inapp">Sa loob ng app (inirerekomenda)</string>
+    <string name="mode_switch">Palitan ang input ng TV</string>
+    <string name="menu_overlay">Ipakita sa ibabaw ng ibang app</string>
+    <string name="menu_home">Gawing pangunahing app ng TV</string>
+    <string name="menu_reload">I-reload ang screen</string>
+    <string name="menu_info">Impormasyon ng device</string>
+    <string name="pick_hdmi_title">Piliin ang HDMI input kung saan nakasaksak ang console</string>
+    <string name="info_version">Bersyon ng app: %1$s</string>
+    <string name="info_paired">Naka-pair sa unit: %1$s</string>
+    <string name="info_unpaired">Hindi pa naka-pair — ilagay ang code mula sa dashboard</string>
+    <string name="info_input">HDMI input: %1$s</string>
+    <string name="info_mode">Mode: %1$s</string>
+    <string name="info_overlay">Ipakita sa ibabaw ng ibang app: %1$s</string>
+</resources>

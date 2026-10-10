@@ -98,6 +98,19 @@ export default function TvPage() {
     setToken(null);
   }, []);
 
+  // Aplikasi Android TV "NEXBILL TV" (folder android-tv/) memuat halaman ini di WebView dan perlu
+  // tahu token layar supaya bisa mengambil status unit sendiri: memindahkan TV ke input HDMI saat
+  // sesi berjalan dan menutupnya lagi saat waktu habis. Di browser biasa jembatan ini tidak ada.
+  useEffect(() => {
+    if (!booted) return;
+    const bridge = (window as unknown as { NexbillTvApp?: { setToken?: (t: string) => void } }).NexbillTvApp;
+    try {
+      bridge?.setToken?.(token ?? "");
+    } catch {
+      /* jembatan aplikasi gagal — halaman tetap jalan seperti di browser biasa */
+    }
+  }, [booted, token]);
+
   if (!booted) return <div className="min-h-screen bg-black" />;
   if (!token) return <PairingScreen onPaired={handlePaired} />;
   return <ScreenDisplay token={token} onUnpair={handleUnpair} />;
