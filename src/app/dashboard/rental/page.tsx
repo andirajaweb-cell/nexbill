@@ -22,6 +22,8 @@ import { confirmPaymentReceived } from "@/lib/payments/confirm-client";
 // 2026-09-19. See charge.ts's own doc comment.
 import { computeSessionCharge, estimateAccessoryCharge } from "@/lib/rental/charge";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
+import { QuickRateEditor } from "./quick-rate-editor";
+import "@/lib/i18n/dict-setup";
 import { describeError } from "@/lib/api/error";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { LiveClock } from "@/components/dashboard/LiveClock";
@@ -329,6 +331,12 @@ function OnlineRentalPage() {
   // Active methods from /dashboard/payments incl. QRIS/rekening instructions — see usePaymentMethods.
   const { methods, find: findMethod, labelOf: methodLabel } = usePaymentMethods();
   const [units, setUnits] = useState<RentalUnit[]>([]);
+  // "Atur tarif semua unit" (lib: quick-rate-editor). Dibuka otomatis lewat ?atur=tarif dari daftar
+  // "Siap Buka Outlet" di Ringkasan.
+  const [showRateEditor, setShowRateEditor] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("atur") === "tarif") setShowRateEditor(true);
+  }, []);
   const [sessions, setSessions] = useState<RentalSession[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [bills, setBills] = useState<Record<string, BillBreakdown>>({});
@@ -637,6 +645,15 @@ function OnlineRentalPage() {
 
   const start = async (unitId: string) => {
     if (startingSession) return; // already in flight — ignore a double-click/impatient retry
+    // Unit hasil pendaftaran bertarif Rp0 sampai pemilik mengaturnya. Tanpa paket promo, sesi di unit
+    // itu akan tertagih Rp0 — tanyakan dulu, jangan diam-diam.
+    const unit = units.find((u) => u.id === unitId);
+    if (unit && !(unit.hourlyRate > 0) && !selectedPromoId) {
+      const go = await showConfirm(
+        t("setup.rates.zeroStartConfirm", "Tarif {unit} masih Rp0, jadi sesi ini akan tertagih Rp0. Tetap mulai? (Atur tarif lewat tombol \"Atur Tarif Semua Unit\".)").replace("{unit}", unit.name)
+      );
+      if (!go) return;
+    }
     setStartingSession(true);
     try {
       await doStart(unitId);
@@ -1085,11 +1102,30 @@ function OnlineRentalPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <LiveClock lang={lang} />
           <NotificationVolumeControl onPreview={() => playAlertBeep()} />
+          <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowRateEditor((v) => !v)}>
+            {t("setup.rates.openButton", "Atur Tarif Semua Unit")}
+          </Button>
           <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowUnitManager((v) => !v)}>
             <Settings size={14} /> {showUnitManager ? t("rental.toggleCloseUnitManager", "Tutup Kelola Unit") : t("rental.toggleOpenUnitManager", "Kelola Unit")}
           </Button>
         </div>
       </div>
+
+      {(() => {
+        const zero = units.filter((u) => u.isActive !== false && !(u.hourlyRate > 0));
+        if (zero.length === 0 || showRateEditor) return null;
+        return (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <span className="flex-1 min-w-[220px]">
+              {t("setup.rates.zeroBanner", "{n} unit tarifnya masih Rp0 — sesi di unit ini akan tertagih Rp0.").replace("{n}", String(zero.length))}
+            </span>
+            <Button className="text-xs" onClick={() => setShowRateEditor(true)}>{t("setup.rates.fixNow", "Atur tarif sekarang")}</Button>
+          </div>
+        );
+      })()}
+      {showRateEditor && (
+        <QuickRateEditor units={units} consoleTypes={CONSOLE_TYPES} onClose={() => setShowRateEditor(false)} onSaved={() => load()} />
+      )}
 
       {/* Permintaan dari HP pelanggan lewat QR bilik — berbunyi saat ada yang baru. */}
       <UnitRequestsPanel onNewRequest={() => playAlertBeep()} onHandled={() => load()} money={rupiah} />
@@ -1643,8 +1679,9 @@ function OnlineRentalPage() {
             );
           })}
           {activeUnits.length === 0 && (
-            <Card className="sm:col-span-2 2xl:col-span-3 text-center text-neutral-500 text-sm py-8">
-              {t("rental.noUnitsEmptyState", 'Belum ada unit PS. Klik "Kelola Unit" untuk menambahkan.')}
+            <Card className="sm:col-span-2 2xl:col-span-3 text-center text-neutral-500 text-sm py-8 space-y-3">
+              <div>{t("rental.noUnitsEmptyState", 'Belum ada unit PS. Klik "Kelola Unit" untuk menambahkan.')}</div>
+              <Button className="text-xs" onClick={() => setShowUnitManager(true)}>{t("setup.rates.addUnitButton", "Tambah unit PS")}</Button>
             </Card>
           )}
         </div>

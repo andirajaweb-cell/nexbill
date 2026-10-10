@@ -38,7 +38,8 @@ import {
   Wrench,
   Share2, Store, X,} from "lucide-react";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
-import { roleLabel, type StaffRole } from "@/lib/auth/permissions";
+import { hasPermission, roleLabel, type StaffRole } from "@/lib/auth/permissions";
+import { visibleNav } from "@/lib/nav/menu";
 import { fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -46,37 +47,41 @@ import { useMobileNav } from "@/components/dashboard/MobileNav";
 import { featureForDashboardPath, type PlanFeature } from "@/lib/subscription/pricing";
 import "@/lib/i18n/dict-plan";
 
-const nav = [
-  { href: "/dashboard", key: "nav.summary", icon: LayoutDashboard },
-  { href: "/dashboard/rental", key: "nav.rental", icon: Gamepad2 },
-  { href: "/dashboard/billing-board", key: "nav.billingBoard", icon: MonitorSmartphone },
-  { href: "/dashboard/booking", key: "nav.booking", icon: CalendarClock },
-  { href: "/dashboard/pos", key: "nav.pos", icon: ShoppingCart },
-  { href: "/dashboard/transactions", key: "nav.transactions", icon: ClipboardList },
-  { href: "/dashboard/ppob", key: "nav.ppob", icon: Smartphone },
-  { href: "/dashboard/inventory", key: "nav.inventory", icon: Package },
-  { href: "/dashboard/promo", key: "nav.promo", icon: Tag },
-  { href: "/dashboard/membership", key: "nav.membership", icon: Users },
-  { href: "/dashboard/shift", key: "nav.shift", icon: Wallet },
-  { href: "/dashboard/devices", key: "nav.devices", icon: Radio },
-  { href: "/dashboard/payments", key: "nav.payments", icon: CreditCard },
-  { href: "/dashboard/billing", key: "nav.billing", icon: BillingIcon },
-  { href: "/dashboard/rekomendasi-produk", key: "nav.affiliateShowcase", icon: Gift },
-  { href: "/dashboard/marketplace", key: "nav.marketplace", icon: Store },
-  { href: "/dashboard/referral", key: "nav.referral", icon: Share2 },
-  { href: "/dashboard/accounting", key: "nav.accounting", icon: Calculator },
-  { href: "/dashboard/expenses", key: "nav.expenses", icon: Receipt },
-  { href: "/dashboard/other-income", key: "nav.otherIncome", icon: Coins },
-  { href: "/dashboard/assets", key: "nav.assets", icon: Boxes },
-  { href: "/dashboard/maintenance", key: "nav.maintenance", icon: Wrench },
-  { href: "/dashboard/staff", key: "nav.staff", icon: ShieldCheck },
-  { href: "/dashboard/kitchen", key: "nav.kitchen", icon: ChefHat },
-  { href: "/dashboard/chat", key: "nav.chat", icon: MessageCircle },
-  { href: "/dashboard/reports", key: "nav.reports", icon: BarChart3 },
-  { href: "/dashboard/ai", key: "nav.ai", icon: Sparkles },
-  { href: "/dashboard/settings", key: "nav.settings", icon: Settings },
-  { href: "/dashboard/help", key: "nav.help", icon: HelpCircle },
-] as const;
+// Ikon per menu. Susunan, kelompok, dan aturan siapa melihat menu apa ada di lib/nav/menu.ts.
+const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
+  "/dashboard": LayoutDashboard,
+  "/dashboard/rental": Gamepad2,
+  "/dashboard/billing-board": MonitorSmartphone,
+  "/dashboard/booking": CalendarClock,
+  "/dashboard/pos": ShoppingCart,
+  "/dashboard/transactions": ClipboardList,
+  "/dashboard/ppob": Smartphone,
+  "/dashboard/inventory": Package,
+  "/dashboard/promo": Tag,
+  "/dashboard/membership": Users,
+  "/dashboard/shift": Wallet,
+  "/dashboard/devices": Radio,
+  "/dashboard/payments": CreditCard,
+  "/dashboard/billing": BillingIcon,
+  "/dashboard/rekomendasi-produk": Gift,
+  "/dashboard/marketplace": Store,
+  "/dashboard/referral": Share2,
+  "/dashboard/accounting": Calculator,
+  "/dashboard/expenses": Receipt,
+  "/dashboard/other-income": Coins,
+  "/dashboard/assets": Boxes,
+  "/dashboard/maintenance": Wrench,
+  "/dashboard/staff": ShieldCheck,
+  "/dashboard/kitchen": ChefHat,
+  "/dashboard/chat": MessageCircle,
+  "/dashboard/reports": BarChart3,
+  "/dashboard/ai": Sparkles,
+  "/dashboard/settings": Settings,
+  "/dashboard/help": HelpCircle,
+  "/dashboard/home-rental": Truck,
+  "/dashboard/admin": Database,
+  "/dashboard/semua-outlet": Building2,
+};
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -116,24 +121,16 @@ export function Sidebar() {
       .catch(() => setHomeRentalEnabled(false));
   }, [user]);
 
-  // AI Business Intelligence is Owner/Superuser only (assertAiRoleAllowed in
-  // lib/subscription/service.ts) and, for Owner, additionally gated on a paid AI Add-on/trial
-  // (see /dashboard/ai's own paywall card) — hide the nav entry entirely for roles that can never
-  // reach it (Manager/Supervisor/Akuntan/Kasir/Dapur) rather than let them click into a
-  // role-restricted message. Owner still sees it even unpaid, so they can discover and upgrade.
-  const aiAllowedRole = user?.role === "superuser" || user?.role === "owner";
-
-  let items: { href: string; key: string; icon: typeof LayoutDashboard }[] = (
-    homeRentalEnabled ? [...nav, { href: "/dashboard/home-rental", key: "nav.homeRental", icon: Truck }] : [...nav]
-  )
-    .filter((n) => n.href !== "/dashboard/ppob" || ppobEnabled)
-    .filter((n) => n.href !== "/dashboard/ai" || aiAllowedRole);
-  if (superuser) items = [...items, { href: "/dashboard/admin", key: "nav.adminData", icon: Database }];
-  // Only shown for accounts linked to more than one outlet (see outletMemberships) — the
-  // common single-outlet case never sees this entry at all.
-  if (user?.linkedOutlets && user.linkedOutlets.length > 1) {
-    items = [items[0], { href: "/dashboard/semua-outlet", key: "nav.allOutlets", icon: Building2 }, ...items.slice(1)];
-  }
+  // Menu dikelompokkan dan disaring per peran (izin efektif, termasuk izin kustom outlet) — lihat
+  // lib/nav/menu.ts. Kasir hanya melihat menu meja depan, Dapur hanya layar dapur.
+  const role = (user?.role ?? "cashier") as StaffRole;
+  const groups = visibleNav({
+    role,
+    can: (p) => hasPermission(role, p),
+    homeRentalEnabled,
+    ppobEnabled,
+    multiOutlet: !!(user?.linkedOutlets && user.linkedOutlets.length > 1),
+  });
 
   const { open: drawerOpen, setOpen: setDrawerOpen } = useMobileNav();
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -179,7 +176,11 @@ export function Sidebar() {
 
   const navList = (
     <nav className="flex-1 flex flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1" aria-label="Menu">
-      {items.map(({ href, key, icon: Icon }) => {
+      {groups.map(({ group, items }) => (
+        <div key={group.id} className="mb-1.5">
+          <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t(group.key, group.fallback)}</div>
+      {items.map(({ href, key }) => {
+        const Icon = NAV_ICONS[href] ?? LayoutDashboard;
         const active = pathname === href;
         return (
           <Link
@@ -210,6 +211,8 @@ export function Sidebar() {
           </Link>
         );
       })}
+        </div>
+      ))}
     </nav>
   );
 

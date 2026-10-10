@@ -7,6 +7,7 @@ import type { BusyHourRow } from "@/lib/dashboard/busy-hours";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { LiveClock } from "@/components/dashboard/LiveClock";
+import { SetupChecklist } from "@/components/dashboard/SetupChecklist";
 
 // recharts is a sizeable chunk of client JS that only this section of the page actually uses —
 // loaded on demand (ssr:false, since it reads from the browser canvas/DOM APIs) instead of
@@ -272,6 +273,8 @@ export default function OwnerDashboardPage() {
           {data && <Badge status="available">{t("dash.live")}</Badge>}
         </div>
       </div>
+
+      <SetupChecklist />
 
       <SectionTitle>{t("section.revenueProfit")}</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

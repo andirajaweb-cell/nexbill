@@ -16,6 +16,12 @@ registerDict({
   "topbar.openMenu": { id: "Buka menu", en: "Open menu", ms: "Buka menu", th: "เปิดเมนู", fil: "Buksan ang menu", vi: "Mở menu" },
 
   // --- Sidebar: nav items ---
+  "nav.group.operations": { id: "Operasional", en: "Operations", ms: "Operasi", th: "งานหน้าร้าน", fil: "Operasyon", vi: "Vận hành" },
+  "nav.group.customers": { id: "Pelanggan & Produk", en: "Customers & Products", ms: "Pelanggan & Produk", th: "ลูกค้าและสินค้า", fil: "Customer at Produkto", vi: "Khách hàng & Sản phẩm" },
+  "nav.group.finance": { id: "Keuangan", en: "Finance", ms: "Kewangan", th: "การเงิน", fil: "Pananalapi", vi: "Tài chính" },
+  "nav.group.devices": { id: "Perangkat", en: "Devices", ms: "Peranti", th: "อุปกรณ์", fil: "Mga Device", vi: "Thiết bị" },
+  "nav.group.growth": { id: "Tumbuh", en: "Growth", ms: "Pertumbuhan", th: "เติบโต", fil: "Paglago", vi: "Phát triển" },
+  "nav.group.admin": { id: "Pengaturan & Bantuan", en: "Settings & Help", ms: "Tetapan & Bantuan", th: "ตั้งค่าและช่วยเหลือ", fil: "Settings at Tulong", vi: "Cài đặt & Trợ giúp" },
   "nav.summary": { id: "Ringkasan", en: "Overview", ms: "Ringkasan", th: "ภาพรวม", fil: "Buod", vi: "Tổng quan" },
   "nav.rental": { id: "Rental PS", en: "PS Rental", ms: "Sewa PS", th: "เช่า PS", fil: "Upa ng PS", vi: "Cho thuê PS" },
   "nav.billingBoard": { id: "Live Billing Board", en: "Live Billing Board", ms: "Papan Bil Langsung", th: "บอร์ดบิลสด", fil: "Live Billing Board", vi: "Bảng tính giờ trực tiếp" },
