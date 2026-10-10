@@ -18,7 +18,11 @@ import { TabGuide, WorkflowGuide } from "./TabGuide";
 import { HistoricalImportSection } from "./HistoricalImport";
 import { ProfitLossSteps } from "./ProfitLossSteps";
 import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Lock } from "lucide-react";
+import Link from "next/link";
+import { usePlanFeatures } from "@/lib/subscription/use-plan-features";
+import { LockedFeaturePreview } from "@/components/dashboard/LockedFeaturePreview";
+import "@/lib/i18n/dict-plan-preview";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
@@ -64,6 +68,14 @@ export default function AccountingPage() {
   const [showWorkflow, setShowWorkflow] = useState(false);
   const { user } = useAuth();
   const { t } = useDashboardLang();
+  // Paket Starter: halaman ini terbuka untuk Laba Rugi ringkas; tab pembukuan lain tetap terlihat
+  // tapi menampilkan pratinjau terkunci (lihat STARTER_FEATURES di lib/subscription/pricing.ts).
+  const plan = usePlanFeatures();
+  const fullBooks = plan.has("accounting");
+  const [tabChosen, setTabChosen] = useState(false);
+  useEffect(() => {
+    if (plan.loaded && !fullBooks && !tabChosen) setTab("Laba Rugi");
+  }, [plan.loaded, fullBooks, tabChosen]);
   const role = (user?.role ?? "cashier") as any;
   const isMigrationRole = role === "superuser" || role === "owner";
   const canSeePeriodLock = hasPermission(role, "close_period") || hasPermission(role, "reopen_period");
@@ -92,6 +104,7 @@ export default function AccountingPage() {
           shortcuts={(["Neraca Saldo", "Audit", "Laba Rugi", "Tutup Periode"] as Tab[]).filter((tb) => visibleTabs.includes(tb))}
           tabLabel={(tb) => (TAB_LABEL_KEYS[tb as Tab] ? t(TAB_LABEL_KEYS[tb as Tab].key, TAB_LABEL_KEYS[tb as Tab].fallback) : tb)}
           onOpenTab={(tb) => {
+            setTabChosen(true);
             setTab(tb as Tab);
             setShowWorkflow(false);
           }}
@@ -102,17 +115,23 @@ export default function AccountingPage() {
         {visibleTabs.map((tb) => (
           <button
             key={tb}
-            onClick={() => setTab(tb)}
+            onClick={() => {
+              setTabChosen(true);
+              setTab(tb);
+            }}
             className={`px-3 py-2 text-sm whitespace-nowrap ${tab === tb ? "border-b-2 border-emerald-500 text-emerald-400" : "text-neutral-500 hover:text-neutral-300"}`}
           >
             {t(TAB_LABEL_KEYS[tb].key, TAB_LABEL_KEYS[tb].fallback)}
+            {!fullBooks && tb !== "Laba Rugi" && <Lock size={11} className="inline ml-1 -mt-0.5 text-amber-300/80" />}
           </button>
         ))}
       </div>
 
       {outletId && <TabGuide key={tab} tab={tab} label={t(TAB_LABEL_KEYS[tab].key, TAB_LABEL_KEYS[tab].fallback)} />}
 
-      {!outletId ? null : tab === "Chart of Accounts" ? (
+      {!outletId ? null : !fullBooks && tab !== "Laba Rugi" ? (
+        <LockedFeaturePreview feature="accounting" compact note={t("planPreview.accountingTab", "Tab ini bagian dari pembukuan lengkap paket Pro. Laba Rugi ringkas tetap terbuka di paket Anda.")} />
+      ) : tab === "Chart of Accounts" ? (
         <ChartOfAccountsTab outletId={outletId} />
       ) : tab === "Account Mapping" ? (
         <AccountMappingTab outletId={outletId} />
@@ -781,6 +800,15 @@ function JournalTab({ outletId }: { outletId: string }) {
 
 function DownloadButtons({ outletId, reportType, from, to, showZero }: { outletId: string; reportType: string; from?: string; to?: string; showZero?: boolean }) {
   const { t, lang } = useDashboardLang();
+  const plan = usePlanFeatures();
+  if (!plan.has("accounting")) {
+    // Ekspor laporan termasuk pembukuan lengkap (Pro) — tombolnya tetap terlihat, terkunci.
+    return (
+      <Link href="/dashboard/billing" className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200 hover:bg-amber-500/10">
+        <Lock size={12} /> {t("planPreview.exportLocked", "Ekspor PDF/Excel (Pro)")}
+      </Link>
+    );
+  }
   const qs = new URLSearchParams({ outletId, type: reportType, lang, ...(from ? { from } : {}), ...(to ? { to } : {}), ...(showZero ? { showZero: "1" } : {}) });
   return (
     <div className="flex gap-2">

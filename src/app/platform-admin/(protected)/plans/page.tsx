@@ -10,7 +10,7 @@ const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-
 /**
  * Katalog paket NEXBILL (struktur harga 2026-10 — lihat src/lib/subscription/pricing.ts):
  *  - tier "starter" + model "per_unit": Harga = per unit PS aktif per bulan, minimal Min. Unit.
- *    Fitur operasional saja (akuntansi, aset, PPOB, anti-fraud, multi-cabang, rental ke rumah dikunci).
+ *    Operasional + pengeluaran, laba rugi ringkas, rental ke rumah (pembukuan lengkap, aset, PPOB, anti-fraud, multi-cabang dikunci, tetap terlihat).
  *  - tier "pro" + model "flat": Harga = per outlet per bulan, unit tak terbatas, semua fitur + AI.
  * Bulan Tagih Tahunan = berapa bulan yang dibayar untuk 12 bulan aktif. Diskon Cabang = potongan
  * untuk outlet Pro ke-2 dst dalam satu grup penagihan.

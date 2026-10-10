@@ -5,12 +5,12 @@ registerDict({
   "plan.starter.name": { id: "Starter", en: "Starter", ms: "Starter", th: "Starter", fil: "Starter", vi: "Starter" },
   "plan.pro.name": { id: "Pro", en: "Pro", ms: "Pro", th: "Pro", fil: "Pro", vi: "Pro" },
   "plan.starter.tagline": {
-    id: "Operasional rental: billing, kasir, booking, kontrol TV, QR pelanggan.",
-    en: "Rental operations: billing, cashier, booking, TV control, customer QR.",
-    ms: "Operasi rental: bil, juruwang, tempahan, kawalan TV, QR pelanggan.",
-    th: "งานหน้าร้าน: บิล แคชเชียร์ จองคิว ควบคุมทีวี QR ลูกค้า",
-    fil: "Operasyon ng rental: billing, cashier, booking, TV control, customer QR.",
-    vi: "Vận hành: tính tiền, thu ngân, đặt chỗ, điều khiển TV, QR khách hàng.",
+    id: "Operasional rental: billing, kasir, booking, kontrol TV, QR pelanggan, pengeluaran, laba rugi ringkas, rental ke rumah.",
+    en: "Rental operations: billing, cashier, booking, TV control, customer QR, expenses, P&L summary, home rental.",
+    ms: "Operasi rental: bil, juruwang, tempahan, kawalan TV, QR pelanggan, perbelanjaan, ringkasan untung rugi, sewa ke rumah.",
+    th: "งานหน้าร้าน: บิล แคชเชียร์ จองคิว ควบคุมทีวี QR ลูกค้า ค่าใช้จ่าย สรุปกำไรขาดทุน เช่ากลับบ้าน",
+    fil: "Operasyon ng rental: billing, cashier, booking, TV control, customer QR, gastos, buod ng P&L, home rental.",
+    vi: "Vận hành: tính tiền, thu ngân, đặt chỗ, điều khiển TV, QR khách hàng, chi phí, tóm tắt lãi lỗ, cho thuê mang về.",
   },
   "plan.pro.tagline": {
     id: "Unit tak terbatas + semua fitur bisnis & AI.",

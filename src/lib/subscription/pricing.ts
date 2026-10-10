@@ -3,9 +3,12 @@
  * pricing.test.ts. Satu-satunya tempat aturan harga dihitung, dipakai oleh checkout, perpanjangan,
  * tagihan gabungan multi-cabang, upgrade prorata, halaman Langganan, dan landing page.
  *
- *  - Starter : per unit PS aktif per bulan (minimal MIN_UNITS unit), fitur operasional saja.
- *  - Pro     : flat per outlet per bulan, unit tak terbatas + seluruh fitur (akuntansi, aset,
- *              PPOB, anti-fraud, AI, multi-cabang, rental ke rumah).
+ *  - Starter : per unit PS aktif per bulan (minimal MIN_UNITS unit). Operasional + yang dimiliki
+ *              pesaing di kelas harga yang sama (revisi 2026-10-10): pencatatan pengeluaran, laba
+ *              rugi ringkas (baca saja), dan rental ke rumah. Fitur Pro lainnya TETAP TERLIHAT di
+ *              dashboard tapi terkunci (pratinjau + tombol upgrade, lihat LockedFeaturePreview).
+ *  - Pro     : flat per outlet per bulan, unit tak terbatas + seluruh fitur (pembukuan lengkap,
+ *              aset, PPOB, anti-fraud otomatis, AI, multi-cabang).
  *  - Multi-cabang : outlet Pro ke-2 dst dalam satu grup penagihan dapat diskon.
  *  - Tahunan : bayar 10 bulan, aktif 12 bulan.
  *  - Trial 30 hari = akses penuh setara Pro. Status free_forever TIDAK diatur di sini (perilakunya
@@ -16,15 +19,33 @@ export type PlanTier = "starter" | "pro";
 export type PricingModel = "per_unit" | "flat";
 export type BillingCycle = "monthly" | "annual";
 
-/** Fitur yang dikunci untuk Starter. AI diatur terpisah (assertAiAllowed) karena punya Add-on. */
-export type PlanFeature = "accounting" | "assets" | "ppob" | "anti_fraud" | "multi_outlet" | "home_rental";
+/**
+ * Fitur yang diatur per paket. AI diatur terpisah (assertAiAllowed) karena punya Add-on.
+ *  - expenses      : Pengeluaran (catat, setujui, bayar, berulang) + pusat biaya.
+ *  - profit_report : Laba Rugi ringkas di halaman Akuntansi — baca saja; ekspor PDF/Excel tetap Pro.
+ *  - accounting    : pembukuan lengkap (jurnal, neraca saldo, neraca, arus kas, piutang/hutang,
+ *                    rekonsiliasi, CALK, audit, tutup periode, migrasi) + pendapatan lain-lain.
+ */
+export type PlanFeature = "expenses" | "profit_report" | "home_rental" | "accounting" | "assets" | "ppob" | "anti_fraud" | "multi_outlet";
 
-export const ALL_PLAN_FEATURES: PlanFeature[] = ["accounting", "assets", "ppob", "anti_fraud", "multi_outlet", "home_rental"];
+export const ALL_PLAN_FEATURES: PlanFeature[] = ["expenses", "profit_report", "home_rental", "accounting", "assets", "ppob", "anti_fraud", "multi_outlet"];
+
+/**
+ * Pilihan isi Starter (2026-10-10) disusun terhadap pesaing di kelas Rp5.000–10.000/unit (CECO,
+ * RR Billing, AlfSmart): mereka semua menyertakan pencatatan pengeluaran, laporan laba sederhana,
+ * dan (CECO) sewa bawa pulang. Tanpa ketiganya Starter kalah nilai di harga yang sama. Yang
+ * dipertahankan di Pro adalah yang memang tidak dimiliki pesaing: pembukuan lengkap SAK EMKM,
+ * aset & penyusutan, PPOB, deteksi shift berisiko otomatis, multi-cabang, AI.
+ */
+export const STARTER_FEATURES: PlanFeature[] = ["expenses", "profit_report", "home_rental"];
 
 export const TIER_FEATURES: Record<PlanTier, PlanFeature[]> = {
-  starter: [],
+  starter: STARTER_FEATURES,
   pro: ALL_PLAN_FEATURES,
 };
+
+/** Fitur Pro yang tidak termasuk Starter — yang ditampilkan terkunci di dashboard Starter. */
+export const PRO_ONLY_FEATURES: PlanFeature[] = ALL_PLAN_FEATURES.filter((f) => !STARTER_FEATURES.includes(f));
 
 /** Paket mana yang menyertakan AI Business Assistant tanpa Add-on. */
 export const TIER_INCLUDES_AI: Record<PlanTier, boolean> = { starter: false, pro: true };
@@ -215,12 +236,17 @@ export function featureForApiRequest(pathname: string, method: string): PlanFeat
 
   if (under("/api/accounting")) {
     if (p === "/api/accounting/coa" && m === "GET") return null;
+    // Laba Rugi ringkas untuk Starter (baca saja). Ekspor PDF/Excel lewat /reports/export tetap Pro.
+    if (under("/api/accounting/profit-loss") && m === "GET") return "profit_report";
+    // Halaman Pengeluaran membaca periode tertutup untuk memberi peringatan sebelum menyetujui.
+    if (p === "/api/accounting/periods" && m === "GET") return "expenses";
     return "accounting";
   }
-  if (under("/api/account-mappings") || under("/api/other-income") || under("/api/cost-centers")) return "accounting";
+  if (under("/api/account-mappings") || under("/api/other-income")) return "accounting";
+  if (under("/api/cost-centers")) return "expenses";
   if (under("/api/expenses")) {
     if (p === "/api/expenses" && m === "GET") return null;
-    return "accounting";
+    return "expenses";
   }
   if (under("/api/assets") || under("/api/asset-purchases")) return "assets";
   if (under("/api/ppob")) {
@@ -235,7 +261,10 @@ export function featureForApiRequest(pathname: string, method: string): PlanFeat
 /** Fitur yang dibutuhkan halaman dashboard (untuk kunci di UI + gembok di sidebar). */
 export function featureForDashboardPath(pathname: string): PlanFeature | null {
   const under = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
-  if (under("/dashboard/accounting") || under("/dashboard/expenses") || under("/dashboard/other-income")) return "accounting";
+  // Halaman Akuntansi terbuka untuk Starter (tab Laba Rugi); tab lain dikunci di dalam halaman.
+  if (under("/dashboard/accounting")) return "profit_report";
+  if (under("/dashboard/expenses")) return "expenses";
+  if (under("/dashboard/other-income")) return "accounting";
   if (under("/dashboard/assets")) return "assets";
   if (under("/dashboard/ppob")) return "ppob";
   if (under("/dashboard/home-rental")) return "home_rental";
@@ -244,7 +273,9 @@ export function featureForDashboardPath(pathname: string): PlanFeature | null {
 }
 
 export const FEATURE_LABEL_ID: Record<PlanFeature, string> = {
-  accounting: "Akuntansi & Keuangan",
+  expenses: "Pengeluaran",
+  profit_report: "Laba Rugi Ringkas",
+  accounting: "Pembukuan Lengkap",
   assets: "Manajemen Aset",
   ppob: "PPOB (pulsa, token, tagihan)",
   anti_fraud: "Kontrol Anti-Fraud Shift",

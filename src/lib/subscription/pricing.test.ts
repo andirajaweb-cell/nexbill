@@ -70,9 +70,10 @@ describe("resolveEntitlements", () => {
     expect(e.features.length).toBeGreaterThan(0);
     expect(e.unitLimit).toBeNull();
   });
-  it("starter locks Pro features and caps units at the paid quota (min 5)", () => {
+  it("starter gets expenses, profit report and home rental; locks the rest; caps units at the paid quota (min 5)", () => {
     const e = resolveEntitlements({ status: "active", tier: "starter", planUnits: 3, minUnits: 5 });
-    expect(e.features).toEqual([]);
+    expect(e.features).toEqual(["expenses", "profit_report", "home_rental"]);
+    for (const f of ["accounting", "assets", "ppob", "anti_fraud", "multi_outlet"]) expect(e.features).not.toContain(f);
     expect(e.unitLimit).toBe(5);
     expect(resolveEntitlements({ status: "grace", tier: "starter", planUnits: 9 }).unitLimit).toBe(9);
   });
@@ -88,8 +89,15 @@ describe("feature routing", () => {
     expect(featureForApiRequest("/api/accounting/coa", "GET")).toBeNull();
     expect(featureForApiRequest("/api/accounting/coa", "POST")).toBe("accounting");
     expect(featureForApiRequest("/api/expenses", "GET")).toBeNull();
-    expect(featureForApiRequest("/api/expenses", "POST")).toBe("accounting");
-    expect(featureForApiRequest("/api/expenses/upload", "POST")).toBe("accounting");
+    expect(featureForApiRequest("/api/expenses", "POST")).toBe("expenses");
+    expect(featureForApiRequest("/api/expenses/upload", "POST")).toBe("expenses");
+    expect(featureForApiRequest("/api/cost-centers", "GET")).toBe("expenses");
+    expect(featureForApiRequest("/api/accounting/periods", "GET")).toBe("expenses");
+    expect(featureForApiRequest("/api/accounting/periods", "POST")).toBe("accounting");
+    expect(featureForApiRequest("/api/accounting/profit-loss", "GET")).toBe("profit_report");
+    expect(featureForApiRequest("/api/accounting/profit-loss/account-detail", "GET")).toBe("profit_report");
+    expect(featureForApiRequest("/api/accounting/reports/export", "GET")).toBe("accounting");
+    expect(featureForApiRequest("/api/other-income", "POST")).toBe("accounting");
     expect(featureForApiRequest("/api/assets/abc", "PATCH")).toBe("assets");
     expect(featureForApiRequest("/api/ppob/transactions", "POST")).toBe("ppob");
     expect(featureForApiRequest("/api/outlets", "POST")).toBe("multi_outlet");
@@ -98,7 +106,9 @@ describe("feature routing", () => {
     expect(featureForApiRequest("/api/assetsx", "GET")).toBeNull();
   });
   it("maps dashboard pages", () => {
-    expect(featureForDashboardPath("/dashboard/accounting")).toBe("accounting");
+    expect(featureForDashboardPath("/dashboard/accounting")).toBe("profit_report");
+    expect(featureForDashboardPath("/dashboard/expenses")).toBe("expenses");
+    expect(featureForDashboardPath("/dashboard/other-income")).toBe("accounting");
     expect(featureForDashboardPath("/dashboard/semua-outlet")).toBe("multi_outlet");
     expect(featureForDashboardPath("/dashboard/pos")).toBeNull();
   });
