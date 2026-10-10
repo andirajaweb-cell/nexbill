@@ -11,6 +11,9 @@ import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-booking";
 import { BookingMap, toLocalYmd } from "./BookingMap";
 import { OPEN_BOOKING_EVENT, BOOKINGS_CHANGED_EVENT } from "@/lib/rental/booking-events";
+import { PageGuide } from "@/components/dashboard/PageGuide";
+import { ShareBookingLink } from "./share-booking-link";
+import "@/lib/i18n/dict-setup";
 
 interface Booking {
   id: string;
@@ -224,6 +227,10 @@ export default function BookingPage() {
         <p className="text-sm text-neutral-500">{t("booking.pageSubtitle", "DP opsional, deteksi bentrok otomatis (termasuk booking \"konsol apa saja\"), waiting list auto-promote, dan auto-release bila belum check-in.")}</p>
       </div>
 
+      <PageGuide page="booking" title={t("booking.pageTitle", "Booking / Reservasi")} />
+
+      <ShareBookingLink />
+
       <Card className="flex flex-wrap items-end gap-2">
         <div className="flex-1 min-w-[200px]">
           <label className="text-xs text-neutral-500">{t("booking.lookupLabel", "Cari Kode Booking (check-in cepat)")}</label>
@@ -362,7 +369,21 @@ export default function BookingPage() {
             {renderActions(b)}
           </Card>
         ))}
-        {bookings.length === 0 && <p className="text-sm text-neutral-500">{t("booking.emptyState", "Belum ada booking.")}</p>}
+        {bookings.length === 0 && (
+          <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/40 p-5 text-center space-y-2">
+            <p className="text-sm text-neutral-400">{t("booking.emptyState", "Belum ada booking.")}</p>
+            <p className="text-xs text-neutral-500">{t("setup.booking.emptyHint", "Bagikan link booking online di atas, atau catat pesanan dari telepon/WhatsApp lewat Booking Baru.")}</p>
+            <Button
+              className="text-xs"
+              onClick={() => {
+                formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                setTimeout(() => nameRef.current?.focus(), 350);
+              }}
+            >
+              {t("setup.booking.createFirst", "Buat booking pertama")}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

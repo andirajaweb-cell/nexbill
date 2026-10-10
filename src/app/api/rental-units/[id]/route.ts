@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { rentalUnits } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
+import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError, errorStatus } from "@/lib/api/error";
 import { assertUnitQuotaAvailable } from "@/lib/subscription/service";
 
@@ -23,6 +24,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const [existing] = await db.select().from(rentalUnits).where(eq(rentalUnits.id, id)).limit(1);
     if (!existing || existing.outletId !== session.outletId) return NextResponse.json({ error: "Unit tidak ditemukan." }, { status: 404 });
+
+    // Tarif per jam = harga jual. Mengubahnya butuh izin harga (sama dengan Promo); peran lain tetap
+    // boleh mengubah hal operasional unit (maintenance, catatan, dll.).
+    if (
+      body.hourlyRate !== undefined &&
+      Number(body.hourlyRate) !== Number(existing.hourlyRate) &&
+      !hasPermission(session.role as StaffRole, "manage_pricing_promo")
+    ) {
+      return NextResponse.json({ error: "Role kamu tidak punya izin mengubah tarif unit." }, { status: 403 });
+    }
 
     if (body.isActive === false && existing.status === "occupied") {
       return NextResponse.json({ error: "Unit sedang dipakai — hentikan sesi dulu sebelum menonaktifkan unit." }, { status: 400 });

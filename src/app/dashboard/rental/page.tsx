@@ -42,6 +42,8 @@ import { UnitQrModal } from "./UnitQrModal";
 import { OfflineRentalBoard } from "./OfflineRentalBoard";
 import { useConnectivity, useOfflineData } from "@/lib/offline/hooks";
 import { getLastOutletId } from "@/lib/offline/store";
+import { PageGuide } from "@/components/dashboard/PageGuide";
+import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 
 // recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
 const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
@@ -334,9 +336,10 @@ function OnlineRentalPage() {
   // "Atur tarif semua unit" (lib: quick-rate-editor). Dibuka otomatis lewat ?atur=tarif dari daftar
   // "Siap Buka Outlet" di Ringkasan.
   const [showRateEditor, setShowRateEditor] = useState(false);
+  const canEditRates = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_pricing_promo");
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("atur") === "tarif") setShowRateEditor(true);
-  }, []);
+    if (new URLSearchParams(window.location.search).get("atur") === "tarif" && canEditRates) setShowRateEditor(true);
+  }, [canEditRates]);
   const [sessions, setSessions] = useState<RentalSession[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [bills, setBills] = useState<Record<string, BillBreakdown>>({});
@@ -1102,14 +1105,18 @@ function OnlineRentalPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <LiveClock lang={lang} />
           <NotificationVolumeControl onPreview={() => playAlertBeep()} />
-          <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowRateEditor((v) => !v)}>
-            {t("setup.rates.openButton", "Atur Tarif Semua Unit")}
-          </Button>
+          {canEditRates && (
+            <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowRateEditor((v) => !v)}>
+              {t("setup.rates.openButton", "Atur Tarif Semua Unit")}
+            </Button>
+          )}
           <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowUnitManager((v) => !v)}>
             <Settings size={14} /> {showUnitManager ? t("rental.toggleCloseUnitManager", "Tutup Kelola Unit") : t("rental.toggleOpenUnitManager", "Kelola Unit")}
           </Button>
         </div>
       </div>
+
+      <PageGuide page="rental" title={t("nav.rental", "Rental PS")} />
 
       {(() => {
         const zero = units.filter((u) => u.isActive !== false && !(u.hourlyRate > 0));
@@ -1119,11 +1126,15 @@ function OnlineRentalPage() {
             <span className="flex-1 min-w-[220px]">
               {t("setup.rates.zeroBanner", "{n} unit tarifnya masih Rp0 — sesi di unit ini akan tertagih Rp0.").replace("{n}", String(zero.length))}
             </span>
-            <Button className="text-xs" onClick={() => setShowRateEditor(true)}>{t("setup.rates.fixNow", "Atur tarif sekarang")}</Button>
+            {canEditRates ? (
+              <Button className="text-xs" onClick={() => setShowRateEditor(true)}>{t("setup.rates.fixNow", "Atur tarif sekarang")}</Button>
+            ) : (
+              <span className="text-xs text-amber-200/80">{t("setup.rates.askOwner", "Minta pemilik atau manajer mengatur tarifnya.")}</span>
+            )}
           </div>
         );
       })()}
-      {showRateEditor && (
+      {showRateEditor && canEditRates && (
         <QuickRateEditor units={units} consoleTypes={CONSOLE_TYPES} onClose={() => setShowRateEditor(false)} onSaved={() => load()} />
       )}
 

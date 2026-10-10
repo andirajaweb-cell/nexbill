@@ -1,7 +1,7 @@
 "use client";
 import { PrintReceiptButton } from "@/components/printer/PrintReceiptButton";
 import { CameraScanner } from "@/components/scanner/CameraScanner";
-import { ScanLine } from "lucide-react";
+import { ScanLine, Plus } from "lucide-react";
 import "@/lib/i18n/dict-scanner";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Card } from "@/components/ui/Card";
@@ -18,6 +18,11 @@ import "@/lib/i18n/dict-pos";
 import { useAuth } from "@/lib/auth/client";
 import { buildOrderTimeLabel } from "@/lib/pos/open-order-label";
 import type { DateFormatStyle } from "@/lib/format/date";
+import { PageGuide } from "@/components/dashboard/PageGuide";
+import Link from "next/link";
+import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
+import { QuickAddProduct } from "./quick-add-product";
+import "@/lib/i18n/dict-setup";
 
 interface Product {
   id: string;
@@ -117,6 +122,16 @@ export default function PosPage() {
   }, []);
 
   const loadOpenOrders = () => fetchJsonArray("/api/orders?status=open").then(setOpenOrders);
+  const loadProducts = () =>
+    fetchJsonArray("/api/products").then((rows) => {
+      setProducts(rows.filter((p: Product) => p.isActive && p.category !== "device_rental"));
+      setProductsLoaded(true);
+    });
+  // "Tambah menu cepat" — hanya untuk peran yang boleh mengubah katalog/harga (server memeriksa juga).
+  const role = (user?.role ?? "cashier") as StaffRole;
+  const canAddProduct = hasPermission(role, "manage_inventory_purchasing") || hasPermission(role, "manage_pricing_promo");
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [productsLoaded, setProductsLoaded] = useState(false);
 
   // Restore any in-progress order left over from before navigating away.
   useEffect(() => {
@@ -155,7 +170,7 @@ export default function PosPage() {
     // Rental + the Rental page's own session/accessory system — they're not
     // sellable through the generic F&B/retail cashier, so exclude them here
     // regardless of what's in the Produk catalog.
-    fetchJsonArray("/api/products").then((rows) => setProducts(rows.filter((p: Product) => p.isActive && p.category !== "device_rental")));
+    loadProducts();
     loadOpenOrders();
   }, []);
 
@@ -353,6 +368,8 @@ export default function PosPage() {
           <p className="text-sm text-neutral-500">{t("pos.subtitle", "Makanan & minuman. Sewa perangkat dikelola di Home Rental / halaman Rental, bukan di sini.")}</p>
         </div>
 
+        <PageGuide page="pos" title={t("pos.title", "Kasir (POS)")} />
+
         <div className="flex gap-2">
           <input
             ref={searchRef}
@@ -371,6 +388,16 @@ export default function PosPage() {
           >
             <ScanLine size={16} /> <span className="hidden sm:inline">{t("scanner.button", "Scan kamera")}</span>
           </button>
+          {canAddProduct && (
+            <button
+              type="button"
+              onClick={() => setShowQuickAdd(true)}
+              className="shrink-0 flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 text-sm text-emerald-200 hover:bg-emerald-500/20"
+              title={t("setup.quickProduct.button", "Tambah menu")}
+            >
+              <Plus size={16} /> <span className="hidden sm:inline">{t("setup.quickProduct.button", "Tambah menu")}</span>
+            </button>
+          )}
         </div>
         <CameraScanner
           open={scanOpen}
@@ -385,6 +412,15 @@ export default function PosPage() {
             return t("scanner.added", "Ditambahkan: {name}").replace("{name}", exact.name);
           }}
         />
+        {showQuickAdd && (
+          <QuickAddProduct
+            onClose={() => setShowQuickAdd(false)}
+            onCreated={(p) => {
+              loadProducts();
+              setCart((prev) => [...prev, { productId: p.id, description: p.name, qty: 1, unitPrice: p.price }]);
+            }}
+          />
+        )}
 
         {openOrders.length > 0 && (
           <Card>
@@ -451,6 +487,26 @@ export default function PosPage() {
                     </div>
                   </button>
                 ))}
+              </div>
+            )}
+          </div>
+        ) : productsLoaded && products.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/40 p-6 text-center space-y-3">
+            <div className="text-sm font-medium text-neutral-200">{t("setup.pos.emptyTitle", "Belum ada menu untuk dijual")}</div>
+            <p className="text-xs text-neutral-500">
+              {canAddProduct
+                ? t("setup.pos.emptyBody", "Tambahkan menu makanan/minuman pertama Anda di sini, atau impor banyak menu sekaligus dari Excel.")
+                : t("setup.pos.emptyBodyCashier", "Minta pemilik atau manajer menambahkan menu di Inventory.")}
+            </p>
+            {canAddProduct && (
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button onClick={() => setShowQuickAdd(true)}>{t("setup.quickProduct.title", "Tambah menu cepat")}</Button>
+                <Link
+                  href="/dashboard/inventory"
+                  className="rounded-lg px-3 py-2 text-sm font-medium bg-white/5 border border-white/10 text-neutral-100 hover:bg-white/10"
+                >
+                  {t("setup.quickProduct.importLink", "Banyak menu? Import dari Excel")}
+                </Link>
               </div>
             )}
           </div>

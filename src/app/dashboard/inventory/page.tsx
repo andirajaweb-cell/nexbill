@@ -23,6 +23,8 @@ import { BarcodeField } from "@/components/scanner/BarcodeField";
 import { ProductScanButton } from "@/components/scanner/ProductScanButton";
 import { findBarcodeConflict, normalizeBarcode } from "@/lib/inventory/barcode";
 import "@/lib/i18n/dict-scanner";
+import { PageGuide } from "@/components/dashboard/PageGuide";
+import "@/lib/i18n/dict-setup";
 
 /** Label opsi produk di pemilih + teks cari barcode/SKU (scanner USB yang mengetik ke kotak cari ikut cocok). */
 const productOption = (p: { id: string; name: string; barcode?: string | null; sku?: string | null }, label?: string) => ({
@@ -92,6 +94,8 @@ export default function InventoryPage() {
         <p className="text-sm text-neutral-500">{t("inventory.pageSubtitle", "Stok, supplier, purchase order, dan stock opname — semua otomatis terhubung ke akuntansi.")}</p>
       </div>
 
+      <PageGuide page="inventory" title={t("inventory.pageTitle", "Inventory Control")} />
+
       <div className="flex gap-1 border-b border-neutral-800 overflow-x-auto">
         {TABS.map((tb) => (
           <button key={tb} onClick={() => setTab(tb)} className={`px-3 py-2 text-sm whitespace-nowrap ${tab === tb ? "border-b-2 border-emerald-500 text-emerald-400" : "text-neutral-500 hover:text-neutral-300"}`}>{t(TAB_LABEL_KEYS[tb].key, TAB_LABEL_KEYS[tb].fallback)}</button>
@@ -140,6 +144,7 @@ function ProductTab({ outletId }: { outletId: string }) {
   // loading menutupi halaman sampai server selesai (produk + stok awal + jurnal Persediaan).
   const proses = useProsesTunggal();
   const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoaded, setProductsLoaded] = useState(false);
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
@@ -182,7 +187,10 @@ function ProductTab({ outletId }: { outletId: string }) {
 
   const load = () => {
     fetchJsonObject<CostMethodInfo>("/api/inventory/cost-method").then(setCostInfo);
-    return fetchJsonArray("/api/products").then(setProducts);
+    return fetchJsonArray("/api/products").then((rows) => {
+      setProducts(rows);
+      setProductsLoaded(true);
+    });
   };
   useEffect(() => {
     load();
@@ -429,6 +437,15 @@ function ProductTab({ outletId }: { outletId: string }) {
             <option value="stock_asc">{t("inventory.product.sortStockAsc", "Stok Tersedikit")}</option>
           </select>
         </div>
+        {productsLoaded && products.length === 0 && (
+          <div className="my-3 rounded-xl border border-dashed border-neutral-700 bg-neutral-900/40 p-5 text-center space-y-2">
+            <div className="text-sm font-medium text-neutral-200">{t("setup.inventory.emptyTitle", "Belum ada produk")}</div>
+            <p className="text-xs text-neutral-500">{t("setup.inventory.emptyBody", "Isi Tambah Produk Baru untuk satu per satu, atau Import Produk dari Excel untuk banyak produk sekaligus.")}</p>
+            <Button className="text-xs" onClick={() => addFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+              {t("setup.inventory.addFirst", "Tambah produk pertama")}
+            </Button>
+          </div>
+        )}
         {filteredProducts.length === 0 && products.length > 0 && (
           <p className="text-sm text-neutral-500 py-4 text-center">{t("inventory.product.noSearchResults", "Tidak ada produk yang cocok dengan pencarian/filter ini.")}</p>
         )}

@@ -15,6 +15,7 @@ import "@/lib/i18n/dict-membership";
 import { isPaidTier, summarizeTierBenefits, isMembershipActive, sisaHariKeanggotaan } from "@/lib/membership/tier-benefits";
 import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
 import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
+import { PageGuide } from "@/components/dashboard/PageGuide";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const TABS = ["Customer", "Membership Tier", "Reward", "Voucher"] as const;
@@ -65,6 +66,8 @@ function MembershipPageInner() {
         <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("membership.pageTitle", "Membership & CRM")}</h1>
         <p className="text-sm text-neutral-500">{t("membership.pageSubtitle", "Poin loyalty & upgrade tier otomatis setiap transaksi selesai — atau langsung jual keanggotaan (Cash/QRIS) dari detail customer, dengan biaya yang bisa diatur per outlet di tab Membership Tier.")}</p>
       </div>
+
+      <PageGuide page="membership" title={t("membership.pageTitle", "Membership & CRM")} />
 
       <div className="flex gap-1 border-b border-neutral-800">
         {TABS.map((tabItem) => (

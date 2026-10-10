@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { products } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
+import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { recordOpeningStock } from "@/lib/accounting/inventory-postings";
 import { lockEntity } from "@/lib/accounting/journal";
@@ -27,6 +28,13 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    // Membuat produk = mengubah katalog & harga jual (plus stok awal dan jurnal Persediaan), jadi
+    // butuh izin yang sama dengan Inventory/harga. Dulu cukup login, sehingga peran mana pun bisa
+    // membuat produk lewat API meski menu Inventory tidak tampil untuknya.
+    const role = session.role as StaffRole;
+    if (!hasPermission(role, "manage_inventory_purchasing") && !hasPermission(role, "manage_pricing_promo")) {
+      return NextResponse.json({ error: "Role kamu tidak punya izin menambah produk." }, { status: 403 });
+    }
     const body = await req.json();
     const { outletId: _ignoredOutlet, ...rest } = body;
     const name = typeof rest.name === "string" ? rest.name.trim().replace(/\s+/g, " ") : "";

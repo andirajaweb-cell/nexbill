@@ -8,6 +8,7 @@ import "@/lib/i18n/dict-reports";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { PeriodBar, resolvePeriodPreset, describePeriod, type PeriodPreset } from "@/components/reports/PeriodPicker";
+import { PageGuide } from "@/components/dashboard/PageGuide";
 
 // recharts moved to its own lazy-loaded chunks (one per tab's chart) — see BusyHoursChart.tsx's
 // doc comment for the rationale. Only whichever report tab the user actually opens pays for it.
@@ -73,6 +74,8 @@ export default function ReportsPage() {
         <h1 className="gm-display text-2xl font-bold gm-gradient-title">{t("reports.title", "Laporan & Analitik")}</h1>
         <p className="text-sm text-neutral-500">{t("reports.subtitle", "Laporan operasional per periode — penjualan, rental, inventori/HPP, dan pelanggan.")}</p>
       </div>
+
+      <PageGuide page="reports" title={t("reports.title", "Laporan & Analitik")} />
 
       <div className="flex gap-1 border-b border-neutral-800 overflow-x-auto">
         {TABS.map((tabId) => (

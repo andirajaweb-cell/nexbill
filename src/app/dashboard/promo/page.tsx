@@ -8,6 +8,8 @@ import { fetchJsonArray } from "@/lib/api/fetch-json";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-promo";
+import { PageGuide } from "@/components/dashboard/PageGuide";
+import "@/lib/i18n/dict-setup";
 
 interface BundleItem {
   id?: string;
@@ -150,8 +152,29 @@ export default function PromoPage() {
         <p className="text-sm text-neutral-500">{t("promo.subtitle", "Paket harga tetap untuk durasi tertentu, dipakai juga oleh AI agent saat menjawab chat.")}</p>
       </div>
 
+      <PageGuide page="promo" title={t("promo.title", "Promo & Paket Rental")} />
+
       <Card>
         <h2 className="font-medium mb-3">{t("promo.createHeading", "Buat Paket Rental")}</h2>
+        {/* Contoh siap pakai: mengisi nama & durasi, harga tetap diisi pemilik (tidak ada harga karangan). */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-neutral-500">{t("setup.promo.templates", "Contoh cepat:")}</span>
+          {[
+            { key: "setup.promo.tpl3h", fallback: "Paket 3 Jam", minutes: 180 },
+            { key: "setup.promo.tplNight", fallback: "Paket Malam 5 Jam", minutes: 300 },
+            { key: "setup.promo.tplStudent", fallback: "Paket Pelajar 2 Jam", minutes: 120 },
+          ].map((tpl) => (
+            <button
+              key={tpl.key}
+              type="button"
+              onClick={() => setForm({ ...form, name: t(tpl.key, tpl.fallback), durationMinutes: tpl.minutes })}
+              className="rounded-full border border-neutral-700 px-2.5 py-1 text-neutral-300 hover:border-emerald-500 hover:text-emerald-300"
+            >
+              {t(tpl.key, tpl.fallback)}
+            </button>
+          ))}
+          <span className="text-neutral-600">{t("setup.promo.templatesHint", "lalu isi harga paketnya.")}</span>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           <input className="col-span-2 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("promo.namePlaceholder", "Nama paket (mis. Paket 3 Jam PS4)")}
             value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -274,7 +297,11 @@ export default function PromoPage() {
             )}
           </Card>
         ))}
-        {promos.length === 0 && <p className="text-sm text-neutral-500">{t("promo.emptyState", "Belum ada paket promo.")}</p>}
+        {promos.length === 0 && (
+          <p className="text-sm text-neutral-500">
+            {t("promo.emptyState", "Belum ada paket promo.")} {t("setup.promo.emptyHint", "Pilih salah satu contoh cepat di atas untuk membuat paket pertama.")}
+          </p>
+        )}
       </div>
     </div>
   );
