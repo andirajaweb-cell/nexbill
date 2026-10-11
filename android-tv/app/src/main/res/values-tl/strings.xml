@@ -36,4 +36,8 @@
     <string name="info_input">HDMI input: %1$s</string>
     <string name="info_mode">Mode: %1$s</string>
     <string name="info_overlay">Ipakita sa ibabaw ng ibang app: %1$s</string>
+    <string name="menu_update">Tingnan ang update ng app</string>
+    <string name="update_available">May bagong bersyon %1$s. Para mag-update: buksan ang Downloader app sa TV na ito, i-type ang %2$s, saka piliin ang Install. Mananatili ang pairing at settings.</string>
+    <string name="update_latest">Pinakabago na ang app (%1$s).</string>
+    <string name="update_error">Hindi matingnan ang update. Siguraduhing nakakonekta sa internet ang TV.</string>
 </resources>

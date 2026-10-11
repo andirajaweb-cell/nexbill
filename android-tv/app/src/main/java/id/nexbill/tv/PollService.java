@@ -29,6 +29,18 @@ public class PollService extends Service {
     private final Handler main = new Handler(Looper.getMainLooper());
     private OverlayTimer overlay;
     private long lastBroughtFront;
+    private String lastToken = "";
+    /** Token baru dari halaman /tv (pairing selesai) → ambil status SEKARANG, tidak menunggu 5 detik. */
+    private final Runnable onRepoChange = () -> {
+        String t = StateRepo.token(PollService.this);
+        if (!t.equals(lastToken)) {
+            lastToken = t;
+            if (worker != null && !t.isEmpty()) {
+                worker.removeCallbacks(PollService.this.poll);
+                worker.post(PollService.this.poll);
+            }
+        }
+    };
 
     static void start(Context c) {
         Intent i = new Intent(c, PollService.class);
@@ -48,6 +60,8 @@ public class PollService extends Service {
         thread = new HandlerThread("nexbill-poll");
         thread.start();
         worker = new Handler(thread.getLooper());
+        lastToken = StateRepo.token(this);
+        StateRepo.addListener(onRepoChange);
         worker.post(poll);
         main.post(tick);
     }
@@ -60,6 +74,7 @@ public class PollService extends Service {
     @Override
     public void onDestroy() {
         main.removeCallbacks(tick);
+        StateRepo.removeListener(onRepoChange);
         if (worker != null) worker.removeCallbacksAndMessages(null);
         if (thread != null) thread.quitSafely();
         overlay.hide();

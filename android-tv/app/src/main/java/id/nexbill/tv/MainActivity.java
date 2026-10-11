@@ -191,6 +191,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        // Termasuk muat-ulang halaman yang dijadwalkan onReceivedError — jangan sampai jalan setelah destroy.
+        ui.removeCallbacksAndMessages(null);
         web.destroy();
         super.onDestroy();
     }
@@ -274,6 +276,19 @@ public class MainActivity extends Activity {
 
     /** ---------------- Input HDMI ---------------- */
 
+    private List<TvInputInfo> cachedInputs;
+    private long cachedInputsAt;
+
+    /** Daftar input dibaca ulang paling sering tiap 10 detik — render() berjalan setiap detik. */
+    private List<TvInputInfo> hdmiInputsCached() {
+        long now = SystemClock.elapsedRealtime();
+        if (cachedInputs == null || now - cachedInputsAt > 10_000) {
+            cachedInputs = hdmiInputs();
+            cachedInputsAt = now;
+        }
+        return cachedInputs;
+    }
+
     private List<TvInputInfo> hdmiInputs() {
         List<TvInputInfo> out = new ArrayList<>();
         TvInputManager tim = (TvInputManager) getSystemService(Context.TV_INPUT_SERVICE);
@@ -289,7 +304,7 @@ public class MainActivity extends Activity {
 
     /** Input yang dipilih staf; kalau belum dipilih, HDMI pertama yang ditemukan. */
     private String chosenInput() {
-        List<TvInputInfo> inputs = hdmiInputs();
+        List<TvInputInfo> inputs = hdmiInputsCached();
         if (inputs.isEmpty()) return null;
         String saved = StateRepo.hdmiInput(this);
         for (TvInputInfo i : inputs) if (i.getId().equals(saved)) return saved;
@@ -376,6 +391,7 @@ public class MainActivity extends Activity {
                 getString(R.string.menu_overlay),
                 getString(R.string.menu_home),
                 getString(R.string.menu_reload),
+                getString(R.string.menu_update),
                 getString(R.string.menu_info),
         };
         new AlertDialog.Builder(this)
@@ -391,6 +407,7 @@ public class MainActivity extends Activity {
                         case 4: openSettings(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))); break;
                         case 5: openSettings(new Intent(Settings.ACTION_HOME_SETTINGS)); break;
                         case 6: web.loadUrl(Config.TV_PAGE); break;
+                        case 7: checkUpdate(); break;
                         default: showInfo(); break;
                     }
                 })
@@ -400,6 +417,8 @@ public class MainActivity extends Activity {
 
     private void pickHdmi() {
         final List<TvInputInfo> inputs = hdmiInputs();
+        cachedInputs = inputs;
+        cachedInputsAt = SystemClock.elapsedRealtime();
         if (inputs.isEmpty()) {
             Toast.makeText(this, R.string.no_hdmi, Toast.LENGTH_LONG).show();
             return;
@@ -438,6 +457,30 @@ public class MainActivity extends Activity {
         } catch (ActivityNotFoundException | SecurityException e) {
             Toast.makeText(this, R.string.not_supported, Toast.LENGTH_LONG).show();
         }
+    }
+
+    /**
+     * Cek versi terbaru di nexbill.id. Sengaja TIDAK memasang sendiri: aplikasi yang memperbarui diri
+     * di luar Google Play dilarang kebijakan Play. Selama dipasang manual, staf cukup memasang ulang
+     * lewat aplikasi Downloader dengan alamat yang sama (data & pairing tetap tersimpan).
+     */
+    private void checkUpdate() {
+        new Thread(() -> {
+            String msg;
+            try {
+                Http.Result r = Http.request("GET", Config.LATEST_URL, null, null);
+                JSONObject o = new JSONObject(r.body);
+                int latest = o.optInt("versionCode", 0);
+                String name = o.optString("versionName", "");
+                msg = r.code == 200 && latest > Config.VERSION_CODE
+                        ? getString(R.string.update_available, name, Config.INSTALL_SHORT_URL)
+                        : getString(R.string.update_latest, Config.APP_VERSION);
+            } catch (Exception e) {
+                msg = getString(R.string.update_error);
+            }
+            final String text = msg;
+            ui.post(() -> new AlertDialog.Builder(this).setTitle(R.string.menu_update).setMessage(text).setPositiveButton(R.string.ok, null).show());
+        }).start();
     }
 
     private void showInfo() {

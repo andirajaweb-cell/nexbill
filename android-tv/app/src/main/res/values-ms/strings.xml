@@ -36,4 +36,8 @@
     <string name="info_input">Input HDMI: %1$s</string>
     <string name="info_mode">Mod: %1$s</string>
     <string name="info_overlay">Paparan di atas aplikasi lain: %1$s</string>
+    <string name="menu_update">Semak kemas kini apl</string>
+    <string name="update_available">Versi baharu %1$s tersedia. Cara mengemas kini: buka apl Downloader pada TV ini, taip %2$s, kemudian pilih Install. Pairing dan tetapan kekal tersimpan.</string>
+    <string name="update_latest">Apl sudah versi terkini (%1$s).</string>
+    <string name="update_error">Tidak dapat menyemak kemas kini. Pastikan TV bersambung ke internet.</string>
 </resources>

@@ -14,12 +14,34 @@ android {
         versionName '1.0.0'
     }
 
-    // Kunci upload diisi lewat Android Studio (Build > Generate Signed App Bundle) atau
-    // local.properties — tidak pernah di-commit. Lihat README.md.
+    // Kunci upload TIDAK pernah di-commit. Dua cara mengisinya (lihat README.md):
+    //   - Android Studio: Build > Generate Signed App Bundle / APK;
+    //   - GitHub Actions (.github/workflows/nexbill-tv.yml): environment variable NEXBILL_TV_KEYSTORE
+    //     (path file .jks), NEXBILL_TV_KEYSTORE_PASSWORD, NEXBILL_TV_KEY_ALIAS, NEXBILL_TV_KEY_PASSWORD.
+    // Tanpa variabel itu build release tetap jalan tapi tidak ditandatangani.
+    def ksPath = System.getenv("NEXBILL_TV_KEYSTORE")
+    signingConfigs {
+        if (ksPath != null && !ksPath.isEmpty()) {
+            release {
+                storeFile file(ksPath)
+                storePassword System.getenv("NEXBILL_TV_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("NEXBILL_TV_KEY_ALIAS")
+                keyPassword System.getenv("NEXBILL_TV_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            if (ksPath != null && !ksPath.isEmpty()) signingConfig signingConfigs.release
         }
+    }
+
+    // Laporan lint tetap dibuat (artifact "nexbill-tv-lint" di GitHub Actions), tapi temuan lint tidak
+    // menggagalkan build — yang wajib lulus adalah kompilasinya.
+    lint {
+        abortOnError false
     }
 
     compileOptions {

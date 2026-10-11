@@ -36,4 +36,8 @@
     <string name="info_input">Cổng HDMI: %1$s</string>
     <string name="info_mode">Chế độ: %1$s</string>
     <string name="info_overlay">Hiển thị trên ứng dụng khác: %1$s</string>
+    <string name="menu_update">Kiểm tra cập nhật ứng dụng</string>
+    <string name="update_available">Đã có phiên bản mới %1$s. Cách cập nhật: mở ứng dụng Downloader trên TV này, gõ %2$s rồi chọn Install. Ghép nối và cài đặt vẫn được giữ.</string>
+    <string name="update_latest">Ứng dụng đã là bản mới nhất (%1$s).</string>
+    <string name="update_error">Không kiểm tra được cập nhật. Hãy chắc TV đã kết nối internet.</string>
 </resources>

@@ -16,7 +16,7 @@ export function TvAppGuide() {
       title: t("devices.guide.tvApp.s1Title", "Pasang aplikasi NEXBILL TV di TV"),
       body: t(
         "devices.guide.tvApp.s1Body",
-        "Di TV, buka Google Play, cari \"NEXBILL TV\", lalu Instal. Selama aplikasi belum terbit di Google Play, minta file pemasangnya ke tim NEXBILL lewat menu Chat/Bantuan."
+        "Di TV, buka Google Play dan pasang aplikasi gratis \"Downloader\" (by AFTVnews). Buka Downloader, ketik alamat nexbill.id/tvapk lalu Go — file NEXBILL TV terunduh, pilih Install. Kalau TV bertanya, izinkan Downloader memasang aplikasi tidak dikenal. Setelah NEXBILL TV terbit di Google Play, cukup cari \"NEXBILL TV\" di Google Play."
       ),
     },
     {
@@ -88,6 +88,8 @@ export function TvAppGuide() {
           )}
         </p>
       </div>
+
+      <p className="text-neutral-500">{t("devices.guide.tvApp.updateNote", "Memperbarui aplikasi: di TV tahan OK 3 detik → \"Cek pembaruan aplikasi\". Kalau ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi — pairing dan pengaturan tetap tersimpan.")}</p>
 
       <p className="text-neutral-500">
         {t(

@@ -28,6 +28,19 @@ const nextConfig: NextConfig = {
           { key: "Service-Worker-Allowed", value: "/" },
         ],
       },
+      // APK NEXBILL TV (android-tv/build.ps1 -Step publish): tipe yang benar supaya aplikasi Downloader
+      // di TV langsung menawarkan Install; latest.json selalu dicek ulang (menu staf "Cek pembaruan").
+      {
+        source: "/downloads/nexbill-tv/nexbill-tv.apk",
+        headers: [
+          { key: "Content-Type", value: "application/vnd.android.package-archive" },
+          { key: "Cache-Control", value: "no-cache" },
+        ],
+      },
+      {
+        source: "/downloads/nexbill-tv/latest.json",
+        headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }],
+      },
       {
         source: "/:path*",
         headers: [

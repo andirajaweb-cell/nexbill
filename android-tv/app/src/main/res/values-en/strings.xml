@@ -36,4 +36,8 @@
     <string name="info_input">HDMI input: %1$s</string>
     <string name="info_mode">Mode: %1$s</string>
     <string name="info_overlay">Display over other apps: %1$s</string>
+    <string name="menu_update">Check for app update</string>
+    <string name="update_available">New version %1$s is available. To update: open the Downloader app on this TV, type %2$s, then choose Install. Pairing and settings are kept.</string>
+    <string name="update_latest">The app is up to date (%1$s).</string>
+    <string name="update_error">Could not check for updates. Make sure the TV is connected to the internet.</string>
 </resources>

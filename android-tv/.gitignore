@@ -9,3 +9,4 @@ local.properties
 *.idsig
 .idea/
 *.iml
+build-log.txt

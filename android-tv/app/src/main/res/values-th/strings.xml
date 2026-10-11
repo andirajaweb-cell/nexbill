@@ -36,4 +36,8 @@
     <string name="info_input">อินพุต HDMI: %1$s</string>
     <string name="info_mode">โหมด: %1$s</string>
     <string name="info_overlay">แสดงทับแอปอื่น: %1$s</string>
+    <string name="menu_update">ตรวจหาอัปเดตแอป</string>
+    <string name="update_available">มีเวอร์ชันใหม่ %1$s วิธีอัปเดต: เปิดแอป Downloader บนทีวีนี้ พิมพ์ %2$s แล้วเลือก Install การจับคู่และการตั้งค่ายังอยู่ครบ</string>
+    <string name="update_latest">แอปเป็นเวอร์ชันล่าสุดแล้ว (%1$s)</string>
+    <string name="update_error">ตรวจหาอัปเดตไม่ได้ ตรวจว่าทีวีเชื่อมต่ออินเทอร์เน็ต</string>
 </resources>

@@ -37,4 +37,8 @@
     <string name="info_input">Input HDMI: %1$s</string>
     <string name="info_mode">Mode: %1$s</string>
     <string name="info_overlay">Izin tampil di atas aplikasi lain: %1$s</string>
+    <string name="menu_update">Cek pembaruan aplikasi</string>
+    <string name="update_available">Versi baru %1$s tersedia. Cara memperbarui: buka aplikasi Downloader di TV ini, ketik %2$s, lalu pilih Instal. Pairing dan pengaturan tetap tersimpan.</string>
+    <string name="update_latest">Aplikasi sudah versi terbaru (%1$s).</string>
+    <string name="update_error">Tidak bisa mengecek pembaruan. Pastikan TV tersambung ke internet.</string>
 </resources>
