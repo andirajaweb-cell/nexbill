@@ -15,10 +15,11 @@ import { ANDROID_GUIDE_URL } from "@/components/devices/AndroidRelayVisualGuide"
  * dan autostart lewat Termux:Boot. Setiap perintah di sini punya tombol Salin supaya pemilik
  * outlet tidak perlu mengetik apa pun.
  */
-// `pkg upgrade` dulu: Termux yang lama tidak di-upgrade lalu memasang curl baru berakhir dengan
-// "CANNOT LINK EXECUTABLE curl … SSL_set_quic_tls_early_data_enabled" (curl baru, openssl lama).
+// Upgrade penuh dulu: Termux lama yang langsung memasang curl baru berakhir dengan "CANNOT LINK
+// EXECUTABLE curl … SSL_set_quic_tls_early_data_enabled" (curl baru, openssl lama). Pakai `apt`, bukan
+// `pkg`: pkg memakai curl untuk memilih mirror, sehingga ikut gagal saat curl rusak.
 export const ANDROID_INSTALL_COMMAND =
-  "yes | pkg upgrade && pkg install -y curl && curl -fsSL https://www.nexbill.id/downloads/nexbill-agent/android/install.sh | bash";
+  "apt update && yes | apt full-upgrade && apt install -y curl && curl -fsSL https://www.nexbill.id/downloads/nexbill-agent/android/install.sh | bash";
 const TERMUX_URL = "https://f-droid.org/packages/com.termux/";
 const TERMUX_BOOT_URL = "https://f-droid.org/packages/com.termux.boot/";
 
@@ -163,7 +164,7 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
           <AlertTriangle size={14} /> {t("devices.guide.android.troubleTitle", "Kalau ada masalah")}
         </div>
         <ul className="list-disc pl-4 space-y-1">
-          <li>{t("devices.guide.android.troubleCurl", "Muncul \"CANNOT LINK EXECUTABLE curl\" atau \"cannot locate symbol\": paket Termux belum diperbarui semua. Di Termux ketik: yes | pkg upgrade — tunggu selesai, lalu tempel lagi perintah Langkah 3.")}</li>
+          <li>{t("devices.guide.android.troubleCurl", "Muncul \"CANNOT LINK EXECUTABLE curl\" atau \"cannot locate symbol\": paket Termux belum diperbarui semua. Di Termux ketik: apt update && yes | apt full-upgrade — tunggu selesai, lalu tempel lagi perintah Langkah 3.")}</li>
           <li>{t("devices.guide.android.trouble1", "Relay Agent \"offline\": buka Termux, ketik nexbill lalu Enter.")}</li>
           <li>{t("devices.guide.android.trouble2", "TV tidak merespons: pastikan TV menyala/standby dan di WiFi yang sama, lalu di Termux ketik nexbill-tv diikuti IP TV.")}</li>
           <li>{t("devices.guide.android.trouble3", "Setelah HP dinyalakan ulang, agent menyala sendiri (Termux:Boot). Kalau tidak, buka Termux dan ketik nexbill.")}</li>

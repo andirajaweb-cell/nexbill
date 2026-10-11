@@ -2,7 +2,7 @@
 # =====================================================================================
 #  NEXBILL Relay Agent — pemasangan di HP Android (aplikasi Termux)
 #  Jalankan di Termux dengan SATU perintah (salin dari halaman Kontrol Perangkat):
-#    yes | pkg upgrade && pkg install -y curl && curl -fsSL https://www.nexbill.id/downloads/nexbill-agent/android/install.sh | bash
+#    apt update && yes | apt full-upgrade && apt install -y curl && curl -fsSL https://www.nexbill.id/downloads/nexbill-agent/android/install.sh | bash
 #  Aman dijalankan ulang (untuk memperbarui agent). Token tersimpan di ~/nexbill/config.json.
 # =====================================================================================
 set -e
@@ -18,10 +18,12 @@ echo "Pastikan HP terhubung ke WiFi outlet (WiFi yang sama dengan TV) dan sedang
 say "[1/5] Memasang Node.js dan adb (butuh internet, sekitar 2-5 menit)..."
 # Upgrade PENUH, bukan cuma `pkg update`: memasang paket baru di atas Termux yang belum di-upgrade
 # membuat pustaka tidak cocok — contoh nyata: curl baru + openssl lama = "CANNOT LINK EXECUTABLE curl:
-# cannot locate symbol SSL_set_quic_tls_early_data_enabled". --force-confnew + `yes` supaya tidak
-# berhenti menunggu jawaban soal file konfigurasi.
-yes | pkg upgrade -y -o Dpkg::Options::=--force-confnew >/dev/null 2>&1 || true
-pkg install -y nodejs-lts android-tools curl >/dev/null
+# cannot locate symbol SSL_set_quic_tls_early_data_enabled". Sengaja `apt`, bukan `pkg`: pkg memakai
+# curl untuk memilih mirror, jadi pkg ikut gagal begitu curl rusak; apt tetap jalan.
+# --force-confnew + `yes` supaya tidak berhenti menunggu jawaban soal file konfigurasi.
+apt update -y >/dev/null 2>&1 || true
+yes | apt full-upgrade -y -o Dpkg::Options::=--force-confnew >/dev/null 2>&1 || true
+apt install -y nodejs-lts android-tools curl >/dev/null
 
 say "[2/5] Mengunduh NexbillAgent..."
 mkdir -p "$DIR"
