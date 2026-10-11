@@ -6,7 +6,10 @@ import { useDashboardLang, type LangCode } from "@/lib/i18n/dashboard-lang";
 import { showAlert } from "@/lib/ui/dialog";
 import { setPsCursorLoading } from "@/lib/ui/ps-cursor";
 import "@/lib/i18n/dict-devices-guide";
-import { Monitor, Smartphone, Tv } from "lucide-react";
+import "@/lib/i18n/dict-devices-guide-detail";
+import Link from "next/link";
+import { Monitor, Plug, Smartphone, Tv } from "lucide-react";
+import { URL_REKOMENDASI_SMART_PLUG } from "@/lib/tv/smart-plug-need";
 import { AndroidRelayGuide } from "./android-relay-guide";
 import { TvAppGuide } from "./tv-app-guide";
 
@@ -156,6 +159,41 @@ export function DeviceSetupGuide() {
 
                 {s.key === "tv" && (
                   <div className="space-y-3">
+                    {/* "Pilih cara kontrol TV" — merchant awam tidak tahu harus memilih tab mana. Satu baris per
+                        kondisi outlet → cara yang cocok; menekan baris membuka tab panduannya. */}
+                    <div className="rounded-xl border border-cyan-500/25 bg-cyan-500/5 p-3 space-y-2">
+                      <div className="text-neutral-200 font-medium">{t("devices.guide.choose.title", "Pilih cara kontrol TV yang cocok untuk outlet Anda")}</div>
+                      <p className="text-neutral-500">{t("devices.guide.choose.sub", "Satu outlet boleh memakai lebih dari satu cara. Tekan salah satu untuk membuka panduannya.")}</p>
+                      <div className="grid gap-1.5">
+                        {(
+                          [
+                            { key: "app", Icon: Tv, ifText: t("devices.guide.choose.ifApp", "Android TV / Google TV yang bisa memasang aplikasi"), useText: t("devices.guide.choose.useApp", "Aplikasi NEXBILL TV — tanpa PC, tanpa HP tambahan") },
+                            { key: "pc", Icon: Monitor, ifText: t("devices.guide.choose.ifPc", "Ada PC Windows di kasir yang selalu menyala"), useText: t("devices.guide.choose.usePc", "NexbillAgent di PC — semua TV dihubungkan dari satu layar") },
+                            { key: "android", Icon: Smartphone, ifText: t("devices.guide.choose.ifAndroid", "Tidak ada PC, ada HP Android bekas"), useText: t("devices.guide.choose.useAndroid", "HP Android sebagai jembatan (aplikasi Termux)") },
+                          ] as const
+                        ).map(({ key, Icon, ifText, useText }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setTvPlatform(key)}
+                            className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${tvPlatform === key ? "border-cyan-400/50 bg-cyan-500/10" : "border-white/10 bg-white/[0.02] hover:border-cyan-400/30"}`}
+                          >
+                            <Icon size={16} className="mt-0.5 shrink-0 text-cyan-300" />
+                            <span className="min-w-0">
+                              <span className="block text-neutral-400">{ifText}</span>
+                              <span className="block font-medium text-neutral-100">→ {useText}</span>
+                            </span>
+                          </button>
+                        ))}
+                        <Link href={URL_REKOMENDASI_SMART_PLUG} className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-2.5 py-2 hover:border-cyan-400/30">
+                          <Plug size={16} className="mt-0.5 shrink-0 text-cyan-300" />
+                          <span className="min-w-0">
+                            <span className="block text-neutral-400">{t("devices.guide.choose.ifPlug", "TV biasa (bukan Android)")}</span>
+                            <span className="block font-medium text-neutral-100">→ {t("devices.guide.choose.usePlug", "Smart plug — TV menyala dan mati mengikuti aliran listrik")}</span>
+                          </span>
+                        </Link>
+                      </div>
+                    </div>
                     <div className="flex flex-wrap items-center gap-1 rounded-xl border border-neutral-800 bg-white/[0.02] p-1 w-fit">
                       <button
                         type="button"

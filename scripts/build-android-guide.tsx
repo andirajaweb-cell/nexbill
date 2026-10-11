@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { RelayIllustration, relayIllustrationLang, type RelayIllustrationKind } from "../src/components/devices/AndroidRelayIllustrations";
 import { translate, type LangCode } from "../src/lib/i18n/registry";
 import "../src/lib/i18n/dict-devices-guide";
+import "../src/lib/i18n/dict-devices-guide-detail";
 import { ANDROID_INSTALL_COMMAND } from "../src/app/dashboard/devices/android-relay-guide";
 
 const LANGS: { code: LangCode; label: string }[] = [
@@ -35,18 +36,20 @@ function article(lang: LangCode) {
       <div class="txt"><h2><span class="num">${n}</span>${t(titleKey)}</h2>${body}</div>
     </section>`;
   const cmd = (c: string) => `<pre class="code">${esc(c)}</pre>`;
+  const ol = (keys: string[], extra: Record<number, string> = {}) => `<ol class="substeps">${keys.map((k, i) => `<li>${t(k)}${extra[i] ?? ""}</li>`).join("")}</ol>`;
   return `
 <article data-lang="${lang}"${lang === "id" ? "" : " hidden"}>
   <h1>NEXBILL Relay Agent — ${title}</h1>
   <p class="sub">${t("intro")}</p>
   ${step(0, "prepare", "s0Title", `<ul><li>${t("req1")}</li><li>${t("req2")}</li><li>${t("req3")}</li></ul>`)}
   ${step(1, "token", "s1Title", `<p>${t("s1Body")}</p>`)}
-  ${step(2, "install", "s2Title", `<p>${t("s2Body")}</p><p class="links"><b>Termux:</b> https://f-droid.org/packages/com.termux/<br/><b>Termux:Boot:</b> https://f-droid.org/packages/com.termux.boot/</p><p class="note">${t("s2Note")}</p>`)}
-  ${step(3, "paste", "s3Title", `<p>${t("s3Body")}</p>${cmd(ANDROID_INSTALL_COMMAND)}`)}
-  ${step(4, "language", "s4Title", `<p>${t("s4Body")}</p>`)}
-  ${step(5, "tv", "s5Title", `<p>${t("s5Body")}</p>${cmd("nexbill-tv 192.168.1.50")}<p class="note">${t("s5Note")}</p>`)}
-  ${step(6, "battery", "s6Title", `<ul><li>${t("s6a")}</li><li>${t("s6b")}</li><li>${t("s6c")}</li></ul>`)}
+  ${step(2, "install", "s2Title", `<p class="warn">${t("s2Warn")}</p>${ol(["s2a", "s2b", "s2c", "s2d", "s2e", "s2f", "s2g"], { 0: `<p class="links"><b>Termux:</b> https://f-droid.org/packages/com.termux/<br/><b>Termux:Boot:</b> https://f-droid.org/packages/com.termux.boot/</p>` })}`)}
+  ${step(3, "paste", "s3Title", `<p>${t("s3Body")}</p>${cmd(ANDROID_INSTALL_COMMAND)}<p class="note">${t("s3Done")}</p>`)}
+  ${step(4, "language", "s4Title", ol(["s4a", "s4b", "s4c", "s4d"]))}
+  ${step(5, "tv", "s5Title", `${ol(["s5a", "s5b", "s5c", "s5d"], { 2: cmd("nexbill-tv 192.168.1.50") })}<p class="note">${t("s5Note")}</p>`)}
+  ${step(6, "battery", "s6Title", `<ul><li>${t("s6a")}</li><li>${t("s6b")}</li><li>${t("s6c")}</li><li>${t("s6g")}</li></ul><ul class="brands"><li>${t("s6d")}</li><li>${t("s6e")}</li><li>${t("s6f")}</li></ul>`)}
   ${step(7, "done", "s7Title", `<p>${esc(translate(lang, "devices.guide.android.s7Body"))}</p>`)}
+  <section class="check"><h2>✓ ${t("checkTitle")}</h2><ul><li>${t("check1")}</li><li>${t("check2")}</li><li>${t("check3")}</li></ul></section>
   <section class="trouble"><h2>⚠ ${t("troubleTitle")}</h2><ul>
     <li>${t("troubleCurl")}</li><li>${t("trouble1")}</li><li>${t("trouble2")}</li><li>${t("trouble3")}</li><li>${t("trouble4")}</li><li>${t("trouble5")}</li>
   </ul></section>
@@ -82,6 +85,12 @@ const html = `<!doctype html>
   .note { color:#475569; font-size:14px; }
   .links { font-size:14px; word-break:break-all; }
   pre.code { background:#0b1220; color:#a7f3d0; border-radius:10px; padding:10px 14px; white-space:pre-wrap; word-break:break-all; font-family:Consolas,"Cascadia Mono","Courier New",monospace; font-size:14px; }
+  ol.substeps { margin:6px 0 0; padding-left:22px; }
+  ol.substeps li { margin:5px 0; }
+  .warn { background:#fffbeb; border:1px solid #fcd34d; border-radius:10px; padding:8px 12px; margin:0 0 8px; }
+  ul.brands { color:#475569; font-size:14px; }
+  .check { margin-top:18px; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:12px; padding:14px 18px; }
+  .check h2 { font-size:17px; margin:0 0 6px; }
   .trouble { margin-top:18px; background:#fffbeb; border:1px solid #fcd34d; border-radius:12px; padding:14px 18px; }
   .trouble h2 { font-size:17px; margin:0 0 6px; }
   .footer { color:#64748b; font-size:13px; margin-top:28px; }

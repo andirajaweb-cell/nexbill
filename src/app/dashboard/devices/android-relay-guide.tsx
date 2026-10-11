@@ -4,6 +4,7 @@ import { Check, Copy, Smartphone, BatteryCharging, Wifi, AlertTriangle } from "l
 import { Button } from "@/components/ui/Button";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-devices-guide";
+import "@/lib/i18n/dict-devices-guide-detail";
 import { RelayIllustration, relayIllustrationLang, type RelayIllustrationKind } from "@/components/devices/AndroidRelayIllustrations";
 import { ANDROID_GUIDE_URL } from "@/components/devices/AndroidRelayVisualGuide";
 
@@ -45,6 +46,20 @@ function CopyCommand({ command }: { command: string }) {
         {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? t("devices.guide.android.copied", "Tersalin") : t("devices.guide.android.copy", "Salin")}
       </button>
     </div>
+  );
+}
+
+/** Daftar langkah bernomor kecil di dalam satu Step (1, 2, 3 …). */
+function SubSteps({ items }: { items: React.ReactNode[] }) {
+  return (
+    <ol className="space-y-1.5">
+      {items.map((it, i) => (
+        <li key={i} className="flex gap-2">
+          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-semibold text-neutral-300">{i + 1}</span>
+          <span className="min-w-0">{it}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -104,17 +119,24 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
       </Step>
 
       <Step n={2} illus="install" title={t("devices.guide.android.s2Title", "Pasang aplikasi Termux dan Termux:Boot")}>
-        <p>
-          {t(
-            "devices.guide.android.s2Body",
-            "Buka dua link di bawah dari HP tersebut. Di setiap halaman, gulir ke bawah dan tekan \"Download APK\", lalu buka file-nya dan pasang. Kalau HP bertanya \"Izinkan dari sumber ini?\", pilih Izinkan. Pasang KEDUANYA dari F-Droid (jangan campur dengan versi Play Store, nanti tidak cocok)."
-          )}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <a className={linkButtonCls} href={TERMUX_URL} target="_blank" rel="noopener noreferrer">Termux</a>
-          <a className={linkButtonCls} href={TERMUX_BOOT_URL} target="_blank" rel="noopener noreferrer">Termux:Boot</a>
-        </div>
-        <p className="text-neutral-500">{t("devices.guide.android.s2Note", "Setelah terpasang, buka Termux:Boot SEKALI saja (cukup dibuka lalu ditutup) supaya agent bisa menyala otomatis saat HP dinyalakan ulang.")}</p>
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-amber-200">{t("devices.guide.android.s2Warn", "Pernah memasang Termux dari Play Store? Hapus dulu (uninstall). Termux versi Play Store sudah lama dan tidak cocok dengan Termux:Boot dari F-Droid.")}</div>
+        <SubSteps
+          items={[
+            <>
+              {t("devices.guide.android.s2a", "Di HP yang akan dipakai, buka link Termux di bawah dengan Chrome.")}
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                <a className={linkButtonCls} href={TERMUX_URL} target="_blank" rel="noopener noreferrer">Termux</a>
+                <a className={linkButtonCls} href={TERMUX_BOOT_URL} target="_blank" rel="noopener noreferrer">Termux:Boot</a>
+              </div>
+            </>,
+            t("devices.guide.android.s2b", "Gulir ke bagian \"Packages\" / \"Paket\", lalu tekan \"Download APK\" / \"Unduh APK\" pada versi PALING ATAS. Jangan tekan tombol besar \"Download F-Droid\"."),
+            t("devices.guide.android.s2c", "Setelah unduhan selesai, tekan \"Buka\" (atau buka file .apk dari notifikasi / folder Download)."),
+            t("devices.guide.android.s2d", "Kalau muncul \"Untuk keamanan, HP Anda tidak diizinkan memasang aplikasi tidak dikenal dari sumber ini\": tekan Setelan, aktifkan \"Izinkan dari sumber ini\", lalu kembali dan tekan Instal."),
+            t("devices.guide.android.s2e", "Kalau Google Play Protect memperingatkan, pilih \"Detail lainnya\" → \"Tetap instal\". Termux dari F-Droid adalah aplikasi resmi yang aman."),
+            t("devices.guide.android.s2f", "Ulangi langkah yang sama untuk Termux:Boot (link kedua)."),
+            t("devices.guide.android.s2g", "Buka aplikasi Termux:Boot SEKALI (cukup dibuka lalu ditutup), lalu buka Termux dan tunggu sampai muncul tanda $ di layar hitam."),
+          ]}
+        />
       </Step>
 
       <Step n={3} illus="paste" title={t("devices.guide.android.s3Title", "Salin satu perintah ke Termux")}>
@@ -125,25 +147,27 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
           )}
         </p>
         <CopyCommand command={ANDROID_INSTALL_COMMAND} />
+        <p className="text-neutral-500">{t("devices.guide.android.s3Done", "Selesai kalau muncul tulisan \"[5/5] Selesai dipasang\" lalu \"Pilih bahasa / Choose language\". Muncul tulisan \"WARNING: apt does not have a stable CLI interface\"? Itu normal, abaikan saja.")}</p>
       </Step>
 
       <Step n={4} illus="language" title={t("devices.guide.android.s4Title", "Pilih bahasa dan tempel token")}>
-        <p>
-          {t(
-            "devices.guide.android.s4Body",
-            "Ketik angka bahasa (atau langsung Enter untuk Bahasa Indonesia). Saat diminta \"Masukkan Agent Token\", tempel token dari Langkah 1 lalu Enter. Berhasil kalau muncul tulisan \"Terhubung… Menunggu perintah dari NEXBILL\" dan status Relay Agent di halaman ini berubah menjadi online. Biarkan Termux tetap terbuka (boleh ditinggal di belakang)."
-          )}
-        </p>
+        <SubSteps items={[t("devices.guide.android.s4a", "Di Termux ketik angka bahasa lalu Enter (1 = Bahasa Indonesia, atau langsung Enter)."), t("devices.guide.android.s4b", "Ambil token: buka NEXBILL di Chrome HP ini → menu Chat/Bantuan → pesan berisi token → tekan lama teks token → Salin."), t("devices.guide.android.s4c", "Kembali ke Termux (tulisan \"Masukkan Agent Token\" masih tampil), tekan lama layar hitam → Paste → Enter."), t("devices.guide.android.s4d", "Berhasil kalau muncul \"Terhubung … Menunggu perintah dari NEXBILL\" dan status Relay Agent di halaman ini menjadi online.")]} />
       </Step>
 
       <Step n={5} illus="tv" title={t("devices.guide.android.s5Title", "Sambungkan setiap TV (sekali per TV)")}>
-        <p>
-          {t(
-            "devices.guide.android.s5Body",
-            "Di TV: aktifkan Developer options dan Network debugging, lalu catat alamat IP TV (caranya sama seperti panduan PC, Langkah 4). Kembali ke HP, buka Termux, geser dari kiri layar dan pilih NEW SESSION, lalu ketik perintah di bawah dengan IP TV Anda. Di layar TV akan muncul \"Allow debugging?\" — centang \"Always allow\" lalu pilih Izinkan."
-          )}
-        </p>
-        <CopyCommand command="nexbill-tv 192.168.1.50" />
+        <SubSteps
+          items={[
+            t("devices.guide.android.s5a", "Di TV: Settings → Device Preferences (atau System) → About → tekan baris \"Build\" 7 kali sampai muncul \"You are now a developer\"."),
+            t("devices.guide.android.s5b", "Kembali ke Device Preferences → Developer options → aktifkan \"Network debugging\" (atau \"ADB debugging\"). Catat IP TV — biasanya tampil di bawahnya, mis. 192.168.1.23. Tidak terlihat? Lihat di Settings → Network & Internet → nama WiFi."),
+            <>
+              {t("devices.guide.android.s5c", "Di HP: buka Termux, geser dari tepi KIRI layar → tekan NEW SESSION, lalu ketik perintah di bawah dengan IP TV Anda dan Enter.")}
+              <div className="mt-1.5">
+                <CopyCommand command="nexbill-tv 192.168.1.50" />
+              </div>
+            </>,
+            t("devices.guide.android.s5d", "Lihat layar TV: muncul \"Allow USB debugging?\" / \"Allow network debugging?\" — centang \"Always allow from this computer\", lalu pilih Allow/OK. Ulangi Langkah 5 untuk setiap TV."),
+          ]}
+        />
         <p className="text-neutral-500">{t("devices.guide.android.s5Note", "Ganti 192.168.1.50 dengan IP TV Anda. Berhasil kalau tertulis \"device\" di samping IP TV.")}</p>
       </Step>
 
@@ -152,12 +176,29 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
           <li>{t("devices.guide.android.s6a", "Pengaturan → Aplikasi → Termux → Baterai → pilih \"Tidak dibatasi\" / \"Unrestricted\". Lakukan juga untuk Termux:Boot.")}</li>
           <li>{t("devices.guide.android.s6b", "Buka daftar aplikasi terbaru, tekan lama Termux, lalu pilih Kunci (ikon gembok) supaya tidak ikut tertutup saat \"Bersihkan semua\".")}</li>
           <li>{t("devices.guide.android.s6c", "Jangan hapus notifikasi Termux — itu tanda agent sedang berjalan.")}</li>
+          <li>{t("devices.guide.android.s6g", "Tarik panel notifikasi, cari notifikasi Termux, lalu tekan \"Acquire wakelock\" supaya HP tidak menidurkan agent saat layar mati.")}</li>
+        </ul>
+        <ul className="list-disc pl-4 space-y-1 text-neutral-400">
+          <li>{t("devices.guide.android.s6d", "Xiaomi / Redmi / POCO: Setelan → Aplikasi → Kelola aplikasi → Termux → aktifkan \"Mulai otomatis\", lalu Penghemat baterai → \"Tanpa batasan\".")}</li>
+          <li>{t("devices.guide.android.s6e", "OPPO / realme / vivo: Setelan → Aplikasi → Termux → Penggunaan baterai → aktifkan \"Izinkan aktivitas latar belakang\" dan \"Izinkan mulai otomatis\".")}</li>
+          <li>{t("devices.guide.android.s6f", "Samsung: Setelan → Aplikasi → Termux → Baterai → \"Tidak dibatasi\". Pastikan Termux tidak masuk daftar \"Aplikasi tidur\" di Setelan → Baterai → Batas penggunaan latar belakang.")}</li>
         </ul>
       </Step>
 
       <Step n={7} illus="done" title={t("devices.guide.android.s7Title", "Tambahkan TV di NEXBILL")}>
         <p>{t("devices.guide.android.s7Body", "Kembali ke halaman ini, klik \"Tambah Perangkat\", pilih protokol \"TV (Android/Google TV)\", isi nama dan IP TV dari Langkah 5, lalu Simpan. Selesai — TV bisa dinyalakan/dimatikan dari dashboard ini.")}</p>
       </Step>
+
+      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-1.5">
+        <div className="flex items-center gap-1.5 font-medium text-emerald-300">
+          <Check size={14} /> {t("devices.guide.android.checkTitle", "Cara cek semuanya berjalan")}
+        </div>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>{t("devices.guide.android.check1", "Di halaman ini, status Relay Agent tertulis online.")}</li>
+          <li>{t("devices.guide.android.check2", "Di HP ada notifikasi Termux (\"1 session\"). Kalau hilang, buka Termux dan ketik nexbill.")}</li>
+          <li>{t("devices.guide.android.check3", "Di daftar perangkat di bawah, tombol Nyalakan/Matikan pada TV benar-benar menyalakan dan mematikan TV.")}</li>
+        </ul>
+      </div>
 
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1.5">
         <div className="flex items-center gap-1.5 font-medium text-amber-300">
