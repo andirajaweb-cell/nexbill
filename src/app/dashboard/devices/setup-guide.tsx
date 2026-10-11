@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useDashboardLang, type LangCode } from "@/lib/i18n/dashboard-lang";
@@ -11,7 +11,8 @@ import Link from "next/link";
 import { Monitor, Plug, Smartphone, Tv } from "lucide-react";
 import { URL_REKOMENDASI_SMART_PLUG } from "@/lib/tv/smart-plug-need";
 import { AndroidRelayGuide } from "./android-relay-guide";
-import { TvAppGuide } from "./tv-app-guide";
+import { TvAppGuide, type GuideLevel } from "./tv-app-guide";
+import "@/lib/i18n/dict-devices-guide-levels";
 
 /**
  * NexbillAgent v1.2 (2026-09-24): SATU zip untuk semua bahasa. Agent v1.2 memuat enam bahasa dalam
@@ -62,6 +63,23 @@ export function DeviceSetupGuide() {
   const [requesting, setRequesting] = useState(false);
   // Relay Agent bisa dipasang di PC Windows (NexbillAgent.exe) atau di HP Android (Termux).
   const [tvPlatform, setTvPlatform] = useState<"app" | "pc" | "android">("app");
+  // Tingkat detail panduan (Lengkap untuk pemula / Ringkas untuk yang sudah paham) — diingat per browser.
+  const [level, setLevel] = useState<GuideLevel>("full");
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem("nexbill.devices.guideLevel") === "quick") setLevel("quick");
+    } catch {
+      /* storage diblokir — tetap Lengkap */
+    }
+  }, []);
+  const chooseLevel = (l: GuideLevel) => {
+    setLevel(l);
+    try {
+      window.localStorage.setItem("nexbill.devices.guideLevel", l);
+    } catch {
+      /* storage diblokir */
+    }
+  };
 
   // Fully automatic since the /api/devices/relay-agent-token-request endpoint shipped — no
   // platform-admin action needed, the token is minted and delivered into a support ticket
@@ -218,10 +236,31 @@ export function DeviceSetupGuide() {
                       </button>
                     </div>
 
+                    {tvPlatform !== "pc" && (
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-neutral-500">{t("devices.guide.level.label", "Tampilan panduan:")}</span>
+                          <div className="flex flex-wrap gap-1 rounded-lg border border-neutral-800 bg-white/[0.02] p-1">
+                            {(["full", "quick"] as const).map((l) => (
+                              <button
+                                key={l}
+                                type="button"
+                                onClick={() => chooseLevel(l)}
+                                className={`rounded-md px-2.5 py-1 text-xs ${level === l ? "bg-cyan-500/15 text-cyan-300" : "text-neutral-400 hover:text-neutral-200"}`}
+                              >
+                                {l === "full" ? t("devices.guide.level.full", "Lengkap — untuk pemula") : t("devices.guide.level.quick", "Ringkas — sudah paham teknologi")}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-neutral-500">{t("devices.guide.level.hint", "Isinya sama, hanya beda tingkat detail. Bingung di satu langkah? Pindah ke tampilan Lengkap.")}</p>
+                      </div>
+                    )}
+
                     {tvPlatform === "app" ? (
-                      <TvAppGuide />
+                      <TvAppGuide level={level} />
                     ) : tvPlatform === "android" ? (
-                      <AndroidRelayGuide onRequestToken={requestToken} requesting={requesting} />
+                      <AndroidRelayGuide onRequestToken={requestToken} requesting={requesting} level={level} />
                     ) : (
                     <>
                     <p>

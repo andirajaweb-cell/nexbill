@@ -13,6 +13,7 @@ import { RelayIllustration, relayIllustrationLang, type RelayIllustrationKind } 
 import { translate, type LangCode } from "../src/lib/i18n/registry";
 import "../src/lib/i18n/dict-devices-guide";
 import "../src/lib/i18n/dict-devices-guide-detail";
+import "../src/lib/i18n/dict-devices-guide-levels";
 import { ANDROID_INSTALL_COMMAND } from "../src/app/dashboard/devices/android-relay-guide";
 
 const LANGS: { code: LangCode; label: string }[] = [
@@ -41,6 +42,9 @@ function article(lang: LangCode) {
 <article data-lang="${lang}"${lang === "id" ? "" : " hidden"}>
   <h1>NEXBILL Relay Agent — ${title}</h1>
   <p class="sub">${t("intro")}</p>
+  <section class="quick"><h2>⚡ ${esc(translate(lang, "devices.guide.level.quick"))}</h2><ol>${[1, 2, 3, 4, 5, 6, 7]
+    .map((n) => `<li>${esc(translate(lang, `devices.guide.androidQuick.q${n}`))}${n === 3 ? cmd(ANDROID_INSTALL_COMMAND) : n === 5 ? cmd("nexbill-tv 192.168.1.50") : ""}</li>`)
+    .join("")}</ol></section>
   ${step(0, "prepare", "s0Title", `<ul><li>${t("req1")}</li><li>${t("req2")}</li><li>${t("req3")}</li></ul>`)}
   ${step(1, "token", "s1Title", `<p>${t("s1Body")}</p>`)}
   ${step(2, "install", "s2Title", `<p class="warn">${t("s2Warn")}</p>${ol(["s2a", "s2b", "s2c", "s2d", "s2e", "s2f", "s2g"], { 0: `<p class="links"><b>Termux:</b> https://f-droid.org/packages/com.termux/<br/><b>Termux:Boot:</b> https://f-droid.org/packages/com.termux.boot/</p>` })}`)}
@@ -85,6 +89,8 @@ const html = `<!doctype html>
   .note { color:#475569; font-size:14px; }
   .links { font-size:14px; word-break:break-all; }
   pre.code { background:#0b1220; color:#a7f3d0; border-radius:10px; padding:10px 14px; white-space:pre-wrap; word-break:break-all; font-family:Consolas,"Cascadia Mono","Courier New",monospace; font-size:14px; }
+  .quick { background:#ecfeff; border:1px solid #67e8f9; border-radius:12px; padding:14px 18px; margin:0 0 18px; }
+  .quick h2 { font-size:17px; margin:0 0 6px; }
   ol.substeps { margin:6px 0 0; padding-left:22px; }
   ol.substeps li { margin:5px 0; }
   .warn { background:#fffbeb; border:1px solid #fcd34d; border-radius:10px; padding:8px 12px; margin:0 0 8px; }

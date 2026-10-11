@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NEXBILL TV — Panduan Pemasangan</title>
+<meta name="robots" content="noindex" />
+<!-- Dibangun otomatis oleh scripts/build-tv-app-guide.tsx — jangan diedit manual. -->
+<style>
+  body { margin:0; background:#eef2f7; color:#0f172a; font-family:"Segoe UI",system-ui,-apple-system,"Noto Sans","Noto Sans Thai",Tahoma,Arial,sans-serif; line-height:1.6; }
+  .toolbar { position:sticky; top:0; z-index:10; background:#0b1220; color:#fff; padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; }
+  .toolbar b { letter-spacing:.5px; }
+  .toolbar .langs { display:flex; flex-wrap:wrap; gap:6px; }
+  .toolbar button { background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:8px; padding:6px 10px; font-size:14px; cursor:pointer; }
+  .toolbar button.active { background:#0e7490; border-color:#22d3ee; color:#fff; }
+  .toolbar button.print { background:#15803d; border-color:#22c55e; }
+  main { max-width:900px; margin:0 auto; padding:24px 16px 64px; }
+  article { background:#fff; border:1px solid #dbe3ee; border-radius:16px; padding:28px; }
+  h1 { font-size:26px; line-height:1.25; margin:0 0 6px; }
+  .sub { color:#475569; margin:0 0 22px; }
+  .quick { background:#ecfeff; border:1px solid #67e8f9; border-radius:12px; padding:14px 18px; margin:0 0 18px; }
+  .quick h2 { font-size:17px; margin:0 0 6px; }
+  .need { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin:0 0 6px; }
+  .need h2 { font-size:17px; margin:0 0 6px; }
+  .step { display:grid; grid-template-columns:240px 1fr; gap:20px; align-items:start; padding:18px 0; border-top:1px solid #e2e8f0; }
+  .step .pic svg { border-radius:14px; }
+  .step h2 { font-size:19px; margin:0 0 6px; display:flex; align-items:center; gap:10px; }
+  .num { flex:0 0 30px; height:30px; border-radius:50%; background:#0e7490; color:#fff; font-size:15px; display:inline-flex; align-items:center; justify-content:center; }
+  .step p, .step li { margin:4px 0; }
+  .note { color:#475569; font-size:14px; }
+  .links { font-size:14px; word-break:break-all; }
+  pre.code { background:#0b1220; color:#a7f3d0; border-radius:10px; padding:10px 14px; white-space:pre-wrap; word-break:break-all; font-family:Consolas,"Cascadia Mono","Courier New",monospace; font-size:14px; }
+  ol.substeps { margin:6px 0 0; padding-left:22px; }
+  ol.substeps li { margin:5px 0; }
+  .warn { background:#fffbeb; border:1px solid #fcd34d; border-radius:10px; padding:8px 12px; margin:0 0 8px; }
+  ul.brands { color:#475569; font-size:14px; }
+  .check { margin-top:18px; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:12px; padding:14px 18px; }
+  .check h2 { font-size:17px; margin:0 0 6px; }
+  .trouble { margin-top:18px; background:#fffbeb; border:1px solid #fcd34d; border-radius:12px; padding:14px 18px; }
+  .trouble h2 { font-size:17px; margin:0 0 6px; }
+  .footer { color:#64748b; font-size:13px; margin-top:28px; }
+  @media (max-width:640px) { article { padding:18px; } .step { grid-template-columns:1fr; } .step .pic { max-width:260px; } }
+  @media print { .toolbar { display:none; } body { background:#fff; } main { padding:0; } article { border:none; padding:0; } [hidden] { display:none !important; } .step { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <b>NEXBILL TV · Android TV / Google TV</b>
+  <div class="langs"><button type="button" data-set-lang="id">Bahasa Indonesia</button><button type="button" data-set-lang="en">English</button><button type="button" data-set-lang="ms">Bahasa Melayu</button><button type="button" data-set-lang="th">ภาษาไทย</button><button type="button" data-set-lang="fil">Filipino</button><button type="button" data-set-lang="vi">Tiếng Việt</button>
+    <button type="button" class="print" onclick="window.print()">🖨 PDF</button></div>
+</div>
+<main>
+
+<article data-lang="id">
+  <h1>NEXBILL TV — Aplikasi NEXBILL TV (paling mudah)</h1>
+  <p class="sub">Cara paling mudah untuk Android TV / Google TV: pasang aplikasi NEXBILL TV langsung di TV. Tidak perlu PC, HP, Developer options, atau ADB. Saat sesi dimulai, TV menampilkan game dari HDMI dengan timer di pojok. Saat waktu habis, layar ditutup halaman NEXBILL dan suara game berhenti.</p>
+  <section class="quick"><h2>⚡ Ringkas — sudah paham teknologi</h2><ol><li>TV: Google Play → pasang Downloader (AFTVnews) → buka → ketik nexbill.id/tvapk → Install (izinkan Unknown sources untuk Downloader).</li><li>Dashboard: Feature Management › TV Screensaver ON · unit tipe TV = Android TV · Pengaturan › TV Screensaver › tambah layar → kode 6 digit (30 menit).</li><li>Buka NEXBILL TV → ketik kode.</li><li>Tahan OK 3 detik → "Pilih input HDMI" konsol → "Jadikan aplikasi utama TV".</li><li>Tes sesi 5 menit di kasir: game + timer tampil, waktu habis → layar terkunci &amp; suara berhenti.</li></ol></section>
+  <section class="need"><h2>Yang perlu disiapkan</h2><ul><li>TV Android TV / Google TV (TV pintar yang punya Google Play). TV biasa tanpa Google Play memakai smart plug.</li><li>TV tersambung ke WiFi/internet outlet, dan PlayStation dicolok ke salah satu lubang HDMI TV.</li><li>Remote TV, dan dashboard NEXBILL terbuka di HP/PC kasir (untuk membuat kode pairing).</li></ul></section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">1</span>Pasang aplikasi NEXBILL TV di TV</h2><ol class="substeps"><li>Di TV, buka Google Play (ikon segitiga warna-warni). Pilih kaca pembesar (Cari), ketik "Downloader" dengan remote atau tombol mikrofon.</li><li>Pilih aplikasi "Downloader" (logo oranye, by AFTVnews) → Instal → Buka. Kalau ditanya izin akses file, pilih Izinkan.</li><li>Di kotak alamat Downloader, ketik persis: nexbill.id/tvapk lalu tekan Go.</li><li>Kalau muncul pesan pemasangan diblokir, pilih Settings/Setelan → nyalakan Downloader ("Izinkan dari sumber ini" / "Unknown sources") → tekan Back.</li><li>Pilih Install, tunggu sampai selesai, lalu pilih Done. Kalau Downloader menawarkan menghapus file pemasang, pilih Delete (aplikasinya tetap ada).</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">2</span>Buat kode pairing di dashboard</h2><ol class="substeps"><li>Pengaturan › Feature Management: pastikan TV Screensaver aktif.</li><li>Rental PS › Kelola Unit: tipe TV unit itu = Android TV.</li><li>Pengaturan › TV Screensaver → tambah layar untuk unit itu → catat kode 6 angka yang muncul. Kode berlaku 30 menit.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">3</span>Ketik kode di TV</h2><ol class="substeps"><li>Di TV, buka aplikasi NEXBILL TV (ada di deretan aplikasi). Layar menampilkan kotak kode.</li><li>Ketik 6 angka dengan tombol angka di remote (atau keyboard di layar), lalu OK. Berhasil kalau tampil layar NEXBILL dengan nama unit.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">4</span>Pilih HDMI tempat PlayStation dicolok (sekali saja)</h2><ol class="substeps"><li>Tahan tombol OK di remote selama 3 detik (atau tekan tombol Menu). Menu staf terbuka. Kalau diminta PIN, isi PIN layar dari Pengaturan › TV Screensaver.</li><li>Pilih "Pilih input HDMI", lalu pilih HDMI tempat PlayStation dicolok (mis. HDMI 2).</li><li>Coba di menu staf: "Buka layar game 10 menit". Gambar PlayStation harus tampil dengan timer di pojok kanan atas.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">5</span>Jadikan NEXBILL TV aplikasi utama TV (disarankan)</h2><ol class="substeps"><li>Menu staf → "Jadikan aplikasi utama TV" → pilih NEXBILL TV. Tombol Home dan TV yang baru dinyalakan langsung kembali ke NEXBILL TV, jadi pelanggan tidak bisa keluar ke menu TV.</li><li>Sebagian merek TV tidak menyediakan pilihan ini. Tidak apa-apa: NEXBILL TV tetap menyala sendiri setelah TV restart pada kebanyakan TV.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">6</span>Tes dengan sesi pendek</h2><ol class="substeps"><li>Di Rental PS, mulai sesi 5 menit untuk unit itu. TV harus menampilkan PlayStation dan timer.</li><li>Saat waktu habis, layar NEXBILL menutup game dan suara game berhenti. Selesai — ulangi Langkah 1–6 untuk TV berikutnya.</li></ol></div>
+    </section>
+  <section class="trouble"><h2>⚠ Kalau ada masalah</h2><ul><li>Gambar game tidak muncul ("menunggu sinyal"): pastikan PlayStation menyala dan HDMI-nya benar, lalu pilih ulang input di menu staf. Kalau TV tidak mengizinkan HDMI tampil di dalam aplikasi, NEXBILL TV pindah sendiri ke mode "Pindah input TV" — izinkan "Tampil di atas aplikasi lain" lewat menu staf.</li><li>Kode ditolak: kode berlaku 30 menit dan hanya sekali pakai. Buat kode baru di Pengaturan › TV Screensaver.</li><li>TV kembali menampilkan kotak kode: layar itu dihapus atau dilepas di dashboard. Buat kode baru lalu ketik lagi.</li><li>Downloader tidak bisa membuka nexbill.id/tvapk: pastikan TV tersambung internet dan alamat diketik tanpa spasi. Masih gagal? Kirim foto layar TV ke menu Chat/Bantuan.</li></ul></section>
+  <p class="note" style="margin-top:14px">Memperbarui aplikasi: di TV tahan OK 3 detik → "Cek pembaruan aplikasi". Kalau ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi — pairing dan pengaturan tetap tersimpan.</p>
+  <p class="footer">NEXBILL · Digitrajasa · nexbill.id</p>
+</article>
+
+<article data-lang="en" hidden>
+  <h1>NEXBILL TV — NEXBILL TV app (easiest)</h1>
+  <p class="sub">The easiest way for Android TV / Google TV: install the NEXBILL TV app directly on the TV. No PC, phone, Developer options, or ADB needed. When a session starts, the TV shows the game from HDMI with a timer in the corner. When time runs out, the NEXBILL screen covers it and the game sound stops.</p>
+  <section class="quick"><h2>⚡ Quick — already tech-savvy</h2><ol><li>TV: Google Play → install Downloader (AFTVnews) → open → type nexbill.id/tvapk → Install (allow Unknown sources for Downloader).</li><li>Dashboard: Feature Management › TV Screensaver ON · unit TV type = Android TV · Settings › TV Screensaver › add screen → 6-digit code (30 min).</li><li>Open NEXBILL TV → type the code.</li><li>Hold OK 3 s → "Choose HDMI input" of the console → "Make this the main TV app".</li><li>Test a 5-minute session at the cashier: game + timer show, time up → screen locks and sound stops.</li></ol></section>
+  <section class="need"><h2>What you need</h2><ul><li>An Android TV / Google TV (a smart TV with Google Play). Regular TVs without Google Play use a smart plug.</li><li>The TV is connected to the outlet WiFi/internet, and the PlayStation is plugged into one of the TV's HDMI ports.</li><li>The TV remote, and the NEXBILL dashboard open on the cashier phone/PC (to create the pairing code).</li></ul></section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">1</span>Install the NEXBILL TV app on the TV</h2><ol class="substeps"><li>On the TV, open Google Play (the colourful triangle icon). Choose the magnifier (Search) and type "Downloader" with the remote or the microphone button.</li><li>Choose the "Downloader" app (orange logo, by AFTVnews) → Install → Open. If it asks for file access, choose Allow.</li><li>In Downloader's address box, type exactly: nexbill.id/tvapk then press Go.</li><li>If a message says installation is blocked, choose Settings → turn on Downloader ("Allow from this source" / "Unknown sources") → press Back.</li><li>Choose Install, wait until it finishes, then choose Done. If Downloader offers to delete the installer file, choose Delete (the app stays).</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">2</span>Create a pairing code in the dashboard</h2><ol class="substeps"><li>Settings › Feature Management: make sure TV Screensaver is on.</li><li>PS Rental › Manage Units: that unit's TV type = Android TV.</li><li>Settings › TV Screensaver → add a screen for that unit → note the 6-digit code shown. The code is valid for 30 minutes.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">3</span>Type the code on the TV</h2><ol class="substeps"><li>On the TV, open the NEXBILL TV app (in the apps row). The screen shows a code box.</li><li>Type the 6 digits with the remote's number buttons (or the on-screen keyboard), then OK. It worked when the NEXBILL screen shows the unit name.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">4</span>Choose the HDMI port the PlayStation uses (once)</h2><ol class="substeps"><li>Hold the OK button on the remote for 3 seconds (or press Menu). The staff menu opens. If it asks for a PIN, enter the screen PIN from Settings › TV Screensaver.</li><li>Choose "Choose HDMI input", then pick the HDMI port the PlayStation is plugged into (e.g. HDMI 2).</li><li>Try it from the staff menu: "Open game screen for 10 minutes". The PlayStation picture should appear with a timer in the top-right corner.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">5</span>Make NEXBILL TV the TV's main app (recommended)</h2><ol class="substeps"><li>Staff menu → "Make this the main TV app" → choose NEXBILL TV. The Home button and a freshly switched-on TV go straight back to NEXBILL TV, so customers cannot leave to the TV menu.</li><li>Some TV brands do not offer this option. That is fine: on most TVs NEXBILL TV still starts by itself after a restart.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">6</span>Test with a short session</h2><ol class="substeps"><li>In PS Rental, start a 5-minute session for that unit. The TV should show the PlayStation and the timer.</li><li>When time is up, the NEXBILL screen covers the game and the game sound stops. Done — repeat Steps 1–6 for the next TV.</li></ol></div>
+    </section>
+  <section class="trouble"><h2>⚠ If something goes wrong</h2><ul><li>No game picture ("waiting for signal"): make sure the PlayStation is on and the HDMI is correct, then choose the input again in the staff menu. If the TV does not allow HDMI inside apps, NEXBILL TV switches itself to "Switch TV input" mode — allow "Display over other apps" from the staff menu.</li><li>Code rejected: the code is valid for 30 minutes and works once. Create a new code in Settings › TV Screensaver.</li><li>The TV shows the code box again: that screen was removed or reset in the dashboard. Create a new code and type it again.</li><li>Downloader cannot open nexbill.id/tvapk: make sure the TV has internet and the address has no spaces. Still failing? Send a photo of the TV screen to the Chat/Help menu.</li></ul></section>
+  <p class="note" style="margin-top:14px">Updating the app: on the TV hold OK for 3 seconds → "Check for app update". If there is a new version, open Downloader and type nexbill.id/tvapk again — pairing and settings are kept.</p>
+  <p class="footer">NEXBILL · Digitrajasa · nexbill.id</p>
+</article>
+
+<article data-lang="ms" hidden>
+  <h1>NEXBILL TV — Aplikasi NEXBILL TV (paling mudah)</h1>
+  <p class="sub">Cara paling mudah untuk Android TV / Google TV: pasang aplikasi NEXBILL TV terus pada TV. Tidak perlu PC, telefon, Developer options, atau ADB. Apabila sesi bermula, TV memaparkan permainan dari HDMI dengan pemasa di penjuru. Apabila masa tamat, skrin NEXBILL menutupnya dan bunyi permainan berhenti.</p>
+  <section class="quick"><h2>⚡ Ringkas — sudah faham teknologi</h2><ol><li>TV: Google Play → pasang Downloader (AFTVnews) → buka → taip nexbill.id/tvapk → Install (benarkan Unknown sources untuk Downloader).</li><li>Papan pemuka: Feature Management › TV Screensaver ON · jenis TV unit = Android TV · Tetapan › TV Screensaver › tambah skrin → kod 6 digit (30 minit).</li><li>Buka NEXBILL TV → taip kod.</li><li>Tahan OK 3 saat → "Pilih input HDMI" konsol → "Jadikan aplikasi utama TV".</li><li>Uji sesi 5 minit di juruwang: permainan + pemasa dipaparkan, masa tamat → skrin dikunci &amp; bunyi berhenti.</li></ol></section>
+  <section class="need"><h2>Yang perlu disediakan</h2><ul><li>TV Android TV / Google TV (TV pintar yang ada Google Play). TV biasa tanpa Google Play guna palam pintar.</li><li>TV bersambung ke WiFi/internet outlet, dan PlayStation dipasang ke salah satu port HDMI TV.</li><li>Alat kawalan jauh TV, dan papan pemuka NEXBILL dibuka di telefon/PC juruwang (untuk membuat kod pairing).</li></ul></section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">1</span>Pasang apl NEXBILL TV pada TV</h2><ol class="substeps"><li>Pada TV, buka Google Play (ikon segi tiga berwarna). Pilih kanta pembesar (Cari), taip "Downloader" dengan alat kawalan jauh atau butang mikrofon.</li><li>Pilih apl "Downloader" (logo oren, by AFTVnews) → Pasang → Buka. Jika diminta izin akses fail, pilih Benarkan.</li><li>Dalam kotak alamat Downloader, taip tepat: nexbill.id/tvapk kemudian tekan Go.</li><li>Jika muncul mesej pemasangan disekat, pilih Settings/Tetapan → hidupkan Downloader ("Benarkan daripada sumber ini" / "Unknown sources") → tekan Back.</li><li>Pilih Install, tunggu hingga selesai, kemudian pilih Done. Jika Downloader menawarkan memadam fail pemasang, pilih Delete (aplnya kekal).</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">2</span>Buat kod pairing dalam papan pemuka</h2><ol class="substeps"><li>Tetapan › Feature Management: pastikan TV Screensaver aktif.</li><li>Sewa PS › Urus Unit: jenis TV unit itu = Android TV.</li><li>Tetapan › TV Screensaver → tambah skrin untuk unit itu → catat kod 6 digit yang dipaparkan. Kod sah selama 30 minit.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">3</span>Taip kod pada TV</h2><ol class="substeps"><li>Pada TV, buka apl NEXBILL TV (dalam deretan apl). Skrin memaparkan kotak kod.</li><li>Taip 6 digit dengan butang nombor alat kawalan jauh (atau papan kekunci skrin), kemudian OK. Berjaya jika skrin NEXBILL memaparkan nama unit.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">4</span>Pilih HDMI tempat PlayStation dipasang (sekali sahaja)</h2><ol class="substeps"><li>Tahan butang OK pada alat kawalan jauh selama 3 saat (atau tekan Menu). Menu staf dibuka. Jika diminta PIN, isi PIN skrin dari Tetapan › TV Screensaver.</li><li>Pilih "Pilih input HDMI", kemudian pilih HDMI tempat PlayStation dipasang (cth. HDMI 2).</li><li>Cuba dari menu staf: "Buka skrin permainan 10 minit". Gambar PlayStation sepatutnya dipaparkan dengan pemasa di penjuru kanan atas.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">5</span>Jadikan NEXBILL TV apl utama TV (disyorkan)</h2><ol class="substeps"><li>Menu staf → "Jadikan aplikasi utama TV" → pilih NEXBILL TV. Butang Home dan TV yang baru dihidupkan terus kembali ke NEXBILL TV, jadi pelanggan tidak boleh keluar ke menu TV.</li><li>Sesetengah jenama TV tidak menyediakan pilihan ini. Tidak mengapa: pada kebanyakan TV, NEXBILL TV tetap bermula sendiri selepas dimulakan semula.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">6</span>Uji dengan sesi pendek</h2><ol class="substeps"><li>Di Sewa PS, mulakan sesi 5 minit untuk unit itu. TV sepatutnya memaparkan PlayStation dan pemasa.</li><li>Apabila masa tamat, skrin NEXBILL menutup permainan dan bunyi permainan berhenti. Selesai — ulang Langkah 1–6 untuk TV seterusnya.</li></ol></div>
+    </section>
+  <section class="trouble"><h2>⚠ Jika ada masalah</h2><ul><li>Gambar permainan tidak muncul ("menunggu isyarat"): pastikan PlayStation hidup dan HDMI betul, kemudian pilih semula input dalam menu staf. Jika TV tidak membenarkan HDMI dalam apl, NEXBILL TV beralih sendiri ke mod "Tukar input TV" — benarkan "Paparan di atas aplikasi lain" melalui menu staf.</li><li>Kod ditolak: kod sah 30 minit dan sekali guna. Buat kod baharu di Tetapan › TV Screensaver.</li><li>TV memaparkan kotak kod semula: skrin itu dipadam atau dilepaskan di papan pemuka. Buat kod baharu dan taip semula.</li><li>Downloader tidak dapat membuka nexbill.id/tvapk: pastikan TV bersambung internet dan alamat ditaip tanpa ruang. Masih gagal? Hantar foto skrin TV ke menu Chat/Bantuan.</li></ul></section>
+  <p class="note" style="margin-top:14px">Mengemas kini apl: pada TV tahan OK 3 saat → "Semak kemas kini apl". Jika ada versi baharu, buka Downloader dan taip nexbill.id/tvapk sekali lagi — pairing dan tetapan kekal.</p>
+  <p class="footer">NEXBILL · Digitrajasa · nexbill.id</p>
+</article>
+
+<article data-lang="th" hidden>
+  <h1>NEXBILL TV — แอป NEXBILL TV (ง่ายที่สุด)</h1>
+  <p class="sub">วิธีที่ง่ายที่สุดสำหรับ Android TV / Google TV: ติดตั้งแอป NEXBILL TV บนทีวีโดยตรง ไม่ต้องใช้ PC มือถือ Developer options หรือ ADB เมื่อเริ่มเซสชัน ทีวีจะแสดงเกมจาก HDMI พร้อมตัวจับเวลาที่มุมจอ เมื่อหมดเวลา หน้าจอ NEXBILL จะปิดทับและเสียงเกมจะหยุด</p>
+  <section class="quick"><h2>⚡ ย่อ — คุ้นเคยเทคโนโลยีแล้ว</h2><ol><li>ทีวี: Google Play → ติดตั้ง Downloader (AFTVnews) → เปิด → พิมพ์ nexbill.id/tvapk → Install (อนุญาต Unknown sources ให้ Downloader)</li><li>แดชบอร์ด: Feature Management › TV Screensaver เปิด · ประเภททีวีของเครื่อง = Android TV · การตั้งค่า › TV Screensaver › เพิ่มหน้าจอ → รหัส 6 หลัก (30 นาที)</li><li>เปิด NEXBILL TV → พิมพ์รหัส</li><li>กด OK ค้าง 3 วิ → "เลือกอินพุต HDMI" ของคอนโซล → "ตั้งเป็นแอปหลักของทีวี"</li><li>ทดสอบเซสชัน 5 นาทีที่แคชเชียร์: เกม + ตัวจับเวลาแสดง หมดเวลา → จอล็อกและเสียงหยุด</li></ol></section>
+  <section class="need"><h2>สิ่งที่ต้องเตรียม</h2><ul><li>ทีวี Android TV / Google TV (สมาร์ททีวีที่มี Google Play) ทีวีธรรมดาที่ไม่มี Google Play ให้ใช้ปลั๊กอัจฉริยะ</li><li>ทีวีเชื่อมต่อ WiFi/อินเทอร์เน็ตของร้าน และ PlayStation เสียบอยู่ที่ช่อง HDMI ช่องใดช่องหนึ่งของทีวี</li><li>รีโมททีวี และเปิดแดชบอร์ด NEXBILL บนมือถือ/PC แคชเชียร์ (เพื่อสร้างรหัสจับคู่)</li></ul></section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">1</span>ติดตั้งแอป NEXBILL TV บนทีวี</h2><ol class="substeps"><li>ที่ทีวี เปิด Google Play (ไอคอนสามเหลี่ยมหลากสี) เลือกแว่นขยาย (ค้นหา) พิมพ์ "Downloader" ด้วยรีโมทหรือปุ่มไมโครโฟน</li><li>เลือกแอป "Downloader" (โลโก้สีส้ม by AFTVnews) → ติดตั้ง → เปิด ถ้าขอสิทธิ์เข้าถึงไฟล์ ให้เลือกอนุญาต</li><li>ในช่องที่อยู่ของ Downloader พิมพ์ให้ตรง: nexbill.id/tvapk แล้วกด Go</li><li>ถ้ามีข้อความว่าการติดตั้งถูกบล็อก ให้เลือก Settings → เปิด Downloader ("อนุญาตจากแหล่งนี้" / "Unknown sources") → กด Back</li><li>เลือก Install รอจนเสร็จ แล้วเลือก Done ถ้า Downloader เสนอให้ลบไฟล์ติดตั้ง ให้เลือก Delete (แอปยังอยู่)</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">2</span>สร้างรหัสจับคู่ในแดชบอร์ด</h2><ol class="substeps"><li>การตั้งค่า › Feature Management: ตรวจว่าเปิด TV Screensaver แล้ว</li><li>เช่า PS › จัดการเครื่อง: ประเภททีวีของเครื่องนั้น = Android TV</li><li>การตั้งค่า › TV Screensaver → เพิ่มหน้าจอสำหรับเครื่องนั้น → จดรหัส 6 หลักที่แสดง รหัสใช้ได้ 30 นาที</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">3</span>พิมพ์รหัสที่ทีวี</h2><ol class="substeps"><li>ที่ทีวี เปิดแอป NEXBILL TV (อยู่ในแถวแอป) หน้าจอจะแสดงช่องใส่รหัส</li><li>พิมพ์ตัวเลข 6 หลักด้วยปุ่มตัวเลขบนรีโมท (หรือแป้นพิมพ์บนจอ) แล้วกด OK สำเร็จเมื่อหน้าจอ NEXBILL แสดงชื่อเครื่อง</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">4</span>เลือกช่อง HDMI ที่ต่อ PlayStation (ครั้งเดียว)</h2><ol class="substeps"><li>กดปุ่ม OK บนรีโมทค้างไว้ 3 วินาที (หรือกด Menu) เมนูพนักงานจะเปิด ถ้าขอ PIN ให้ใส่ PIN หน้าจอจาก การตั้งค่า › TV Screensaver</li><li>เลือก "เลือกอินพุต HDMI" แล้วเลือกช่อง HDMI ที่ต่อ PlayStation (เช่น HDMI 2)</li><li>ลองจากเมนูพนักงาน: "เปิดหน้าจอเกม 10 นาที" ภาพ PlayStation ควรแสดงพร้อมตัวจับเวลาที่มุมขวาบน</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">5</span>ตั้ง NEXBILL TV เป็นแอปหลักของทีวี (แนะนำ)</h2><ol class="substeps"><li>เมนูพนักงาน → "ตั้งเป็นแอปหลักของทีวี" → เลือก NEXBILL TV ปุ่ม Home และทีวีที่เพิ่งเปิดจะกลับมาที่ NEXBILL TV ทันที ลูกค้าจึงออกไปเมนูทีวีไม่ได้</li><li>บางยี่ห้อไม่มีตัวเลือกนี้ ไม่เป็นไร: ทีวีส่วนใหญ่ยังเปิด NEXBILL TV เองหลังรีสตาร์ท</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">6</span>ทดสอบด้วยเซสชันสั้น</h2><ol class="substeps"><li>ในเช่า PS เริ่มเซสชัน 5 นาทีสำหรับเครื่องนั้น ทีวีควรแสดง PlayStation และตัวจับเวลา</li><li>เมื่อหมดเวลา หน้าจอ NEXBILL จะปิดเกมและเสียงเกมหยุด เสร็จแล้ว — ทำขั้นตอน 1–6 ซ้ำกับทีวีเครื่องถัดไป</li></ol></div>
+    </section>
+  <section class="trouble"><h2>⚠ ถ้ามีปัญหา</h2><ul><li>ไม่มีภาพเกม ("รอสัญญาณ"): ตรวจว่า PlayStation เปิดอยู่และ HDMI ถูกช่อง แล้วเลือกอินพุตใหม่ในเมนูพนักงาน ถ้าทีวีไม่อนุญาตให้แสดง HDMI ในแอป NEXBILL TV จะเปลี่ยนเป็นโหมด "สลับอินพุตทีวี" เอง — อนุญาต "แสดงทับแอปอื่น" ผ่านเมนูพนักงาน</li><li>รหัสถูกปฏิเสธ: รหัสใช้ได้ 30 นาทีและใช้ได้ครั้งเดียว สร้างรหัสใหม่ที่ การตั้งค่า › TV Screensaver</li><li>ทีวีกลับไปแสดงช่องใส่รหัส: หน้าจอนั้นถูกลบหรือรีเซ็ตในแดชบอร์ด สร้างรหัสใหม่แล้วพิมพ์อีกครั้ง</li><li>Downloader เปิด nexbill.id/tvapk ไม่ได้: ตรวจว่าทีวีมีอินเทอร์เน็ตและพิมพ์ที่อยู่โดยไม่มีช่องว่าง ยังไม่ได้? ส่งรูปหน้าจอทีวีมาที่เมนูแชต/ช่วยเหลือ</li></ul></section>
+  <p class="note" style="margin-top:14px">อัปเดตแอป: ที่ทีวีกด OK ค้าง 3 วินาที → "ตรวจหาอัปเดตแอป" ถ้ามีเวอร์ชันใหม่ เปิด Downloader แล้วพิมพ์ nexbill.id/tvapk อีกครั้ง — การจับคู่และการตั้งค่ายังอยู่</p>
+  <p class="footer">NEXBILL · Digitrajasa · nexbill.id</p>
+</article>
+
+<article data-lang="fil" hidden>
+  <h1>NEXBILL TV — NEXBILL TV app (pinakamadali)</h1>
+  <p class="sub">Ang pinakamadaling paraan para sa Android TV / Google TV: i-install ang NEXBILL TV app mismo sa TV. Hindi kailangan ng PC, phone, Developer options, o ADB. Kapag nagsimula ang session, ipapakita ng TV ang laro mula sa HDMI na may timer sa sulok. Kapag naubos ang oras, tatakpan ito ng NEXBILL screen at titigil ang tunog ng laro.</p>
+  <section class="quick"><h2>⚡ Maikli — sanay na sa teknolohiya</h2><ol><li>TV: Google Play → i-install ang Downloader (AFTVnews) → buksan → i-type ang nexbill.id/tvapk → Install (payagan ang Unknown sources para sa Downloader).</li><li>Dashboard: Feature Management › TV Screensaver ON · uri ng TV ng unit = Android TV · Settings › TV Screensaver › magdagdag ng screen → 6-digit code (30 min).</li><li>Buksan ang NEXBILL TV → i-type ang code.</li><li>Hold OK 3 s → "Piliin ang HDMI input" ng console → "Gawing pangunahing app ng TV".</li><li>Subukan ang 5-minutong session sa cashier: lumabas ang laro + timer, tapos na ang oras → naka-lock ang screen at tumigil ang tunog.</li></ol></section>
+  <section class="need"><h2>Ang kailangan</h2><ul><li>Android TV / Google TV (smart TV na may Google Play). Ang karaniwang TV na walang Google Play ay gumagamit ng smart plug.</li><li>Nakakonekta ang TV sa WiFi/internet ng outlet, at nakasaksak ang PlayStation sa isa sa HDMI port ng TV.</li><li>Remote ng TV, at bukas ang NEXBILL dashboard sa phone/PC ng cashier (para gumawa ng pairing code).</li></ul></section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">1</span>I-install ang NEXBILL TV app sa TV</h2><ol class="substeps"><li>Sa TV, buksan ang Google Play (makulay na tatsulok na icon). Piliin ang magnifier (Search) at i-type ang "Downloader" gamit ang remote o mikropono.</li><li>Piliin ang "Downloader" app (orange na logo, by AFTVnews) → Install → Open. Kapag humingi ng access sa file, piliin ang Allow.</li><li>Sa address box ng Downloader, i-type nang eksakto: nexbill.id/tvapk saka pindutin ang Go.</li><li>Kapag may mensaheng naka-block ang pag-install, piliin ang Settings → i-on ang Downloader ("Allow from this source" / "Unknown sources") → pindutin ang Back.</li><li>Piliin ang Install, hintaying matapos, saka piliin ang Done. Kapag inalok ng Downloader na burahin ang installer, piliin ang Delete (mananatili ang app).</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">2</span>Gumawa ng pairing code sa dashboard</h2><ol class="substeps"><li>Settings › Feature Management: siguraduhing naka-on ang TV Screensaver.</li><li>PS Rental › Pamahalaan ang Unit: ang uri ng TV ng unit = Android TV.</li><li>Settings › TV Screensaver → magdagdag ng screen para sa unit → itala ang 6-digit code. Valid ang code nang 30 minuto.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">3</span>I-type ang code sa TV</h2><ol class="substeps"><li>Sa TV, buksan ang NEXBILL TV app (nasa hanay ng apps). May code box sa screen.</li><li>I-type ang 6 na digit gamit ang number buttons ng remote (o on-screen keyboard), saka OK. Tagumpay kapag ipinakita ng NEXBILL screen ang pangalan ng unit.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">4</span>Piliin ang HDMI kung saan nakasaksak ang PlayStation (isang beses)</h2><ol class="substeps"><li>Pindutin nang matagal ang OK sa remote nang 3 segundo (o pindutin ang Menu). Bubukas ang staff menu. Kapag humingi ng PIN, ilagay ang screen PIN mula sa Settings › TV Screensaver.</li><li>Piliin ang "Piliin ang HDMI input", saka piliin ang HDMI na may PlayStation (hal. HDMI 2).</li><li>Subukan mula sa staff menu: "Buksan ang game screen nang 10 minuto". Dapat lumabas ang PlayStation na may timer sa kanang itaas.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">5</span>Gawing pangunahing app ng TV ang NEXBILL TV (inirerekomenda)</h2><ol class="substeps"><li>Staff menu → "Gawing pangunahing app ng TV" → piliin ang NEXBILL TV. Babalik agad sa NEXBILL TV ang Home button at ang TV na kabubukas, kaya hindi makakalabas ang customer sa TV menu.</li><li>Ang ilang brand ng TV ay walang ganitong opsyon. Ayos lang: sa karamihan ng TV, kusang bumubukas pa rin ang NEXBILL TV pagkatapos mag-restart.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">6</span>Subukan gamit ang maikling session</h2><ol class="substeps"><li>Sa PS Rental, magsimula ng 5-minutong session para sa unit. Dapat ipakita ng TV ang PlayStation at ang timer.</li><li>Kapag tapos na ang oras, tatakpan ng NEXBILL screen ang laro at titigil ang tunog. Tapos — ulitin ang Hakbang 1–6 para sa susunod na TV.</li></ol></div>
+    </section>
+  <section class="trouble"><h2>⚠ Kapag may problema</h2><ul><li>Walang larawan ng laro ("naghihintay ng signal"): siguraduhing naka-on ang PlayStation at tama ang HDMI, saka piliin ulit ang input sa staff menu. Kung hindi pinapayagan ng TV ang HDMI sa loob ng app, kusang lilipat ang NEXBILL TV sa "Palitan ang input ng TV" mode — payagan ang "Ipakita sa ibabaw ng ibang app" sa staff menu.</li><li>Tinanggihan ang code: valid nang 30 minuto at isang beses lang magagamit. Gumawa ng bago sa Settings › TV Screensaver.</li><li>Bumalik sa code box ang TV: inalis o ni-reset ang screen sa dashboard. Gumawa ng bagong code at i-type ulit.</li><li>Hindi mabuksan ng Downloader ang nexbill.id/tvapk: siguraduhing may internet ang TV at walang espasyo ang address. Hindi pa rin? Magpadala ng larawan ng TV screen sa Chat/Tulong.</li></ul></section>
+  <p class="note" style="margin-top:14px">Pag-update ng app: sa TV pindutin nang matagal ang OK nang 3 segundo → "Tingnan ang update ng app". Kapag may bagong bersyon, buksan ang Downloader at i-type ulit ang nexbill.id/tvapk — mananatili ang pairing at settings.</p>
+  <p class="footer">NEXBILL · Digitrajasa · nexbill.id</p>
+</article>
+
+<article data-lang="vi" hidden>
+  <h1>NEXBILL TV — Ứng dụng NEXBILL TV (dễ nhất)</h1>
+  <p class="sub">Cách dễ nhất cho Android TV / Google TV: cài ứng dụng NEXBILL TV trực tiếp trên TV. Không cần PC, điện thoại, Developer options hay ADB. Khi bắt đầu phiên, TV hiển thị game từ HDMI kèm đồng hồ ở góc. Khi hết giờ, màn hình NEXBILL che lại và âm thanh game dừng.</p>
+  <section class="quick"><h2>⚡ Ngắn gọn — đã quen công nghệ</h2><ol><li>TV: Google Play → cài Downloader (AFTVnews) → mở → gõ nexbill.id/tvapk → Install (cho phép Unknown sources cho Downloader).</li><li>Dashboard: Feature Management › TV Screensaver BẬT · loại TV của máy = Android TV · Cài đặt › TV Screensaver › thêm màn hình → mã 6 số (30 phút).</li><li>Mở NEXBILL TV → nhập mã.</li><li>Giữ OK 3 giây → "Chọn cổng HDMI" của máy → "Đặt làm ứng dụng chính của TV".</li><li>Thử phiên 5 phút ở quầy: hiện game + đồng hồ, hết giờ → màn hình khóa và tắt tiếng.</li></ol></section>
+  <section class="need"><h2>Cần chuẩn bị</h2><ul><li>TV Android TV / Google TV (TV thông minh có Google Play). TV thường không có Google Play dùng ổ cắm thông minh.</li><li>TV đã kết nối WiFi/internet của cửa hàng, và PlayStation cắm vào một cổng HDMI của TV.</li><li>Điều khiển TV, và mở dashboard NEXBILL trên điện thoại/PC thu ngân (để tạo mã ghép nối).</li></ul></section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">1</span>Cài ứng dụng NEXBILL TV trên TV</h2><ol class="substeps"><li>Trên TV, mở Google Play (biểu tượng tam giác nhiều màu). Chọn kính lúp (Tìm kiếm), gõ "Downloader" bằng điều khiển hoặc nút micro.</li><li>Chọn ứng dụng "Downloader" (logo màu cam, by AFTVnews) → Cài đặt → Mở. Nếu hỏi quyền truy cập tệp, chọn Cho phép.</li><li>Trong ô địa chỉ của Downloader, gõ chính xác: nexbill.id/tvapk rồi bấm Go.</li><li>Nếu có thông báo việc cài bị chặn, chọn Settings → bật Downloader ("Cho phép từ nguồn này" / "Unknown sources") → bấm Back.</li><li>Chọn Install, đợi xong rồi chọn Done. Nếu Downloader đề nghị xóa tệp cài đặt, chọn Delete (ứng dụng vẫn còn).</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">2</span>Tạo mã ghép nối trong dashboard</h2><ol class="substeps"><li>Cài đặt › Feature Management: đảm bảo TV Screensaver đang bật.</li><li>Cho thuê PS › Quản lý máy: loại TV của máy đó = Android TV.</li><li>Cài đặt › TV Screensaver → thêm màn hình cho máy đó → ghi lại mã 6 số hiện ra. Mã có hiệu lực 30 phút.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">3</span>Nhập mã trên TV</h2><ol class="substeps"><li>Trên TV, mở ứng dụng NEXBILL TV (trong hàng ứng dụng). Màn hình hiện ô nhập mã.</li><li>Nhập 6 số bằng phím số trên điều khiển (hoặc bàn phím trên màn hình) rồi OK. Thành công khi màn hình NEXBILL hiện tên máy.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">4</span>Chọn cổng HDMI cắm PlayStation (một lần)</h2><ol class="substeps"><li>Giữ nút OK trên điều khiển 3 giây (hoặc bấm Menu). Menu nhân viên mở ra. Nếu hỏi PIN, nhập PIN màn hình từ Cài đặt › TV Screensaver.</li><li>Chọn "Chọn cổng HDMI", rồi chọn cổng HDMI cắm PlayStation (vd. HDMI 2).</li><li>Thử từ menu nhân viên: "Mở màn hình game 10 phút". Hình PlayStation phải hiện cùng đồng hồ ở góc trên bên phải.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">5</span>Đặt NEXBILL TV làm ứng dụng chính của TV (khuyên dùng)</h2><ol class="substeps"><li>Menu nhân viên → "Đặt làm ứng dụng chính của TV" → chọn NEXBILL TV. Nút Home và TV vừa bật sẽ quay lại NEXBILL TV ngay, nên khách không thoát ra menu TV được.</li><li>Một số hãng TV không có tùy chọn này. Không sao: trên hầu hết TV, NEXBILL TV vẫn tự mở sau khi khởi động lại.</li></ol></div>
+    </section>
+  
+    <section class="step" style="grid-template-columns:1fr">
+      <div class="txt"><h2><span class="num">6</span>Thử với một phiên ngắn</h2><ol class="substeps"><li>Ở Cho thuê PS, bắt đầu phiên 5 phút cho máy đó. TV phải hiện PlayStation và đồng hồ.</li><li>Khi hết giờ, màn hình NEXBILL che game và tiếng game dừng. Xong — lặp lại Bước 1–6 cho TV tiếp theo.</li></ol></div>
+    </section>
+  <section class="trouble"><h2>⚠ Nếu có sự cố</h2><ul><li>Không có hình game ("đang chờ tín hiệu"): đảm bảo PlayStation đang bật và đúng HDMI, rồi chọn lại đầu vào ở menu nhân viên. Nếu TV không cho hiện HDMI trong ứng dụng, NEXBILL TV tự chuyển sang chế độ "Chuyển cổng TV" — cho phép "Hiển thị trên ứng dụng khác" ở menu nhân viên.</li><li>Mã bị từ chối: mã có hiệu lực 30 phút và chỉ dùng một lần. Tạo mã mới ở Cài đặt › TV Screensaver.</li><li>TV lại hiện ô nhập mã: màn hình đó đã bị xóa hoặc gỡ trong dashboard. Tạo mã mới rồi nhập lại.</li><li>Downloader không mở được nexbill.id/tvapk: đảm bảo TV có internet và địa chỉ không có khoảng trắng. Vẫn lỗi? Gửi ảnh màn hình TV vào menu Chat/Trợ giúp.</li></ul></section>
+  <p class="note" style="margin-top:14px">Cập nhật ứng dụng: trên TV giữ OK 3 giây → "Kiểm tra cập nhật ứng dụng". Nếu có bản mới, mở Downloader và gõ lại nexbill.id/tvapk — ghép nối và cài đặt vẫn được giữ.</p>
+  <p class="footer">NEXBILL · Digitrajasa · nexbill.id</p>
+</article>
+</main>
+<script>
+(function () {
+  var codes = ["id","en","ms","th","fil","vi"];
+  function pick() {
+    var q = new URLSearchParams(location.search).get("lang");
+    if (q && codes.indexOf(q) >= 0) return q;
+    var b = (navigator.language || "id").slice(0, 2).toLowerCase();
+    if (b === "tl") b = "fil";
+    return codes.indexOf(b) >= 0 ? b : "id";
+  }
+  function show(code) {
+    document.querySelectorAll("article[data-lang]").forEach(function (a) { a.hidden = a.getAttribute("data-lang") !== code; });
+    document.querySelectorAll("[data-set-lang]").forEach(function (b) { b.classList.toggle("active", b.getAttribute("data-set-lang") === code); });
+    document.documentElement.lang = code;
+  }
+  document.querySelectorAll("[data-set-lang]").forEach(function (b) { b.addEventListener("click", function () { show(b.getAttribute("data-set-lang")); }); });
+  show(pick());
+})();
+</script>
+</body>
+</html>

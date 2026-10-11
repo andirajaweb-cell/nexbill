@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-devices-guide";
 import "@/lib/i18n/dict-devices-guide-detail";
+import "@/lib/i18n/dict-devices-guide-levels";
 import { RelayIllustration, relayIllustrationLang, type RelayIllustrationKind } from "@/components/devices/AndroidRelayIllustrations";
 import { ANDROID_GUIDE_URL } from "@/components/devices/AndroidRelayVisualGuide";
 
@@ -83,8 +84,64 @@ function Step({ n, title, illus, children }: { n: number; title: string; illus: 
   );
 }
 
-export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestToken: () => void; requesting: boolean }) {
+export function AndroidRelayGuide({
+  onRequestToken,
+  requesting,
+  level = "full",
+}: {
+  onRequestToken: () => void;
+  requesting: boolean;
+  /** "quick" = tujuh baris untuk yang sudah paham teknologi; "full" = langkah demi langkah untuk pemula. */
+  level?: "full" | "quick";
+}) {
   const { t, lang } = useDashboardLang();
+  if (level === "quick") {
+    const rows: React.ReactNode[] = [
+      <>
+        {t("devices.guide.androidQuick.q1", "Minta token (tombol di bawah) → token masuk ke Chat/Bantuan.")}
+        <div className="mt-1.5">
+          <Button className="text-xs" onClick={onRequestToken} disabled={requesting}>
+            {requesting ? t("devices.guide.tv.requesting", "Mengirim...") : t("devices.guide.tv.requestTokenButton", "Minta Token Relay Agent")}
+          </Button>
+        </div>
+      </>,
+      <>
+        {t("devices.guide.androidQuick.q2", "Pasang Termux + Termux:Boot dari F-Droid (bukan Play Store), buka Termux:Boot sekali.")}
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          <a className={linkButtonCls} href={TERMUX_URL} target="_blank" rel="noopener noreferrer">Termux</a>
+          <a className={linkButtonCls} href={TERMUX_BOOT_URL} target="_blank" rel="noopener noreferrer">Termux:Boot</a>
+        </div>
+      </>,
+      <>
+        {t("devices.guide.androidQuick.q3", "Tempel di Termux:")}
+        <div className="mt-1.5">
+          <CopyCommand command={ANDROID_INSTALL_COMMAND} />
+        </div>
+      </>,
+      t("devices.guide.androidQuick.q4", "Pilih bahasa → tempel token → tunggu status Relay Agent online."),
+      <>
+        {t("devices.guide.androidQuick.q5", "Tiap TV: Developer options › Network debugging ON → di Termux (NEW SESSION) ketik nexbill-tv <IP TV> → Allow di TV (centang Always allow).")}
+        <div className="mt-1.5">
+          <CopyCommand command="nexbill-tv 192.168.1.50" />
+        </div>
+      </>,
+      t("devices.guide.androidQuick.q6", "HP: baterai Termux \"Tidak dibatasi\", kunci Termux di Recent apps, notifikasi Termux → Acquire wakelock."),
+      t("devices.guide.androidQuick.q7", "Kontrol Perangkat › Tambah Perangkat › TV (Android/Google TV) › isi nama & IP TV → Simpan → tes Nyalakan/Matikan."),
+    ];
+    return (
+      <div className="space-y-3">
+        <ol className="space-y-2">
+          {rows.map((row, i) => (
+            <li key={i} className="flex gap-2.5 rounded-lg border border-neutral-800 bg-white/[0.015] p-2.5">
+              <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500/20 text-[10px] font-bold text-cyan-300">{i + 1}</span>
+              <span className="min-w-0 flex-1">{row}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="text-neutral-500">{t("devices.guide.android.troubleCurl", "Muncul \"CANNOT LINK EXECUTABLE curl\" atau \"cannot locate symbol\": paket Termux belum diperbarui semua. Di Termux ketik: apt update && yes | apt full-upgrade — tunggu selesai, lalu tempel lagi perintah Langkah 3.")}</p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
       <p>
