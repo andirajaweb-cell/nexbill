@@ -46,9 +46,9 @@ function article(lang: LangCode) {
   ${step(4, "language", "s4Title", `<p>${t("s4Body")}</p>`)}
   ${step(5, "tv", "s5Title", `<p>${t("s5Body")}</p>${cmd("nexbill-tv 192.168.1.50")}<p class="note">${t("s5Note")}</p>`)}
   ${step(6, "battery", "s6Title", `<ul><li>${t("s6a")}</li><li>${t("s6b")}</li><li>${t("s6c")}</li></ul>`)}
-  ${step(7, "done", "s7Title", `<p>${esc(translate(lang, "devices.guide.tv.step5Body"))}</p>`)}
+  ${step(7, "done", "s7Title", `<p>${esc(translate(lang, "devices.guide.android.s7Body"))}</p>`)}
   <section class="trouble"><h2>⚠ ${t("troubleTitle")}</h2><ul>
-    <li>${t("trouble1")}</li><li>${t("trouble2")}</li><li>${t("trouble3")}</li><li>${t("trouble4")}</li><li>${t("trouble5")}</li>
+    <li>${t("troubleCurl")}</li><li>${t("trouble1")}</li><li>${t("trouble2")}</li><li>${t("trouble3")}</li><li>${t("trouble4")}</li><li>${t("trouble5")}</li>
   </ul></section>
   <p class="footer">NEXBILL · Digitrajasa · nexbill.id</p>
 </article>`;

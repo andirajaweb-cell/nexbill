@@ -2,7 +2,7 @@
 # =====================================================================================
 #  NEXBILL Relay Agent — pemasangan di HP Android (aplikasi Termux)
 #  Jalankan di Termux dengan SATU perintah (salin dari halaman Kontrol Perangkat):
-#    pkg install -y curl && curl -fsSL https://www.nexbill.id/downloads/nexbill-agent/android/install.sh | bash
+#    yes | pkg upgrade && pkg install -y curl && curl -fsSL https://www.nexbill.id/downloads/nexbill-agent/android/install.sh | bash
 #  Aman dijalankan ulang (untuk memperbarui agent). Token tersimpan di ~/nexbill/config.json.
 # =====================================================================================
 set -e
@@ -16,7 +16,11 @@ say "== NEXBILL Relay Agent untuk HP Android =="
 echo "Pastikan HP terhubung ke WiFi outlet (WiFi yang sama dengan TV) dan sedang dicas."
 
 say "[1/5] Memasang Node.js dan adb (butuh internet, sekitar 2-5 menit)..."
-yes | pkg update -y >/dev/null 2>&1 || true
+# Upgrade PENUH, bukan cuma `pkg update`: memasang paket baru di atas Termux yang belum di-upgrade
+# membuat pustaka tidak cocok — contoh nyata: curl baru + openssl lama = "CANNOT LINK EXECUTABLE curl:
+# cannot locate symbol SSL_set_quic_tls_early_data_enabled". --force-confnew + `yes` supaya tidak
+# berhenti menunggu jawaban soal file konfigurasi.
+yes | pkg upgrade -y -o Dpkg::Options::=--force-confnew >/dev/null 2>&1 || true
 pkg install -y nodejs-lts android-tools curl >/dev/null
 
 say "[2/5] Mengunduh NexbillAgent..."
