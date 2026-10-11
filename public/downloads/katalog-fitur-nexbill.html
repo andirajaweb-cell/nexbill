@@ -67,6 +67,23 @@
   .tag.opt{background:var(--cyan-soft);color:var(--cyan)}
   .tag.free{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
 
+  /* "Hanya di NEXBILL" — keunggulan yang tidak tercantum di situs aplikasi billing rental PS lain (dicek 10 Okt 2026) */
+  .only-sec{background:linear-gradient(180deg,#ecfeff 0%,#fff 100%)}
+  .only-tag{display:inline-block;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.02em;border-radius:999px;padding:2px 9px;margin-left:6px;vertical-align:2px;background:#0b0e1a;color:#22d3ee;white-space:nowrap}
+  .feat.only{background:#ecfeff;box-shadow:inset 0 0 0 1.5px #22d3ee}
+  .feat.only::before{background:#0b0e1a}
+  .cmp{width:100%;border-collapse:separate;border-spacing:0;margin-top:14px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+  .cmp th,.cmp td{padding:12px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);font-size:14px}
+  .cmp tr:last-child td{border-bottom:0}
+  .cmp th{background:var(--dark);color:#e8ecf4;font-size:13px}
+  .cmp th.us{color:#22d3ee}
+  .cmp td b{display:block;font-size:14.5px}
+  .cmp td span{color:var(--muted);font-size:13px}
+  .cmp td.yes{color:var(--emerald);font-weight:800;white-space:nowrap}
+  .cmp td.no{color:var(--soft);white-space:nowrap}
+  .cmp-note{color:var(--soft);font-size:12px;margin-top:10px}
+  @media(max-width:640px){.cmp th,.cmp td{padding:10px 8px;font-size:13px}.cmp td.yes,.cmp td.no{white-space:normal;font-size:12px}}
+
   .steps{counter-reset:s;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
   @media(max-width:820px){.steps{grid-template-columns:1fr}}
   .step{border:1px solid var(--line);border-radius:14px;padding:18px}
@@ -84,7 +101,8 @@
     .hero p.lead,.chip{color:var(--muted)}
     .chip{border-color:var(--line)}
     section{padding:18px 0}
-    .feat,.box,.step{break-inside:avoid}
+    .feat,.box,.step,.cmp tr{break-inside:avoid}
+    .only-sec{background:#fff}
     body{font-size:12.5px}
   }
 </style>
@@ -115,7 +133,7 @@
   </div>
 </header>
 <nav class="toolbar" aria-label="Daftar isi"><div class="wrap">
-  <a href="#id-1">Rental</a><a href="#id-2">Booking</a><a href="#id-3">Kasir &amp; F&amp;B</a><a href="#id-4">TV Otomatis</a><a href="#id-5">Anti-Kecurangan</a><a href="#id-6">Member</a><a href="#id-7">Chat &amp; IG</a><a href="#id-8">PPOB</a><a href="#id-9">Stok</a><a href="#id-10">Pembukuan</a><a href="#id-11">Pengeluaran</a><a href="#id-12">Maintenance</a><a href="#id-13">Home Rental</a><a href="#id-14">Marketplace</a><a href="#id-15">Laporan &amp; AI</a><a href="#id-16">Tim &amp; Cabang</a><a href="#id-17">Keamanan</a><a href="#id-18">Dukungan</a>
+  <a href="#id-unggul" style="background:#0b0e1a;color:#22d3ee;font-weight:700">Hanya di NEXBILL</a><a href="#id-1">Rental</a><a href="#id-2">Booking</a><a href="#id-3">Kasir &amp; F&amp;B</a><a href="#id-4">TV Otomatis</a><a href="#id-5">Anti-Kecurangan</a><a href="#id-6">Member</a><a href="#id-7">Chat &amp; IG</a><a href="#id-8">PPOB</a><a href="#id-9">Stok</a><a href="#id-10">Pembukuan</a><a href="#id-11">Pengeluaran</a><a href="#id-12">Maintenance</a><a href="#id-13">Home Rental</a><a href="#id-14">Marketplace</a><a href="#id-15">Laporan &amp; AI</a><a href="#id-16">Tim &amp; Cabang</a><a href="#id-17">Keamanan</a><a href="#id-18">Dukungan</a>
 </div></nav>
 <main>
 <section><div class="wrap">
@@ -125,6 +143,14 @@
     <div class="box"><h3>Gaming lounge &amp; kafe</h3><p>Sewa PS, makanan &amp; minuman, booking online, member, dan layar promosi di TV — semua dalam satu tagihan.</p></div>
     <div class="box"><h3>Pemilik multi-cabang</h3><p>Pantau omzet, kas, dan kinerja kasir setiap cabang dari HP, secara realtime, tanpa harus datang ke outlet.</p></div>
   </div>
+</div></section>
+
+<section id="id-unggul" class="only-sec"><div class="wrap">
+  <div class="kicker">Hanya di NEXBILL</div>
+  <h2 class="sec" style="margin-top:6px">Yang belum ada di aplikasi billing rental PS lain</h2>
+  <p class="sec-lead">Hampir semua aplikasi billing rental PS sudah punya argo, kasir, booking, dan kontrol TV. Enam hal di bawah ini yang membedakan NEXBILL.</p>
+  <table class="cmp"><thead><tr><th>Fitur</th><th class="us">NEXBILL</th><th class="oth">Aplikasi lain*</th></tr></thead><tbody><tr><td><b>Pembukuan lengkap otomatis</b><span>Jurnal, neraca, arus kas, piutang/hutang, dan tutup buku tersusun sendiri dari transaksi kasir — bukan sekadar rekap omzet.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak disebut</td></tr><tr><td><b>Laporan siap untuk akuntan, bank &amp; pajak</b><span>Laporan keuangan format SAK EMKM lengkap dengan Catatan atas Laporan Keuangan (CALK), bisa diekspor ke PDF/Excel.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak disebut</td></tr><tr><td><b>Aset &amp; penyusutan otomatis</b><span>Konsol, TV, dan peralatan tercatat sebagai aset; penyusutannya dihitung dan dibukukan tiap bulan.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak disebut</td></tr><tr><td><b>PPOB terhubung ke kas &amp; pembukuan</b><span>Pulsa, token listrik, dan tarik tunai masuk ke kas shift yang sama dan ikut tercatat di laporan keuangan.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak disebut</td></tr><tr><td><b>Selisih kas dipecah per sumber</b><span>Saat tutup shift, selisih dicek per sumber: tunai, QRIS, PPOB, setoran, dan pindah kas — ketahuan dari mana uangnya kurang.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak disebut</td></tr><tr><td><b>6 bahasa</b><span>Indonesia, Inggris, Melayu, Thai, Filipino, dan Vietnam — untuk staf dari mana saja dan outlet di luar Indonesia.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak disebut</td></tr></tbody></table>
+  <p class="cmp-note">*Dibandingkan dengan halaman resmi 9 aplikasi billing rental PS lain pada 10 Oktober 2026. "Tidak disebut" berarti fitur itu tidak tercantum di situs mereka; bisa saja berubah sejak saat itu.</p>
 </div></section>
 
 <section id="id-1"><div class="wrap">
@@ -222,7 +248,7 @@
 </div></section>
 
 <section id="id-8"><div class="wrap">
-  <h2 class="sec"><span class="num">8</span>PPOB — Penghasilan Tambahan <span class="tag opt">Opsional</span></h2>
+  <h2 class="sec"><span class="num">8</span>PPOB — Penghasilan Tambahan <span class="tag opt">Opsional</span> <em class="only-tag">Hanya di NEXBILL</em></h2>
   <p class="sec-lead">Jual produk digital di kasir yang sama, tanpa aplikasi terpisah.</p>
   <div class="feats">
     <div class="feat"><b>Transaksi PPOB</b><span>Catat, selesaikan, dan batalkan transaksi produk digital.</span></div>
@@ -246,17 +272,17 @@
 </div></section>
 
 <section id="id-10"><div class="wrap">
-  <h2 class="sec"><span class="num">10</span>Pembukuan &amp; Laporan Keuangan Otomatis</h2>
+  <h2 class="sec"><span class="num">10</span>Pembukuan &amp; Laporan Keuangan Otomatis <em class="only-tag">Hanya di NEXBILL</em></h2>
   <p class="sec-lead">Setiap transaksi langsung tercatat di pembukuan. Laporan keuangan siap kapan saja — tanpa aplikasi akuntansi terpisah.</p>
   <div class="feats">
     <div class="feat"><b>Laba Rugi</b><span>Untung atau rugi bulan ini, bisa dirinci sampai per akun.</span></div>
-    <div class="feat"><b>Neraca &amp; Arus Kas</b><span>Posisi aset, hutang, modal, dan aliran uang masuk-keluar.</span></div>
-    <div class="feat"><b>Piutang &amp; Hutang</b><span>Siapa yang belum bayar, dan tagihan apa yang harus Anda bayar.</span></div>
-    <div class="feat"><b>Daftar akun (COA) siap pakai</b><span>Sudah disiapkan untuk bisnis rental; bisa disesuaikan.</span></div>
-    <div class="feat"><b>Jurnal &amp; kunci periode</b><span>Koreksi jurnal, dan kunci bulan yang sudah ditutup agar tidak berubah.</span></div>
-    <div class="feat"><b>Saldo awal &amp; impor data lama</b><span>Pindahkan data dari pembukuan sebelumnya memakai template.</span></div>
-    <div class="feat"><b>Rekonsiliasi</b><span>Cocokkan catatan sistem dengan kas dan bank.</span></div>
-    <div class="feat"><b>Ekspor laporan</b><span>Unduh laporan untuk akuntan, bank, atau pajak.</span></div>
+    <div class="feat only"><b>Neraca &amp; Arus Kas</b><span>Posisi aset, hutang, modal, dan aliran uang masuk-keluar.</span></div>
+    <div class="feat only"><b>Piutang &amp; Hutang</b><span>Siapa yang belum bayar, dan tagihan apa yang harus Anda bayar.</span></div>
+    <div class="feat only"><b>Daftar akun (COA) siap pakai</b><span>Sudah disiapkan untuk bisnis rental; bisa disesuaikan.</span></div>
+    <div class="feat only"><b>Jurnal &amp; kunci periode</b><span>Koreksi jurnal, dan kunci bulan yang sudah ditutup agar tidak berubah.</span></div>
+    <div class="feat only"><b>Saldo awal &amp; impor data lama</b><span>Pindahkan data dari pembukuan sebelumnya memakai template.</span></div>
+    <div class="feat only"><b>Rekonsiliasi</b><span>Cocokkan catatan sistem dengan kas dan bank.</span></div>
+    <div class="feat only"><b>Ekspor laporan</b><span>Unduh laporan untuk akuntan, bank, atau pajak.</span></div>
   </div>
 </div></section>
 
@@ -270,7 +296,7 @@
     <div class="feat"><b>Biaya rutin otomatis</b><span>Listrik, internet, sewa, gaji — dibuatkan draf tiap periode.</span></div>
     <div class="feat"><b>Cost center</b><span>Pisahkan biaya per bagian: rental, F&amp;B, dapur, administrasi.</span></div>
     <div class="feat"><b>Pendapatan lain-lain</b><span>Catat pemasukan di luar sewa &amp; kasir, termasuk potongan biaya QRIS.</span></div>
-    <div class="feat"><b>Aset tetap</b><span>Konsol, TV, dan peralatan — dengan penyusutan otomatis dan riwayat perawatan.</span></div>
+    <div class="feat only"><b>Aset tetap <em class="only-tag">Hanya di NEXBILL</em></b><span>Konsol, TV, dan peralatan — dengan penyusutan otomatis dan riwayat perawatan.</span></div>
   </div>
 </div></section>
 
@@ -332,7 +358,7 @@
     <div class="feat"><b>Multi-cabang</b><span>Berpindah cabang dalam satu klik, atau lihat semua cabang sekaligus.</span></div>
     <div class="feat"><b>Pengaturan outlet</b><span>Profil, logo, pajak &amp; NPWP, printer, notifikasi, dan aturan booking.</span></div>
     <div class="feat"><b>Nyalakan fitur sesuai kebutuhan</b><span>Fitur tambahan (Home Rental, PPOB, TV Screensaver) diaktifkan per outlet.</span></div>
-    <div class="feat"><b>6 bahasa</b><span>Indonesia, Inggris, Melayu, Thai, Filipino, dan Vietnam.</span></div>
+    <div class="feat only"><b>6 bahasa <em class="only-tag">Hanya di NEXBILL</em></b><span>Indonesia, Inggris, Melayu, Thai, Filipino, dan Vietnam.</span></div>
     <div class="feat"><b>Login mudah</b><span>Email atau akun Google, dengan verifikasi email dan reset password.</span></div>
   </div>
 </div></section>
@@ -391,7 +417,7 @@
   </div>
 </header>
 <nav class="toolbar" aria-label="Contents"><div class="wrap">
-  <a href="#en-1">Rental</a><a href="#en-2">Booking</a><a href="#en-3">POS &amp; F&amp;B</a><a href="#en-4">Auto TV</a><a href="#en-5">Anti-Fraud</a><a href="#en-6">Members</a><a href="#en-7">Chat &amp; IG</a><a href="#en-8">PPOB</a><a href="#en-9">Stock</a><a href="#en-10">Bookkeeping</a><a href="#en-11">Expenses</a><a href="#en-12">Maintenance</a><a href="#en-13">Home Rental</a><a href="#en-14">Marketplace</a><a href="#en-15">Reports &amp; AI</a><a href="#en-16">Team &amp; Branches</a><a href="#en-17">Security</a><a href="#en-18">Support</a>
+  <a href="#en-unggul" style="background:#0b0e1a;color:#22d3ee;font-weight:700">Only in NEXBILL</a><a href="#en-1">Rental</a><a href="#en-2">Booking</a><a href="#en-3">POS &amp; F&amp;B</a><a href="#en-4">Auto TV</a><a href="#en-5">Anti-Fraud</a><a href="#en-6">Members</a><a href="#en-7">Chat &amp; IG</a><a href="#en-8">PPOB</a><a href="#en-9">Stock</a><a href="#en-10">Bookkeeping</a><a href="#en-11">Expenses</a><a href="#en-12">Maintenance</a><a href="#en-13">Home Rental</a><a href="#en-14">Marketplace</a><a href="#en-15">Reports &amp; AI</a><a href="#en-16">Team &amp; Branches</a><a href="#en-17">Security</a><a href="#en-18">Support</a>
 </div></nav>
 <main>
 <section><div class="wrap">
@@ -401,6 +427,14 @@
     <div class="box"><h3>Gaming lounges &amp; cafés</h3><p>PS rental, food &amp; drinks, online booking, members, and promo screens on the TVs — all on one bill.</p></div>
     <div class="box"><h3>Multi-branch owners</h3><p>Track revenue, cash, and cashier performance for every branch from your phone, in real time, without visiting the outlet.</p></div>
   </div>
+</div></section>
+
+<section id="en-unggul" class="only-sec"><div class="wrap">
+  <div class="kicker">Only in NEXBILL</div>
+  <h2 class="sec" style="margin-top:6px">What other PS rental billing apps don't offer yet</h2>
+  <p class="sec-lead">Almost every PS rental billing app already has timers, a cashier, booking and TV control. These six things set NEXBILL apart.</p>
+  <table class="cmp"><thead><tr><th>Feature</th><th class="us">NEXBILL</th><th class="oth">Other apps*</th></tr></thead><tbody><tr><td><b>Full automatic bookkeeping</b><span>Journals, balance sheet, cash flow, receivables/payables and period closing build themselves from cashier transactions — not just a revenue recap.</span></td><td class="yes">✓ Yes</td><td class="no">Not listed</td></tr><tr><td><b>Reports ready for accountants, banks &amp; tax</b><span>Financial statements in the SAK EMKM format with Notes to the Financial Statements (CALK), exportable to PDF/Excel.</span></td><td class="yes">✓ Yes</td><td class="no">Not listed</td></tr><tr><td><b>Automatic assets &amp; depreciation</b><span>Consoles, TVs and equipment are recorded as assets; depreciation is calculated and posted every month.</span></td><td class="yes">✓ Yes</td><td class="no">Not listed</td></tr><tr><td><b>Bill payments (PPOB) linked to cash &amp; books</b><span>Phone credit, electricity tokens and cash withdrawals go into the same shift cash and appear in the financial reports.</span></td><td class="yes">✓ Yes</td><td class="no">Not listed</td></tr><tr><td><b>Cash differences split by source</b><span>At shift close, differences are checked per source: cash, QRIS, PPOB, deposits and transfers — you see where the money went missing.</span></td><td class="yes">✓ Yes</td><td class="no">Not listed</td></tr><tr><td><b>6 languages</b><span>Indonesian, English, Malay, Thai, Filipino and Vietnamese — for staff from anywhere and outlets outside Indonesia.</span></td><td class="yes">✓ Yes</td><td class="no">Not listed</td></tr></tbody></table>
+  <p class="cmp-note">*Compared with the official pages of 9 other PS rental billing apps on 10 October 2026. "Not listed" means the feature is not mentioned on their site; this may have changed since.</p>
 </div></section>
 
 <section id="en-1"><div class="wrap">
@@ -498,7 +532,7 @@
 </div></section>
 
 <section id="en-8"><div class="wrap">
-  <h2 class="sec"><span class="num">8</span>PPOB — Extra Income <span class="tag opt">Optional</span></h2>
+  <h2 class="sec"><span class="num">8</span>PPOB — Extra Income <span class="tag opt">Optional</span> <em class="only-tag">Only in NEXBILL</em></h2>
   <p class="sec-lead">Sell digital products (bill payments &amp; top-ups) at the same cashier, no separate app.</p>
   <div class="feats">
     <div class="feat"><b>PPOB transactions</b><span>Record, settle, and void digital product transactions.</span></div>
@@ -522,17 +556,17 @@
 </div></section>
 
 <section id="en-10"><div class="wrap">
-  <h2 class="sec"><span class="num">10</span>Automatic Bookkeeping &amp; Financial Reports</h2>
+  <h2 class="sec"><span class="num">10</span>Automatic Bookkeeping &amp; Financial Reports <em class="only-tag">Only in NEXBILL</em></h2>
   <p class="sec-lead">Every transaction is posted to your books instantly. Financial statements are ready any time — no separate accounting software.</p>
   <div class="feats">
     <div class="feat"><b>Profit &amp; Loss</b><span>This month's profit or loss, drillable down to each account.</span></div>
-    <div class="feat"><b>Balance Sheet &amp; Cash Flow</b><span>Your assets, liabilities, equity, and money coming in and going out.</span></div>
-    <div class="feat"><b>Receivables &amp; Payables</b><span>Who hasn't paid yet, and which bills you need to pay.</span></div>
-    <div class="feat"><b>Ready-made chart of accounts</b><span>Pre-built for rental businesses; fully adjustable.</span></div>
-    <div class="feat"><b>Journals &amp; period locking</b><span>Correct journals, and lock closed months so they can't change.</span></div>
-    <div class="feat"><b>Opening balances &amp; historical import</b><span>Bring in data from your previous books using a template.</span></div>
-    <div class="feat"><b>Reconciliation</b><span>Match system records against your cash and bank.</span></div>
-    <div class="feat"><b>Report export</b><span>Download reports for your accountant, bank, or tax filing.</span></div>
+    <div class="feat only"><b>Balance Sheet &amp; Cash Flow</b><span>Your assets, liabilities, equity, and money coming in and going out.</span></div>
+    <div class="feat only"><b>Receivables &amp; Payables</b><span>Who hasn't paid yet, and which bills you need to pay.</span></div>
+    <div class="feat only"><b>Ready-made chart of accounts</b><span>Pre-built for rental businesses; fully adjustable.</span></div>
+    <div class="feat only"><b>Journals &amp; period locking</b><span>Correct journals, and lock closed months so they can't change.</span></div>
+    <div class="feat only"><b>Opening balances &amp; historical import</b><span>Bring in data from your previous books using a template.</span></div>
+    <div class="feat only"><b>Reconciliation</b><span>Match system records against your cash and bank.</span></div>
+    <div class="feat only"><b>Report export</b><span>Download reports for your accountant, bank, or tax filing.</span></div>
   </div>
 </div></section>
 
@@ -546,7 +580,7 @@
     <div class="feat"><b>Automatic recurring costs</b><span>Electricity, internet, rent, salaries — drafted every period.</span></div>
     <div class="feat"><b>Cost centers</b><span>Split costs by area: rental, F&amp;B, kitchen, administration.</span></div>
     <div class="feat"><b>Other income</b><span>Record income outside rentals &amp; POS, including QRIS fee deductions.</span></div>
-    <div class="feat"><b>Fixed assets</b><span>Consoles, TVs, and equipment — with automatic depreciation and maintenance history.</span></div>
+    <div class="feat only"><b>Fixed assets <em class="only-tag">Only in NEXBILL</em></b><span>Consoles, TVs, and equipment — with automatic depreciation and maintenance history.</span></div>
   </div>
 </div></section>
 
@@ -608,7 +642,7 @@
     <div class="feat"><b>Multi-branch</b><span>Switch branches in one click, or view all branches at once.</span></div>
     <div class="feat"><b>Outlet settings</b><span>Profile, logo, tax details, printer, notifications, and booking rules.</span></div>
     <div class="feat"><b>Turn on only what you need</b><span>Extra features (Home Rental, PPOB, TV Screensaver) are enabled per outlet.</span></div>
-    <div class="feat"><b>6 languages</b><span>Indonesian, English, Malay, Thai, Filipino, and Vietnamese.</span></div>
+    <div class="feat only"><b>6 languages <em class="only-tag">Only in NEXBILL</em></b><span>Indonesian, English, Malay, Thai, Filipino, and Vietnamese.</span></div>
     <div class="feat"><b>Easy sign-in</b><span>Email or Google account, with email verification and password reset.</span></div>
   </div>
 </div></section>
@@ -667,7 +701,7 @@
   </div>
 </header>
 <nav class="toolbar" aria-label="Kandungan"><div class="wrap">
-  <a href="#ms-1">Sewa</a><a href="#ms-2">Tempahan</a><a href="#ms-3">Kaunter &amp; F&amp;B</a><a href="#ms-4">TV Automatik</a><a href="#ms-5">Anti-Penipuan</a><a href="#ms-6">Ahli</a><a href="#ms-7">Chat &amp; IG</a><a href="#ms-8">PPOB</a><a href="#ms-9">Stok</a><a href="#ms-10">Perakaunan</a><a href="#ms-11">Perbelanjaan</a><a href="#ms-12">Penyelenggaraan</a><a href="#ms-13">Home Rental</a><a href="#ms-14">Marketplace</a><a href="#ms-15">Laporan &amp; AI</a><a href="#ms-16">Pasukan &amp; Cawangan</a><a href="#ms-17">Keselamatan</a><a href="#ms-18">Sokongan</a>
+  <a href="#ms-unggul" style="background:#0b0e1a;color:#22d3ee;font-weight:700">Hanya di NEXBILL</a><a href="#ms-1">Sewa</a><a href="#ms-2">Tempahan</a><a href="#ms-3">Kaunter &amp; F&amp;B</a><a href="#ms-4">TV Automatik</a><a href="#ms-5">Anti-Penipuan</a><a href="#ms-6">Ahli</a><a href="#ms-7">Chat &amp; IG</a><a href="#ms-8">PPOB</a><a href="#ms-9">Stok</a><a href="#ms-10">Perakaunan</a><a href="#ms-11">Perbelanjaan</a><a href="#ms-12">Penyelenggaraan</a><a href="#ms-13">Home Rental</a><a href="#ms-14">Marketplace</a><a href="#ms-15">Laporan &amp; AI</a><a href="#ms-16">Pasukan &amp; Cawangan</a><a href="#ms-17">Keselamatan</a><a href="#ms-18">Sokongan</a>
 </div></nav>
 <main>
 <section><div class="wrap">
@@ -677,6 +711,14 @@
     <div class="box"><h3>Gaming lounge &amp; kafe</h3><p>Sewa PS, makanan &amp; minuman, tempahan atas talian, ahli, dan skrin promosi di TV — semuanya dalam satu bil.</p></div>
     <div class="box"><h3>Pemilik pelbagai cawangan</h3><p>Pantau jualan, tunai, dan prestasi juruwang setiap cawangan dari telefon, secara masa nyata, tanpa perlu ke outlet.</p></div>
   </div>
+</div></section>
+
+<section id="ms-unggul" class="only-sec"><div class="wrap">
+  <div class="kicker">Hanya di NEXBILL</div>
+  <h2 class="sec" style="margin-top:6px">Yang belum ada dalam aplikasi billing sewa PS lain</h2>
+  <p class="sec-lead">Hampir semua aplikasi billing sewa PS sudah ada pemasa, juruwang, tempahan dan kawalan TV. Enam perkara di bawah inilah yang membezakan NEXBILL.</p>
+  <table class="cmp"><thead><tr><th>Ciri</th><th class="us">NEXBILL</th><th class="oth">Aplikasi lain*</th></tr></thead><tbody><tr><td><b>Perakaunan lengkap automatik</b><span>Jurnal, kunci kira-kira, aliran tunai, penghutang/pemiutang dan tutup buku tersusun sendiri daripada transaksi juruwang — bukan sekadar rekap jualan.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak dinyatakan</td></tr><tr><td><b>Laporan sedia untuk akauntan, bank &amp; cukai</b><span>Penyata kewangan format SAK EMKM lengkap dengan Nota kepada Penyata Kewangan (CALK), boleh dieksport ke PDF/Excel.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak dinyatakan</td></tr><tr><td><b>Aset &amp; susut nilai automatik</b><span>Konsol, TV dan peralatan direkod sebagai aset; susut nilainya dikira dan dibukukan setiap bulan.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak dinyatakan</td></tr><tr><td><b>PPOB bersambung ke tunai &amp; perakaunan</b><span>Prabayar, token elektrik dan pengeluaran tunai masuk ke tunai syif yang sama dan direkod dalam laporan kewangan.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak dinyatakan</td></tr><tr><td><b>Perbezaan tunai dipecah mengikut sumber</b><span>Semasa tutup syif, perbezaan disemak mengikut sumber: tunai, QRIS, PPOB, setoran dan pindahan — nampak dari mana wang berkurang.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak dinyatakan</td></tr><tr><td><b>6 bahasa</b><span>Indonesia, Inggeris, Melayu, Thai, Filipino dan Vietnam — untuk staf dari mana-mana dan outlet di luar Indonesia.</span></td><td class="yes">✓ Ada</td><td class="no">Tidak dinyatakan</td></tr></tbody></table>
+  <p class="cmp-note">*Dibandingkan dengan halaman rasmi 9 aplikasi billing sewa PS lain pada 10 Oktober 2026. "Tidak dinyatakan" bermaksud ciri itu tidak tercatat di laman mereka; mungkin telah berubah sejak itu.</p>
 </div></section>
 
 <section id="ms-1"><div class="wrap">
@@ -774,7 +816,7 @@
 </div></section>
 
 <section id="ms-8"><div class="wrap">
-  <h2 class="sec"><span class="num">8</span>PPOB — Pendapatan Tambahan <span class="tag opt">Pilihan</span></h2>
+  <h2 class="sec"><span class="num">8</span>PPOB — Pendapatan Tambahan <span class="tag opt">Pilihan</span> <em class="only-tag">Hanya di NEXBILL</em></h2>
   <p class="sec-lead">Jual produk digital (bayaran bil &amp; tambah nilai) di kaunter yang sama, tanpa aplikasi berasingan.</p>
   <div class="feats">
     <div class="feat"><b>Transaksi PPOB</b><span>Rekod, selesaikan, dan batalkan transaksi produk digital.</span></div>
@@ -798,17 +840,17 @@
 </div></section>
 
 <section id="ms-10"><div class="wrap">
-  <h2 class="sec"><span class="num">10</span>Perakaunan &amp; Laporan Kewangan Automatik</h2>
+  <h2 class="sec"><span class="num">10</span>Perakaunan &amp; Laporan Kewangan Automatik <em class="only-tag">Hanya di NEXBILL</em></h2>
   <p class="sec-lead">Setiap transaksi terus direkod dalam perakaunan. Laporan kewangan sedia bila-bila masa — tanpa perisian perakaunan berasingan.</p>
   <div class="feats">
     <div class="feat"><b>Untung Rugi</b><span>Untung atau rugi bulan ini, boleh diperincikan sehingga setiap akaun.</span></div>
-    <div class="feat"><b>Kunci Kira-kira &amp; Aliran Tunai</b><span>Kedudukan aset, liabiliti, modal, dan aliran wang masuk-keluar.</span></div>
-    <div class="feat"><b>Penghutang &amp; Pemiutang</b><span>Siapa yang belum bayar, dan bil apa yang perlu anda bayar.</span></div>
-    <div class="feat"><b>Carta akaun sedia guna</b><span>Disediakan untuk perniagaan sewa; boleh disesuaikan.</span></div>
-    <div class="feat"><b>Jurnal &amp; kunci tempoh</b><span>Betulkan jurnal, dan kunci bulan yang sudah ditutup supaya tidak berubah.</span></div>
-    <div class="feat"><b>Baki awal &amp; import data lama</b><span>Pindahkan data dari perakaunan sebelumnya menggunakan templat.</span></div>
-    <div class="feat"><b>Penyesuaian</b><span>Padankan rekod sistem dengan tunai dan bank.</span></div>
-    <div class="feat"><b>Eksport laporan</b><span>Muat turun laporan untuk akauntan, bank, atau cukai.</span></div>
+    <div class="feat only"><b>Kunci Kira-kira &amp; Aliran Tunai</b><span>Kedudukan aset, liabiliti, modal, dan aliran wang masuk-keluar.</span></div>
+    <div class="feat only"><b>Penghutang &amp; Pemiutang</b><span>Siapa yang belum bayar, dan bil apa yang perlu anda bayar.</span></div>
+    <div class="feat only"><b>Carta akaun sedia guna</b><span>Disediakan untuk perniagaan sewa; boleh disesuaikan.</span></div>
+    <div class="feat only"><b>Jurnal &amp; kunci tempoh</b><span>Betulkan jurnal, dan kunci bulan yang sudah ditutup supaya tidak berubah.</span></div>
+    <div class="feat only"><b>Baki awal &amp; import data lama</b><span>Pindahkan data dari perakaunan sebelumnya menggunakan templat.</span></div>
+    <div class="feat only"><b>Penyesuaian</b><span>Padankan rekod sistem dengan tunai dan bank.</span></div>
+    <div class="feat only"><b>Eksport laporan</b><span>Muat turun laporan untuk akauntan, bank, atau cukai.</span></div>
   </div>
 </div></section>
 
@@ -822,7 +864,7 @@
     <div class="feat"><b>Kos berulang automatik</b><span>Elektrik, internet, sewa, gaji — draf disediakan setiap tempoh.</span></div>
     <div class="feat"><b>Pusat kos</b><span>Asingkan kos mengikut bahagian: sewa, F&amp;B, dapur, pentadbiran.</span></div>
     <div class="feat"><b>Pendapatan lain-lain</b><span>Rekod pendapatan di luar sewa &amp; kaunter, termasuk potongan caj QR.</span></div>
-    <div class="feat"><b>Aset tetap</b><span>Konsol, TV, dan peralatan — dengan susut nilai automatik dan sejarah penyelenggaraan.</span></div>
+    <div class="feat only"><b>Aset tetap <em class="only-tag">Hanya di NEXBILL</em></b><span>Konsol, TV, dan peralatan — dengan susut nilai automatik dan sejarah penyelenggaraan.</span></div>
   </div>
 </div></section>
 
@@ -884,7 +926,7 @@
     <div class="feat"><b>Pelbagai cawangan</b><span>Tukar cawangan dengan satu klik, atau lihat semua cawangan sekali gus.</span></div>
     <div class="feat"><b>Tetapan outlet</b><span>Profil, logo, butiran cukai, pencetak, notifikasi, dan peraturan tempahan.</span></div>
     <div class="feat"><b>Hidupkan ciri mengikut keperluan</b><span>Ciri tambahan (Home Rental, PPOB, TV Screensaver) diaktifkan bagi setiap outlet.</span></div>
-    <div class="feat"><b>6 bahasa</b><span>Indonesia, Inggeris, Melayu, Thai, Filipino, dan Vietnam.</span></div>
+    <div class="feat only"><b>6 bahasa <em class="only-tag">Hanya di NEXBILL</em></b><span>Indonesia, Inggeris, Melayu, Thai, Filipino, dan Vietnam.</span></div>
     <div class="feat"><b>Log masuk mudah</b><span>E-mel atau akaun Google, dengan pengesahan e-mel dan tetapan semula kata laluan.</span></div>
   </div>
 </div></section>
@@ -943,7 +985,7 @@
   </div>
 </header>
 <nav class="toolbar" aria-label="สารบัญ"><div class="wrap">
-  <a href="#th-1">ให้เช่า</a><a href="#th-2">การจอง</a><a href="#th-3">แคชเชียร์ &amp; F&amp;B</a><a href="#th-4">ทีวีอัตโนมัติ</a><a href="#th-5">กันทุจริต</a><a href="#th-6">สมาชิก</a><a href="#th-7">แชต &amp; IG</a><a href="#th-8">PPOB</a><a href="#th-9">สต็อก</a><a href="#th-10">บัญชี</a><a href="#th-11">ค่าใช้จ่าย</a><a href="#th-12">ซ่อมบำรุง</a><a href="#th-13">Home Rental</a><a href="#th-14">Marketplace</a><a href="#th-15">รายงาน &amp; AI</a><a href="#th-16">ทีม &amp; สาขา</a><a href="#th-17">ความปลอดภัย</a><a href="#th-18">การช่วยเหลือ</a>
+  <a href="#th-unggul" style="background:#0b0e1a;color:#22d3ee;font-weight:700">มีเฉพาะ NEXBILL</a><a href="#th-1">ให้เช่า</a><a href="#th-2">การจอง</a><a href="#th-3">แคชเชียร์ &amp; F&amp;B</a><a href="#th-4">ทีวีอัตโนมัติ</a><a href="#th-5">กันทุจริต</a><a href="#th-6">สมาชิก</a><a href="#th-7">แชต &amp; IG</a><a href="#th-8">PPOB</a><a href="#th-9">สต็อก</a><a href="#th-10">บัญชี</a><a href="#th-11">ค่าใช้จ่าย</a><a href="#th-12">ซ่อมบำรุง</a><a href="#th-13">Home Rental</a><a href="#th-14">Marketplace</a><a href="#th-15">รายงาน &amp; AI</a><a href="#th-16">ทีม &amp; สาขา</a><a href="#th-17">ความปลอดภัย</a><a href="#th-18">การช่วยเหลือ</a>
 </div></nav>
 <main>
 <section><div class="wrap">
@@ -953,6 +995,14 @@
     <div class="box"><h3>เกมมิ่งเลานจ์และคาเฟ่</h3><p>เช่า PS อาหารและเครื่องดื่ม จองออนไลน์ สมาชิก และหน้าจอโปรโมชันบนทีวี — ทั้งหมดในบิลเดียว</p></div>
     <div class="box"><h3>เจ้าของหลายสาขา</h3><p>ดูยอดขาย เงินสด และผลงานแคชเชียร์ทุกสาขาจากมือถือแบบเรียลไทม์ โดยไม่ต้องไปที่ร้าน</p></div>
   </div>
+</div></section>
+
+<section id="th-unggul" class="only-sec"><div class="wrap">
+  <div class="kicker">มีเฉพาะ NEXBILL</div>
+  <h2 class="sec" style="margin-top:6px">สิ่งที่แอปบิลลิ่งร้านเช่า PS อื่นยังไม่มี</h2>
+  <p class="sec-lead">แอปบิลลิ่งร้านเช่า PS เกือบทุกตัวมีตัวจับเวลา แคชเชียร์ การจอง และการควบคุมทีวีแล้ว หกเรื่องด้านล่างนี้คือสิ่งที่ทำให้ NEXBILL ต่างออกไป</p>
+  <table class="cmp"><thead><tr><th>ฟีเจอร์</th><th class="us">NEXBILL</th><th class="oth">แอปอื่น*</th></tr></thead><tbody><tr><td><b>บัญชีครบวงจรอัตโนมัติ</b><span>สมุดรายวัน งบดุล งบกระแสเงินสด ลูกหนี้/เจ้าหนี้ และการปิดงวด สร้างเองจากรายการแคชเชียร์ — ไม่ใช่แค่สรุปยอดขาย</span></td><td class="yes">✓ มี</td><td class="no">ไม่ได้ระบุ</td></tr><tr><td><b>รายงานพร้อมส่งนักบัญชี ธนาคาร และภาษี</b><span>งบการเงินรูปแบบ SAK EMKM พร้อมหมายเหตุประกอบงบการเงิน (CALK) ส่งออกเป็น PDF/Excel ได้</span></td><td class="yes">✓ มี</td><td class="no">ไม่ได้ระบุ</td></tr><tr><td><b>สินทรัพย์และค่าเสื่อมราคาอัตโนมัติ</b><span>คอนโซล ทีวี และอุปกรณ์ถูกบันทึกเป็นสินทรัพย์ คำนวณและลงบัญชีค่าเสื่อมราคาทุกเดือน</span></td><td class="yes">✓ มี</td><td class="no">ไม่ได้ระบุ</td></tr><tr><td><b>PPOB เชื่อมกับเงินสดและบัญชี</b><span>เติมเงินมือถือ โทเคนไฟฟ้า และถอนเงินสด เข้าเงินสดกะเดียวกันและปรากฏในรายงานการเงิน</span></td><td class="yes">✓ มี</td><td class="no">ไม่ได้ระบุ</td></tr><tr><td><b>แยกเงินขาดเกินตามแหล่งที่มา</b><span>ตอนปิดกะ ตรวจเงินขาดเกินแยกตามแหล่ง: เงินสด QRIS PPOB เงินฝาก และการโอน — รู้ว่าเงินหายจากตรงไหน</span></td><td class="yes">✓ มี</td><td class="no">ไม่ได้ระบุ</td></tr><tr><td><b>6 ภาษา</b><span>อินโดนีเซีย อังกฤษ มาเลย์ ไทย ฟิลิปปินส์ และเวียดนาม — สำหรับพนักงานจากทุกที่และร้านนอกอินโดนีเซีย</span></td><td class="yes">✓ มี</td><td class="no">ไม่ได้ระบุ</td></tr></tbody></table>
+  <p class="cmp-note">*เปรียบเทียบกับหน้าเว็บทางการของแอปบิลลิ่งร้านเช่า PS อื่น 9 ตัว เมื่อ 10 ตุลาคม 2026 "ไม่ได้ระบุ" หมายถึงฟีเจอร์นั้นไม่มีอยู่ในเว็บไซต์ของเขา ซึ่งอาจเปลี่ยนไปแล้ว</p>
 </div></section>
 
 <section id="th-1"><div class="wrap">
@@ -1050,7 +1100,7 @@
 </div></section>
 
 <section id="th-8"><div class="wrap">
-  <h2 class="sec"><span class="num">8</span>PPOB — รายได้เสริม <span class="tag opt">ไม่บังคับ</span></h2>
+  <h2 class="sec"><span class="num">8</span>PPOB — รายได้เสริม <span class="tag opt">ไม่บังคับ</span> <em class="only-tag">มีเฉพาะ NEXBILL</em></h2>
   <p class="sec-lead">ขายสินค้าดิจิทัล (ชำระบิลและเติมเงิน) ที่แคชเชียร์เดียวกัน ไม่ต้องใช้แอปแยก</p>
   <div class="feats">
     <div class="feat"><b>ธุรกรรม PPOB</b><span>บันทึก ดำเนินการให้เสร็จ และยกเลิกธุรกรรมสินค้าดิจิทัล</span></div>
@@ -1074,17 +1124,17 @@
 </div></section>
 
 <section id="th-10"><div class="wrap">
-  <h2 class="sec"><span class="num">10</span>บัญชีและรายงานการเงินอัตโนมัติ</h2>
+  <h2 class="sec"><span class="num">10</span>บัญชีและรายงานการเงินอัตโนมัติ <em class="only-tag">มีเฉพาะ NEXBILL</em></h2>
   <p class="sec-lead">ทุกธุรกรรมลงบัญชีทันที รายงานการเงินพร้อมเสมอ — ไม่ต้องใช้ซอฟต์แวร์บัญชีแยก</p>
   <div class="feats">
     <div class="feat"><b>กำไรขาดทุน</b><span>เดือนนี้กำไรหรือขาดทุน เจาะลึกได้ถึงแต่ละบัญชี</span></div>
-    <div class="feat"><b>งบดุลและกระแสเงินสด</b><span>สถานะสินทรัพย์ หนี้สิน ทุน และเงินเข้า-ออก</span></div>
-    <div class="feat"><b>ลูกหนี้และเจ้าหนี้</b><span>ใครยังไม่จ่าย และบิลใดที่คุณต้องจ่าย</span></div>
-    <div class="feat"><b>ผังบัญชีพร้อมใช้</b><span>ออกแบบมาสำหรับธุรกิจให้เช่า ปรับแต่งได้</span></div>
-    <div class="feat"><b>สมุดรายวันและปิดงวด</b><span>แก้ไขรายการ และล็อกเดือนที่ปิดแล้วไม่ให้เปลี่ยน</span></div>
-    <div class="feat"><b>ยอดยกมาและนำเข้าข้อมูลเก่า</b><span>ย้ายข้อมูลจากระบบบัญชีเดิมด้วยเทมเพลต</span></div>
-    <div class="feat"><b>กระทบยอด</b><span>จับคู่บันทึกในระบบกับเงินสดและธนาคาร</span></div>
-    <div class="feat"><b>ส่งออกรายงาน</b><span>ดาวน์โหลดรายงานสำหรับนักบัญชี ธนาคาร หรือภาษี</span></div>
+    <div class="feat only"><b>งบดุลและกระแสเงินสด</b><span>สถานะสินทรัพย์ หนี้สิน ทุน และเงินเข้า-ออก</span></div>
+    <div class="feat only"><b>ลูกหนี้และเจ้าหนี้</b><span>ใครยังไม่จ่าย และบิลใดที่คุณต้องจ่าย</span></div>
+    <div class="feat only"><b>ผังบัญชีพร้อมใช้</b><span>ออกแบบมาสำหรับธุรกิจให้เช่า ปรับแต่งได้</span></div>
+    <div class="feat only"><b>สมุดรายวันและปิดงวด</b><span>แก้ไขรายการ และล็อกเดือนที่ปิดแล้วไม่ให้เปลี่ยน</span></div>
+    <div class="feat only"><b>ยอดยกมาและนำเข้าข้อมูลเก่า</b><span>ย้ายข้อมูลจากระบบบัญชีเดิมด้วยเทมเพลต</span></div>
+    <div class="feat only"><b>กระทบยอด</b><span>จับคู่บันทึกในระบบกับเงินสดและธนาคาร</span></div>
+    <div class="feat only"><b>ส่งออกรายงาน</b><span>ดาวน์โหลดรายงานสำหรับนักบัญชี ธนาคาร หรือภาษี</span></div>
   </div>
 </div></section>
 
@@ -1098,7 +1148,7 @@
     <div class="feat"><b>ค่าใช้จ่ายประจำอัตโนมัติ</b><span>ค่าไฟ อินเทอร์เน็ต ค่าเช่า เงินเดือน — สร้างร่างให้ทุกงวด</span></div>
     <div class="feat"><b>ศูนย์ต้นทุน</b><span>แยกต้นทุนตามส่วน: ให้เช่า F&amp;B ครัว ธุรการ</span></div>
     <div class="feat"><b>รายได้อื่น</b><span>บันทึกรายได้นอกเหนือการเช่าและแคชเชียร์ รวมถึงการหักค่าธรรมเนียม QR</span></div>
-    <div class="feat"><b>สินทรัพย์ถาวร</b><span>คอนโซล ทีวี และอุปกรณ์ — พร้อมค่าเสื่อมราคาอัตโนมัติและประวัติการซ่อม</span></div>
+    <div class="feat only"><b>สินทรัพย์ถาวร <em class="only-tag">มีเฉพาะ NEXBILL</em></b><span>คอนโซล ทีวี และอุปกรณ์ — พร้อมค่าเสื่อมราคาอัตโนมัติและประวัติการซ่อม</span></div>
   </div>
 </div></section>
 
@@ -1160,7 +1210,7 @@
     <div class="feat"><b>หลายสาขา</b><span>สลับสาขาด้วยคลิกเดียว หรือดูทุกสาขาพร้อมกัน</span></div>
     <div class="feat"><b>ตั้งค่าร้าน</b><span>โปรไฟล์ โลโก้ ข้อมูลภาษี เครื่องพิมพ์ การแจ้งเตือน และกฎการจอง</span></div>
     <div class="feat"><b>เปิดฟีเจอร์ตามต้องการ</b><span>ฟีเจอร์เสริม (Home Rental, PPOB, TV Screensaver) เปิดใช้แยกตามร้าน</span></div>
-    <div class="feat"><b>6 ภาษา</b><span>อินโดนีเซีย อังกฤษ มลายู ไทย ฟิลิปปินส์ และเวียดนาม</span></div>
+    <div class="feat only"><b>6 ภาษา <em class="only-tag">มีเฉพาะ NEXBILL</em></b><span>อินโดนีเซีย อังกฤษ มลายู ไทย ฟิลิปปินส์ และเวียดนาม</span></div>
     <div class="feat"><b>เข้าสู่ระบบง่าย</b><span>อีเมลหรือบัญชี Google พร้อมยืนยันอีเมลและรีเซ็ตรหัสผ่าน</span></div>
   </div>
 </div></section>
@@ -1219,7 +1269,7 @@
   </div>
 </header>
 <nav class="toolbar" aria-label="Nilalaman"><div class="wrap">
-  <a href="#fil-1">Renta</a><a href="#fil-2">Booking</a><a href="#fil-3">Kahera &amp; F&amp;B</a><a href="#fil-4">Auto TV</a><a href="#fil-5">Anti-Fraud</a><a href="#fil-6">Miyembro</a><a href="#fil-7">Chat &amp; IG</a><a href="#fil-8">PPOB</a><a href="#fil-9">Stock</a><a href="#fil-10">Accounting</a><a href="#fil-11">Gastos</a><a href="#fil-12">Maintenance</a><a href="#fil-13">Home Rental</a><a href="#fil-14">Marketplace</a><a href="#fil-15">Ulat &amp; AI</a><a href="#fil-16">Team &amp; Sangay</a><a href="#fil-17">Seguridad</a><a href="#fil-18">Suporta</a>
+  <a href="#fil-unggul" style="background:#0b0e1a;color:#22d3ee;font-weight:700">Sa NEXBILL lang</a><a href="#fil-1">Renta</a><a href="#fil-2">Booking</a><a href="#fil-3">Kahera &amp; F&amp;B</a><a href="#fil-4">Auto TV</a><a href="#fil-5">Anti-Fraud</a><a href="#fil-6">Miyembro</a><a href="#fil-7">Chat &amp; IG</a><a href="#fil-8">PPOB</a><a href="#fil-9">Stock</a><a href="#fil-10">Accounting</a><a href="#fil-11">Gastos</a><a href="#fil-12">Maintenance</a><a href="#fil-13">Home Rental</a><a href="#fil-14">Marketplace</a><a href="#fil-15">Ulat &amp; AI</a><a href="#fil-16">Team &amp; Sangay</a><a href="#fil-17">Seguridad</a><a href="#fil-18">Suporta</a>
 </div></nav>
 <main>
 <section><div class="wrap">
@@ -1229,6 +1279,14 @@
     <div class="box"><h3>Gaming lounge at café</h3><p>PS rental, pagkain at inumin, online booking, miyembro at promo screen sa TV — lahat sa iisang bill.</p></div>
     <div class="box"><h3>May-ari ng maraming sangay</h3><p>Bantayan ang benta, cash at performance ng kahera sa bawat sangay mula sa phone, real-time, nang hindi pumupunta sa outlet.</p></div>
   </div>
+</div></section>
+
+<section id="fil-unggul" class="only-sec"><div class="wrap">
+  <div class="kicker">Sa NEXBILL lang</div>
+  <h2 class="sec" style="margin-top:6px">Ang wala pa sa ibang PS rental billing app</h2>
+  <p class="sec-lead">Halos lahat ng PS rental billing app ay may timer, cashier, booking at TV control na. Ang anim na ito ang nagpapaiba sa NEXBILL.</p>
+  <table class="cmp"><thead><tr><th>Feature</th><th class="us">NEXBILL</th><th class="oth">Ibang app*</th></tr></thead><tbody><tr><td><b>Kumpletong awtomatikong bookkeeping</b><span>Journal, balance sheet, cash flow, receivable/payable at pagsasara ng period ay kusang nabubuo mula sa cashier — hindi lang recap ng benta.</span></td><td class="yes">✓ Mayroon</td><td class="no">Hindi nakalista</td></tr><tr><td><b>Ulat na handa para sa accountant, bangko at buwis</b><span>Financial statements sa format na SAK EMKM kasama ang Notes to the Financial Statements (CALK), puwedeng i-export sa PDF/Excel.</span></td><td class="yes">✓ Mayroon</td><td class="no">Hindi nakalista</td></tr><tr><td><b>Awtomatikong asset at depreciation</b><span>Naitatala bilang asset ang console, TV at kagamitan; kinukuwenta at itinatala ang depreciation bawat buwan.</span></td><td class="yes">✓ Mayroon</td><td class="no">Hindi nakalista</td></tr><tr><td><b>PPOB na konektado sa cash at libro</b><span>Load, electricity token at cash withdrawal ay pumapasok sa parehong shift cash at lumalabas sa financial report.</span></td><td class="yes">✓ Mayroon</td><td class="no">Hindi nakalista</td></tr><tr><td><b>Kulang sa cash na hinati ayon sa pinagmulan</b><span>Sa pagsasara ng shift, sinusuri ang kulang ayon sa pinagmulan: cash, QRIS, PPOB, deposito at paglipat — makikita kung saan nawala ang pera.</span></td><td class="yes">✓ Mayroon</td><td class="no">Hindi nakalista</td></tr><tr><td><b>6 na wika</b><span>Indonesian, English, Malay, Thai, Filipino at Vietnamese — para sa staff saanman at outlet sa labas ng Indonesia.</span></td><td class="yes">✓ Mayroon</td><td class="no">Hindi nakalista</td></tr></tbody></table>
+  <p class="cmp-note">*Inihambing sa opisyal na pahina ng 9 na ibang PS rental billing app noong 10 Oktubre 2026. Ang "Hindi nakalista" ay nangangahulugang hindi binanggit ang feature sa kanilang site; maaaring nagbago na ito.</p>
 </div></section>
 
 <section id="fil-1"><div class="wrap">
@@ -1326,7 +1384,7 @@
 </div></section>
 
 <section id="fil-8"><div class="wrap">
-  <h2 class="sec"><span class="num">8</span>PPOB — Dagdag na Kita <span class="tag opt">Opsyonal</span></h2>
+  <h2 class="sec"><span class="num">8</span>PPOB — Dagdag na Kita <span class="tag opt">Opsyonal</span> <em class="only-tag">Sa NEXBILL lang</em></h2>
   <p class="sec-lead">Magbenta ng digital na produkto (bills payment at load) sa parehong kahera, walang hiwalay na app.</p>
   <div class="feats">
     <div class="feat"><b>Mga transaksyong PPOB</b><span>Itala, tapusin at kanselahin ang transaksyon ng digital na produkto.</span></div>
@@ -1350,17 +1408,17 @@
 </div></section>
 
 <section id="fil-10"><div class="wrap">
-  <h2 class="sec"><span class="num">10</span>Awtomatikong Accounting at Ulat Pinansyal</h2>
+  <h2 class="sec"><span class="num">10</span>Awtomatikong Accounting at Ulat Pinansyal <em class="only-tag">Sa NEXBILL lang</em></h2>
   <p class="sec-lead">Bawat transaksyon ay diretsong naitatala sa accounting. Laging handa ang ulat pinansyal — walang hiwalay na accounting software.</p>
   <div class="feats">
     <div class="feat"><b>Kita at Lugi</b><span>Tubo o lugi ngayong buwan, masisilip hanggang sa bawat account.</span></div>
-    <div class="feat"><b>Balance Sheet at Cash Flow</b><span>Posisyon ng asset, utang, puhunan at daloy ng perang pumapasok at lumalabas.</span></div>
-    <div class="feat"><b>Receivable at Payable</b><span>Sino ang hindi pa nagbabayad, at anong bill ang kailangan mong bayaran.</span></div>
-    <div class="feat"><b>Handang chart of accounts</b><span>Inihanda para sa negosyong paupahan; puwedeng i-customize.</span></div>
-    <div class="feat"><b>Journal at pag-lock ng panahon</b><span>Iwasto ang journal, at i-lock ang mga saradong buwan para hindi mabago.</span></div>
-    <div class="feat"><b>Opening balance at import ng lumang data</b><span>Ilipat ang data mula sa dating accounting gamit ang template.</span></div>
-    <div class="feat"><b>Reconciliation</b><span>Itugma ang talaan ng sistema sa cash at bangko.</span></div>
-    <div class="feat"><b>I-export ang ulat</b><span>I-download ang ulat para sa accountant, bangko o buwis.</span></div>
+    <div class="feat only"><b>Balance Sheet at Cash Flow</b><span>Posisyon ng asset, utang, puhunan at daloy ng perang pumapasok at lumalabas.</span></div>
+    <div class="feat only"><b>Receivable at Payable</b><span>Sino ang hindi pa nagbabayad, at anong bill ang kailangan mong bayaran.</span></div>
+    <div class="feat only"><b>Handang chart of accounts</b><span>Inihanda para sa negosyong paupahan; puwedeng i-customize.</span></div>
+    <div class="feat only"><b>Journal at pag-lock ng panahon</b><span>Iwasto ang journal, at i-lock ang mga saradong buwan para hindi mabago.</span></div>
+    <div class="feat only"><b>Opening balance at import ng lumang data</b><span>Ilipat ang data mula sa dating accounting gamit ang template.</span></div>
+    <div class="feat only"><b>Reconciliation</b><span>Itugma ang talaan ng sistema sa cash at bangko.</span></div>
+    <div class="feat only"><b>I-export ang ulat</b><span>I-download ang ulat para sa accountant, bangko o buwis.</span></div>
   </div>
 </div></section>
 
@@ -1374,7 +1432,7 @@
     <div class="feat"><b>Awtomatikong paulit-ulit na gastos</b><span>Kuryente, internet, upa, sahod — may draft bawat panahon.</span></div>
     <div class="feat"><b>Cost center</b><span>Paghiwalayin ang gastos ayon sa bahagi: renta, F&amp;B, kusina, admin.</span></div>
     <div class="feat"><b>Iba pang kita</b><span>Itala ang kita sa labas ng renta at kahera, kasama ang bawas na QR fee.</span></div>
-    <div class="feat"><b>Fixed assets</b><span>Console, TV at kagamitan — may awtomatikong depreciation at kasaysayan ng maintenance.</span></div>
+    <div class="feat only"><b>Fixed assets <em class="only-tag">Sa NEXBILL lang</em></b><span>Console, TV at kagamitan — may awtomatikong depreciation at kasaysayan ng maintenance.</span></div>
   </div>
 </div></section>
 
@@ -1436,7 +1494,7 @@
     <div class="feat"><b>Maraming sangay</b><span>Lumipat ng sangay sa isang click, o tingnan ang lahat ng sangay nang sabay.</span></div>
     <div class="feat"><b>Setting ng outlet</b><span>Profile, logo, detalye ng buwis, printer, notipikasyon at patakaran ng booking.</span></div>
     <div class="feat"><b>I-on ang feature ayon sa kailangan</b><span>Ang dagdag na feature (Home Rental, PPOB, TV Screensaver) ay ina-activate bawat outlet.</span></div>
-    <div class="feat"><b>6 na wika</b><span>Indonesian, English, Malay, Thai, Filipino at Vietnamese.</span></div>
+    <div class="feat only"><b>6 na wika <em class="only-tag">Sa NEXBILL lang</em></b><span>Indonesian, English, Malay, Thai, Filipino at Vietnamese.</span></div>
     <div class="feat"><b>Madaling pag-login</b><span>Email o Google account, may beripikasyon ng email at pag-reset ng password.</span></div>
   </div>
 </div></section>
@@ -1495,7 +1553,7 @@
   </div>
 </header>
 <nav class="toolbar" aria-label="Mục lục"><div class="wrap">
-  <a href="#vi-1">Cho thuê</a><a href="#vi-2">Đặt chỗ</a><a href="#vi-3">Thu ngân &amp; F&amp;B</a><a href="#vi-4">TV tự động</a><a href="#vi-5">Chống gian lận</a><a href="#vi-6">Thành viên</a><a href="#vi-7">Chat &amp; IG</a><a href="#vi-8">PPOB</a><a href="#vi-9">Kho</a><a href="#vi-10">Kế toán</a><a href="#vi-11">Chi phí</a><a href="#vi-12">Bảo trì</a><a href="#vi-13">Home Rental</a><a href="#vi-14">Marketplace</a><a href="#vi-15">Báo cáo &amp; AI</a><a href="#vi-16">Nhân sự &amp; Chi nhánh</a><a href="#vi-17">Bảo mật</a><a href="#vi-18">Hỗ trợ</a>
+  <a href="#vi-unggul" style="background:#0b0e1a;color:#22d3ee;font-weight:700">Chỉ có ở NEXBILL</a><a href="#vi-1">Cho thuê</a><a href="#vi-2">Đặt chỗ</a><a href="#vi-3">Thu ngân &amp; F&amp;B</a><a href="#vi-4">TV tự động</a><a href="#vi-5">Chống gian lận</a><a href="#vi-6">Thành viên</a><a href="#vi-7">Chat &amp; IG</a><a href="#vi-8">PPOB</a><a href="#vi-9">Kho</a><a href="#vi-10">Kế toán</a><a href="#vi-11">Chi phí</a><a href="#vi-12">Bảo trì</a><a href="#vi-13">Home Rental</a><a href="#vi-14">Marketplace</a><a href="#vi-15">Báo cáo &amp; AI</a><a href="#vi-16">Nhân sự &amp; Chi nhánh</a><a href="#vi-17">Bảo mật</a><a href="#vi-18">Hỗ trợ</a>
 </div></nav>
 <main>
 <section><div class="wrap">
@@ -1505,6 +1563,14 @@
     <div class="box"><h3>Gaming lounge &amp; quán cà phê</h3><p>Thuê PS, đồ ăn &amp; thức uống, đặt chỗ trực tuyến, thành viên và màn hình khuyến mãi trên TV — tất cả trong một hóa đơn.</p></div>
     <div class="box"><h3>Chủ nhiều chi nhánh</h3><p>Theo dõi doanh thu, tiền mặt và hiệu suất thu ngân từng chi nhánh trên điện thoại, theo thời gian thực, không cần đến tiệm.</p></div>
   </div>
+</div></section>
+
+<section id="vi-unggul" class="only-sec"><div class="wrap">
+  <div class="kicker">Chỉ có ở NEXBILL</div>
+  <h2 class="sec" style="margin-top:6px">Những gì các ứng dụng tính tiền cho thuê PS khác chưa có</h2>
+  <p class="sec-lead">Hầu hết ứng dụng tính tiền cho thuê PS đều đã có hẹn giờ, thu ngân, đặt chỗ và điều khiển TV. Sáu điều dưới đây làm NEXBILL khác biệt.</p>
+  <table class="cmp"><thead><tr><th>Tính năng</th><th class="us">NEXBILL</th><th class="oth">Ứng dụng khác*</th></tr></thead><tbody><tr><td><b>Sổ sách kế toán đầy đủ tự động</b><span>Nhật ký, bảng cân đối, lưu chuyển tiền tệ, công nợ phải thu/phải trả và khóa sổ tự lập từ giao dịch thu ngân — không chỉ là tổng kết doanh thu.</span></td><td class="yes">✓ Có</td><td class="no">Không nêu</td></tr><tr><td><b>Báo cáo sẵn sàng cho kế toán, ngân hàng &amp; thuế</b><span>Báo cáo tài chính theo chuẩn SAK EMKM kèm Thuyết minh báo cáo tài chính (CALK), xuất được PDF/Excel.</span></td><td class="yes">✓ Có</td><td class="no">Không nêu</td></tr><tr><td><b>Tài sản &amp; khấu hao tự động</b><span>Máy chơi game, TV và thiết bị được ghi nhận là tài sản; khấu hao được tính và ghi sổ hằng tháng.</span></td><td class="yes">✓ Có</td><td class="no">Không nêu</td></tr><tr><td><b>PPOB gắn với tiền mặt &amp; sổ sách</b><span>Nạp tiền điện thoại, mã điện và rút tiền mặt đi vào cùng quỹ ca và hiện trong báo cáo tài chính.</span></td><td class="yes">✓ Có</td><td class="no">Không nêu</td></tr><tr><td><b>Chênh lệch tiền chia theo nguồn</b><span>Khi đóng ca, chênh lệch được kiểm theo từng nguồn: tiền mặt, QRIS, PPOB, nộp tiền và chuyển quỹ — biết tiền thiếu từ đâu.</span></td><td class="yes">✓ Có</td><td class="no">Không nêu</td></tr><tr><td><b>6 ngôn ngữ</b><span>Indonesia, Anh, Mã Lai, Thái, Philippines và Việt Nam — cho nhân viên ở bất kỳ đâu và cửa hàng ngoài Indonesia.</span></td><td class="yes">✓ Có</td><td class="no">Không nêu</td></tr></tbody></table>
+  <p class="cmp-note">*So sánh với trang chính thức của 9 ứng dụng tính tiền cho thuê PS khác vào ngày 10/10/2026. "Không nêu" nghĩa là tính năng không được ghi trên trang của họ; có thể đã thay đổi từ đó.</p>
 </div></section>
 
 <section id="vi-1"><div class="wrap">
@@ -1602,7 +1668,7 @@
 </div></section>
 
 <section id="vi-8"><div class="wrap">
-  <h2 class="sec"><span class="num">8</span>PPOB — Thu nhập thêm <span class="tag opt">Tùy chọn</span></h2>
+  <h2 class="sec"><span class="num">8</span>PPOB — Thu nhập thêm <span class="tag opt">Tùy chọn</span> <em class="only-tag">Chỉ có ở NEXBILL</em></h2>
   <p class="sec-lead">Bán sản phẩm số (thanh toán hóa đơn &amp; nạp tiền) ngay tại quầy, không cần ứng dụng riêng.</p>
   <div class="feats">
     <div class="feat"><b>Giao dịch PPOB</b><span>Ghi nhận, hoàn tất và hủy giao dịch sản phẩm số.</span></div>
@@ -1626,17 +1692,17 @@
 </div></section>
 
 <section id="vi-10"><div class="wrap">
-  <h2 class="sec"><span class="num">10</span>Kế toán &amp; Báo cáo tài chính tự động</h2>
+  <h2 class="sec"><span class="num">10</span>Kế toán &amp; Báo cáo tài chính tự động <em class="only-tag">Chỉ có ở NEXBILL</em></h2>
   <p class="sec-lead">Mọi giao dịch được ghi sổ ngay. Báo cáo tài chính luôn sẵn sàng — không cần phần mềm kế toán riêng.</p>
   <div class="feats">
     <div class="feat"><b>Lãi lỗ</b><span>Tháng này lãi hay lỗ, xem chi tiết đến từng tài khoản.</span></div>
-    <div class="feat"><b>Bảng cân đối &amp; Lưu chuyển tiền</b><span>Tình hình tài sản, nợ, vốn và dòng tiền vào-ra.</span></div>
-    <div class="feat"><b>Phải thu &amp; Phải trả</b><span>Ai chưa trả tiền, và hóa đơn nào bạn cần thanh toán.</span></div>
-    <div class="feat"><b>Hệ thống tài khoản dùng ngay</b><span>Thiết kế cho mô hình cho thuê; có thể tùy chỉnh.</span></div>
-    <div class="feat"><b>Bút toán &amp; khóa kỳ</b><span>Điều chỉnh bút toán, và khóa các tháng đã chốt để không bị sửa.</span></div>
-    <div class="feat"><b>Số dư đầu kỳ &amp; nhập dữ liệu cũ</b><span>Chuyển dữ liệu từ hệ thống kế toán trước bằng mẫu có sẵn.</span></div>
-    <div class="feat"><b>Đối chiếu</b><span>Khớp sổ sách hệ thống với tiền mặt và ngân hàng.</span></div>
-    <div class="feat"><b>Xuất báo cáo</b><span>Tải báo cáo cho kế toán, ngân hàng hoặc thuế.</span></div>
+    <div class="feat only"><b>Bảng cân đối &amp; Lưu chuyển tiền</b><span>Tình hình tài sản, nợ, vốn và dòng tiền vào-ra.</span></div>
+    <div class="feat only"><b>Phải thu &amp; Phải trả</b><span>Ai chưa trả tiền, và hóa đơn nào bạn cần thanh toán.</span></div>
+    <div class="feat only"><b>Hệ thống tài khoản dùng ngay</b><span>Thiết kế cho mô hình cho thuê; có thể tùy chỉnh.</span></div>
+    <div class="feat only"><b>Bút toán &amp; khóa kỳ</b><span>Điều chỉnh bút toán, và khóa các tháng đã chốt để không bị sửa.</span></div>
+    <div class="feat only"><b>Số dư đầu kỳ &amp; nhập dữ liệu cũ</b><span>Chuyển dữ liệu từ hệ thống kế toán trước bằng mẫu có sẵn.</span></div>
+    <div class="feat only"><b>Đối chiếu</b><span>Khớp sổ sách hệ thống với tiền mặt và ngân hàng.</span></div>
+    <div class="feat only"><b>Xuất báo cáo</b><span>Tải báo cáo cho kế toán, ngân hàng hoặc thuế.</span></div>
   </div>
 </div></section>
 
@@ -1650,7 +1716,7 @@
     <div class="feat"><b>Chi phí định kỳ tự động</b><span>Điện, internet, thuê mặt bằng, lương — tự tạo bản nháp mỗi kỳ.</span></div>
     <div class="feat"><b>Trung tâm chi phí</b><span>Tách chi phí theo bộ phận: cho thuê, F&amp;B, bếp, hành chính.</span></div>
     <div class="feat"><b>Thu nhập khác</b><span>Ghi nhận thu nhập ngoài cho thuê &amp; quầy, kể cả khấu trừ phí QR.</span></div>
-    <div class="feat"><b>Tài sản cố định</b><span>Máy chơi game, TV và thiết bị — tự tính khấu hao và lịch sử bảo trì.</span></div>
+    <div class="feat only"><b>Tài sản cố định <em class="only-tag">Chỉ có ở NEXBILL</em></b><span>Máy chơi game, TV và thiết bị — tự tính khấu hao và lịch sử bảo trì.</span></div>
   </div>
 </div></section>
 
@@ -1712,7 +1778,7 @@
     <div class="feat"><b>Nhiều chi nhánh</b><span>Chuyển chi nhánh chỉ với một cú nhấp, hoặc xem tất cả cùng lúc.</span></div>
     <div class="feat"><b>Cài đặt tiệm</b><span>Hồ sơ, logo, thông tin thuế, máy in, thông báo và quy tắc đặt chỗ.</span></div>
     <div class="feat"><b>Bật tính năng theo nhu cầu</b><span>Tính năng bổ sung (Home Rental, PPOB, TV Screensaver) được kích hoạt theo từng tiệm.</span></div>
-    <div class="feat"><b>6 ngôn ngữ</b><span>Tiếng Indonesia, Anh, Mã Lai, Thái, Philippines và Việt.</span></div>
+    <div class="feat only"><b>6 ngôn ngữ <em class="only-tag">Chỉ có ở NEXBILL</em></b><span>Tiếng Indonesia, Anh, Mã Lai, Thái, Philippines và Việt.</span></div>
     <div class="feat"><b>Đăng nhập dễ dàng</b><span>Email hoặc tài khoản Google, có xác minh email và đặt lại mật khẩu.</span></div>
   </div>
 </div></section>

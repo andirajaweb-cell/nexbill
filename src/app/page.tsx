@@ -1146,19 +1146,19 @@ function LandingPageInner() {
               {t.fitur.catalogCta} →
             </a>
             <p style={{ marginTop: 10, fontSize: 13, opacity: 0.7 }}>{t.fitur.catalogNote}</p>
+            <a href="#gap" style={{ display: 'inline-block', marginTop: 14, color: '#22d3ee', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+              {t.fitur.gapCta} ↓
+            </a>
           </div>
         </div>
       </section>
 
-      {/* SECTION: GAP KOMPETITIF — apa yang jarang dimiliki software billing rental PS lain.
-          Deliberately generic ("kebanyakan software billing rental PS", not any named product) —
-          see docs/SEO-ARCHITECTURE.md §8 guardrails on unsubstantiated/comparative claims. Every
-          item here is a real, already-shipped NEXBILL feature (full double-entry accounting,
-          per-source cash reconciliation incl. PPOB/cash-drop/cash-transfer, approval-gated
-          internal transfers + fraud flagging, multi-business-line billing) — not aspirational
-          copy. Reuses the exact .feat-grid/.feat-card visual language from the FITUR section
-          above (same index-readout treatment) so it reads as a continuation of that section
-          rather than a bolted-on comparison table. */}
+      {/* SECTION: GAP KOMPETITIF — "Hanya di NEXBILL" (diperbarui 2026-10-11).
+          Berisi HANYA fitur yang tidak tercantum di situs resmi 9 aplikasi billing rental PS lain yang
+          dibandingkan pada 10 Okt 2026 (dokumen SWOT). Tidak menyebut nama produk mana pun dan memakai
+          "Tidak disebut", bukan "tidak ada" — catatan dasar perbandingannya (t.gap.note) WAJIB tampil.
+          Lihat docs/SEO-ARCHITECTURE.md §8: tidak ada klaim perbandingan tanpa dasar. Fitur yang juga
+          dimiliki pesaing (anti-curang, rental ke rumah, kontrol TV, offline) sengaja TIDAK di sini. */}
       <section id="gap" style={{ backgroundColor: 'transparent' }}>
         <div className="wrap">
           <div className="section-head">
@@ -1168,15 +1168,29 @@ function LandingPageInner() {
           </div>
           <div className="feat-grid">
             {t.gap.items.map((g, i) => (
-              <div className="feat-card" key={i} style={{ backdropFilter: 'blur(10px)', backgroundColor: 'rgba(13, 21, 38, 0.5)' }}>
-                <div className="feat-icon floating-3d-asset" style={{ boxShadow: 'inset 0 4px 6px rgba(255,255,255,0.1), 0 10px 15px -3px rgba(59, 130, 246, 0.3)' }}>
-                  {String(i + 1).padStart(2, "0")}
+              <div
+                className="feat-card"
+                key={i}
+                style={{ backdropFilter: 'blur(10px)', backgroundColor: 'rgba(13, 21, 38, 0.6)', boxShadow: 'inset 0 0 0 1px rgba(34, 211, 238, 0.35)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div className="feat-icon floating-3d-asset" style={{ boxShadow: 'inset 0 4px 6px rgba(255,255,255,0.1), 0 10px 15px -3px rgba(34, 211, 238, 0.35)' }}>
+                    {String(i + 1).padStart(2, "0")}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.03em', borderRadius: 999, padding: '3px 10px', background: 'rgba(34, 211, 238, 0.15)', color: '#67e8f9', border: '1px solid rgba(34, 211, 238, 0.4)', whiteSpace: 'nowrap' }}>
+                    {t.gap.kicker}
+                  </span>
                 </div>
                 <h3>{g.title}</h3>
                 <p>{g.desc}</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 10, fontSize: 12.5 }}>
+                  <span style={{ color: '#6ee7b7', fontWeight: 700 }}>✓ {t.gap.colUs}: {t.gap.yes}</span>
+                  <span style={{ color: 'var(--text-dim)' }}>{t.gap.colOthers}: {t.gap.notListed}</span>
+                </div>
               </div>
             ))}
           </div>
+          <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 12.5, marginTop: 18, maxWidth: 760, marginLeft: 'auto', marginRight: 'auto' }}>{t.gap.note}</p>
         </div>
       </section>
 

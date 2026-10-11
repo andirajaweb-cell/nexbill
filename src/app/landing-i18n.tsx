@@ -57,13 +57,15 @@ export interface LandingCopy {
     statNum: string; statLabel: string; kasirLabel: string; videoHint: string; laporanLabel: string;
   };
   solusi: { kicker: string; title: string; sub: string; points: PainPoint[] };
-  fitur: { kicker: string; title: string; sub: string; catalogCta: string; catalogNote: string; items: Feature[] };
+  fitur: { kicker: string; title: string; sub: string; catalogCta: string; catalogNote: string; gapCta: string; items: Feature[] };
   // Competitive-gap section (page.tsx, between #fitur and #harga) — features most generic PS
   // rental billing/POS software doesn't have. Deliberately does not name any competitor by name
   // (see docs/SEO-ARCHITECTURE.md §8 guardrails: no misleading/unsubstantiated claims) — every
   // item here is a real, already-shipped NEXBILL feature, framed generically against "kebanyakan
   // software billing rental PS" rather than any specific named product.
-  gap: { kicker: string; title: string; sub: string; items: Feature[] };
+  // Sejak 2026-10-11: hanya fitur yang TIDAK tercantum di situs resmi 9 aplikasi billing rental PS lain
+  // (dicek 10 Okt 2026, lihat dokumen SWOT). `note` wajib tampil — menjelaskan dasar perbandingannya.
+  gap: { kicker: string; title: string; sub: string; items: Feature[]; colUs: string; colOthers: string; yes: string; notListed: string; note: string };
   // "Kasir tanpa PC" (2026-10): HP Android + printer Bluetooth + notifikasi + scan kamera.
   mobile: { kicker: string; title: string; sub: string; items: Feature[]; note: string; cta: string };
   // "Coba Demo" (2026-10): kredensial akun demo publik — lihat src/lib/demo-public.ts.
@@ -155,7 +157,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Fitur Lengkap", title: "Semua yang dibutuhkan rental PS, dalam satu sistem",
       sub: "Bukan cuma kasir. Sembilan modul ini menutupi seluruh alur operasional outlet — dari sesi pertama pelanggan duduk sampai laporan laba rugi akhir bulan.",
-      catalogCta: "Lihat Katalog Fitur Lengkap", catalogNote: "18 kategori, 100+ fitur — bisa dicetak atau disimpan sebagai PDF.",
+      catalogCta: "Lihat Katalog Fitur Lengkap", catalogNote: "18 kategori, 100+ fitur — bisa dicetak atau disimpan sebagai PDF.", gapCta: "Lihat 6 keunggulan yang belum ada di aplikasi lain",
       items: [
         { title: "Timer Sewa Presisi Detik", desc: "Tap start, sistem hitung durasi & tagihan otomatis sampai ke detik — akurat untuk tarif per jam, paket hemat, maupun harga member, tanpa stopwatch atau kalkulator manual." },
         { title: "Manajemen Unit PS4, PS5 & PS6", desc: "Setiap unit dicatat terpisah lengkap dengan kondisi, tipe TV, dan riwayat pemakaian. Pelanggan booking online tahu persis unit generasi mana yang kosong dan spesifikasinya." },
@@ -169,16 +171,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     gap: {
-      kicker: "Bukan Software Kasir Biasa",
-      title: "Yang Jarang Dimiliki Software Billing Rental PS Lain",
-      sub: "Kebanyakan software billing/kasir rental PS berhenti di “hitung tarif & cetak struk”. NEXBILL dibangun lebih jauh dari itu:",
+      kicker: "Hanya di NEXBILL",
+      title: "Yang belum ada di aplikasi billing rental PS lain",
+      sub: "Hampir semua aplikasi billing rental PS sudah punya argo, kasir, booking, dan kontrol TV. Enam hal di bawah ini yang membedakan NEXBILL.",
+      colUs: "NEXBILL", colOthers: "Aplikasi lain*", yes: "Ada", notListed: "Tidak disebut",
       items: [
-        { title: "Akuntansi Penuh, Bukan Cuma Kasir", desc: "Jurnal otomatis, neraca, dan laba rugi tersusun langsung dari transaksi kasir — kebanyakan software billing rental PS berhenti di rekap omzet harian, tidak sampai ke pembukuan akuntansi yang bisa dipakai untuk pajak atau laporan ke investor." },
-        { title: "Rekonsiliasi Kas Sampai ke Sumbernya", desc: "Selisih kas dipecah per sumber: tunai, QRIS, PPOB (pulsa/token/tarik tunai), setoran kas, sampai pindah kas antar pos — bukan cuma satu angka “total uang masuk” yang mengaburkan dari mana selisih itu berasal." },
-        { title: "PPOB Terintegrasi ke Pembukuan", desc: "Transaksi pulsa, token listrik, dan tarik tunai otomatis masuk-keluar dari kas shift yang sama — kebanyakan sistem lain memperlakukan PPOB sebagai modul terpisah yang tidak nyambung ke laporan keuangan utama." },
-        { title: "Kontrol Internal Anti-Fraud", desc: "Pemindahan kas antar pos wajib approval atasan, deteksi pola shift berisiko otomatis, dan skor kepercayaan pelanggan berbasis riwayat — bukan sekadar catatan transaksi tanpa lapisan pengawasan." },
-        { title: "Satu Sistem untuk Banyak Model Bisnis", desc: "Sewa konsol, sewa alat/barang (home rental), sampai jual makanan/minuman digabung jadi satu tagihan dan satu laporan — tidak perlu tempel-tempel aplikasi kasir terpisah untuk tiap lini bisnis." },
+        { title: "Pembukuan lengkap otomatis", desc: "Jurnal, neraca, arus kas, piutang/hutang, dan tutup buku tersusun sendiri dari transaksi kasir — bukan sekadar rekap omzet." },
+        { title: "Laporan siap untuk akuntan, bank & pajak", desc: "Laporan keuangan format SAK EMKM lengkap dengan Catatan atas Laporan Keuangan (CALK), bisa diekspor ke PDF/Excel." },
+        { title: "Aset & penyusutan otomatis", desc: "Konsol, TV, dan peralatan tercatat sebagai aset; penyusutannya dihitung dan dibukukan tiap bulan." },
+        { title: "PPOB terhubung ke kas & pembukuan", desc: "Pulsa, token listrik, dan tarik tunai masuk ke kas shift yang sama dan ikut tercatat di laporan keuangan." },
+        { title: "Selisih kas dipecah per sumber", desc: "Saat tutup shift, selisih dicek per sumber: tunai, QRIS, PPOB, setoran, dan pindah kas — ketahuan dari mana uangnya kurang." },
+        { title: "6 bahasa", desc: "Indonesia, Inggris, Melayu, Thai, Filipino, dan Vietnam — untuk staf dari mana saja dan outlet di luar Indonesia." },
       ],
+      note: "*Dibandingkan dengan halaman resmi 9 aplikasi billing rental PS lain pada 10 Oktober 2026. \"Tidak disebut\" berarti fitur itu tidak tercantum di situs mereka; bisa saja berubah sejak saat itu.",
     },
     appShowcase: {
       kicker: "Aplikasi Android",
@@ -366,7 +371,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Full Feature Set", title: "Everything a PS rental needs, in one system",
       sub: "It's not just a POS. These nine modules cover the entire outlet workflow — from the moment a customer sits down to the month-end P&L report.",
-      catalogCta: "See the Full Feature Catalog", catalogNote: "18 categories, 100+ features — printable or save as PDF.",
+      catalogCta: "See the Full Feature Catalog", catalogNote: "18 categories, 100+ features — printable or save as PDF.", gapCta: "See 6 advantages other apps don't have yet",
       items: [
         { title: "Per-Second Precision Rental Timer", desc: "Tap start, and the system automatically calculates duration and billing down to the second — accurate for hourly rates, saver packages, or member pricing, with no stopwatch or manual calculator needed." },
         { title: "PS4, PS5 & PS6 Unit Management", desc: "Every unit is tracked separately with its condition, TV type, and usage history. Online booking customers know exactly which generation of unit is free and its specs." },
@@ -380,16 +385,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     gap: {
-      kicker: "Not Just Another POS",
-      title: "What Most PS Rental Billing Software Doesn't Have",
-      sub: "Most PS rental billing/POS software stops at \"calculate the rate & print a receipt.\" NEXBILL goes further:",
+      kicker: "Only in NEXBILL",
+      title: "What other PS rental billing apps don't offer yet",
+      sub: "Almost every PS rental billing app already has timers, a cashier, booking and TV control. These six things set NEXBILL apart.",
+      colUs: "NEXBILL", colOthers: "Other apps*", yes: "Yes", notListed: "Not listed",
       items: [
-        { title: "Full Accounting, Not Just a Cash Register", desc: "Automatic journal entries, a balance sheet, and profit & loss are built straight from cashier transactions — most rental billing software stops at a daily revenue recap, never reaching real bookkeeping you can use for taxes or investor reports." },
-        { title: "Cash Reconciliation Down to the Source", desc: "Cash variance is broken down by source: cash, QRIS, PPOB (airtime/electricity/cash withdrawal), cash drops, and internal transfers between accounts — not just one \"total income\" number that hides where the gap came from." },
-        { title: "PPOB Built Into the Books", desc: "Airtime, electricity token, and cash withdrawal transactions automatically flow in and out of the same shift's cash balance — most other systems treat PPOB as a separate module disconnected from the main financial reports." },
-        { title: "Built-In Anti-Fraud Controls", desc: "Moving cash between accounts requires manager approval, risky shifts get flagged automatically, and customers get a trust score based on history — not just a transaction log with no oversight layer." },
-        { title: "One System for Multiple Business Lines", desc: "Console rental, equipment rental, and food & drink sales combine into a single bill and a single report — no need to stitch together separate POS apps for each line of business." },
+        { title: "Full automatic bookkeeping", desc: "Journals, balance sheet, cash flow, receivables/payables and period closing build themselves from cashier transactions — not just a revenue recap." },
+        { title: "Reports ready for accountants, banks & tax", desc: "Financial statements in the SAK EMKM format with Notes to the Financial Statements (CALK), exportable to PDF/Excel." },
+        { title: "Automatic assets & depreciation", desc: "Consoles, TVs and equipment are recorded as assets; depreciation is calculated and posted every month." },
+        { title: "Bill payments (PPOB) linked to cash & books", desc: "Phone credit, electricity tokens and cash withdrawals go into the same shift cash and appear in the financial reports." },
+        { title: "Cash differences split by source", desc: "At shift close, differences are checked per source: cash, QRIS, PPOB, deposits and transfers — you see where the money went missing." },
+        { title: "6 languages", desc: "Indonesian, English, Malay, Thai, Filipino and Vietnamese — for staff from anywhere and outlets outside Indonesia." },
       ],
+      note: "*Compared with the official pages of 9 other PS rental billing apps on 10 October 2026. \"Not listed\" means the feature is not mentioned on their site; this may have changed since.",
     },
     appShowcase: {
       kicker: "Android App",
@@ -577,7 +585,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Ciri Lengkap", title: "Semua yang diperlukan outlet sewa PS, dalam satu sistem",
       sub: "Bukan sekadar kaunter jualan. Sembilan modul ini merangkumi seluruh aliran operasi outlet — dari saat pertama pelanggan duduk sehingga laporan untung rugi akhir bulan.",
-      catalogCta: "Lihat Katalog Ciri Penuh", catalogNote: "18 kategori, 100+ ciri — boleh dicetak atau disimpan sebagai PDF.",
+      catalogCta: "Lihat Katalog Ciri Penuh", catalogNote: "18 kategori, 100+ ciri — boleh dicetak atau disimpan sebagai PDF.", gapCta: "Lihat 6 kelebihan yang belum ada dalam aplikasi lain",
       items: [
         { title: "Pemasa Sewa Ketepatan Saat", desc: "Tekan mula, sistem kira tempoh & bil automatik sehingga ke saat — tepat untuk kadar sejam, pakej jimat, mahupun harga ahli, tanpa jam randik atau kalkulator manual." },
         { title: "Pengurusan Unit PS4, PS5 & PS6", desc: "Setiap unit dicatat berasingan lengkap dengan keadaan, jenis TV, dan sejarah penggunaan. Pelanggan tempahan atas talian tahu tepat unit generasi mana yang kosong dan spesifikasinya." },
@@ -591,16 +599,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     gap: {
-      kicker: "Bukan Sekadar POS Biasa",
-      title: "Apa yang Kebanyakan Software Billing Sewa PS Tiada",
-      sub: "Kebanyakan software billing/kaunter jualan sewa PS berhenti di \"kira kadar & cetak resit.\" NEXBILL pergi lebih jauh:",
+      kicker: "Hanya di NEXBILL",
+      title: "Yang belum ada dalam aplikasi billing sewa PS lain",
+      sub: "Hampir semua aplikasi billing sewa PS sudah ada pemasa, juruwang, tempahan dan kawalan TV. Enam perkara di bawah inilah yang membezakan NEXBILL.",
+      colUs: "NEXBILL", colOthers: "Aplikasi lain*", yes: "Ada", notListed: "Tidak dinyatakan",
       items: [
-        { title: "Perakaunan Penuh, Bukan Sekadar Kaunter Jualan", desc: "Entri jurnal automatik, kunci kira-kira, dan untung rugi terus terbentuk dari transaksi kaunter jualan — kebanyakan software billing sewa PS berhenti di rekap hasil harian, tidak sampai ke perakaunan sebenar untuk cukai atau laporan kepada pelabur." },
-        { title: "Penyesuaian Tunai Sampai ke Puncanya", desc: "Perbezaan tunai dipecahkan mengikut sumber: tunai, QRIS, PPOB (topup/token elektrik/pengeluaran tunai), deposit kas, sehingga pindahan dalaman antara akaun — bukan sekadar satu angka \"jumlah masuk\" yang menyembunyikan puncanya." },
-        { title: "PPOB Bersepadu dengan Pembukuan", desc: "Transaksi topup, token elektrik, dan pengeluaran tunai automatik masuk-keluar dari baki tunai syif yang sama — kebanyakan sistem lain anggap PPOB sebagai modul berasingan yang tidak berkait dengan laporan kewangan utama." },
-        { title: "Kawalan Dalaman Anti-Penipuan", desc: "Pemindahan tunai antara akaun wajib kelulusan pengurus, syif berisiko dikesan automatik, dan pelanggan diberi skor kepercayaan berdasarkan sejarah — bukan sekadar log transaksi tanpa lapisan pengawasan." },
-        { title: "Satu Sistem untuk Pelbagai Lini Perniagaan", desc: "Sewa konsol, sewa peralatan (home rental), dan jualan makanan/minuman digabung jadi satu bil dan satu laporan — tidak perlu guna app kaunter jualan berasingan untuk setiap lini perniagaan." },
+        { title: "Perakaunan lengkap automatik", desc: "Jurnal, kunci kira-kira, aliran tunai, penghutang/pemiutang dan tutup buku tersusun sendiri daripada transaksi juruwang — bukan sekadar rekap jualan." },
+        { title: "Laporan sedia untuk akauntan, bank & cukai", desc: "Penyata kewangan format SAK EMKM lengkap dengan Nota kepada Penyata Kewangan (CALK), boleh dieksport ke PDF/Excel." },
+        { title: "Aset & susut nilai automatik", desc: "Konsol, TV dan peralatan direkod sebagai aset; susut nilainya dikira dan dibukukan setiap bulan." },
+        { title: "PPOB bersambung ke tunai & perakaunan", desc: "Prabayar, token elektrik dan pengeluaran tunai masuk ke tunai syif yang sama dan direkod dalam laporan kewangan." },
+        { title: "Perbezaan tunai dipecah mengikut sumber", desc: "Semasa tutup syif, perbezaan disemak mengikut sumber: tunai, QRIS, PPOB, setoran dan pindahan — nampak dari mana wang berkurang." },
+        { title: "6 bahasa", desc: "Indonesia, Inggeris, Melayu, Thai, Filipino dan Vietnam — untuk staf dari mana-mana dan outlet di luar Indonesia." },
       ],
+      note: "*Dibandingkan dengan halaman rasmi 9 aplikasi billing sewa PS lain pada 10 Oktober 2026. \"Tidak dinyatakan\" bermaksud ciri itu tidak tercatat di laman mereka; mungkin telah berubah sejak itu.",
     },
     appShowcase: {
       kicker: "Aplikasi Android",
@@ -791,7 +802,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "ฟีเจอร์ครบครัน", title: "ทุกสิ่งที่ร้านเช่า PS ต้องการ ในระบบเดียว",
       sub: "ไม่ใช่แค่แคชเชียร์ เก้าโมดูลนี้ครอบคลุมการทำงานทั้งหมดของร้าน — ตั้งแต่ลูกค้านั่งลงครั้งแรกไปจนถึงรายงานกำไรขาดทุนสิ้นเดือน",
-      catalogCta: "ดูแคตตาล็อกฟีเจอร์ทั้งหมด", catalogNote: "18 หมวด ฟีเจอร์กว่า 100 รายการ — พิมพ์หรือบันทึกเป็น PDF ได้",
+      catalogCta: "ดูแคตตาล็อกฟีเจอร์ทั้งหมด", catalogNote: "18 หมวด ฟีเจอร์กว่า 100 รายการ — พิมพ์หรือบันทึกเป็น PDF ได้", gapCta: "ดู 6 ข้อได้เปรียบที่แอปอื่นยังไม่มี",
       items: [
         { title: "นาฬิกาจับเวลาเช่าละเอียดถึงวินาที", desc: "แตะเริ่ม ระบบคำนวณระยะเวลาและค่าบริการอัตโนมัติถึงวินาที — แม่นยำทั้งอัตรารายชั่วโมง แพ็กเกจประหยัด หรือราคาสมาชิก โดยไม่ต้องใช้นาฬิกาจับเวลาหรือเครื่องคิดเลข" },
         { title: "จัดการเครื่อง PS4, PS5 และ PS6", desc: "แต่ละเครื่องถูกบันทึกแยกกันพร้อมสภาพ ประเภททีวี และประวัติการใช้งาน ลูกค้าที่จองออนไลน์รู้ชัดเจนว่าเครื่องรุ่นไหนว่างและสเปกเป็นอย่างไร" },
@@ -805,16 +816,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     gap: {
-      kicker: "ไม่ใช่แค่ POS ทั่วไป",
-      title: "สิ่งที่ซอฟต์แวร์บิลลิ่งร้านเช่า PS ส่วนใหญ่ไม่มี",
-      sub: "ซอฟต์แวร์บิลลิ่ง/แคชเชียร์เช่า PS ส่วนใหญ่หยุดแค่ \"คำนวณค่าเช่าแล้วพิมพ์ใบเสร็จ\" แต่ NEXBILL ไปไกลกว่านั้น:",
+      kicker: "มีเฉพาะ NEXBILL",
+      title: "สิ่งที่แอปบิลลิ่งร้านเช่า PS อื่นยังไม่มี",
+      sub: "แอปบิลลิ่งร้านเช่า PS เกือบทุกตัวมีตัวจับเวลา แคชเชียร์ การจอง และการควบคุมทีวีแล้ว หกเรื่องด้านล่างนี้คือสิ่งที่ทำให้ NEXBILL ต่างออกไป",
+      colUs: "NEXBILL", colOthers: "แอปอื่น*", yes: "มี", notListed: "ไม่ได้ระบุ",
       items: [
-        { title: "บัญชีเต็มรูปแบบ ไม่ใช่แค่แคชเชียร์", desc: "สร้างสมุดรายวัน งบดุล และกำไรขาดทุนอัตโนมัติจากทุกธุรกรรมหน้าร้าน — ซอฟต์แวร์ส่วนใหญ่หยุดแค่สรุปยอดขายรายวัน ไปไม่ถึงบัญชีจริงที่ใช้ยื่นภาษีหรือรายงานนักลงทุนได้" },
-        { title: "กระทบยอดเงินสดถึงต้นตอ", desc: "แยกส่วนต่างเงินสดตามแหล่งที่มา: เงินสด, QRIS, PPOB (เติมเงิน/ค่าไฟ/ถอนเงินสด), นำฝากเงินสด, ไปจนถึงการโอนภายในระหว่างบัญชี — ไม่ใช่แค่ตัวเลข \"ยอดรวมรับเข้า\" ตัวเดียวที่ซ่อนที่มาของส่วนต่าง" },
-        { title: "PPOB เชื่อมกับบัญชีโดยตรง", desc: "ธุรกรรมเติมเงิน ค่าไฟ และถอนเงินสด เข้า-ออกจากยอดเงินสดกะเดียวกันโดยอัตโนมัติ — ระบบอื่นส่วนใหญ่แยก PPOB เป็นโมดูลต่างหากที่ไม่เชื่อมกับรายงานการเงินหลัก" },
-        { title: "ระบบควบคุมภายในป้องกันการโกง", desc: "การโอนเงินสดระหว่างบัญชีต้องได้รับอนุมัติจากผู้จัดการ ตรวจจับกะที่มีความเสี่ยงโดยอัตโนมัติ และให้คะแนนความน่าเชื่อถือลูกค้าจากประวัติ — ไม่ใช่แค่บันทึกธุรกรรมที่ไม่มีการตรวจสอบ" },
-        { title: "ระบบเดียวสำหรับหลายประเภทธุรกิจ", desc: "เช่าคอนโซล เช่าอุปกรณ์ (home rental) และขายอาหาร/เครื่องดื่ม รวมเป็นบิลเดียวและรายงานเดียว — ไม่ต้องใช้แอปแคชเชียร์แยกสำหรับแต่ละธุรกิจ" },
+        { title: "บัญชีครบวงจรอัตโนมัติ", desc: "สมุดรายวัน งบดุล งบกระแสเงินสด ลูกหนี้/เจ้าหนี้ และการปิดงวด สร้างเองจากรายการแคชเชียร์ — ไม่ใช่แค่สรุปยอดขาย" },
+        { title: "รายงานพร้อมส่งนักบัญชี ธนาคาร และภาษี", desc: "งบการเงินรูปแบบ SAK EMKM พร้อมหมายเหตุประกอบงบการเงิน (CALK) ส่งออกเป็น PDF/Excel ได้" },
+        { title: "สินทรัพย์และค่าเสื่อมราคาอัตโนมัติ", desc: "คอนโซล ทีวี และอุปกรณ์ถูกบันทึกเป็นสินทรัพย์ คำนวณและลงบัญชีค่าเสื่อมราคาทุกเดือน" },
+        { title: "PPOB เชื่อมกับเงินสดและบัญชี", desc: "เติมเงินมือถือ โทเคนไฟฟ้า และถอนเงินสด เข้าเงินสดกะเดียวกันและปรากฏในรายงานการเงิน" },
+        { title: "แยกเงินขาดเกินตามแหล่งที่มา", desc: "ตอนปิดกะ ตรวจเงินขาดเกินแยกตามแหล่ง: เงินสด QRIS PPOB เงินฝาก และการโอน — รู้ว่าเงินหายจากตรงไหน" },
+        { title: "6 ภาษา", desc: "อินโดนีเซีย อังกฤษ มาเลย์ ไทย ฟิลิปปินส์ และเวียดนาม — สำหรับพนักงานจากทุกที่และร้านนอกอินโดนีเซีย" },
       ],
+      note: "*เปรียบเทียบกับหน้าเว็บทางการของแอปบิลลิ่งร้านเช่า PS อื่น 9 ตัว เมื่อ 10 ตุลาคม 2026 \"ไม่ได้ระบุ\" หมายถึงฟีเจอร์นั้นไม่มีอยู่ในเว็บไซต์ของเขา ซึ่งอาจเปลี่ยนไปแล้ว",
     },
     appShowcase: {
       kicker: "แอป Android",
@@ -1005,7 +1019,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Tính năng đầy đủ", title: "Mọi thứ cửa hàng cho thuê PS cần, trong một hệ thống",
       sub: "Không chỉ là thu ngân. Chín module này bao quát toàn bộ quy trình vận hành cửa hàng — từ lúc khách hàng ngồi xuống đến báo cáo lãi lỗ cuối tháng.",
-      catalogCta: "Xem danh mục tính năng đầy đủ", catalogNote: "18 nhóm, hơn 100 tính năng — có thể in hoặc lưu thành PDF.",
+      catalogCta: "Xem danh mục tính năng đầy đủ", catalogNote: "18 nhóm, hơn 100 tính năng — có thể in hoặc lưu thành PDF.", gapCta: "Xem 6 ưu điểm mà ứng dụng khác chưa có",
       items: [
         { title: "Đồng hồ tính giờ thuê chính xác đến giây", desc: "Chạm bắt đầu, hệ thống tự động tính thời lượng & hóa đơn chính xác đến từng giây — đúng cho giá theo giờ, gói tiết kiệm, hay giá hội viên, không cần đồng hồ bấm giờ hay máy tính thủ công." },
         { title: "Quản lý thiết bị PS4, PS5 & PS6", desc: "Mỗi thiết bị được ghi nhận riêng biệt kèm tình trạng, loại TV, và lịch sử sử dụng. Khách đặt chỗ trực tuyến biết chính xác thiết bị thế hệ nào đang trống và thông số của nó." },
@@ -1019,16 +1033,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     gap: {
-      kicker: "Không Chỉ Là Phần Mềm Thu Ngân",
-      title: "Những Gì Phần Mềm Billing Cho Thuê PS Khác Thường Không Có",
-      sub: "Hầu hết phần mềm billing/thu ngân cho thuê PS chỉ dừng ở \"tính giá & in hóa đơn.\" NEXBILL đi xa hơn thế:",
+      kicker: "Chỉ có ở NEXBILL",
+      title: "Những gì các ứng dụng tính tiền cho thuê PS khác chưa có",
+      sub: "Hầu hết ứng dụng tính tiền cho thuê PS đều đã có hẹn giờ, thu ngân, đặt chỗ và điều khiển TV. Sáu điều dưới đây làm NEXBILL khác biệt.",
+      colUs: "NEXBILL", colOthers: "Ứng dụng khác*", yes: "Có", notListed: "Không nêu",
       items: [
-        { title: "Kế Toán Đầy Đủ, Không Chỉ Là Máy Tính Tiền", desc: "Tự động lập sổ nhật ký, bảng cân đối kế toán và báo cáo lãi lỗ ngay từ giao dịch thu ngân — hầu hết phần mềm khác chỉ dừng ở tổng kết doanh thu hàng ngày, chưa đạt đến mức sổ sách kế toán thực sự dùng để khai thuế hay báo cáo nhà đầu tư." },
-        { title: "Đối Soát Tiền Mặt Đến Tận Gốc", desc: "Chênh lệch tiền mặt được tách theo từng nguồn: tiền mặt, QRIS, PPOB (nạp tiền/tiền điện/rút tiền mặt), nộp quỹ, đến chuyển khoản nội bộ giữa các tài khoản — không chỉ một con số \"tổng thu\" duy nhất che giấu chênh lệch đến từ đâu." },
-        { title: "PPOB Tích Hợp Thẳng Vào Sổ Sách", desc: "Giao dịch nạp tiền điện thoại, tiền điện, và rút tiền mặt tự động ra/vào đúng quỹ tiền mặt của ca làm việc đó — hầu hết hệ thống khác coi PPOB là mô-đun riêng biệt, không liên kết với báo cáo tài chính chính." },
-        { title: "Kiểm Soát Nội Bộ Chống Gian Lận", desc: "Chuyển tiền mặt giữa các tài khoản bắt buộc phải được quản lý phê duyệt, ca làm việc rủi ro được tự động gắn cờ, và khách hàng có điểm tin cậy dựa trên lịch sử — không chỉ là nhật ký giao dịch không có lớp giám sát nào." },
-        { title: "Một Hệ Thống Cho Nhiều Mô Hình Kinh Doanh", desc: "Cho thuê máy chơi game, cho thuê thiết bị (home rental), và bán đồ ăn/thức uống gộp thành một hóa đơn và một báo cáo duy nhất — không cần ghép nhiều ứng dụng thu ngân riêng lẻ cho từng mảng kinh doanh." },
+        { title: "Sổ sách kế toán đầy đủ tự động", desc: "Nhật ký, bảng cân đối, lưu chuyển tiền tệ, công nợ phải thu/phải trả và khóa sổ tự lập từ giao dịch thu ngân — không chỉ là tổng kết doanh thu." },
+        { title: "Báo cáo sẵn sàng cho kế toán, ngân hàng & thuế", desc: "Báo cáo tài chính theo chuẩn SAK EMKM kèm Thuyết minh báo cáo tài chính (CALK), xuất được PDF/Excel." },
+        { title: "Tài sản & khấu hao tự động", desc: "Máy chơi game, TV và thiết bị được ghi nhận là tài sản; khấu hao được tính và ghi sổ hằng tháng." },
+        { title: "PPOB gắn với tiền mặt & sổ sách", desc: "Nạp tiền điện thoại, mã điện và rút tiền mặt đi vào cùng quỹ ca và hiện trong báo cáo tài chính." },
+        { title: "Chênh lệch tiền chia theo nguồn", desc: "Khi đóng ca, chênh lệch được kiểm theo từng nguồn: tiền mặt, QRIS, PPOB, nộp tiền và chuyển quỹ — biết tiền thiếu từ đâu." },
+        { title: "6 ngôn ngữ", desc: "Indonesia, Anh, Mã Lai, Thái, Philippines và Việt Nam — cho nhân viên ở bất kỳ đâu và cửa hàng ngoài Indonesia." },
       ],
+      note: "*So sánh với trang chính thức của 9 ứng dụng tính tiền cho thuê PS khác vào ngày 10/10/2026. \"Không nêu\" nghĩa là tính năng không được ghi trên trang của họ; có thể đã thay đổi từ đó.",
     },
     appShowcase: {
       kicker: "Ứng dụng Android",
@@ -1219,7 +1236,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     fitur: {
       kicker: "Kumpletong Feature", title: "Lahat ng kailangan ng PS rental, sa isang sistema",
       sub: "Hindi lang cashier. Ang siyam na module na ito ang sumasaklaw sa buong daloy ng operasyon ng outlet — mula sa unang pagupo ng customer hanggang sa profit-and-loss report sa katapusan ng buwan.",
-      catalogCta: "Tingnan ang Buong Katalogo ng Feature", catalogNote: "18 kategorya, 100+ feature — puwedeng i-print o i-save bilang PDF.",
+      catalogCta: "Tingnan ang Buong Katalogo ng Feature", catalogNote: "18 kategorya, 100+ feature — puwedeng i-print o i-save bilang PDF.", gapCta: "Tingnan ang 6 na kalamangan na wala pa sa ibang app",
       items: [
         { title: "Rental Timer na Tumpak Hanggang Segundo", desc: "I-tap ang start, awtomatikong bibilangin ng sistema ang tagal at bayarin hanggang sa segundo — tumpak para sa per-hour rate, savings package, o presyo ng miyembro, walang kailangang stopwatch o manual na kalkulator." },
         { title: "Pamamahala ng PS4, PS5 & PS6 Unit", desc: "Bawat unit ay naitatala nang hiwalay kasama ang kondisyon, uri ng TV, at history ng paggamit. Alam mismo ng customer na nag-book online kung aling generation ng unit ang bakante at ano ang specs nito." },
@@ -1233,16 +1250,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     gap: {
-      kicker: "Hindi Lang Basic na POS",
-      title: "Ang Kadalasang Wala sa Ibang Software na Billing Para sa Rental ng PS",
-      sub: "Karamihan sa software na billing/cashier para sa rental ng PS ay hanggang \"kwentahin ang rate at magprint ng resibo\" lang. Mas malayo ang narating ng NEXBILL:",
+      kicker: "Sa NEXBILL lang",
+      title: "Ang wala pa sa ibang PS rental billing app",
+      sub: "Halos lahat ng PS rental billing app ay may timer, cashier, booking at TV control na. Ang anim na ito ang nagpapaiba sa NEXBILL.",
+      colUs: "NEXBILL", colOthers: "Ibang app*", yes: "Mayroon", notListed: "Hindi nakalista",
       items: [
-        { title: "Buong Accounting, Hindi Lang Cash Register", desc: "Awtomatikong journal entries, balance sheet, at profit & loss galing mismo sa mga transaksyon ng cashier — karamihan sa software ay hanggang daily revenue recap lang, hindi umaabot sa totoong bookkeeping na pwedeng gamitin para sa buwis o report sa investor." },
-        { title: "Cash Reconciliation Hanggang sa Pinagmulan", desc: "Hinahati ang variance ng cash ayon sa pinagmulan: cash, QRIS, PPOB (load/kuryente/cash withdrawal), cash drop, hanggang internal transfer sa pagitan ng mga account — hindi lang iisang numero na \"total income\" na nagtatago kung saan galing ang pagkakaiba." },
-        { title: "PPOB Nakaintegrate sa Libro", desc: "Awtomatikong papasok at lalabas ang load, kuryente, at cash withdrawal sa parehong cash balance ng shift — karamihan sa ibang sistema ay itinuturing ang PPOB bilang hiwalay na module na hindi konektado sa pangunahing financial report." },
-        { title: "Built-In na Anti-Fraud Control", desc: "Kailangan ng approval ng manager ang paglipat ng cash sa pagitan ng mga account, awtomatikong na-fla-flag ang mga risky na shift, at may trust score ang customer batay sa history nila — hindi lang basic na transaction log na walang oversight." },
-        { title: "Iisang Sistema para sa Maraming Uri ng Negosyo", desc: "Pagpapaupa ng konsola, pagpapaupa ng gamit (home rental), at pagbebenta ng pagkain/inumin ay pinagsasama sa iisang bill at iisang report — hindi na kailangan ng hiwalay na POS app para sa bawat linya ng negosyo." },
+        { title: "Kumpletong awtomatikong bookkeeping", desc: "Journal, balance sheet, cash flow, receivable/payable at pagsasara ng period ay kusang nabubuo mula sa cashier — hindi lang recap ng benta." },
+        { title: "Ulat na handa para sa accountant, bangko at buwis", desc: "Financial statements sa format na SAK EMKM kasama ang Notes to the Financial Statements (CALK), puwedeng i-export sa PDF/Excel." },
+        { title: "Awtomatikong asset at depreciation", desc: "Naitatala bilang asset ang console, TV at kagamitan; kinukuwenta at itinatala ang depreciation bawat buwan." },
+        { title: "PPOB na konektado sa cash at libro", desc: "Load, electricity token at cash withdrawal ay pumapasok sa parehong shift cash at lumalabas sa financial report." },
+        { title: "Kulang sa cash na hinati ayon sa pinagmulan", desc: "Sa pagsasara ng shift, sinusuri ang kulang ayon sa pinagmulan: cash, QRIS, PPOB, deposito at paglipat — makikita kung saan nawala ang pera." },
+        { title: "6 na wika", desc: "Indonesian, English, Malay, Thai, Filipino at Vietnamese — para sa staff saanman at outlet sa labas ng Indonesia." },
       ],
+      note: "*Inihambing sa opisyal na pahina ng 9 na ibang PS rental billing app noong 10 Oktubre 2026. Ang \"Hindi nakalista\" ay nangangahulugang hindi binanggit ang feature sa kanilang site; maaaring nagbago na ito.",
     },
     appShowcase: {
       kicker: "Android App",
