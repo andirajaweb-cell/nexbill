@@ -249,7 +249,7 @@ export function DeviceSetupGuide() {
                       <p>
                         {t(
                           "devices.guide.tv.step3Body",
-                          'Buka folder hasil extract, jalankan NexbillAgent.exe. Saat pertama kali dijalankan, pilih bahasa (ketik angkanya, atau langsung Enter untuk Bahasa Indonesia), lalu aplikasi akan minta "Masukkan Agent Token" — tempel token dari Langkah 1. Setelah itu token tersimpan otomatis, dan NexbillAgent menyala sendiri setiap kali PC ini login.'
+                          "Buka folder hasil extract, jalankan NexbillAgent.exe. Browser akan membuka layar \"Hubungkan TV\" sendiri — tempel token dari Langkah 1 di sana lalu klik Simpan token (atau tempel di jendela agent). Token tersimpan otomatis, NexbillAgent menyala sendiri setiap kali PC ini login, dan pintasan \"NEXBILL - Hubungkan TV\" dibuat di Desktop."
                         )}
                       </p>
                     </div>
@@ -259,7 +259,7 @@ export function DeviceSetupGuide() {
                       <p>
                         {t(
                           "devices.guide.tv.step4Body",
-                          'Di TV: buka Settings > Device Preferences (System) > About > tekan baris versi build 7x sampai muncul "Developer options". Masuk ke Developer options, aktifkan "Network debugging", catat alamat IP yang muncul di layar. Saat NexbillAgent pertama kali konek ke TV ini, layar TV akan menampilkan popup "Allow debugging?" — centang "Always allow from this computer" lalu pilih Izinkan. Setelah itu tidak perlu approve lagi.'
+                          "Di TV: buka Settings > Device Preferences (System) > About > tekan baris versi build 7x sampai muncul \"Developer options\", lalu aktifkan \"Network debugging\". Di PC kasir, buka layar Hubungkan TV (pintasan di Desktop) dan klik \"Cari TV\" — IP tidak perlu dicatat. Klik Hubungkan pada TV-nya; layar TV menampilkan \"Allow debugging?\" — centang \"Always allow from this computer\" lalu Izinkan. Google TV / Android 11+ yang hanya punya \"Wireless debugging\": pakai bagian \"Pairing kode\" di layar yang sama."
                         )}
                       </p>
                     </div>
@@ -269,7 +269,7 @@ export function DeviceSetupGuide() {
                       <p>
                         {t(
                           "devices.guide.tv.step5Body",
-                          'Kembali ke halaman ini, klik "Tambah Perangkat", pilih protokol "TV (Android/Google TV)", isi nama dan IP TV dari Langkah 4, lalu Simpan. Selesai — TV bisa dinyalakan/dimatikan dari dashboard ini.'
+                          "Kembali ke halaman ini. TV yang sudah siap muncul di kartu \"Hubungkan TV tanpa Command Prompt\" — klik Tambahkan. Selesai — TV bisa dinyalakan/dimatikan dari dashboard ini, dan NexbillAgent menyambungkannya ulang sendiri bila TV sempat mati."
                         )}
                       </p>
                     </div>

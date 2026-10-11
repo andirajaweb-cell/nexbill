@@ -15,6 +15,7 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-devices";
 import { DeviceSetupGuide } from "./setup-guide";
 import { LocalControlCard } from "./local-control-card";
+import { DiscoveredTvsCard, type DiscoveredTvsResponse } from "./discovered-tvs-card";
 import "@/lib/i18n/dict-local-control";
 import { parseTasmotaLocalIp } from "@/lib/relay/local-control";
 
@@ -257,6 +258,9 @@ export default function DevicesPage() {
   // lib/devices/heartbeat.ts). Generated fresh from THIS outlet's current device list every time
   // it's clicked, so there's nothing to hand-edit and nothing to ask NEXBILL support for — an
   // outlet just re-downloads and overwrites the file whenever a TV is added/removed/re-IP'd.
+  // NexbillAgent v1.5+ menyambung ulang TV sendiri tiap 30 detik — script .bat hanya untuk agent lama.
+  const { data: tvSetupData } = useApi<DiscoveredTvsResponse>("/api/devices/discovered-tvs", { refreshInterval: 10000 });
+  const allAgentsAutoReconnect = !!tvSetupData && tvSetupData.agents.length > 0 && tvSetupData.agents.every((a) => a.supportsSetup);
   const tvTargets = devices
     .filter((d) => d.protocol === "android_tv_adb" || d.protocol === "android_tv_relay")
     .map((d) => parseAndroidTvConfig(d.config))
@@ -412,6 +416,8 @@ export default function DevicesPage() {
 
       {canManage && <DeviceSetupGuide />}
 
+      <DiscoveredTvsCard onAdded={load} />
+
       <LocalControlCard canManage={canManage} reloadSignal={devices} onDeviceChanged={load} />
 
       {canManage && (
@@ -443,7 +449,7 @@ export default function DevicesPage() {
         </Card>
       )}
 
-      {canManage && tvTargets.length > 0 && (
+      {canManage && tvTargets.length > 0 && !allAgentsAutoReconnect && (
         <Card>
           <h2 className="font-medium mb-1">{t("devices.reconnectScript.title", "Script Auto-Reconnect ADB (opsional)")}</h2>
           <p className="text-xs text-neutral-500 mb-3">

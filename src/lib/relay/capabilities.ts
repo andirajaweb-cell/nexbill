@@ -35,7 +35,11 @@ export type RelayAction = (typeof RELAY_ACTIONS)[number];
  * Lokal di LAN dan menerima local_config (lihat lib/relay/local-control.ts) supaya TV & plug
  * Tasmota tetap bisa dikontrol saat internet outlet putus.
  */
-export const RELAY_CAPABILITIES = ["power", "open_screensaver", "switch_hdmi", "tv_info", "self_update", "local_control"] as const;
+/**
+ * "tv_setup" (agent v1.5+) juga bukan perintah hub: agent punya layar Hubungkan TV di
+ * http://localhost:8737/setup dan mengirim laporan tv_report (lib/relay/tv-discovery.ts).
+ */
+export const RELAY_CAPABILITIES = ["power", "open_screensaver", "switch_hdmi", "tv_info", "self_update", "local_control", "tv_setup"] as const;
 export type RelayCapability = (typeof RELAY_CAPABILITIES)[number];
 
 export const ACTION_REQUIRES: Record<RelayAction, RelayCapability> = {

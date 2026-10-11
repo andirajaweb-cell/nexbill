@@ -57,6 +57,7 @@ import {
   RelayDispatchResponse,
 } from "../src/lib/relay/config";
 import { parseLocalInfo } from "../src/lib/relay/local-control";
+import { mergeLocalInfoJson, sanitizeTvReport } from "../src/lib/relay/tv-discovery";
 import { buildLocalConfigForAgent } from "../src/lib/relay/local-config-service";
 
 interface ConnectedAgent {
@@ -75,6 +76,8 @@ interface ConnectedAgent {
   capabilities: RelayCapability[];
   /** Kapan local_config terakhir dikirim — permintaan lebih rapat dari LOCAL_CONFIG_MIN_INTERVAL_MS diabaikan. */
   lastLocalConfigAt: number;
+  /** Laporan TV terakhir yang belum ditulis (ditulis paling sering sekali per 2 detik, yang terbaru menang). */
+  pendingTvReport: { raw: unknown; timer: ReturnType<typeof setTimeout> | null } | null;
 }
 
 /** Agent v1.4 meminta local_config tiap 30 detik; batas bawah ini melindungi database dari agent yang rusak. */
@@ -184,13 +187,42 @@ async function recordLocalInfo(relayAgentId: string, raw: unknown) {
   const info = parseLocalInfo(raw ? JSON.stringify(raw) : null);
   if (!info) return;
   try {
-    const row = { relayAgentId, localInfo: JSON.stringify(info), updatedAt: new Date().toISOString() };
+    // Digabung dengan yang tersimpan: kolom yang sama juga menyimpan laporan TV agent v1.5 (tvs/tvsAt).
+    const [existing] = await db
+      .select({ localInfo: relayAgentLocalInfo.localInfo })
+      .from(relayAgentLocalInfo)
+      .where(eq(relayAgentLocalInfo.relayAgentId, relayAgentId))
+      .limit(1);
+    const row = { relayAgentId, localInfo: mergeLocalInfoJson(existing?.localInfo, { ...info }), updatedAt: new Date().toISOString() };
     await db
       .insert(relayAgentLocalInfo)
       .values(row)
       .onConflictDoUpdate({ target: relayAgentLocalInfo.relayAgentId, set: { localInfo: row.localInfo, updatedAt: row.updatedAt } });
   } catch (err) {
     console.warn(`[relay-hub] Alamat LAN agent tidak tersimpan (${describeError(err)}). Jalankan supabase/migrations/0033_relay_agent_local_control.sql.`);
+  }
+}
+
+/**
+ * Laporan TV dari layar Hubungkan TV agent v1.5 (lib/relay/tv-discovery.ts). Disimpan di
+ * relay_agent_local_info.local_info (kunci tvs/tvsAt) supaya Kontrol Perangkat bisa menawarkan
+ * "Tambahkan" tanpa merchant mengetik IP. Kegagalan hanya dicatat — kontrol TV tidak terpengaruh.
+ */
+async function recordTvReport(relayAgentId: string, raw: unknown) {
+  const tvs = sanitizeTvReport(raw);
+  try {
+    const [existing] = await db
+      .select({ localInfo: relayAgentLocalInfo.localInfo })
+      .from(relayAgentLocalInfo)
+      .where(eq(relayAgentLocalInfo.relayAgentId, relayAgentId))
+      .limit(1);
+    const row = { relayAgentId, localInfo: mergeLocalInfoJson(existing?.localInfo, { tvs, tvsAt: new Date().toISOString() }), updatedAt: new Date().toISOString() };
+    await db
+      .insert(relayAgentLocalInfo)
+      .values(row)
+      .onConflictDoUpdate({ target: relayAgentLocalInfo.relayAgentId, set: { localInfo: row.localInfo, updatedAt: row.updatedAt } });
+  } catch (err) {
+    console.warn(`[relay-hub] Laporan TV agent tidak tersimpan (${describeError(err)}). Jalankan supabase/migrations/0033_relay_agent_local_control.sql.`);
   }
 }
 
@@ -257,6 +289,7 @@ wss.on("connection", (ws) => {
         agentVersion: handshake.agentVersion,
         capabilities: handshake.capabilities,
         lastLocalConfigAt: 0,
+        pendingTvReport: null,
       };
       connectedByToken.set(msg.token, agent);
       // Dibatasi 2 detik: auth_ok dulu dikirim seketika setelah token cocok. Kolom tambahannya
@@ -291,6 +324,23 @@ wss.on("connection", (ws) => {
 
     if (msg.type === "local_config_request") {
       await sendLocalConfig(agent);
+      return;
+    }
+
+    if (msg.type === "tv_report") {
+      // Agent hanya melapor saat ada perubahan, tapi agent rusak tidak boleh membanjiri database:
+      // laporan dikumpulkan maksimal 2 detik dan hanya yang TERBARU ditulis.
+      const current = agent;
+      if (current.pendingTvReport) {
+        current.pendingTvReport.raw = msg.tvs;
+        return;
+      }
+      current.pendingTvReport = { raw: msg.tvs, timer: null };
+      current.pendingTvReport.timer = setTimeout(() => {
+        const pending = current.pendingTvReport;
+        current.pendingTvReport = null;
+        if (pending) void recordTvReport(current.relayAgentId, pending.raw);
+      }, 2000);
       return;
     }
 

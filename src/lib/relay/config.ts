@@ -193,7 +193,13 @@ export interface RelayPongMessage {
   type: "pong";
 }
 
-export type RelayAgentToHubMessage = RelayAuthMessage | RelayResultMessage | RelayPingMessage | RelayLocalConfigRequest;
+/** Agent v1.5+ -> Hub: TV yang ditemukan/dihubungkan di layar Hubungkan TV (lib/relay/tv-discovery.ts). */
+export interface RelayTvReportMessage {
+  type: "tv_report";
+  tvs: unknown;
+}
+
+export type RelayAgentToHubMessage = RelayAuthMessage | RelayResultMessage | RelayPingMessage | RelayLocalConfigRequest | RelayTvReportMessage;
 export type RelayHubToAgentMessage =
   | RelayAuthOkMessage
   | RelayAuthErrorMessage
