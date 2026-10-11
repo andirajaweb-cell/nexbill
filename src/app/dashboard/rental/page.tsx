@@ -758,15 +758,18 @@ function OnlineRentalPage() {
   // "Jeda semua" saat listrik padam (lib/rental/bulk-pause.ts): waktu sesi di server tetap berjalan
   // selama mati lampu, jadi semua sesi dijeda sekaligus dengan satu cap waktu, lalu dilanjutkan
   // bersama-sama — dari perangkat mana pun — saat listrik kembali.
-  const BULK_KEY = "nexbill.rental.bulkPauseAt";
+  // Diingat PER OUTLET: pemilik dengan beberapa cabang di browser yang sama tidak boleh melihat
+  // banner "Lanjutkan semua" milik cabang lain. Datanya sendiri selalu dari server per outlet aktif.
+  const BULK_KEY = `nexbill.rental.bulkPauseAt.${outletId ?? "none"}`;
   const [bulkStamp, setBulkStamp] = useState<string | null>(null);
   useEffect(() => {
+    if (!outletId) return;
     try {
-      setBulkStamp(window.localStorage.getItem(BULK_KEY));
+      setBulkStamp(window.localStorage.getItem(`nexbill.rental.bulkPauseAt.${outletId}`));
     } catch {
       /* storage diblokir */
     }
-  }, []);
+  }, [outletId]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const runningCount = sessions.filter((x) => x.status === "running").length;
   const bulkGroup = latestBulkPauseGroup(sessions, bulkStamp);
