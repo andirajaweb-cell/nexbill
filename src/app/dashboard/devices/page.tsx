@@ -15,6 +15,7 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-devices";
 import { DeviceSetupGuide } from "./setup-guide";
 import { LocalControlCard } from "./local-control-card";
+import { DeviceMethodsAndRisks } from "./methods-and-risks";
 import { DiscoveredTvsCard, type DiscoveredTvsResponse } from "./discovered-tvs-card";
 import "@/lib/i18n/dict-local-control";
 import { parseTasmotaLocalIp } from "@/lib/relay/local-control";
@@ -413,6 +414,9 @@ export default function DevicesPage() {
           </div>
         </Card>
       )}
+
+      {/* Keunggulan tiap metode + rencana darurat (listrik padam, internet putus, error) — untuk semua peran. */}
+      <DeviceMethodsAndRisks />
 
       {canManage && <DeviceSetupGuide />}
 
