@@ -13,13 +13,13 @@
     <string name="overlay_needed">Kailangan ng mode na ito ang pahintulot na magpakita sa ibabaw ng ibang app. Buksan ang staff menu → Ipakita sa ibabaw ng ibang app.</string>
     <string name="pin_title">Ilagay ang staff PIN</string>
     <string name="pin_wrong">Mali ang PIN</string>
-    <string name="pin_error">Hindi masuri ang PIN. Suriin ang internet.</string>
+    <string name="pin_error">Hindi matingnan ang PIN: walang internet at hindi pa nagagamit ang PIN sa TV na ito. Gamitin ang Input/Source button ng remote para lumipat sa HDMI.</string>
     <string name="ok">OK</string>
     <string name="cancel">Kanselahin</string>
     <string name="yes">Oo</string>
     <string name="no">Hindi</string>
     <string name="menu_title">Staff menu</string>
-    <string name="menu_show_game">Buksan ang game screen nang 10 minuto</string>
+    <string name="menu_show_game">Buksan ang game screen (walang session)</string>
     <string name="menu_end_staff">Tapusin ang staff mode</string>
     <string name="menu_pick_hdmi">Piliin ang HDMI input</string>
     <string name="menu_mode">HDMI display mode</string>
@@ -40,4 +40,7 @@
     <string name="update_available">May bagong bersyon %1$s. Para mag-update: buksan ang Downloader app sa TV na ito, i-type ang %2$s, saka piliin ang Install. Mananatili ang pairing at settings.</string>
     <string name="update_latest">Pinakabago na ang app (%1$s).</string>
     <string name="update_error">Hindi matingnan ang update. Siguraduhing nakakonekta sa internet ang TV.</string>
+    <string name="staff_duration_title">Gaano katagal bubuksan ang game screen?</string>
+    <string name="minutes_fmt">%1$d minuto</string>
+    <string name="pin_offline_ok">Walang internet — inihambing ang PIN sa huling PIN na ginamit sa TV na ito.</string>
 </resources>

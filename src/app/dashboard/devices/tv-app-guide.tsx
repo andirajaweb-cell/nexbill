@@ -123,7 +123,7 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
       items: [
         t("devices.guide.tvFull.s4a", "Tahan tombol OK di remote selama 3 detik (atau tekan tombol Menu). Menu staf terbuka. Kalau diminta PIN, isi PIN layar dari Pengaturan › TV Screensaver."),
         t("devices.guide.tvFull.s4b", "Pilih \"Pilih input HDMI\", lalu pilih HDMI tempat PlayStation dicolok (mis. HDMI 2)."),
-        t("devices.guide.tvFull.s4c", "Coba di menu staf: \"Buka layar game 10 menit\". Gambar PlayStation harus tampil dengan timer di pojok kanan atas."),
+        t("devices.guide.tvFull.s4c", "Coba di menu staf: \"Buka layar game (tanpa sesi)\" → 10 menit. Gambar PlayStation harus tampil dengan timer di pojok kanan atas."),
       ],
     },
     {

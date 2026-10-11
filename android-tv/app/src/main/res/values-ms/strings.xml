@@ -13,13 +13,13 @@
     <string name="overlay_needed">Mod ini perlukan kebenaran paparan di atas aplikasi lain. Buka menu staf → Paparan di atas aplikasi lain.</string>
     <string name="pin_title">Masukkan PIN staf</string>
     <string name="pin_wrong">PIN salah</string>
-    <string name="pin_error">Tidak dapat menyemak PIN. Semak sambungan internet.</string>
+    <string name="pin_error">Tidak dapat menyemak PIN: internet terputus dan PIN belum pernah digunakan pada TV ini. Guna butang Input/Source pada alat kawalan jauh untuk tukar ke HDMI.</string>
     <string name="ok">OK</string>
     <string name="cancel">Batal</string>
     <string name="yes">Ya</string>
     <string name="no">Tidak</string>
     <string name="menu_title">Menu staf</string>
-    <string name="menu_show_game">Buka skrin permainan 10 minit</string>
+    <string name="menu_show_game">Buka skrin permainan (tanpa sesi)</string>
     <string name="menu_end_staff">Tamatkan mod staf</string>
     <string name="menu_pick_hdmi">Pilih input HDMI</string>
     <string name="menu_mode">Mod paparan HDMI</string>
@@ -40,4 +40,7 @@
     <string name="update_available">Versi baharu %1$s tersedia. Cara mengemas kini: buka apl Downloader pada TV ini, taip %2$s, kemudian pilih Install. Pairing dan tetapan kekal tersimpan.</string>
     <string name="update_latest">Apl sudah versi terkini (%1$s).</string>
     <string name="update_error">Tidak dapat menyemak kemas kini. Pastikan TV bersambung ke internet.</string>
+    <string name="staff_duration_title">Buka skrin permainan berapa lama?</string>
+    <string name="minutes_fmt">%1$d minit</string>
+    <string name="pin_offline_ok">Internet terputus — PIN dipadankan dengan PIN terakhir yang digunakan pada TV ini.</string>
 </resources>

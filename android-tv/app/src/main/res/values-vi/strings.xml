@@ -13,13 +13,13 @@
     <string name="overlay_needed">Chế độ này cần quyền hiển thị trên ứng dụng khác. Mở menu nhân viên → Hiển thị trên ứng dụng khác.</string>
     <string name="pin_title">Nhập PIN nhân viên</string>
     <string name="pin_wrong">Sai PIN</string>
-    <string name="pin_error">Không kiểm tra được PIN. Kiểm tra kết nối internet.</string>
+    <string name="pin_error">Không kiểm tra được PIN: mất internet và chưa từng dùng PIN trên TV này. Dùng nút Input/Source trên điều khiển để chuyển sang HDMI.</string>
     <string name="ok">OK</string>
     <string name="cancel">Hủy</string>
     <string name="yes">Có</string>
     <string name="no">Không</string>
     <string name="menu_title">Menu nhân viên</string>
-    <string name="menu_show_game">Mở màn hình game 10 phút</string>
+    <string name="menu_show_game">Mở màn hình game (không có phiên)</string>
     <string name="menu_end_staff">Kết thúc chế độ nhân viên</string>
     <string name="menu_pick_hdmi">Chọn cổng HDMI</string>
     <string name="menu_mode">Chế độ hiển thị HDMI</string>
@@ -40,4 +40,7 @@
     <string name="update_available">Đã có phiên bản mới %1$s. Cách cập nhật: mở ứng dụng Downloader trên TV này, gõ %2$s rồi chọn Install. Ghép nối và cài đặt vẫn được giữ.</string>
     <string name="update_latest">Ứng dụng đã là bản mới nhất (%1$s).</string>
     <string name="update_error">Không kiểm tra được cập nhật. Hãy chắc TV đã kết nối internet.</string>
+    <string name="staff_duration_title">Mở màn hình game trong bao lâu?</string>
+    <string name="minutes_fmt">%1$d phút</string>
+    <string name="pin_offline_ok">Mất internet — PIN được so với PIN dùng gần nhất trên TV này.</string>
 </resources>

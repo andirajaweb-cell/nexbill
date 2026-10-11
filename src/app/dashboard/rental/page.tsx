@@ -44,6 +44,7 @@ import { useConnectivity, useOfflineData } from "@/lib/offline/hooks";
 import { getLastOutletId } from "@/lib/offline/store";
 import { PageGuide } from "@/components/dashboard/PageGuide";
 import { hasAnyPermission, hasPermission, type StaffRole } from "@/lib/auth/permissions";
+import { latestBulkPauseGroup } from "@/lib/rental/bulk-pause";
 
 // recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
 const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
@@ -754,6 +755,63 @@ function OnlineRentalPage() {
     }
   };
 
+  // "Jeda semua" saat listrik padam (lib/rental/bulk-pause.ts): waktu sesi di server tetap berjalan
+  // selama mati lampu, jadi semua sesi dijeda sekaligus dengan satu cap waktu, lalu dilanjutkan
+  // bersama-sama — dari perangkat mana pun — saat listrik kembali.
+  const BULK_KEY = "nexbill.rental.bulkPauseAt";
+  const [bulkStamp, setBulkStamp] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setBulkStamp(window.localStorage.getItem(BULK_KEY));
+    } catch {
+      /* storage diblokir */
+    }
+  }, []);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const runningCount = sessions.filter((x) => x.status === "running").length;
+  const bulkGroup = latestBulkPauseGroup(sessions, bulkStamp);
+
+  const pauseAll = async () => {
+    const ok = await showConfirm(
+      t("rental.bulk.confirm", "Jeda SEMUA sesi yang sedang berjalan ({n} sesi)? Pakai saat listrik padam supaya pelanggan tidak tertagih waktu yang tidak dipakai. Tekan \"Lanjutkan semua\" saat listrik kembali.").replace("{n}", String(runningCount))
+    );
+    if (!ok) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/rental-sessions/pause-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "pause" }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? res.statusText);
+      try {
+        window.localStorage.setItem(BULK_KEY, data.pausedAt);
+      } catch {
+        /* storage diblokir */
+      }
+      setBulkStamp(data.pausedAt);
+      showAlert(t("rental.bulk.done", "{n} sesi dijeda. Saat listrik kembali, tekan \"Lanjutkan semua\".").replace("{n}", String(data.count ?? 0)));
+      load();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const resumeAll = async (pausedAt: string) => {
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/rental-sessions/pause-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "resume", pausedAt }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? res.statusText);
+      try {
+        window.localStorage.removeItem(BULK_KEY);
+      } catch {
+        /* storage diblokir */
+      }
+      setBulkStamp(null);
+      load();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const pause = async (sessionId: string) => {
     await fetch(`/api/rental-sessions/${sessionId}/pause`, { method: "POST" });
     load();
@@ -1107,6 +1165,11 @@ function OnlineRentalPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <LiveClock lang={lang} />
           <NotificationVolumeControl onPreview={() => playAlertBeep()} />
+          {runningCount > 0 && (
+            <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={pauseAll} disabled={bulkBusy}>
+              <Pause size={14} /> {t("rental.bulk.pauseAll", "Jeda semua (mati lampu)")}
+            </Button>
+          )}
           {canEditRates && (
             <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={() => setShowRateEditor((v) => !v)}>
               {t("setup.rates.openButton", "Atur Tarif Semua Unit")}
@@ -1119,6 +1182,19 @@ function OnlineRentalPage() {
       </div>
 
       <PageGuide page="rental" title={t("nav.rental", "Rental PS")} />
+
+      {bulkGroup && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <span className="flex-1 min-w-[220px]">
+            {t("rental.bulk.banner", "{n} sesi dijeda bersamaan sejak {time} (mis. listrik padam). Waktu pelanggan tidak berjalan selama dijeda.")
+              .replace("{n}", String(bulkGroup.sessionIds.length))
+              .replace("{time}", new Date(bulkGroup.pausedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}
+          </span>
+          <Button className="text-xs" onClick={() => resumeAll(bulkGroup.pausedAt)} disabled={bulkBusy}>
+            <span className="inline-flex items-center gap-1.5"><PlayCircle size={14} /> {t("rental.bulk.resumeAll", "Lanjutkan semua")}</span>
+          </Button>
+        </div>
+      )}
 
       {(() => {
         const zero = units.filter((u) => u.isActive !== false && !(u.hourlyRate > 0));

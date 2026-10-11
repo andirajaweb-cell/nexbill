@@ -340,7 +340,9 @@ public class MainActivity extends Activity {
     private void openStaffMenu() {
         if (menuOpen) return;
         TvState s = StateRepo.state();
-        if (s != null && s.requiresPin) askPin();
+        // TV yang baru menyala tanpa internet belum punya status dari server: kalau PIN pernah dipakai di
+        // sini, tetap minta PIN (mencabut internet tidak boleh membuka menu staf tanpa PIN).
+        if ((s != null && s.requiresPin) || (s == null && StateRepo.hasRememberedPin(this))) askPin();
         else showStaffMenu();
     }
 
@@ -357,6 +359,10 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    /** Percobaan PIN offline yang salah berturut-turut; dikunci 5 menit setelah 5 kali. */
+    private int offlinePinFails;
+    private long offlinePinLockedUntil;
+
     private void checkPin(final String pin) {
         final String token = StateRepo.token(this);
         new Thread(() -> {
@@ -365,17 +371,39 @@ public class MainActivity extends Activity {
             try {
                 JSONObject body = new JSONObject().put("pin", pin);
                 Http.Result r = Http.request("POST", Config.UNLOCK_URL, token, body.toString());
+                if (r.code >= 500) throw new java.io.IOException("server " + r.code);
                 ok = r.code == 200 && new JSONObject(r.body).optBoolean("ok", false);
+                // PIN benar menurut server → diingat untuk dipakai saat internet putus.
+                if (ok) StateRepo.rememberPin(this, pin);
             } catch (Exception e) {
-                ok = false;
+                // Internet / server tidak terjangkau: cocokkan dengan PIN yang terakhir dinyatakan benar.
                 failed = true;
+                long now = SystemClock.elapsedRealtime();
+                if (now < offlinePinLockedUntil) {
+                    ok = false;
+                } else {
+                    ok = StateRepo.matchesRememberedPin(this, pin);
+                    if (ok) {
+                        offlinePinFails = 0;
+                    } else if (++offlinePinFails >= 5) {
+                        offlinePinFails = 0;
+                        offlinePinLockedUntil = now + 5 * 60_000L;
+                    }
+                }
             }
             final boolean pass = ok;
-            final boolean err = failed;
+            final boolean offline = failed;
+            final boolean noMemory = failed && !StateRepo.hasRememberedPin(this);
             ui.post(() -> {
                 menuOpen = false;
-                if (pass) showStaffMenu();
-                else Toast.makeText(this, err ? R.string.pin_error : R.string.pin_wrong, Toast.LENGTH_SHORT).show();
+                if (pass) {
+                    if (offline) Toast.makeText(this, R.string.pin_offline_ok, Toast.LENGTH_SHORT).show();
+                    showStaffMenu();
+                } else if (noMemory) {
+                    Toast.makeText(this, R.string.pin_error, Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, R.string.pin_wrong, Toast.LENGTH_SHORT).show();
+                }
             });
         }).start();
     }
@@ -400,7 +428,7 @@ public class MainActivity extends Activity {
                     menuOpen = false;
                     long now = SystemClock.elapsedRealtime();
                     switch (which) {
-                        case 0: StateRepo.setStaffUntil(now + Config.STAFF_BYPASS_MS); break;
+                        case 0: pickStaffDuration(); break;
                         case 1: StateRepo.setStaffUntil(0); break;
                         case 2: pickHdmi(); break;
                         case 3: pickMode(); break;
@@ -412,6 +440,21 @@ public class MainActivity extends Activity {
                     }
                 })
                 .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    /**
+     * "Buka layar game" tanpa sesi: dipakai untuk tes, dan sebagai cadangan saat internet putus (sesi
+     * baru tidak sampai ke TV) — staf memilih lamanya sesuai sesi yang dicatat di Mode Offline kasir.
+     * Layar terkunci lagi otomatis saat waktunya habis.
+     */
+    private void pickStaffDuration() {
+        final int[] minutes = new int[] { 10, 30, 60, 120, 180 };
+        String[] labels = new String[minutes.length];
+        for (int i = 0; i < minutes.length; i++) labels[i] = getString(R.string.minutes_fmt, minutes[i]);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.staff_duration_title)
+                .setItems(labels, (d, which) -> StateRepo.setStaffUntil(SystemClock.elapsedRealtime() + minutes[which] * 60_000L))
                 .show();
     }
 

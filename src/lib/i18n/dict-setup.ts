@@ -719,3 +719,47 @@ registerDict({
     vi: "In",
   },
 });
+
+/* Rental PS: "Jeda semua" saat listrik padam (lib/rental/bulk-pause.ts). */
+registerDict({
+  "rental.bulk.pauseAll": {
+    id: "Jeda semua (mati lampu)",
+    en: "Pause all (power cut)",
+    ms: "Jeda semua (elektrik terputus)",
+    th: "พักทั้งหมด (ไฟดับ)",
+    fil: "I-pause lahat (brownout)",
+    vi: "Tạm dừng tất cả (mất điện)",
+  },
+  "rental.bulk.confirm": {
+    id: "Jeda SEMUA sesi yang sedang berjalan ({n} sesi)? Pakai saat listrik padam supaya pelanggan tidak tertagih waktu yang tidak dipakai. Tekan \"Lanjutkan semua\" saat listrik kembali.",
+    en: "Pause ALL running sessions ({n})? Use this during a power cut so customers are not billed for unused time. Press \"Resume all\" when power returns.",
+    ms: "Jeda SEMUA sesi yang sedang berjalan ({n} sesi)? Guna semasa elektrik terputus supaya pelanggan tidak dicaj masa yang tidak digunakan. Tekan \"Sambung semua\" apabila elektrik kembali.",
+    th: "พักเซสชันที่กำลังเล่นทั้งหมด ({n} เซสชัน)? ใช้ตอนไฟดับเพื่อไม่ให้ลูกค้าถูกคิดเวลาที่ไม่ได้ใช้ กด \"เล่นต่อทั้งหมด\" เมื่อไฟกลับมา",
+    fil: "I-pause ang LAHAT ng tumatakbong session ({n})? Gamitin kapag brownout para hindi masingil ang customer sa oras na hindi nagamit. Pindutin ang \"Ituloy lahat\" pagbalik ng kuryente.",
+    vi: "Tạm dừng TẤT CẢ phiên đang chạy ({n} phiên)? Dùng khi mất điện để khách không bị tính giờ không dùng. Bấm \"Tiếp tục tất cả\" khi có điện lại.",
+  },
+  "rental.bulk.done": {
+    id: "{n} sesi dijeda. Saat listrik kembali, tekan \"Lanjutkan semua\".",
+    en: "{n} sessions paused. When power returns, press \"Resume all\".",
+    ms: "{n} sesi dijeda. Apabila elektrik kembali, tekan \"Sambung semua\".",
+    th: "พัก {n} เซสชันแล้ว เมื่อไฟกลับมา กด \"เล่นต่อทั้งหมด\"",
+    fil: "Na-pause ang {n} session. Pagbalik ng kuryente, pindutin ang \"Ituloy lahat\".",
+    vi: "Đã tạm dừng {n} phiên. Khi có điện lại, bấm \"Tiếp tục tất cả\".",
+  },
+  "rental.bulk.banner": {
+    id: "{n} sesi dijeda bersamaan sejak {time} (mis. listrik padam). Waktu pelanggan tidak berjalan selama dijeda.",
+    en: "{n} sessions were paused together at {time} (e.g. power cut). Customer time does not run while paused.",
+    ms: "{n} sesi dijeda serentak sejak {time} (cth. elektrik terputus). Masa pelanggan tidak berjalan semasa dijeda.",
+    th: "{n} เซสชันถูกพักพร้อมกันตั้งแต่ {time} (เช่น ไฟดับ) เวลาของลูกค้าไม่เดินระหว่างพัก",
+    fil: "{n} session ang na-pause nang sabay noong {time} (hal. brownout). Hindi tumatakbo ang oras ng customer habang naka-pause.",
+    vi: "{n} phiên được tạm dừng cùng lúc từ {time} (vd. mất điện). Thời gian của khách không chạy khi tạm dừng.",
+  },
+  "rental.bulk.resumeAll": {
+    id: "Lanjutkan semua",
+    en: "Resume all",
+    ms: "Sambung semua",
+    th: "เล่นต่อทั้งหมด",
+    fil: "Ituloy lahat",
+    vi: "Tiếp tục tất cả",
+  },
+});

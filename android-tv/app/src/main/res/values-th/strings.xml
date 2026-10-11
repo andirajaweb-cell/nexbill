@@ -13,13 +13,13 @@
     <string name="overlay_needed">โหมดนี้ต้องได้รับอนุญาตให้แสดงทับแอปอื่น เปิดเมนูพนักงาน → แสดงทับแอปอื่น</string>
     <string name="pin_title">ใส่ PIN พนักงาน</string>
     <string name="pin_wrong">PIN ไม่ถูกต้อง</string>
-    <string name="pin_error">ตรวจสอบ PIN ไม่ได้ โปรดตรวจการเชื่อมต่ออินเทอร์เน็ต</string>
+    <string name="pin_error">ตรวจ PIN ไม่ได้: อินเทอร์เน็ตหลุดและยังไม่เคยใช้ PIN บนทีวีนี้ ใช้ปุ่ม Input/Source บนรีโมทเพื่อสลับไป HDMI</string>
     <string name="ok">ตกลง</string>
     <string name="cancel">ยกเลิก</string>
     <string name="yes">ใช่</string>
     <string name="no">ไม่</string>
     <string name="menu_title">เมนูพนักงาน</string>
-    <string name="menu_show_game">เปิดหน้าจอเกม 10 นาที</string>
+    <string name="menu_show_game">เปิดหน้าจอเกม (ไม่มีเซสชัน)</string>
     <string name="menu_end_staff">จบโหมดพนักงาน</string>
     <string name="menu_pick_hdmi">เลือกอินพุต HDMI</string>
     <string name="menu_mode">โหมดแสดงผล HDMI</string>
@@ -40,4 +40,7 @@
     <string name="update_available">มีเวอร์ชันใหม่ %1$s วิธีอัปเดต: เปิดแอป Downloader บนทีวีนี้ พิมพ์ %2$s แล้วเลือก Install การจับคู่และการตั้งค่ายังอยู่ครบ</string>
     <string name="update_latest">แอปเป็นเวอร์ชันล่าสุดแล้ว (%1$s)</string>
     <string name="update_error">ตรวจหาอัปเดตไม่ได้ ตรวจว่าทีวีเชื่อมต่ออินเทอร์เน็ต</string>
+    <string name="staff_duration_title">เปิดหน้าจอเกมนานเท่าไร?</string>
+    <string name="minutes_fmt">%1$d นาที</string>
+    <string name="pin_offline_ok">อินเทอร์เน็ตหลุด — ตรวจ PIN กับ PIN ล่าสุดที่ใช้บนทีวีนี้</string>
 </resources>

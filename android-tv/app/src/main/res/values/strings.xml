@@ -14,13 +14,13 @@
     <string name="overlay_needed">Mode ini butuh izin tampil di atas aplikasi lain. Buka menu staf → Izin tampil di atas aplikasi lain.</string>
     <string name="pin_title">Masukkan PIN staf</string>
     <string name="pin_wrong">PIN salah</string>
-    <string name="pin_error">Tidak bisa memeriksa PIN. Periksa koneksi internet.</string>
+    <string name="pin_error">Tidak bisa memeriksa PIN: internet putus dan PIN belum pernah dipakai di TV ini. Pakai tombol Input/Source di remote untuk pindah ke HDMI.</string>
     <string name="ok">OK</string>
     <string name="cancel">Batal</string>
     <string name="yes">Ya</string>
     <string name="no">Tidak</string>
     <string name="menu_title">Menu staf</string>
-    <string name="menu_show_game">Buka layar game 10 menit</string>
+    <string name="menu_show_game">Buka layar game (tanpa sesi)</string>
     <string name="menu_end_staff">Akhiri mode staf</string>
     <string name="menu_pick_hdmi">Pilih input HDMI</string>
     <string name="menu_mode">Mode tampilan HDMI</string>
@@ -41,4 +41,7 @@
     <string name="update_available">Versi baru %1$s tersedia. Cara memperbarui: buka aplikasi Downloader di TV ini, ketik %2$s, lalu pilih Instal. Pairing dan pengaturan tetap tersimpan.</string>
     <string name="update_latest">Aplikasi sudah versi terbaru (%1$s).</string>
     <string name="update_error">Tidak bisa mengecek pembaruan. Pastikan TV tersambung ke internet.</string>
+    <string name="staff_duration_title">Buka layar game berapa lama?</string>
+    <string name="minutes_fmt">%1$d menit</string>
+    <string name="pin_offline_ok">Internet putus — PIN dicocokkan dengan PIN terakhir yang dipakai di TV ini.</string>
 </resources>

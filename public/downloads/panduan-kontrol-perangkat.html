@@ -69,12 +69,12 @@
   <div class="grid" style="margin-top:14px">
     <div class="card"><h3>Listrik padam (mati lampu)</h3>
       <div class="lbl">Yang terjadi</div><p>TV, PlayStation, router, dan PC mati. Waktu sesi di NEXBILL tetap berjalan, jadi pelanggan bisa tertagih waktu yang tidak dipakai.</p>
-      <div class="do"><div class="lbl doc">Yang dilakukan kasir</div><p>Buka NEXBILL di HP (pakai paket data) → Rental PS → tekan Jeda pada setiap sesi yang berjalan. Saat listrik kembali, tekan Lanjut. Kalau lupa menjeda, perpanjang waktu pelanggan sebesar lama padam.</p></div>
+      <div class="do"><div class="lbl doc">Yang dilakukan kasir</div><p>Buka NEXBILL di HP (pakai paket data) → Rental PS → tekan "Jeda semua (mati lampu)". Saat listrik kembali, tekan "Lanjutkan semua" di banner kuning — dari HP atau PC mana pun. Kalau lupa menjeda, perpanjang waktu pelanggan sebesar lama padam.</p></div>
       <div class="lbl ok">Pencegahan</div><p>Pasang UPS kecil untuk router dan PC/HP agent. Atur TV menyala sendiri saat listrik masuk, jadikan NEXBILL TV aplikasi utama, dan atur PC menyala &amp; login otomatis setelah listrik kembali.</p></div>
     <div class="card"><h3>Internet putus (WiFi masih menyala)</h3>
       <div class="lbl">Yang terjadi</div><p>Dashboard tidak bisa dimuat ulang. Sesi yang sudah berjalan tetap dihitung: di TV NEXBILL TV dan oleh NexbillAgent (Kontrol Lokal).</p>
-      <div class="do"><div class="lbl doc">Yang dilakukan kasir</div><p>Tetap pakai halaman Rental PS yang sudah terbuka — otomatis masuk Mode Offline; sesi disimpan dan dikirim saat online. Dengan NexbillAgent, TV &amp; plug Tasmota tetap menyala/mati otomatis. Dengan NEXBILL TV, untuk sesi baru tekan tombol Input/Source di remote TV → pilih HDMI konsol, lalu awasi waktunya dari Rental PS (menu staf yang diberi PIN butuh internet).</p></div>
-      <div class="lbl ok">Pencegahan</div><p>Siapkan internet cadangan (hotspot HP kasir). Catat PIN Kontrol Lokal dari kartu Kontrol Lokal di Kontrol Perangkat. Biarkan halaman Rental PS terbuka sepanjang hari.</p></div>
+      <div class="do"><div class="lbl doc">Yang dilakukan kasir</div><p>Tetap pakai halaman Rental PS yang sudah terbuka — otomatis masuk Mode Offline; sesi disimpan dan dikirim saat online. Dengan NexbillAgent, TV &amp; plug Tasmota tetap menyala/mati otomatis. Dengan NEXBILL TV, untuk sesi baru tahan OK 3 detik → "Buka layar game (tanpa sesi)" → pilih lamanya; layar terkunci lagi saat waktunya habis. PIN tetap bisa dipakai tanpa internet asal pernah dipakai sekali di TV itu — kalau belum, tekan Input/Source di remote → HDMI konsol.</p></div>
+      <div class="lbl ok">Pencegahan</div><p>Siapkan internet cadangan (hotspot HP kasir). Catat PIN Kontrol Lokal dari kartu Kontrol Lokal di Kontrol Perangkat. NEXBILL TV: buka menu staf sekali dengan PIN di setiap TV saat online. Biarkan halaman Rental PS terbuka sepanjang hari.</p></div>
     <div class="card"><h3>NexbillAgent offline (PC/HP mati atau tertidur)</h3>
       <div class="lbl">Yang terjadi</div><p>Status Relay Agent di Kontrol Perangkat menjadi offline; TV tidak menyala/mati saat sesi dimulai/selesai.</p>
       <div class="do"><div class="lbl doc">Yang dilakukan kasir</div><p>Nyalakan PC/HP lalu jalankan NexbillAgent (PC: buka NexbillAgent.exe; HP: buka Termux, ketik nexbill). Sementara itu nyalakan/matikan TV dengan remote, dan tetap catat sesi di Rental PS.</p></div>
@@ -89,7 +89,7 @@
       <div class="lbl ok">Pencegahan</div><p>Letakkan router dekat bilik / pakai penguat WiFi. Untuk outlet yang internetnya sering putus, pilih smart plug NEXBILL/Tasmota + NexbillAgent supaya tetap jalan tanpa internet.</p></div>
     <div class="card"><h3>Dashboard NEXBILL error / tidak bisa dibuka</h3>
       <div class="lbl">Yang terjadi</div><p>Halaman tidak termuat atau menampilkan pesan error, padahal internet outlet normal.</p>
-      <div class="do"><div class="lbl doc">Yang dilakukan kasir</div><p>Lakukan seperti saat internet putus (Rental PS Mode Offline + Kontrol Lokal / tombol Input/Source untuk NEXBILL TV). Catat jam mulai &amp; selesai manual kalau perlu. Laporkan lewat Chat/Bantuan atau WhatsApp tim NEXBILL dengan screenshot errornya.</p></div>
+      <div class="do"><div class="lbl doc">Yang dilakukan kasir</div><p>Lakukan seperti saat internet putus (Rental PS Mode Offline + Kontrol Lokal / menu staf NEXBILL TV). Catat jam mulai &amp; selesai manual kalau perlu. Laporkan lewat Chat/Bantuan atau WhatsApp tim NEXBILL dengan screenshot errornya.</p></div>
       <div class="lbl ok">Pencegahan</div><p>Simpan nomor WhatsApp tim NEXBILL di HP kasir. Siapkan buku catatan cadangan di meja kasir.</p></div></div>
   <h1 style="margin-top:28px">Metode kontrol perangkat &amp; keunggulannya</h1>
   <p class="sub">NEXBILL menyediakan beberapa cara supaya TV mengikuti sesi kasir. Pilih yang paling cocok — boleh digabung dalam satu outlet.</p>
@@ -125,12 +125,12 @@
   <div class="grid" style="margin-top:14px">
     <div class="card"><h3>Power cut (blackout)</h3>
       <div class="lbl">What happens</div><p>TVs, PlayStations, router and PC go off. Session time in NEXBILL keeps running, so customers may be billed for unused time.</p>
-      <div class="do"><div class="lbl doc">What the cashier does</div><p>Open NEXBILL on a phone (mobile data) → PS Rental → press Pause on every running session. When power returns, press Resume. If you forgot to pause, extend the customer's time by the length of the outage.</p></div>
+      <div class="do"><div class="lbl doc">What the cashier does</div><p>Open NEXBILL on a phone (mobile data) → PS Rental → press "Pause all (power cut)". When power returns, press "Resume all" in the yellow banner — from any phone or PC. If you forgot to pause, extend the customer's time by the length of the outage.</p></div>
       <div class="lbl ok">Prevention</div><p>Put a small UPS on the router and the agent PC/phone. Set TVs to power on when electricity returns, make NEXBILL TV the main app, and set the PC to start and log in automatically after power returns.</p></div>
     <div class="card"><h3>Internet down (WiFi still on)</h3>
       <div class="lbl">What happens</div><p>The dashboard cannot reload. Running sessions keep counting: on NEXBILL TV screens and by NexbillAgent (Local Control).</p>
-      <div class="do"><div class="lbl doc">What the cashier does</div><p>Keep using the PS Rental page that is already open — it switches to Offline Mode; sessions are saved and sent when online. With NexbillAgent, TVs &amp; Tasmota plugs still switch automatically. With NEXBILL TV, for new sessions press Input/Source on the TV remote → choose the console HDMI, and watch the time from PS Rental (a PIN-protected staff menu needs internet).</p></div>
-      <div class="lbl ok">Prevention</div><p>Prepare backup internet (cashier phone hotspot). Note the Local Control PIN from the Local Control card in Device Control. Keep the PS Rental page open all day.</p></div>
+      <div class="do"><div class="lbl doc">What the cashier does</div><p>Keep using the PS Rental page that is already open — it switches to Offline Mode; sessions are saved and sent when online. With NexbillAgent, TVs &amp; Tasmota plugs still switch automatically. With NEXBILL TV, for new sessions hold OK 3 s → "Open game screen (no session)" → choose the length; the screen locks again when it runs out. The PIN works offline if it was used once on that TV before — if not, press Input/Source on the remote → the console HDMI.</p></div>
+      <div class="lbl ok">Prevention</div><p>Prepare backup internet (cashier phone hotspot). Note the Local Control PIN from the Local Control card in Device Control. NEXBILL TV: open the staff menu once with the PIN on every TV while online. Keep the PS Rental page open all day.</p></div>
     <div class="card"><h3>NexbillAgent offline (PC/phone off or asleep)</h3>
       <div class="lbl">What happens</div><p>The Relay Agent status in Device Control turns offline; TVs do not switch when sessions start/end.</p>
       <div class="do"><div class="lbl doc">What the cashier does</div><p>Turn the PC/phone on and start NexbillAgent (PC: open NexbillAgent.exe; phone: open Termux, type nexbill). Meanwhile switch TVs with the remote, and still record sessions in PS Rental.</p></div>
@@ -145,7 +145,7 @@
       <div class="lbl ok">Prevention</div><p>Place the router near the booths / use a WiFi extender. If the internet often drops, choose a NEXBILL/Tasmota plug + NexbillAgent so it works without internet.</p></div>
     <div class="card"><h3>NEXBILL dashboard errors / will not open</h3>
       <div class="lbl">What happens</div><p>Pages do not load or show an error even though the outlet internet is fine.</p>
-      <div class="do"><div class="lbl doc">What the cashier does</div><p>Do the same as when the internet is down (PS Rental Offline Mode + Local Control / Input/Source button for NEXBILL TV). Write start &amp; end times by hand if needed. Report it via Chat/Help or the NEXBILL team's WhatsApp with a screenshot of the error.</p></div>
+      <div class="do"><div class="lbl doc">What the cashier does</div><p>Do the same as when the internet is down (PS Rental Offline Mode + Local Control / NEXBILL TV staff menu). Write start &amp; end times by hand if needed. Report it via Chat/Help or the NEXBILL team's WhatsApp with a screenshot of the error.</p></div>
       <div class="lbl ok">Prevention</div><p>Save the NEXBILL team's WhatsApp number on the cashier phone. Keep a backup notebook at the cashier desk.</p></div></div>
   <h1 style="margin-top:28px">Device control methods &amp; their strengths</h1>
   <p class="sub">NEXBILL offers several ways for TVs to follow the cashier's sessions. Choose what fits best — you can combine them in one outlet.</p>
@@ -181,12 +181,12 @@
   <div class="grid" style="margin-top:14px">
     <div class="card"><h3>Bekalan elektrik terputus</h3>
       <div class="lbl">Apa yang berlaku</div><p>TV, PlayStation, router dan PC mati. Masa sesi dalam NEXBILL tetap berjalan, jadi pelanggan mungkin dicaj masa yang tidak digunakan.</p>
-      <div class="do"><div class="lbl doc">Tindakan juruwang</div><p>Buka NEXBILL di telefon (data mudah alih) → Sewa PS → tekan Jeda pada setiap sesi yang berjalan. Apabila elektrik kembali, tekan Sambung. Jika terlupa menjeda, lanjutkan masa pelanggan selama tempoh terputus.</p></div>
+      <div class="do"><div class="lbl doc">Tindakan juruwang</div><p>Buka NEXBILL di telefon (data mudah alih) → Sewa PS → tekan "Jeda semua (elektrik terputus)". Apabila elektrik kembali, tekan "Sambung semua" pada sepanduk kuning — dari mana-mana telefon atau PC. Jika terlupa menjeda, lanjutkan masa pelanggan selama tempoh terputus.</p></div>
       <div class="lbl ok">Pencegahan</div><p>Pasang UPS kecil untuk router dan PC/telefon ejen. Tetapkan TV hidup sendiri apabila elektrik masuk, jadikan NEXBILL TV apl utama, dan tetapkan PC hidup &amp; log masuk automatik selepas elektrik kembali.</p></div>
     <div class="card"><h3>Internet terputus (WiFi masih hidup)</h3>
       <div class="lbl">Apa yang berlaku</div><p>Papan pemuka tidak boleh dimuat semula. Sesi yang berjalan tetap dikira: pada skrin NEXBILL TV dan oleh NexbillAgent (Kawalan Setempat).</p>
-      <div class="do"><div class="lbl doc">Tindakan juruwang</div><p>Teruskan guna halaman Sewa PS yang sudah dibuka — beralih ke Mod Luar Talian; sesi disimpan dan dihantar semasa dalam talian. Dengan NexbillAgent, TV &amp; palam Tasmota tetap hidup/mati automatik. Dengan NEXBILL TV, untuk sesi baharu tekan butang Input/Source pada alat kawalan jauh TV → pilih HDMI konsol, dan pantau masa dari Sewa PS (menu staf berPIN perlukan internet).</p></div>
-      <div class="lbl ok">Pencegahan</div><p>Sediakan internet sandaran (hotspot telefon juruwang). Catat PIN Kawalan Setempat daripada kad Kawalan Setempat di Kawalan Peranti. Biarkan halaman Sewa PS terbuka sepanjang hari.</p></div>
+      <div class="do"><div class="lbl doc">Tindakan juruwang</div><p>Teruskan guna halaman Sewa PS yang sudah dibuka — beralih ke Mod Luar Talian; sesi disimpan dan dihantar semasa dalam talian. Dengan NexbillAgent, TV &amp; palam Tasmota tetap hidup/mati automatik. Dengan NEXBILL TV, untuk sesi baharu tahan OK 3 saat → "Buka skrin permainan (tanpa sesi)" → pilih tempohnya; skrin dikunci semula apabila masa tamat. PIN tetap boleh digunakan tanpa internet jika pernah digunakan sekali pada TV itu — jika belum, tekan Input/Source pada alat kawalan jauh → HDMI konsol.</p></div>
+      <div class="lbl ok">Pencegahan</div><p>Sediakan internet sandaran (hotspot telefon juruwang). Catat PIN Kawalan Setempat daripada kad Kawalan Setempat di Kawalan Peranti. NEXBILL TV: buka menu staf sekali dengan PIN pada setiap TV semasa dalam talian. Biarkan halaman Sewa PS terbuka sepanjang hari.</p></div>
     <div class="card"><h3>NexbillAgent luar talian (PC/telefon mati atau tidur)</h3>
       <div class="lbl">Apa yang berlaku</div><p>Status Relay Agent di Kawalan Peranti menjadi luar talian; TV tidak hidup/mati apabila sesi bermula/tamat.</p>
       <div class="do"><div class="lbl doc">Tindakan juruwang</div><p>Hidupkan PC/telefon dan jalankan NexbillAgent (PC: buka NexbillAgent.exe; telefon: buka Termux, taip nexbill). Sementara itu hidup/matikan TV dengan alat kawalan jauh, dan tetap rekod sesi dalam Sewa PS.</p></div>
@@ -201,7 +201,7 @@
       <div class="lbl ok">Pencegahan</div><p>Letakkan router dekat bilik / guna penguat WiFi. Jika internet kerap terputus, pilih palam NEXBILL/Tasmota + NexbillAgent supaya tetap berfungsi tanpa internet.</p></div>
     <div class="card"><h3>Papan pemuka NEXBILL ralat / tidak boleh dibuka</h3>
       <div class="lbl">Apa yang berlaku</div><p>Halaman tidak dimuatkan atau memaparkan mesej ralat walaupun internet outlet normal.</p>
-      <div class="do"><div class="lbl doc">Tindakan juruwang</div><p>Lakukan seperti semasa internet terputus (Sewa PS Mod Luar Talian + Kawalan Setempat / butang Input/Source untuk NEXBILL TV). Catat masa mula &amp; tamat secara manual jika perlu. Laporkan melalui Chat/Bantuan atau WhatsApp pasukan NEXBILL dengan tangkapan skrin ralat.</p></div>
+      <div class="do"><div class="lbl doc">Tindakan juruwang</div><p>Lakukan seperti semasa internet terputus (Sewa PS Mod Luar Talian + Kawalan Setempat / menu staf NEXBILL TV). Catat masa mula &amp; tamat secara manual jika perlu. Laporkan melalui Chat/Bantuan atau WhatsApp pasukan NEXBILL dengan tangkapan skrin ralat.</p></div>
       <div class="lbl ok">Pencegahan</div><p>Simpan nombor WhatsApp pasukan NEXBILL dalam telefon juruwang. Sediakan buku catatan sandaran di kaunter.</p></div></div>
   <h1 style="margin-top:28px">Kaedah kawalan peranti &amp; kelebihannya</h1>
   <p class="sub">NEXBILL menyediakan beberapa cara supaya TV mengikut sesi juruwang. Pilih yang paling sesuai — boleh digabungkan dalam satu outlet.</p>
@@ -237,12 +237,12 @@
   <div class="grid" style="margin-top:14px">
     <div class="card"><h3>ไฟดับ</h3>
       <div class="lbl">สิ่งที่เกิดขึ้น</div><p>ทีวี PlayStation เราเตอร์ และ PC ดับ เวลาเซสชันใน NEXBILL ยังเดินอยู่ ลูกค้าอาจถูกคิดเวลาที่ไม่ได้ใช้</p>
-      <div class="do"><div class="lbl doc">สิ่งที่แคชเชียร์ทำ</div><p>เปิด NEXBILL บนมือถือ (ใช้เน็ตมือถือ) → เช่า PS → กดพักทุกเซสชันที่กำลังเล่น เมื่อไฟกลับมา กดเล่นต่อ ถ้าลืมพัก ให้ต่อเวลาให้ลูกค้าเท่ากับเวลาที่ไฟดับ</p></div>
+      <div class="do"><div class="lbl doc">สิ่งที่แคชเชียร์ทำ</div><p>เปิด NEXBILL บนมือถือ (ใช้เน็ตมือถือ) → เช่า PS → กด "พักทั้งหมด (ไฟดับ)" เมื่อไฟกลับมา กด "เล่นต่อทั้งหมด" ในแถบสีเหลือง — จากมือถือหรือ PC เครื่องใดก็ได้ ถ้าลืมพัก ให้ต่อเวลาให้ลูกค้าเท่ากับเวลาที่ไฟดับ</p></div>
       <div class="lbl ok">การป้องกัน</div><p>ติดตั้ง UPS เล็ก ๆ ให้เราเตอร์และ PC/มือถือเอเจนต์ ตั้งทีวีให้เปิดเองเมื่อไฟเข้า ตั้ง NEXBILL TV เป็นแอปหลัก และตั้ง PC ให้เปิดและล็อกอินอัตโนมัติหลังไฟกลับ</p></div>
     <div class="card"><h3>อินเทอร์เน็ตหลุด (WiFi ยังเปิด)</h3>
       <div class="lbl">สิ่งที่เกิดขึ้น</div><p>แดชบอร์ดโหลดใหม่ไม่ได้ เซสชันที่เล่นอยู่ยังนับต่อ: บนทีวี NEXBILL TV และโดย NexbillAgent (การควบคุมภายใน)</p>
-      <div class="do"><div class="lbl doc">สิ่งที่แคชเชียร์ทำ</div><p>ใช้หน้าเช่า PS ที่เปิดอยู่ต่อไป — จะเข้าโหมดออฟไลน์ เซสชันถูกบันทึกและส่งเมื่อออนไลน์ ถ้าใช้ NexbillAgent ทีวีและปลั๊ก Tasmota ยังเปิดปิดอัตโนมัติ ถ้าใช้ NEXBILL TV สำหรับเซสชันใหม่ ให้กดปุ่ม Input/Source บนรีโมททีวี → เลือก HDMI ของคอนโซล แล้วคุมเวลาจากหน้าเช่า PS (เมนูพนักงานที่ตั้ง PIN ต้องใช้อินเทอร์เน็ต)</p></div>
-      <div class="lbl ok">การป้องกัน</div><p>เตรียมอินเทอร์เน็ตสำรอง (ฮอตสปอตมือถือแคชเชียร์) จด PIN การควบคุมภายในจากการ์ดการควบคุมภายในในหน้าควบคุมอุปกรณ์ เปิดหน้าเช่า PS ทิ้งไว้ทั้งวัน</p></div>
+      <div class="do"><div class="lbl doc">สิ่งที่แคชเชียร์ทำ</div><p>ใช้หน้าเช่า PS ที่เปิดอยู่ต่อไป — จะเข้าโหมดออฟไลน์ เซสชันถูกบันทึกและส่งเมื่อออนไลน์ ถ้าใช้ NexbillAgent ทีวีและปลั๊ก Tasmota ยังเปิดปิดอัตโนมัติ ถ้าใช้ NEXBILL TV สำหรับเซสชันใหม่ กด OK ค้าง 3 วิ → "เปิดหน้าจอเกม (ไม่มีเซสชัน)" → เลือกระยะเวลา จอจะล็อกอีกครั้งเมื่อหมดเวลา PIN ใช้ได้แม้ไม่มีเน็ตถ้าเคยใช้บนทีวีนั้นมาก่อน — ถ้ายังไม่เคย กด Input/Source บนรีโมท → HDMI ของคอนโซล</p></div>
+      <div class="lbl ok">การป้องกัน</div><p>เตรียมอินเทอร์เน็ตสำรอง (ฮอตสปอตมือถือแคชเชียร์) จด PIN การควบคุมภายในจากการ์ดการควบคุมภายในในหน้าควบคุมอุปกรณ์ NEXBILL TV: เปิดเมนูพนักงานด้วย PIN หนึ่งครั้งที่ทีวีทุกเครื่องตอนออนไลน์ เปิดหน้าเช่า PS ทิ้งไว้ทั้งวัน</p></div>
     <div class="card"><h3>NexbillAgent ออฟไลน์ (PC/มือถือดับหรือหลับ)</h3>
       <div class="lbl">สิ่งที่เกิดขึ้น</div><p>สถานะ Relay Agent ในหน้าควบคุมอุปกรณ์เป็นออฟไลน์ ทีวีไม่เปิด/ปิดตามเซสชัน</p>
       <div class="do"><div class="lbl doc">สิ่งที่แคชเชียร์ทำ</div><p>เปิด PC/มือถือแล้วรัน NexbillAgent (PC: เปิด NexbillAgent.exe; มือถือ: เปิด Termux พิมพ์ nexbill) ระหว่างนั้นเปิดปิดทีวีด้วยรีโมท และยังบันทึกเซสชันในเช่า PS</p></div>
@@ -257,7 +257,7 @@
       <div class="lbl ok">การป้องกัน</div><p>วางเราเตอร์ใกล้บูธ / ใช้ตัวขยาย WiFi ถ้าอินเทอร์เน็ตหลุดบ่อย เลือกปลั๊ก NEXBILL/Tasmota + NexbillAgent เพื่อใช้งานได้แม้ไม่มีเน็ต</p></div>
     <div class="card"><h3>แดชบอร์ด NEXBILL ผิดพลาด / เปิดไม่ได้</h3>
       <div class="lbl">สิ่งที่เกิดขึ้น</div><p>หน้าไม่โหลดหรือแสดงข้อผิดพลาด ทั้งที่อินเทอร์เน็ตของร้านปกติ</p>
-      <div class="do"><div class="lbl doc">สิ่งที่แคชเชียร์ทำ</div><p>ทำแบบเดียวกับตอนอินเทอร์เน็ตหลุด (เช่า PS โหมดออฟไลน์ + การควบคุมภายใน / ปุ่ม Input/Source สำหรับ NEXBILL TV) จดเวลาเริ่มและจบเองถ้าจำเป็น แจ้งผ่านแชต/ช่วยเหลือ หรือ WhatsApp ทีม NEXBILL พร้อมภาพหน้าจอข้อผิดพลาด</p></div>
+      <div class="do"><div class="lbl doc">สิ่งที่แคชเชียร์ทำ</div><p>ทำแบบเดียวกับตอนอินเทอร์เน็ตหลุด (เช่า PS โหมดออฟไลน์ + การควบคุมภายใน / เมนูพนักงาน NEXBILL TV) จดเวลาเริ่มและจบเองถ้าจำเป็น แจ้งผ่านแชต/ช่วยเหลือ หรือ WhatsApp ทีม NEXBILL พร้อมภาพหน้าจอข้อผิดพลาด</p></div>
       <div class="lbl ok">การป้องกัน</div><p>บันทึกเบอร์ WhatsApp ทีม NEXBILL ในมือถือแคชเชียร์ เตรียมสมุดจดสำรองไว้ที่โต๊ะแคชเชียร์</p></div></div>
   <h1 style="margin-top:28px">วิธีควบคุมอุปกรณ์และจุดเด่น</h1>
   <p class="sub">NEXBILL มีหลายวิธีให้ทีวีทำงานตามเซสชันของแคชเชียร์ เลือกวิธีที่เหมาะที่สุด — ใช้ร่วมกันในร้านเดียวได้</p>
@@ -293,12 +293,12 @@
   <div class="grid" style="margin-top:14px">
     <div class="card"><h3>Brownout</h3>
       <div class="lbl">Ano ang nangyayari</div><p>Patay ang TV, PlayStation, router at PC. Tuloy ang oras ng session sa NEXBILL, kaya baka masingil ang customer sa oras na hindi nagamit.</p>
-      <div class="do"><div class="lbl doc">Gagawin ng cashier</div><p>Buksan ang NEXBILL sa phone (mobile data) → PS Rental → pindutin ang Pause sa bawat tumatakbong session. Pagbalik ng kuryente, pindutin ang Resume. Kung nakalimutang i-pause, dagdagan ang oras ng customer ayon sa tagal ng brownout.</p></div>
+      <div class="do"><div class="lbl doc">Gagawin ng cashier</div><p>Buksan ang NEXBILL sa phone (mobile data) → PS Rental → pindutin ang "I-pause lahat (brownout)". Pagbalik ng kuryente, pindutin ang "Ituloy lahat" sa dilaw na banner — mula sa anumang phone o PC. Kung nakalimutang i-pause, dagdagan ang oras ng customer ayon sa tagal ng brownout.</p></div>
       <div class="lbl ok">Pag-iwas</div><p>Maglagay ng maliit na UPS sa router at sa agent PC/phone. Itakdang kusang bumukas ang TV kapag may kuryente, gawing pangunahing app ang NEXBILL TV, at itakdang kusang bumukas at mag-log in ang PC.</p></div>
     <div class="card"><h3>Walang internet (naka-on pa ang WiFi)</h3>
       <div class="lbl">Ano ang nangyayari</div><p>Hindi ma-reload ang dashboard. Tuloy ang bilang ng mga tumatakbong session: sa NEXBILL TV at sa NexbillAgent (Local Control).</p>
-      <div class="do"><div class="lbl doc">Gagawin ng cashier</div><p>Gamitin pa rin ang bukas na PS Rental page — lilipat ito sa Offline Mode; naiimbak ang session at ipinapadala kapag online. Sa NexbillAgent, kusang bumubukas/namamatay pa rin ang TV at Tasmota plug. Sa NEXBILL TV, para sa bagong session pindutin ang Input/Source sa TV remote → piliin ang HDMI ng console, at bantayan ang oras sa PS Rental (kailangan ng internet ang staff menu na may PIN).</p></div>
-      <div class="lbl ok">Pag-iwas</div><p>Maghanda ng backup na internet (hotspot ng phone ng cashier). Itala ang PIN ng Local Control mula sa Local Control card sa Device Control. Panatilihing bukas ang PS Rental buong araw.</p></div>
+      <div class="do"><div class="lbl doc">Gagawin ng cashier</div><p>Gamitin pa rin ang bukas na PS Rental page — lilipat ito sa Offline Mode; naiimbak ang session at ipinapadala kapag online. Sa NexbillAgent, kusang bumubukas/namamatay pa rin ang TV at Tasmota plug. Sa NEXBILL TV, para sa bagong session hold OK 3 s → "Buksan ang game screen (walang session)" → piliin ang tagal; magla-lock ulit ang screen pagkatapos. Gumagana ang PIN kahit walang internet kung nagamit na ito minsan sa TV na iyon — kung hindi pa, pindutin ang Input/Source sa remote → HDMI ng console.</p></div>
+      <div class="lbl ok">Pag-iwas</div><p>Maghanda ng backup na internet (hotspot ng phone ng cashier). Itala ang PIN ng Local Control mula sa Local Control card sa Device Control. NEXBILL TV: buksan nang isang beses ang staff menu gamit ang PIN sa bawat TV habang online. Panatilihing bukas ang PS Rental buong araw.</p></div>
     <div class="card"><h3>Offline ang NexbillAgent (patay o tulog ang PC/phone)</h3>
       <div class="lbl">Ano ang nangyayari</div><p>Nagiging offline ang Relay Agent sa Device Control; hindi bumubukas/namamatay ang TV ayon sa session.</p>
       <div class="do"><div class="lbl doc">Gagawin ng cashier</div><p>Buksan ang PC/phone at patakbuhin ang NexbillAgent (PC: buksan ang NexbillAgent.exe; phone: buksan ang Termux, i-type ang nexbill). Samantala, gamitin ang remote para sa TV, at itala pa rin ang session sa PS Rental.</p></div>
@@ -313,7 +313,7 @@
       <div class="lbl ok">Pag-iwas</div><p>Ilapit ang router sa booth / gumamit ng WiFi extender. Kung madalas mawalan ng internet, pumili ng NEXBILL/Tasmota plug + NexbillAgent para gumana kahit walang internet.</p></div>
     <div class="card"><h3>May error / hindi mabuksan ang NEXBILL dashboard</h3>
       <div class="lbl">Ano ang nangyayari</div><p>Hindi naglo-load o may error ang page kahit maayos ang internet ng outlet.</p>
-      <div class="do"><div class="lbl doc">Gagawin ng cashier</div><p>Gawin ang gaya noong walang internet (PS Rental Offline Mode + Local Control / Input/Source button para sa NEXBILL TV). Isulat ang oras ng simula at tapos kung kailangan. I-report sa Chat/Tulong o WhatsApp ng NEXBILL team kasama ang screenshot ng error.</p></div>
+      <div class="do"><div class="lbl doc">Gagawin ng cashier</div><p>Gawin ang gaya noong walang internet (PS Rental Offline Mode + Local Control / NEXBILL TV staff menu). Isulat ang oras ng simula at tapos kung kailangan. I-report sa Chat/Tulong o WhatsApp ng NEXBILL team kasama ang screenshot ng error.</p></div>
       <div class="lbl ok">Pag-iwas</div><p>I-save ang WhatsApp number ng NEXBILL team sa phone ng cashier. Maghanda ng backup na notebook sa cashier.</p></div></div>
   <h1 style="margin-top:28px">Mga paraan ng device control at mga kalakasan</h1>
   <p class="sub">May ilang paraan ang NEXBILL para sumunod ang TV sa session ng cashier. Piliin ang pinakaangkop — puwedeng pagsamahin sa isang outlet.</p>
@@ -349,12 +349,12 @@
   <div class="grid" style="margin-top:14px">
     <div class="card"><h3>Mất điện</h3>
       <div class="lbl">Điều xảy ra</div><p>TV, PlayStation, router và PC tắt. Thời gian phiên trong NEXBILL vẫn chạy, khách có thể bị tính giờ không dùng.</p>
-      <div class="do"><div class="lbl doc">Thu ngân làm gì</div><p>Mở NEXBILL trên điện thoại (dữ liệu di động) → Cho thuê PS → bấm Tạm dừng mọi phiên đang chạy. Khi có điện lại, bấm Tiếp tục. Nếu quên tạm dừng, gia hạn cho khách bằng thời gian mất điện.</p></div>
+      <div class="do"><div class="lbl doc">Thu ngân làm gì</div><p>Mở NEXBILL trên điện thoại (dữ liệu di động) → Cho thuê PS → bấm "Tạm dừng tất cả (mất điện)". Khi có điện lại, bấm "Tiếp tục tất cả" ở dải màu vàng — từ bất kỳ điện thoại hay PC nào. Nếu quên tạm dừng, gia hạn cho khách bằng thời gian mất điện.</p></div>
       <div class="lbl ok">Phòng ngừa</div><p>Lắp UPS nhỏ cho router và PC/điện thoại chạy agent. Cài TV tự bật khi có điện, đặt NEXBILL TV làm ứng dụng chính, và cài PC tự bật &amp; đăng nhập khi có điện lại.</p></div>
     <div class="card"><h3>Mất internet (WiFi vẫn bật)</h3>
       <div class="lbl">Điều xảy ra</div><p>Dashboard không tải lại được. Các phiên đang chạy vẫn đếm: trên TV NEXBILL TV và bởi NexbillAgent (Điều khiển cục bộ).</p>
-      <div class="do"><div class="lbl doc">Thu ngân làm gì</div><p>Tiếp tục dùng trang Cho thuê PS đang mở — tự chuyển sang Chế độ ngoại tuyến; phiên được lưu và gửi khi có mạng. Với NexbillAgent, TV &amp; ổ cắm Tasmota vẫn bật/tắt tự động. Với NEXBILL TV, cho phiên mới hãy bấm Input/Source trên điều khiển TV → chọn HDMI của máy, rồi theo dõi giờ từ Cho thuê PS (menu nhân viên có PIN cần internet).</p></div>
-      <div class="lbl ok">Phòng ngừa</div><p>Chuẩn bị internet dự phòng (điểm phát của điện thoại thu ngân). Ghi lại PIN Điều khiển cục bộ từ thẻ Điều khiển cục bộ trong Điều khiển thiết bị. Để trang Cho thuê PS mở cả ngày.</p></div>
+      <div class="do"><div class="lbl doc">Thu ngân làm gì</div><p>Tiếp tục dùng trang Cho thuê PS đang mở — tự chuyển sang Chế độ ngoại tuyến; phiên được lưu và gửi khi có mạng. Với NexbillAgent, TV &amp; ổ cắm Tasmota vẫn bật/tắt tự động. Với NEXBILL TV, cho phiên mới giữ OK 3 giây → "Mở màn hình game (không có phiên)" → chọn thời lượng; màn hình khóa lại khi hết giờ. PIN vẫn dùng được khi mất mạng nếu từng dùng một lần trên TV đó — nếu chưa, bấm Input/Source trên điều khiển → HDMI của máy.</p></div>
+      <div class="lbl ok">Phòng ngừa</div><p>Chuẩn bị internet dự phòng (điểm phát của điện thoại thu ngân). Ghi lại PIN Điều khiển cục bộ từ thẻ Điều khiển cục bộ trong Điều khiển thiết bị. NEXBILL TV: mở menu nhân viên một lần bằng PIN trên mỗi TV khi có mạng. Để trang Cho thuê PS mở cả ngày.</p></div>
     <div class="card"><h3>NexbillAgent ngoại tuyến (PC/điện thoại tắt hoặc ngủ)</h3>
       <div class="lbl">Điều xảy ra</div><p>Trạng thái Relay Agent trong Điều khiển thiết bị thành ngoại tuyến; TV không bật/tắt theo phiên.</p>
       <div class="do"><div class="lbl doc">Thu ngân làm gì</div><p>Bật PC/điện thoại rồi chạy NexbillAgent (PC: mở NexbillAgent.exe; điện thoại: mở Termux, gõ nexbill). Trong lúc đó bật/tắt TV bằng điều khiển, và vẫn ghi phiên trong Cho thuê PS.</p></div>
@@ -369,7 +369,7 @@
       <div class="lbl ok">Phòng ngừa</div><p>Đặt router gần phòng / dùng bộ kích sóng WiFi. Nếu hay mất mạng, chọn ổ cắm NEXBILL/Tasmota + NexbillAgent để chạy cả khi không có internet.</p></div>
     <div class="card"><h3>Dashboard NEXBILL lỗi / không mở được</h3>
       <div class="lbl">Điều xảy ra</div><p>Trang không tải hoặc báo lỗi dù internet cửa hàng bình thường.</p>
-      <div class="do"><div class="lbl doc">Thu ngân làm gì</div><p>Làm như khi mất internet (Cho thuê PS Chế độ ngoại tuyến + Điều khiển cục bộ / nút Input/Source cho NEXBILL TV). Ghi giờ bắt đầu &amp; kết thúc bằng tay nếu cần. Báo qua Chat/Trợ giúp hoặc WhatsApp đội NEXBILL kèm ảnh chụp lỗi.</p></div>
+      <div class="do"><div class="lbl doc">Thu ngân làm gì</div><p>Làm như khi mất internet (Cho thuê PS Chế độ ngoại tuyến + Điều khiển cục bộ / menu nhân viên NEXBILL TV). Ghi giờ bắt đầu &amp; kết thúc bằng tay nếu cần. Báo qua Chat/Trợ giúp hoặc WhatsApp đội NEXBILL kèm ảnh chụp lỗi.</p></div>
       <div class="lbl ok">Phòng ngừa</div><p>Lưu số WhatsApp đội NEXBILL trong điện thoại thu ngân. Để sẵn sổ ghi chép dự phòng ở quầy.</p></div></div>
   <h1 style="margin-top:28px">Các cách điều khiển thiết bị &amp; ưu điểm</h1>
   <p class="sub">NEXBILL có nhiều cách để TV chạy theo phiên của thu ngân. Chọn cách phù hợp nhất — có thể kết hợp trong một cửa hàng.</p>

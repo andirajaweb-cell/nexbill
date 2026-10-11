@@ -13,13 +13,13 @@
     <string name="overlay_needed">This mode needs permission to display over other apps. Open the staff menu → Display over other apps.</string>
     <string name="pin_title">Enter staff PIN</string>
     <string name="pin_wrong">Wrong PIN</string>
-    <string name="pin_error">Could not check the PIN. Check the internet connection.</string>
+    <string name="pin_error">Cannot check the PIN: the internet is down and no PIN has been used on this TV yet. Use the Input/Source button on the remote to switch to HDMI.</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
     <string name="menu_title">Staff menu</string>
-    <string name="menu_show_game">Open game screen for 10 minutes</string>
+    <string name="menu_show_game">Open game screen (no session)</string>
     <string name="menu_end_staff">End staff mode</string>
     <string name="menu_pick_hdmi">Choose HDMI input</string>
     <string name="menu_mode">HDMI display mode</string>
@@ -40,4 +40,7 @@
     <string name="update_available">New version %1$s is available. To update: open the Downloader app on this TV, type %2$s, then choose Install. Pairing and settings are kept.</string>
     <string name="update_latest">The app is up to date (%1$s).</string>
     <string name="update_error">Could not check for updates. Make sure the TV is connected to the internet.</string>
+    <string name="staff_duration_title">Open the game screen for how long?</string>
+    <string name="minutes_fmt">%1$d minutes</string>
+    <string name="pin_offline_ok">Internet is down — PIN checked against the last PIN used on this TV.</string>
 </resources>
