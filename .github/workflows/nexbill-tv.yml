@@ -3,6 +3,11 @@
 # tanpa Android SDK. Hasilnya APK DEBUG untuk diuji di TV (tab Actions › run › Artifacts).
 # APK rilis bertanda tangan dibuat di PC dengan android-tv/build.ps1 (kunci upload tidak pernah
 # diunggah ke GitHub).
+#
+# Catatan runner: image ubuntu-24.04 dari GitHub sudah berisi Android SDK (platform android-35,
+# build-tools 35, lisensi sudah diterima; ANDROID_HOME sudah diset), jadi tidak memakai
+# android-actions/setup-android (versi v3 gagal di runner Oktober 2026). Runner dipatok ke 24.04
+# karena label ubuntu-latest pindah ke Ubuntu 26 mulai 19 Oktober 2026.
 name: NEXBILL TV (Android TV)
 
 on:
@@ -17,21 +22,32 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:
         working-directory: android-tv
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
+          cache-dependency-path: |
+            android-tv/**/*.gradle
+            android-tv/gradle/wrapper/gradle-wrapper.properties
 
-      - uses: android-actions/setup-android@v3
+      - name: Android SDK tersedia
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          test -n "$ANDROID_HOME" && test -d "$ANDROID_HOME/platforms/android-35" || {
+            echo "::error::Android SDK (platform android-35) tidak ada di runner. Periksa image runner atau pasang lewat sdkmanager."
+            ls "$ANDROID_HOME/platforms" 2>/dev/null || true
+            exit 1
+          }
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
 
       - name: Versi build.gradle = Config.java
         run: |
@@ -40,20 +56,23 @@ jobs:
           cname=$(grep -oP 'APP_VERSION = "\K[^"]+' app/src/main/java/id/nexbill/tv/Config.java)
           ccode=$(grep -oP 'VERSION_CODE = \K\d+' app/src/main/java/id/nexbill/tv/Config.java)
           echo "build.gradle $gname ($gcode) / Config.java $cname ($ccode)"
-          test "$gname" = "$cname" && test "$gcode" = "$ccode"
+          if [ "$gname" != "$cname" ] || [ "$gcode" != "$ccode" ]; then
+            echo "::error::Versi tidak sama: build.gradle $gname ($gcode) vs Config.java $cname ($ccode)"
+            exit 1
+          fi
 
       - name: Build APK debug
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug lintDebug
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: nexbill-tv-debug-apk
           path: android-tv/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: nexbill-tv-lint
