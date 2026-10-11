@@ -48,11 +48,13 @@ function CopyCommand({ command }: { command: string }) {
 function Step({ n, title, illus, children }: { n: number; title: string; illus: RelayIllustrationKind; children: React.ReactNode }) {
   const { lang } = useDashboardLang();
   return (
-    <div className="grid gap-3 sm:grid-cols-[150px_1fr] items-start rounded-xl border border-neutral-800 bg-white/[0.015] p-3">
+    // grid-cols-1 (= minmax(0, 1fr)) di HP: tanpa itu kolom grid ikut melebar mengikuti perintah
+    // panjang yang tidak boleh terpotong (whitespace-nowrap) dan teks langkah keluar dari kartu.
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[150px_minmax(0,1fr)] items-start rounded-xl border border-neutral-800 bg-white/[0.015] p-3">
       <div className="max-w-[220px] sm:max-w-none">
         <RelayIllustration kind={illus} lang={relayIllustrationLang(lang)} />
       </div>
-      <div className="flex gap-3">
+      <div className="flex min-w-0 gap-3">
         <div className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20 text-[11px] font-bold text-cyan-300">{n}</div>
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="text-neutral-200 font-medium">{title}</div>
@@ -151,7 +153,7 @@ export function AndroidRelayGuide({ onRequestToken, requesting }: { onRequestTok
       </Step>
 
       <Step n={7} illus="done" title={t("devices.guide.android.s7Title", "Tambahkan TV di NEXBILL")}>
-        <p>{t("devices.guide.tv.step5Body", "Kembali ke halaman ini, klik \"Tambah Perangkat\", pilih protokol \"TV (Android/Google TV)\", isi nama dan IP TV dari Langkah 4, lalu Simpan. Selesai — TV bisa dinyalakan/dimatikan dari dashboard ini.")}</p>
+        <p>{t("devices.guide.android.s7Body", "Kembali ke halaman ini, klik \"Tambah Perangkat\", pilih protokol \"TV (Android/Google TV)\", isi nama dan IP TV dari Langkah 5, lalu Simpan. Selesai — TV bisa dinyalakan/dimatikan dari dashboard ini.")}</p>
       </Step>
 
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1.5">

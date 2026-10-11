@@ -131,7 +131,7 @@ export function RelayIllustration({ kind, className, lang = "id" }: { kind: Rela
           <circle cx="42" cy="30" r="3" fill={C.amber} />
           <circle cx="52" cy="30" r="3" fill={C.green} />
           <text x="30" y="56" fontSize="9" fontFamily="monospace" fill={C.green}>$ <tspan fill={C.text}>pkg install -y curl &amp;&amp;</tspan></text>
-          <text x="30" y="70" fontSize="9" fontFamily="monospace" fill={C.text}>  curl -fsSL nexbill.id/…/install.sh | bash</text>
+          <text x="30" y="70" fontSize="9" fontFamily="monospace" fill={C.text}>  curl -fsSL …/install.sh | bash</text>
           <text x="30" y="90" fontSize="9" fontFamily="monospace" fill={C.cyan}>[1/5] Node.js + adb …</text>
           <text x="30" y="104" fontSize="9" fontFamily="monospace" fill={C.cyan}>[2/5] NexbillAgent …</text>
           <rect x="30" y="112" width="7" height="11" fill={C.green} />

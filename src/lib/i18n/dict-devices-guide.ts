@@ -278,6 +278,15 @@ registerDict({
     fil: "Bumalik sa page na ito. Lalabas ang mga handang TV sa card na \"Ikonekta ang TV nang walang Command Prompt\" — i-click ang Idagdag. Tapos na — puwede nang i-on/off ang TV mula sa dashboard na ito, at kusang ikokonekta ulit ito ng NexbillAgent kapag namatay ang TV.",
     vi: "Quay lại trang này. TV sẵn sàng hiện trong thẻ \"Kết nối TV không cần Command Prompt\" — bấm Thêm. Xong — TV có thể bật/tắt từ dashboard này, và NexbillAgent tự kết nối lại nếu TV từng bị tắt.",
   },
+  // Panduan HP Android (Termux): TV masih ditambahkan manual dengan IP dari Langkah 5 (agent Android belum v1.5).
+  "devices.guide.android.s7Body": {
+    id: 'Kembali ke halaman ini, klik "Tambah Perangkat", pilih protokol "TV (Android/Google TV)", isi nama dan IP TV dari Langkah 5, lalu Simpan. Selesai — TV bisa dinyalakan/dimatikan dari dashboard ini.',
+    en: 'Come back to this page, click "Add Device", choose the "TV (Android/Google TV)" protocol, enter a name and the TV\'s IP from Step 5, then Save. Done — the TV can now be turned on/off from this dashboard.',
+    ms: 'Kembali ke halaman ini, klik "Tambah Peranti", pilih protokol "TV (Android/Google TV)", isi nama dan IP TV daripada Langkah 5, kemudian Simpan. Selesai — TV boleh dihidupkan/dimatikan dari papan pemuka ini.',
+    th: 'กลับมาที่หน้านี้ คลิก "เพิ่มอุปกรณ์" เลือกโปรโตคอล "ทีวี (Android/Google TV)" กรอกชื่อและ IP ทีวีจากขั้นตอนที่ 5 แล้วบันทึก เสร็จแล้ว — ทีวีสามารถเปิด/ปิดได้จากแดชบอร์ดนี้',
+    fil: 'Bumalik sa page na ito, i-click ang "Magdagdag ng Device", piliin ang protocol na "TV (Android/Google TV)", ilagay ang pangalan at IP ng TV mula sa Hakbang 5, pagkatapos I-save. Tapos na — puwede nang i-on/off ang TV mula sa dashboard na ito.',
+    vi: 'Quay lại trang này, nhấp "Thêm thiết bị", chọn giao thức "TV (Android/Google TV)", nhập tên và IP của TV từ Bước 5, rồi Lưu. Xong — TV có thể được bật/tắt từ dashboard này.',
+  },
 
   // --- Relay Agent di HP Android (android-relay-guide.tsx) ---
   "devices.guide.android.tabPc": { id: "Pakai PC Windows", en: "Use a Windows PC", ms: "Guna PC Windows", th: "ใช้ PC Windows", fil: "Gumamit ng Windows PC", vi: "Dùng máy tính Windows" },
