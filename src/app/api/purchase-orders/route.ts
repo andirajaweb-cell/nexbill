@@ -5,6 +5,7 @@ import { eq, desc, inArray } from "drizzle-orm";
 import { createPurchaseOrder } from "@/lib/inventory/purchasing";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { forbidUnless } from "@/lib/auth/require-permission";
 
 export async function GET() {
   try {
@@ -34,6 +35,8 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    const denied = forbidUnless(session, ["manage_inventory_purchasing"], "Role kamu tidak punya izin membuat purchase order.");
+    if (denied) return denied;
     const body = await req.json();
     return NextResponse.json(await createPurchaseOrder({ ...body, outletId: session.outletId }));
   } catch (err: unknown) {

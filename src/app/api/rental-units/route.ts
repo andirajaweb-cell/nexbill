@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth/session";
 import { describeError, errorStatus } from "@/lib/api/error";
 import { assertUnitQuotaAvailable } from "@/lib/subscription/service";
 import { computeMaintenanceStatus } from "@/lib/rental/maintenance";
+import { forbidUnless } from "@/lib/auth/require-permission";
 
 /**
  * Case/whitespace-insensitive duplicate check, scoped to this outlet's still-active units — two
@@ -45,6 +46,8 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    const denied = forbidUnless(session, ["manage_pricing_promo", "manage_settings", "manage_devices"], "Role kamu tidak punya izin menambah unit.");
+    if (denied) return denied;
     const body = await req.json();
     if (!body.name) return NextResponse.json({ error: "Nama unit wajib diisi." }, { status: 400 });
     if (await nameAlreadyUsed(session.outletId, body.name)) {

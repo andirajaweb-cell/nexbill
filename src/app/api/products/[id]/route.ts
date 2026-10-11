@@ -18,6 +18,7 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError, errorStatus } from "@/lib/api/error";
 import { normalizeBarcode } from "@/lib/inventory/barcode";
 import { assertBarcodeAvailable, DuplicateBarcodeError } from "@/lib/inventory/barcode-server";
+import { forbidUnless } from "@/lib/auth/require-permission";
 
 /**
  * Every table with a real FK to products.id — a product can only be hard-deleted once none of
@@ -42,7 +43,9 @@ async function findProductReferences(productId: string): Promise<string[]> {
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    const { row: current } = await requireOwnedRow<typeof products.$inferSelect>(products, id, "Produk tidak ditemukan.");
+    const { row: current, session } = await requireOwnedRow<typeof products.$inferSelect>(products, id, "Produk tidak ditemukan.");
+    const denied = forbidUnless(session, ["manage_inventory_purchasing", "manage_pricing_promo"], "Role kamu tidak punya izin mengubah produk.");
+    if (denied) return denied;
     const body = await req.json();
     // outletId is intentionally never accepted from the body — a product can't be reassigned
     // to a different outlet through this route.

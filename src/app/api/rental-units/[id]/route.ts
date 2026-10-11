@@ -4,6 +4,7 @@ import { rentalUnits } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
+import { hasAnyPermission } from "@/lib/auth/require-permission";
 import { describeError, errorStatus } from "@/lib/api/error";
 import { assertUnitQuotaAvailable } from "@/lib/subscription/service";
 
@@ -33,6 +34,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       !hasPermission(session.role as StaffRole, "manage_pricing_promo")
     ) {
       return NextResponse.json({ error: "Role kamu tidak punya izin mengubah tarif unit." }, { status: 403 });
+    }
+    // Mengarsipkan/mengaktifkan unit mengubah kuota tagihan langganan dan isi grid kasir —
+    // hak yang sama dengan menambah unit.
+    if (
+      body.isActive !== undefined &&
+      Boolean(body.isActive) !== Boolean(existing.isActive) &&
+      !hasAnyPermission(session.role, ["manage_pricing_promo", "manage_settings", "manage_devices"])
+    ) {
+      return NextResponse.json({ error: "Role kamu tidak punya izin mengarsipkan atau mengaktifkan unit." }, { status: 403 });
     }
 
     if (body.isActive === false && existing.status === "occupied") {

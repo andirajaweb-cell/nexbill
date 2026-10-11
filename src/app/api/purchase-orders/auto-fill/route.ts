@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
+import { forbidUnless } from "@/lib/auth/require-permission";
 
 /**
  * Manual trigger for "Cek & Buat PO Otomatis" on the Purchase Order tab — also called
@@ -13,6 +14,8 @@ export async function POST() {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    const denied = forbidUnless(session, ["manage_inventory_purchasing"], "Role kamu tidak punya izin membuat purchase order.");
+    if (denied) return denied;
     const result = await autoFillLowStockPurchaseOrders(session.outletId);
     return NextResponse.json(result);
   } catch (err: unknown) {

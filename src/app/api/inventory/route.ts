@@ -8,6 +8,7 @@ import { receiveStockForItem } from "@/lib/inventory/stock";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
 import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-postings";
 import { onStockIn, onStockOut } from "@/lib/inventory/costing";
+import { forbidUnless } from "@/lib/auth/require-permission";
 
 export async function GET() {
   try {
@@ -45,8 +46,12 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    const denied = forbidUnless(session, ["manage_inventory_purchasing"], "Role kamu tidak punya izin menyesuaikan stok.");
+    if (denied) return denied;
 
-    const { productId, type, qty, note, staffUserId, unitCost } = await req.json();
+    // staffUserId selalu dari sesi — dulu diambil dari body, sehingga penyesuaian/waste bisa dicatat atas nama orang lain.
+    const { productId, type, qty, note, unitCost } = await req.json();
+    const staffUserId = session.sub;
 
     const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (!product || product.outletId !== session.outletId) return NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });

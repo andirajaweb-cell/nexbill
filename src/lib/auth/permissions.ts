@@ -235,6 +235,11 @@ export function hasPermission(role: StaffRole, permission: Permission): boolean 
   return effectiveMatrix[role]?.has(permission) ?? false;
 }
 
+/** True kalau peran punya SALAH SATU izin di daftar. Aman dipakai di server maupun komponen klien. */
+export function hasAnyPermission(role: string, permissions: Permission[]): boolean {
+  return permissions.some((p) => hasPermission(role as StaffRole, p));
+}
+
 /** Replaces the whole cache — used server-side after loading every row from the rolePermissions table. */
 export function setFullEffectiveMatrix(rows: { role: string; permission: string; granted: boolean }[]): void {
   const matrix = buildMatrixFromDefaults();

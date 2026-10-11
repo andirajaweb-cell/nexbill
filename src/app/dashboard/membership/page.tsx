@@ -890,7 +890,8 @@ function VoucherTab({ outletId }: { outletId: string }) {
 
   const create = async () => {
     if (!form.code) return;
-    await fetch("/api/vouchers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId }) });
+    const res = await fetch("/api/vouchers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outletId }) });
+    if (!res.ok) return showAlert((await res.json().catch(() => ({}))).error ?? res.statusText);
     setForm({ code: "", type: "percent", value: 10, minPurchase: 0 });
     load();
   };

@@ -353,11 +353,12 @@ function ProductTab({ outletId }: { outletId: string }) {
       qty = delta;
       type = "adjustment";
     }
-    await fetch("/api/inventory", {
+    const res = await fetch("/api/inventory", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productId: p.id, type, qty, note: adjustNote || undefined }),
     });
+    if (!res.ok) return showAlert((await res.json().catch(() => ({}))).error ?? res.statusText);
     setAdjustingId(null);
     load();
   };
@@ -1603,7 +1604,8 @@ function PurchaseOrderTab({ outletId }: { outletId: string }) {
 
   const createPo = async () => {
     if (!form.supplierId || cart.length === 0) return showAlert(t("inventory.po.needSupplierAndItemAlert", "Pilih supplier dan tambah minimal 1 item."));
-    await fetch("/api/purchase-orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId, supplierId: form.supplierId, items: cart }) });
+    const res = await fetch("/api/purchase-orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId, supplierId: form.supplierId, items: cart }) });
+    if (!res.ok) return showAlert((await res.json().catch(() => ({}))).error ?? res.statusText);
     setCart([]);
     load();
   };
@@ -1726,7 +1728,8 @@ function StockOpnameTab({ outletId }: { outletId: string }) {
   const submit = async () => {
     const items = Object.entries(counts).filter(([, v]) => v !== undefined).map(([productId, actualQty]) => ({ productId, actualQty }));
     if (items.length === 0) return;
-    await fetch("/api/stock-opnames", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId, items }) });
+    const res = await fetch("/api/stock-opnames", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId, items }) });
+    if (!res.ok) return showAlert((await res.json().catch(() => ({}))).error ?? res.statusText);
     setCounts({});
     load();
   };

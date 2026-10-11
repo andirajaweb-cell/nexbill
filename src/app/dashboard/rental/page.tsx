@@ -43,7 +43,7 @@ import { OfflineRentalBoard } from "./OfflineRentalBoard";
 import { useConnectivity, useOfflineData } from "@/lib/offline/hooks";
 import { getLastOutletId } from "@/lib/offline/store";
 import { PageGuide } from "@/components/dashboard/PageGuide";
-import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
+import { hasAnyPermission, hasPermission, type StaffRole } from "@/lib/auth/permissions";
 
 // recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
 const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
@@ -337,6 +337,8 @@ function OnlineRentalPage() {
   // "Siap Buka Outlet" di Ringkasan.
   const [showRateEditor, setShowRateEditor] = useState(false);
   const canEditRates = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_pricing_promo");
+  // Tambah/arsipkan unit — server memeriksa izin yang sama (POST & PATCH /api/rental-units).
+  const canManageUnits = hasAnyPermission(user?.role ?? "cashier", ["manage_pricing_promo", "manage_settings", "manage_devices"]);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("atur") === "tarif" && canEditRates) setShowRateEditor(true);
   }, [canEditRates]);
@@ -1189,9 +1191,11 @@ function OnlineRentalPage() {
                       >
                         <Wrench size={12} /> {unit.status === "maintenance" ? t("rental.finishMaintenance", "Selesai Maintenance") : t("rental.setMaintenance", "Set Maintenance")}
                       </Button>
-                      <Button variant="ghost" className="text-xs flex items-center gap-1 text-rose-400" onClick={() => archiveUnit(unit)}>
-                        <Archive size={12} /> {t("rental.deactivateUnit", "Nonaktifkan")}
-                      </Button>
+                      {canManageUnits && (
+                        <Button variant="ghost" className="text-xs flex items-center gap-1 text-rose-400" onClick={() => archiveUnit(unit)}>
+                          <Archive size={12} /> {t("rental.deactivateUnit", "Nonaktifkan")}
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>
@@ -1233,11 +1237,11 @@ function OnlineRentalPage() {
                 <Button variant="ghost" onClick={cancelUnitForm}>{t("rental.cancel", "Batal")}</Button>
               </div>
             </div>
-          ) : (
+          ) : canManageUnits ? (
             <Button variant="secondary" className="flex items-center gap-2 text-xs" onClick={startNewUnit}>
               <Plus size={14} /> {t("rental.addUnit", "Tambah Unit")}
             </Button>
-          )}
+          ) : null}
         </Card>
       )}
 
@@ -1692,7 +1696,9 @@ function OnlineRentalPage() {
           {activeUnits.length === 0 && (
             <Card className="sm:col-span-2 2xl:col-span-3 text-center text-neutral-500 text-sm py-8 space-y-3">
               <div>{t("rental.noUnitsEmptyState", 'Belum ada unit PS. Klik "Kelola Unit" untuk menambahkan.')}</div>
-              <Button className="text-xs" onClick={() => setShowUnitManager(true)}>{t("setup.rates.addUnitButton", "Tambah unit PS")}</Button>
+              {canManageUnits && (
+                <Button className="text-xs" onClick={() => setShowUnitManager(true)}>{t("setup.rates.addUnitButton", "Tambah unit PS")}</Button>
+              )}
             </Card>
           )}
         </div>

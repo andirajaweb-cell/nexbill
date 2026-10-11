@@ -5,6 +5,7 @@ import { outlets, relayAgents, supportThreads, supportMessages } from "@/db/sche
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { forbidUnless } from "@/lib/auth/require-permission";
 
 /**
  * Fully self-service Relay Agent (Android TV) token issuance — the automated counterpart to the
@@ -27,6 +28,8 @@ export async function POST() {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    const denied = forbidUnless(session, ["manage_devices"], "Role kamu tidak punya izin meminta token Relay Agent.");
+    if (denied) return denied;
 
     const [existing] = await db.select({ id: relayAgents.id }).from(relayAgents).where(eq(relayAgents.outletId, session.outletId)).limit(1);
     if (existing) {
