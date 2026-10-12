@@ -11,7 +11,7 @@ import { join } from "node:path";
  */
 const api = (p: string) => readFileSync(join(__dirname, "..", "..", "app", "api", p, "route.ts"), "utf8");
 
-const ROUTES = ["rental-sessions/pause-all", "devices/discovered-tvs", "outlets/booking-link", "onboarding/checklist"];
+const ROUTES = ["rental-sessions/pause-all", "devices/discovered-tvs", "outlets/booking-link", "onboarding/checklist", "outlet-role-permissions"];
 
 describe.each(ROUTES)("tenant scope: /api/%s", (route) => {
   const src = api(route);
@@ -44,5 +44,18 @@ describe("TV yang ditemukan agent hanya dari agent outlet sendiri", () => {
   it("filters relay agents and devices by the session outlet", () => {
     expect(src).toMatch(/where\(eq\(relayAgents\.outletId, session\.outletId\)\)/);
     expect(src).toMatch(/where\(eq\(devices\.outletId, session\.outletId\)\)/);
+  });
+});
+
+describe("Checklist izin karyawan hanya untuk outlet sendiri", () => {
+  const src = api("outlet-role-permissions");
+  it("every read/write is keyed by the session outlet", () => {
+    expect(src).toMatch(/listOutletRolePermissions\(outletId\)/);
+    expect(src).toMatch(/setOutletRolePermission\(outletId,/);
+    expect(src).toMatch(/resetOutletRolePermissions\(outletId,/);
+    expect((src.match(/const outletId = session\.outletId;/g) ?? []).length).toBe(3);
+  });
+  it("only Owner/Superuser may change it", () => {
+    expect((src.match(/if \(!canEdit\(session\.role\)\)/g) ?? []).length).toBe(2);
   });
 });

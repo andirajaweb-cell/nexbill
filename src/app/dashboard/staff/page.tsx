@@ -5,12 +5,14 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { PasswordInput } from "@/components/ui/PasswordInput";
-import { roleLabel, hasPermission, StaffRole, Permission, PERMISSION_GROUPS, PERMISSION_LABEL, PERMISSION_LABEL_KEY } from "@/lib/auth/permissions";
+import { roleLabel, hasPermission, isFullAuthorityRole, StaffRole, Permission, PERMISSION_GROUPS, PERMISSION_LABEL, PERMISSION_LABEL_KEY } from "@/lib/auth/permissions";
+import { OutletRoleChecklist } from "./outlet-role-checklist";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { fetchJsonArray, fetchJsonObject } from "@/lib/api/fetch-json";
 import { useApi } from "@/lib/api/use-api";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import "@/lib/i18n/dict-staff";
+import "@/lib/i18n/dict-staff-outlet-roles";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
@@ -146,8 +148,9 @@ export default function StaffPage() {
   };
 
   useEffect(() => {
-    if (tab === "roles" && matrix === null) loadMatrix();
-  }, [tab, matrix]);
+    if (tab === "roles" && matrix === null && isSuperRole(myRole)) loadMatrix();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, matrix, myRole]);
 
   const isCellGranted = (role: StaffRole, permission: Permission) =>
     matrix?.find((c) => c.role === role && c.permission === permission)?.granted ?? false;
@@ -260,7 +263,12 @@ export default function StaffPage() {
       </div>
 
       <div className="flex gap-2 border-b border-neutral-800">
-        {(isSuperRole(myRole) ? (["staff", "approvals", "audit", "roles"] as const) : (["staff", "approvals", "audit"] as const)).map((tabKey) => {
+        {/* Tab Role & Izin: Owner (dan pemegang "Kelola Staf & Role", hanya melihat) mengatur checklist
+            izin karyawan outlet SENDIRI; Superuser juga melihat matriks bawaan NEXBILL untuk semua outlet. */}
+        {(isSuperRole(myRole) || isFullAuthorityRole(myRole) || hasPermission(myRole, "manage_staff")
+          ? (["staff", "approvals", "audit", "roles"] as const)
+          : (["staff", "approvals", "audit"] as const)
+        ).map((tabKey) => {
           const pendingCount = approvals.filter((a) => a.status === "pending").length;
           const label =
             tabKey === "staff" ? t("staff.tabs.staffList", "Daftar Staf")
@@ -433,10 +441,12 @@ export default function StaffPage() {
         </Card>
       )}
 
-      {tab === "roles" && (
+      {tab === "roles" && <OutletRoleChecklist />}
+
+      {tab === "roles" && isSuperRole(myRole) && (
         <Card>
           <div className="flex items-center justify-between mb-1">
-            <h2 className="font-medium">{t("staff.roles.title", "Checklist Izin per Role")}</h2>
+            <h2 className="font-medium">{t("staff.roles.globalTitle", "Bawaan NEXBILL — berlaku untuk semua outlet (khusus Superuser)")}</h2>
           </div>
           <p className="text-xs text-neutral-500 mb-4">
             {t("staff.roles.description", 'Centang untuk memberi izin, hapus centang untuk mencabut. Perubahan berlaku langsung untuk seluruh staf dengan role tersebut. Superuser dan Owner tidak bisa kehilangan izin "Kelola Staf & Role" agar tidak ada yang terkunci dari halaman ini.')}

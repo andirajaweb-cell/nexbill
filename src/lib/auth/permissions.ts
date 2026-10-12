@@ -231,8 +231,103 @@ function buildMatrixFromDefaults(): Record<StaffRole, Set<Permission>> {
  */
 let effectiveMatrix: Record<StaffRole, Set<Permission>> = buildMatrixFromDefaults();
 
-export function hasPermission(role: StaffRole, permission: Permission): boolean {
+/* ------------------------------------------------------------------------------------------
+ * IZIN KHUSUS OUTLET (Okt 2026) — checklist yang dibuat Owner untuk karyawannya sendiri.
+ *
+ * Matriks di atas adalah BAWAAN NEXBILL (sama untuk semua outlet, hanya Superuser yang bisa
+ * mengubahnya). Di atasnya, setiap outlet boleh punya pengecualian per role: "di outlet saya,
+ * Kasir boleh refund", "Supervisor tidak boleh ubah harga". Disimpan di tabel role_permissions
+ * yang sama (tanpa migrasi) dengan kolom role berisi kunci `outlet:<outletId>:<role>` — kunci
+ * itu tidak pernah cocok dengan role biasa, jadi baris outlet tidak bisa tercampur ke matriks
+ * bawaan maupun ke outlet lain.
+ *
+ * ISOLASI: hasPermission() hanya menerapkan pengecualian outlet yang sedang AKTIF di request ini
+ * (dipasang getSession() lewat permission-scope.ts dari session.outletId). Di luar request
+ * (skrip, cron) tidak ada outlet aktif → bawaan NEXBILL. Di browser, cache diisi /api/auth/me
+ * dengan izin efektif pengguna itu sendiri.
+ *
+ * Owner & Superuser tidak pernah terkena pengecualian (tidak bisa mengunci diri sendiri), dan
+ * izin di OUTLET_LOCKED_PERMISSIONS tetap mengikuti bawaan.
+ * ---------------------------------------------------------------------------------------- */
+
+/** Role yang izinnya boleh diatur Owner untuk outletnya sendiri. */
+export const OUTLET_EDITABLE_ROLES: StaffRole[] = ["manager", "supervisor", "accountant", "cashier", "kitchen"];
+
+/** Izin yang tidak bisa diberikan Owner ke karyawan (dijaga juga oleh cek role keras di server). */
+export const OUTLET_LOCKED_PERMISSIONS: Permission[] = ["manage_feature_flags"];
+
+/** Izin berisiko tinggi — UI meminta konfirmasi sebelum Owner memberikannya ke karyawan. */
+export const SENSITIVE_PERMISSIONS: Permission[] = [
+  "manage_staff",
+  "void_order_direct",
+  "refund_order",
+  "permanently_delete_purchase_history",
+  "post_manual_journal",
+  "void_expense",
+  "void_cash_deposit",
+  "reopen_period",
+  "manage_coa",
+];
+
+const OUTLET_ROLE_PREFIX = "outlet:";
+
+/** Kunci kolom role untuk baris izin khusus outlet. */
+export function outletRoleKey(outletId: string, role: StaffRole): string {
+  return `${OUTLET_ROLE_PREFIX}${outletId}:${role}`;
+}
+
+/** Kebalikan outletRoleKey — null bila bukan baris outlet / role tidak bisa diatur outlet. */
+export function parseOutletRoleKey(key: string): { outletId: string; role: StaffRole } | null {
+  if (!key.startsWith(OUTLET_ROLE_PREFIX)) return null;
+  const rest = key.slice(OUTLET_ROLE_PREFIX.length);
+  const i = rest.lastIndexOf(":");
+  if (i <= 0) return null;
+  const outletId = rest.slice(0, i);
+  const role = rest.slice(i + 1) as StaffRole;
+  if (!OUTLET_EDITABLE_ROLES.includes(role)) return null;
+  return { outletId, role };
+}
+
+export function isOutletOverridable(role: StaffRole, permission: Permission): boolean {
+  return OUTLET_EDITABLE_ROLES.includes(role) && !OUTLET_LOCKED_PERMISSIONS.includes(permission);
+}
+
+/** outletId → role → permission → granted (hanya sel yang memang dibedakan oleh Owner). */
+let outletOverrides = new Map<string, Map<StaffRole, Map<Permission, boolean>>>();
+
+/** Mengembalikan outlet yang aktif di request ini (dipasang di server oleh permission-scope.ts). */
+let permissionScopeResolver: (() => string | null) | null = null;
+
+export function setPermissionScopeResolver(fn: (() => string | null) | null): void {
+  permissionScopeResolver = fn;
+}
+
+function defaultGranted(role: StaffRole, permission: Permission): boolean {
   return effectiveMatrix[role]?.has(permission) ?? false;
+}
+
+/** Izin bawaan NEXBILL untuk role (tanpa pengecualian outlet). */
+export function hasDefaultPermission(role: StaffRole, permission: Permission): boolean {
+  return defaultGranted(role, permission);
+}
+
+/** Izin efektif sebuah role di outlet tertentu — eksplisit, tidak bergantung outlet aktif request. */
+export function hasPermissionInOutlet(outletId: string | null | undefined, role: StaffRole, permission: Permission): boolean {
+  if (outletId && isOutletOverridable(role, permission)) {
+    const o = outletOverrides.get(outletId)?.get(role)?.get(permission);
+    if (o !== undefined) return o;
+  }
+  return defaultGranted(role, permission);
+}
+
+/** Pengecualian outlet yang tersimpan untuk satu sel (undefined = ikut bawaan). */
+export function outletOverrideOf(outletId: string, role: StaffRole, permission: Permission): boolean | undefined {
+  return outletOverrides.get(outletId)?.get(role)?.get(permission);
+}
+
+export function hasPermission(role: StaffRole, permission: Permission): boolean {
+  const outletId = permissionScopeResolver ? permissionScopeResolver() : null;
+  return hasPermissionInOutlet(outletId, role, permission);
 }
 
 /** True kalau peran punya SALAH SATU izin di daftar. Aman dipakai di server maupun komponen klien. */
@@ -243,7 +338,19 @@ export function hasAnyPermission(role: string, permissions: Permission[]): boole
 /** Replaces the whole cache — used server-side after loading every row from the rolePermissions table. */
 export function setFullEffectiveMatrix(rows: { role: string; permission: string; granted: boolean }[]): void {
   const matrix = buildMatrixFromDefaults();
+  const overrides = new Map<string, Map<StaffRole, Map<Permission, boolean>>>();
   for (const row of rows) {
+    const scoped = parseOutletRoleKey(row.role);
+    if (scoped) {
+      const permission = row.permission as Permission;
+      if (!ALL_PERMISSIONS.includes(permission) || !isOutletOverridable(scoped.role, permission)) continue;
+      let byRole = overrides.get(scoped.outletId);
+      if (!byRole) overrides.set(scoped.outletId, (byRole = new Map()));
+      let byPerm = byRole.get(scoped.role);
+      if (!byPerm) byRole.set(scoped.role, (byPerm = new Map()));
+      byPerm.set(permission, !!row.granted);
+      continue;
+    }
     const role = row.role as StaffRole;
     const permission = row.permission as Permission;
     if (!matrix[role]) continue; // unknown role in the row — ignore rather than throw, data may lag a code deploy
@@ -251,6 +358,7 @@ export function setFullEffectiveMatrix(rows: { role: string; permission: string;
     else matrix[role].delete(permission);
   }
   effectiveMatrix = matrix;
+  outletOverrides = overrides;
 }
 
 /** Replaces just one role's permission set — used client-side to warm the cache for the current user's own role without needing the full 7-role matrix. */

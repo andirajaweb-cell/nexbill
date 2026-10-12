@@ -1,10 +1,17 @@
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { rolePermissions } from "@/db/schema";
 import {
   ALL_ROLES,
   ALL_PERMISSIONS,
   DEFAULT_ROLE_PERMISSIONS,
+  OUTLET_EDITABLE_ROLES,
   setFullEffectiveMatrix,
+  hasDefaultPermission,
+  hasPermissionInOutlet,
+  isOutletOverridable,
+  outletOverrideOf,
+  outletRoleKey,
   type StaffRole,
   type Permission,
 } from "./permissions";
@@ -111,5 +118,72 @@ export async function resetRolePermissions(role?: StaffRole): Promise<void> {
         });
     }
   }
+  await refreshPermissionsCache(true);
+}
+
+/* ---------------- Izin khusus outlet (checklist buatan Owner) — lihat permissions.ts ---------------- */
+
+export interface OutletRolePermissionCell {
+  role: StaffRole;
+  permission: Permission;
+  /** Izin efektif di outlet ini. */
+  granted: boolean;
+  /** Bawaan NEXBILL (berlaku untuk semua outlet yang tidak mengubahnya). */
+  defaultGranted: boolean;
+  /** true = Owner outlet ini membedakannya dari bawaan. */
+  customized: boolean;
+  /** true = tidak bisa diubah Owner (OUTLET_LOCKED_PERMISSIONS). */
+  locked: boolean;
+}
+
+/** Checklist izin karyawan untuk SATU outlet (5 role × semua izin). Selalu baca segar dari DB. */
+export async function listOutletRolePermissions(outletId: string): Promise<OutletRolePermissionCell[]> {
+  await refreshPermissionsCache(true);
+  const cells: OutletRolePermissionCell[] = [];
+  for (const role of OUTLET_EDITABLE_ROLES) {
+    for (const permission of ALL_PERMISSIONS) {
+      const locked = !isOutletOverridable(role, permission);
+      cells.push({
+        role,
+        permission,
+        granted: hasPermissionInOutlet(outletId, role, permission),
+        defaultGranted: hasDefaultPermission(role, permission),
+        customized: !locked && outletOverrideOf(outletId, role, permission) !== undefined,
+        locked,
+      });
+    }
+  }
+  return cells;
+}
+
+/**
+ * Ubah satu sel checklist outlet. Kalau nilainya sama dengan bawaan NEXBILL, baris pengecualian
+ * dihapus (outlet kembali "ikut bawaan" dan otomatis mengikuti perubahan bawaan di kemudian hari).
+ */
+export async function setOutletRolePermission(outletId: string, role: StaffRole, permission: Permission, granted: boolean): Promise<void> {
+  if (!outletId) throw new Error("Outlet tidak diketahui.");
+  if (!isOutletOverridable(role, permission)) throw new Error("Izin ini tidak bisa diatur per outlet.");
+  await seedRolePermissionsIfEmpty();
+  await refreshPermissionsCache(true);
+  const key = outletRoleKey(outletId, role);
+  if (granted === hasDefaultPermission(role, permission)) {
+    await db.delete(rolePermissions).where(and(eq(rolePermissions.role, key), eq(rolePermissions.permission, permission)));
+  } else {
+    await db
+      .insert(rolePermissions)
+      .values({ role: key, permission, granted })
+      .onConflictDoUpdate({
+        target: [rolePermissions.role, rolePermissions.permission],
+        set: { granted, updatedAt: new Date().toISOString() },
+      });
+  }
+  await refreshPermissionsCache(true);
+}
+
+/** Kembalikan satu role (atau semua role) di SATU outlet ke bawaan NEXBILL. Outlet lain tidak tersentuh. */
+export async function resetOutletRolePermissions(outletId: string, role?: StaffRole): Promise<void> {
+  if (!outletId) throw new Error("Outlet tidak diketahui.");
+  const roles = role ? [role] : OUTLET_EDITABLE_ROLES;
+  await db.delete(rolePermissions).where(inArray(rolePermissions.role, roles.map((r) => outletRoleKey(outletId, r))));
   await refreshPermissionsCache(true);
 }

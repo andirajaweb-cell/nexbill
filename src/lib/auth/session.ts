@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { cookies, headers } from "next/headers";
 import { refreshPermissionsCache } from "./permissions-store";
 import { isSessionCurrent } from "./single-session";
+import { beginPermissionScope } from "./permission-scope";
 
 /**
  * Real login/session system. Stateless JWT in an httpOnly cookie — no session
@@ -63,6 +64,8 @@ export async function inspectSession(): Promise<{ session: SessionPayload | null
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
+  // HARUS pernyataan pertama, sebelum await apa pun — lihat lib/auth/permission-scope.ts.
+  const permissionScope = beginPermissionScope();
   const store = await cookies();
   const token = store.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
@@ -77,6 +80,8 @@ export async function getSession(): Promise<SessionPayload | null> {
     // an "owner" -> "superuser" auto-rewrite here, that would silently break every staffer who
     // now legitimately holds the "owner" role.
     await refreshPermissionsCache();
+    // Checklist izin buatan Owner (izin khusus outlet) hanya berlaku untuk outlet sesi ini.
+    permissionScope.outletId = session.outletId;
     await enforcePlanFeature(session);
   }
   return session;
