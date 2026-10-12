@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { resolveDrawerShiftId } from "@/lib/shift/drawer";
+import { parseExpenseQty } from "@/lib/expenses/line-total";
 
 /**
  * Lists expenses plus the lookup data the Expense Management UI needs
@@ -51,6 +52,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    // qty = jumlah satuan (bilangan bulat ≥ 1); amount = TOTAL biaya — lihat lib/expenses/line-total.ts.
+    if (body.qty !== undefined) {
+      const qty = parseExpenseQty(body.qty);
+      if (qty === null) return NextResponse.json({ error: "Jumlah harus bilangan bulat 1 atau lebih." }, { status: 400 });
+      body.qty = qty;
+    }
 
     /*
      * Penjaga input ganda di sisi server — lapisan kedua di belakang penjaga klik ganda di layar

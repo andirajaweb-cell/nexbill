@@ -20,6 +20,7 @@ import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
 import { formatPeriodLabel } from "@/lib/accounting/closing-split";
 import "@/lib/i18n/dict-expenses";
 import "@/lib/i18n/dict-coa";
+import { expenseLineTotal, expenseUnitPrice, parseExpenseQty } from "@/lib/expenses/line-total";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 type ExpenseListRow = ExpenseLike & { id: string; status: string };
@@ -303,6 +304,9 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
       return showAlert(t("expenses.alert.requiredFields", "Lengkapi dulu: Jenis biaya, Kategori, dan Nominal (langkah 1 dan 2)."));
     }
     if (uploading) return showAlert(t("expenses.alert.waitUpload", "Tunggu sampai unggahan bukti selesai."));
+    const qty = parseExpenseQty(form.qty);
+    if (qty === null) return showAlert(t("expenses.alert.invalidQty", "Jumlah harus bilangan bulat 1 atau lebih."));
+    const lineTotal = expenseLineTotal(form.amount, qty);
     if (!form.recordAsPayable && !form.cashBankAccountId) {
       return showAlert(t("expenses.alert.selectCashBankOrPayable", "Di langkah 4, pilih dulu \"Uangnya diambil dari mana?\" — atau ubah ke \"Belum dibayar (hutang)\" kalau uangnya memang belum keluar."));
     }
@@ -323,7 +327,8 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
         fetchJson("/api/expenses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, outletId, qty: Number(form.qty) || 1, amount: Number(form.amount), taxAmount: Number(form.taxAmount) || 0, expenseDate: expenseDateIso }),
+          // amount = TOTAL (harga per satuan × jumlah) — lihat lib/expenses/line-total.ts.
+          body: JSON.stringify({ ...form, outletId, qty, amount: lineTotal, taxAmount: Number(form.taxAmount) || 0, expenseDate: expenseDateIso }),
         }),
       t("expenses.overlay.createHint", "Mencatat expense, mengecek batas approval, dan membuat jurnal bila langsung disetujui. Jangan tutup halaman ini.")
     );
@@ -504,13 +509,13 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
             <h3 className="text-xs font-semibold text-cyan-300 uppercase tracking-wide">{t("expenses.step2", "2. Berapa nominalnya?")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <label className="space-y-1 block">
-                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldAmount", "Nominal (Rp) *")}</div>
+                <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldUnitPrice", "Harga per satuan (Rp) *")}</div>
                 <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder="0" value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-                <div className="text-[11px] text-neutral-500">{t("expenses.fieldAmountHint", "Tanpa titik atau koma. Contoh: 1005000")}</div>
+                <div className="text-[11px] text-neutral-500">{t("expenses.fieldUnitPriceHint", "Harga untuk 1 satuan, tanpa titik atau koma. Kalau tidak per satuan, isi totalnya dan biarkan Jumlah 1.")}</div>
               </label>
               <label className="space-y-1 block">
                 <div className="text-xs font-medium text-neutral-300">{t("expenses.fieldQty", "Jumlah")}</div>
-                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder="1" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
+                <input type="number" min={1} step={1} inputMode="numeric" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder="1" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
                 <div className="text-[11px] text-neutral-500">{t("expenses.fieldQtyHint", "Biarkan 1 kalau tidak dihitung per satuan.")}</div>
               </label>
               <label className="space-y-1 block">
@@ -519,6 +524,28 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                 <div className="text-[11px] text-neutral-500">{t("expenses.fieldTaxHint", "Kosongkan kalau tidak ada pajak terpisah.")}</div>
               </label>
             </div>
+            {Number(form.amount) > 0 && (
+              <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/5 px-3 py-2 text-sm">
+                {parseExpenseQty(form.qty) === null ? (
+                  <span className="text-amber-300">{t("expenses.alert.invalidQty", "Jumlah harus bilangan bulat 1 atau lebih.")}</span>
+                ) : (
+                  <span>
+                    {t("expenses.totalLine", "Total biaya: {qty} × {unit} = {total}")
+                      .replace("{qty}", String(parseExpenseQty(form.qty)))
+                      .replace("{unit}", rupiah(Number(form.amount)))
+                      .replace("{total}", rupiah(expenseLineTotal(form.amount, form.qty)))}
+                    {Number(form.taxAmount) > 0 && (
+                      <span className="text-neutral-400">
+                        {" "}
+                        {t("expenses.totalLineTax", "+ pajak {tax} = {grand}")
+                          .replace("{tax}", rupiah(Number(form.taxAmount)))
+                          .replace("{grand}", rupiah(expenseLineTotal(form.amount, form.qty) + Number(form.taxAmount)))}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
           </section>
 
           {/* LANGKAH 3 — ke siapa */}
@@ -646,7 +673,7 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
               const akun = bundle.accounts.find((a: any) => a.id === form.accountId);
               const sumber = cashBankAccounts.find((c: any) => c.id === form.cashBankAccountId);
               const penerima = form.payeeName || bundle.suppliers.find((s: any) => s.id === form.supplierId)?.name;
-              const nominal = Number(form.amount) || 0;
+              const nominal = expenseLineTotal(form.amount, form.qty);
               const pajak = Number(form.taxAmount) || 0;
               if (!akun || !nominal) {
                 return <span className="text-neutral-500">{t("expenses.summaryIncomplete", "Isi dulu jenis biaya dan nominalnya.")}</span>;
@@ -738,7 +765,10 @@ function ExpenseListTab({ outletId, role, staffUserId }: { outletId: string; rol
                 <td className="text-xs">{new Date(e.expenseDate).toLocaleDateString(DATE_LOCALE[lang])}</td>
                 <td className="text-xs">{accountName(e.accountId)}</td>
                 <td className="text-xs max-w-[200px] truncate" title={e.description}>{e.description || e.category}</td>
-                <td>{rupiah(e.amount + (e.taxAmount ?? 0))}</td>
+                <td>
+                  {rupiah(e.amount + (e.taxAmount ?? 0))}
+                  {e.qty > 1 && <div className="text-[11px] text-neutral-500">{e.qty} × {rupiah(expenseUnitPrice(e.amount, e.qty))}</div>}
+                </td>
                 <td>
                   <Badge status={STATUS_BADGE[e.status]}>{statusLabel(e.status)}</Badge>
                   {/* Penanda hutang: tanpa ini pemilik tidak bisa membedakan expense "Belum dibayar (hutang)"

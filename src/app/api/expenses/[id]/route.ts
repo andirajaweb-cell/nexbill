@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { requireOwnedExpense } from "@/lib/accounting/expense-guard";
 import { describeError, errorStatus } from "@/lib/api/error";
+import { parseExpenseQty } from "@/lib/expenses/line-total";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,6 +36,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const body = await req.json();
+    // qty = jumlah satuan (bilangan bulat ≥ 1); amount = TOTAL biaya — lihat lib/expenses/line-total.ts.
+    if (body.qty !== undefined) {
+      const qty = parseExpenseQty(body.qty);
+      if (qty === null) return NextResponse.json({ error: "Jumlah harus bilangan bulat 1 atau lebih." }, { status: 400 });
+      body.qty = qty;
+    }
     const patch: Record<string, unknown> = {};
     for (const key of EDITABLE_FIELDS) {
       if (body[key] !== undefined) patch[key] = body[key];
