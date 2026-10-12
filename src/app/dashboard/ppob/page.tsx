@@ -13,6 +13,7 @@ import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-ppob";
 import { PpobMoneyFlow } from "./PpobMoneyFlow";
+import { VendorRecommendations } from "@/components/dashboard/VendorRecommendationCard";
 
 interface FeatureFlagRow { key: string; effectiveEnabled: boolean; }
 
@@ -153,6 +154,8 @@ export default function PpobPage() {
       {outletId && (
         <>
           <SummaryCards saldoProvider={saldoProvider} summary={data?.summary} />
+          {/* Rekomendasi vendor PPOB dari NEXBILL (Owner/Manager saja; diatur di platform-admin). */}
+          <VendorRecommendations placement="ppob" />
           <Card className="flex flex-wrap items-end gap-2">
             <div>
               <label className="text-xs text-neutral-500">{t("ppob.filter.from", "Dari")}</label>

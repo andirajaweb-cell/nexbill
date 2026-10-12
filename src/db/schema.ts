@@ -3148,3 +3148,57 @@ export const offlineSyncActions = pgTable(
   },
   (t) => [index("offline_sync_actions_outlet_idx").on(t.outletId, t.createdAt), index("offline_sync_actions_session_idx").on(t.rentalSessionId)]
 );
+
+/** ---------------- REKOMENDASI VENDOR (PLATFORM-ADMIN) — migrasi 0034 ---------------- */
+
+/*
+ * Kartu "solusi tambahan" yang NEXBILL tampilkan di halaman tertentu dashboard outlet — mis. Fastpay
+ * di halaman PPOB untuk menambah sumber pendapatan. Isinya diatur tim NEXBILL di
+ * /platform-admin/vendor-recommendations (bukan data milik outlet). Lihat src/lib/vendor-recommendations.
+ * benefitsJson = array teks JSON. countries = daftar kode negara outlet (koma), mis. "ID".
+ */
+export const platformVendorRecommendations = pgTable("platform_vendor_recommendations", {
+  id: id(),
+  placement: text("placement").notNull().default("ppob"),
+  vendorName: text("vendor_name").notNull(),
+  badge: text("badge"),
+  headline: text("headline").notNull(),
+  body: text("body"),
+  benefitsJson: text("benefits_json"),
+  promoText: text("promo_text"),
+  primaryLabel: text("primary_label").notNull(),
+  primaryUrl: text("primary_url").notNull(),
+  secondaryLabel: text("secondary_label"),
+  secondaryUrl: text("secondary_url"),
+  infoLabel: text("info_label"),
+  infoUrl: text("info_url"),
+  logoUrl: text("logo_url"),
+  footnote: text("footnote"),
+  disclosure: text("disclosure"),
+  countries: text("countries").notNull().default("ID"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  startsAt: text("starts_at"),
+  endsAt: text("ends_at"),
+  /** Diisi manual oleh tim NEXBILL dari dasbor vendor (mis. tab "Mitra Anda" Fastpay) — dasar angka konversi. */
+  confirmedSignups: integer("confirmed_signups").notNull().default(0),
+  updatedBy: text("updated_by").references(() => platformAdmins.id),
+  ...timestamps,
+});
+
+/** Indikator performa kartu rekomendasi: impression (dilihat, maks. 1×/outlet/12 jam), click (per tombol), dismiss. */
+export const platformVendorRecommendationEvents = pgTable(
+  "platform_vendor_recommendation_events",
+  {
+    id: id(),
+    recommendationId: text("recommendation_id")
+      .notNull()
+      .references(() => platformVendorRecommendations.id, { onDelete: "cascade" }),
+    outletId: text("outlet_id").references(() => outlets.id),
+    staffUserId: text("staff_user_id"),
+    event: text("event", { enum: ["impression", "click", "dismiss"] }).notNull(),
+    target: text("target"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("pvr_events_rec_time_idx").on(t.recommendationId, t.createdAt), index("pvr_events_outlet_rec_idx").on(t.outletId, t.recommendationId, t.event)]
+);
