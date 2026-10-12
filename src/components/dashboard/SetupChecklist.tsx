@@ -8,6 +8,19 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import type { Checklist } from "@/lib/onboarding/checklist";
 import "@/lib/i18n/dict-setup";
 
+/** Key kamus per langkah — ditulis literal (bukan t(`setup.item.${key}…`)) supaya setiap key bisa diaudit. */
+const ITEM_TEXT_KEYS: Record<string, { title: string; desc: string }> = {
+  profile: { title: "setup.item.profile.title", desc: "setup.item.profile.desc" },
+  products: { title: "setup.item.products.title", desc: "setup.item.products.desc" },
+  rates: { title: "setup.item.rates.title", desc: "setup.item.rates.desc" },
+  payments: { title: "setup.item.payments.title", desc: "setup.item.payments.desc" },
+  staff: { title: "setup.item.staff.title", desc: "setup.item.staff.desc" },
+  devices: { title: "setup.item.devices.title", desc: "setup.item.devices.desc" },
+  printer: { title: "setup.item.printer.title", desc: "setup.item.printer.desc" },
+  shift: { title: "setup.item.shift.title", desc: "setup.item.shift.desc" },
+  firstSession: { title: "setup.item.firstSession.title", desc: "setup.item.firstSession.desc" },
+};
+
 type Resp = (Checklist & { outletId: string; hidden?: false }) | { hidden: true };
 
 const storageKey = (outletId: string) => `nexbill.setupChecklist.hidden.${outletId}`;
@@ -117,14 +130,14 @@ export function SetupChecklist() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className={`text-sm font-medium ${item.done ? "text-neutral-500 line-through" : "text-neutral-100"}`}>
-                  {t(`setup.item.${item.key}.title`)}
+                  {ITEM_TEXT_KEYS[item.key] ? t(ITEM_TEXT_KEYS[item.key].title) : item.key}
                   {!item.required && (
                     <span className="ml-2 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] font-normal text-neutral-500 no-underline">
                       {t("setup.checklist.optional", "opsional")}
                     </span>
                   )}
                 </div>
-                {!item.done && <p className="text-xs text-neutral-500">{t(`setup.item.${item.key}.desc`)}</p>}
+                {!item.done && <p className="text-xs text-neutral-500">{ITEM_TEXT_KEYS[item.key] ? t(ITEM_TEXT_KEYS[item.key].desc) : ""}</p>}
               </div>
               {!item.done && (
                 <Link
