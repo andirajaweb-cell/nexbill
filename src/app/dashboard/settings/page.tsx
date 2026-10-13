@@ -24,6 +24,7 @@ import "@/lib/i18n/dict-plan";
 import { TuyaAccountsCard } from "./TuyaAccountsCard";
 import { DeleteAccountCard } from "./DeleteAccountCard";
 import { PushNotificationsCard } from "./PushNotificationsCard";
+import { IntegerInput } from "@/components/ui/IntegerInput";
 
 const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "Banner Iklan", "TV Screensaver", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
 type Tab = (typeof TABS)[number];
@@ -537,7 +538,7 @@ function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: 
         <p className="text-xs text-neutral-500">{t("settings.preferences.accountingPeriodDesc", "Tanggal mulai tahun buku dan panjang periode pelaporan — dipakai laporan keuangan untuk mengelompokkan/melabeli periode. Ini TIDAK mengunci input transaksi/jurnal di tanggal manapun.")}</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Field label={t("settings.preferences.accountingStartDayLabel", "Tanggal Mulai")}>
-            <input type="number" min={1} max={31} className={inputCls} disabled={!canManage} value={form.accountingStartDay ?? 1} onChange={(e) => setForm({ ...form, accountingStartDay: Math.max(1, Math.min(31, Number(e.target.value) || 1)) })} />
+            <IntegerInput min={1} max={31} className={inputCls} disabled={!canManage} value={form.accountingStartDay ?? 1} onValueChange={(n) => setForm((f: any) => ({ ...f, accountingStartDay: n }))} />
           </Field>
           <Field label={t("settings.preferences.accountingStartMonthLabel", "Bulan Mulai")}>
             <select className={inputCls} disabled={!canManage} value={form.accountingStartMonth ?? 1} onChange={(e) => setForm({ ...form, accountingStartMonth: Number(e.target.value) })}>
@@ -635,7 +636,7 @@ function PreferencesTab({ outletId, canManage }: { outletId: string; canManage: 
             <input type="number" min={0} className={inputCls} disabled={!canManage} value={form.fraudVarianceThreshold ?? 50000} onChange={(e) => setForm({ ...form, fraudVarianceThreshold: Math.max(0, Number(e.target.value) || 0) })} />
           </Field>
           <Field label={t("settings.preferences.fraudVoidCountLabel", "Ambang Jumlah Void/Refund per Shift")}>
-            <input type="number" min={1} className={inputCls} disabled={!canManage} value={form.fraudVoidCountThreshold ?? 3} onChange={(e) => setForm({ ...form, fraudVoidCountThreshold: Math.max(1, Number(e.target.value) || 1) })} />
+            <IntegerInput min={1} className={inputCls} disabled={!canManage} value={form.fraudVoidCountThreshold ?? 3} onValueChange={(n) => setForm((f: any) => ({ ...f, fraudVoidCountThreshold: n }))} />
           </Field>
           <Field label={t("settings.preferences.maxManualDiscountLabel", "Batas Diskon Manual Kasir (%)")}>
             <input

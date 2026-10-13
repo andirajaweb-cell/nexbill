@@ -7,6 +7,7 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 import { createClient } from "@/lib/client";
 import { SEA_BANKS } from "@/lib/data/sea-banks";
 import { DAFTAR_COPY, DAFTAR_LANGS, DAFTAR_LANG_STORAGE_KEY, LANDING_LANG_STORAGE_KEY, type DaftarLang } from "./copy";
+import { IntegerInput } from "@/components/ui/IntegerInput";
 
 interface PlanInfo {
   starter: { name: string; pricePerUnit: number; minUnits: number } | null;
@@ -445,13 +446,12 @@ function DaftarPageInner() {
             <>
               <div>
                 <label className={labelClass}>{t.branchQuestion}</label>
-                <input
-                  type="number"
+                <IntegerInput
                   min={1}
                   max={20}
                   className={inputClass}
                   value={branchCount}
-                  onChange={(e) => setBranchCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                  onValueChange={setBranchCount}
                 />
               </div>
               <p className="text-xs text-neutral-500">{t.branchHint}</p>
@@ -464,32 +464,29 @@ function DaftarPageInner() {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className={labelClass}>{t.tvAndroid}</label>
-                  <input
-                    type="number"
+                  <IntegerInput
                     min={0}
                     className={inputClass}
                     value={tvAndroid}
-                    onChange={(e) => setTvAndroid(Math.max(0, Number(e.target.value) || 0))}
+                    onValueChange={setTvAndroid}
                   />
                 </div>
                 <div>
                   <label className={labelClass}>{t.tvSmart}</label>
-                  <input
-                    type="number"
+                  <IntegerInput
                     min={0}
                     className={inputClass}
                     value={tvSmart}
-                    onChange={(e) => setTvSmart(Math.max(0, Number(e.target.value) || 0))}
+                    onValueChange={setTvSmart}
                   />
                 </div>
                 <div>
                   <label className={labelClass}>{t.tvAnalog}</label>
-                  <input
-                    type="number"
+                  <IntegerInput
                     min={0}
                     className={inputClass}
                     value={tvAnalog}
-                    onChange={(e) => setTvAnalog(Math.max(0, Number(e.target.value) || 0))}
+                    onValueChange={setTvAnalog}
                   />
                 </div>
               </div>
@@ -525,45 +522,41 @@ function DaftarPageInner() {
             <>
               <div>
                 <label className={labelClass}>{t.shiftsQuestion}</label>
-                <input
-                  type="number"
+                <IntegerInput
                   min={1}
                   max={5}
                   className={inputClass}
                   value={shifts}
-                  onChange={(e) => setShifts(Math.max(1, Number(e.target.value) || 1))}
+                  onValueChange={setShifts}
                 />
               </div>
               <p className="text-xs text-neutral-500 pt-1">{t.employeesQuestion}</p>
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className={labelClass}>{t.roleKasir}</label>
-                  <input
-                    type="number"
+                  <IntegerInput
                     min={0}
                     className={inputClass}
                     value={empKasir}
-                    onChange={(e) => setEmpKasir(Math.max(0, Number(e.target.value) || 0))}
+                    onValueChange={setEmpKasir}
                   />
                 </div>
                 <div>
                   <label className={labelClass}>{t.roleDapur}</label>
-                  <input
-                    type="number"
+                  <IntegerInput
                     min={0}
                     className={inputClass}
                     value={empDapur}
-                    onChange={(e) => setEmpDapur(Math.max(0, Number(e.target.value) || 0))}
+                    onValueChange={setEmpDapur}
                   />
                 </div>
                 <div>
                   <label className={labelClass}>{t.roleLainnya}</label>
-                  <input
-                    type="number"
+                  <IntegerInput
                     min={0}
                     className={inputClass}
                     value={empLainnya}
-                    onChange={(e) => setEmpLainnya(Math.max(0, Number(e.target.value) || 0))}
+                    onValueChange={setEmpLainnya}
                   />
                 </div>
               </div>

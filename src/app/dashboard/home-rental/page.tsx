@@ -14,6 +14,7 @@ import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
 import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-home-rental";
+import { IntegerInput } from "@/components/ui/IntegerInput";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const TABS = ["Dashboard", "Booking", "Peta Tanggal", "Katalog Produk", "Aset", "Paket", "Risk & Approval", "Kebijakan", "Laporan"] as const;
@@ -725,7 +726,7 @@ function PackagesTab({ outletId, canManage }: { outletId: string; canManage: boo
                   placeholder={t("homeRental.common.selectProduct", "Pilih produk...")}
                   options={products.map((p) => ({ value: p.id, label: p.name }))}
                 />
-                <input type="number" min={1} className="w-20 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={it.quantity} onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value) || 1 } : x))} />
+                <IntegerInput min={1} className="w-20 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={it.quantity} onValueChange={(n) => setItems((prev) => prev.map((x, i) => i === idx ? { ...x, quantity: n } : x))} />
               </div>
             ))}
             <Button variant="secondary" onClick={() => setItems([...items, { productId: "", quantity: 1 }])}>{t("homeRental.package.addComponent", "+ Tambah Komponen")}</Button>
@@ -971,7 +972,7 @@ function BookingTab({ outletId, canManage, canApprove }: { outletId: string; can
             {items.map((it, idx) => (
               <div key={idx} className="flex gap-2">
                 <input className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("homeRental.booking.itemNamePlaceholder", "mis. Kabel HDMI, Charger, Controller ekstra")} value={it.name} onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))} />
-                <input type="number" min={1} className="w-16 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={it.quantity} onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value) || 1 } : x))} />
+                <IntegerInput min={1} className="w-16 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={it.quantity} onValueChange={(n) => setItems((prev) => prev.map((x, i) => i === idx ? { ...x, quantity: n } : x))} />
                 <input className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("homeRental.booking.itemNotePlaceholder", "Catatan (opsional)")} value={it.note} onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, note: e.target.value } : x))} />
                 <button className="text-xs text-rose-400 hover:underline" onClick={() => setItems(items.filter((_, i) => i !== idx))}>{t("homeRental.common.delete", "Hapus")}</button>
               </div>
@@ -1314,7 +1315,7 @@ function RentalDetailModal({ rental, canManage, onClose }: { rental: any; canMan
                 {items.length === 0 && <button className="text-xs text-cyan-400 hover:underline" onClick={seedStandardChecklist}>{t("homeRental.detail.seedChecklistButton", "+ Isi Checklist Standar (Body, Serial, HDMI, Power, Controller, dst.)")}</button>}
                 <div className="flex gap-2 pt-2">
                   <input className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("homeRental.detail.itemNamePlaceholder", "Nama barang")} value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
-                  <input type="number" min={1} className="w-16 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={newItem.quantity} onChange={(e) => setNewItem({ ...newItem, quantity: Number(e.target.value) || 1 })} />
+                  <IntegerInput min={1} className="w-16 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={newItem.quantity} onValueChange={(n) => setNewItem((prev: any) => ({ ...prev, quantity: n }))} />
                   <input className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("homeRental.common.notes", "Catatan")} value={newItem.note} onChange={(e) => setNewItem({ ...newItem, note: e.target.value })} />
                   <Button variant="secondary" onClick={addItem}>{t("homeRental.detail.addButton", "+ Tambah")}</Button>
                 </div>
