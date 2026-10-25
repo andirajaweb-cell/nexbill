@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { showAlert } from "@/lib/ui/dialog";
+import { BranchesSection, ContactLocationSection, HeaderContactButtons, PhotoGallery, type PublicProfile } from "./profile-sections";
 
 const CONSOLE_LABEL: Record<string, string> = {
   ps2: "PS2", ps3: "PS3", ps4: "PS4", ps4_pro: "PS4 Pro", ps5: "PS5", ps5_slim: "PS5 Slim", ps6: "PS6",
@@ -24,15 +25,6 @@ type BusyBlock = { start: string; end: string; kind: "session" | "booking"; labe
 type TimelineUnit = { id: string; name: string; consoleType: string; status: string; busyBlocks: BusyBlock[] };
 type TimelineData = { windowStart: string; windowEnd: string; units: TimelineUnit[]; floatingBookings: { consoleType: string; scheduledStart: string; scheduledEnd: string; status: string }[] };
 type BannerSlide = { id: string; imageUrl: string; linkUrl: string | null; title: string | null };
-
-/** Small brand-accurate WhatsApp glyph — lucide-react only ships generic icons, not brand marks, so this is an inline SVG rather than a new dependency for one icon. */
-function WhatsAppIcon({ size = 16, className = "" }: { size?: number; className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" width={size} height={size} className={className} fill="currentColor" aria-hidden="true">
-      <path d="M16.004 3C9.377 3 4 8.373 4 15c0 2.34.657 4.527 1.797 6.39L4 29l7.86-1.75A11.93 11.93 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3Zm0 21.75a9.7 9.7 0 0 1-4.95-1.36l-.355-.21-4.664 1.04 1.02-4.55-.232-.37A9.7 9.7 0 0 1 5.25 15c0-5.93 4.82-10.75 10.754-10.75S26.75 9.07 26.75 15 21.938 24.75 16.004 24.75Zm5.62-7.77c-.307-.154-1.817-.897-2.1-1-.283-.103-.489-.154-.695.154-.205.308-.797 1-.977 1.205-.18.205-.36.23-.667.077-.307-.154-1.296-.478-2.47-1.524-.913-.814-1.53-1.82-1.71-2.128-.18-.308-.02-.474.135-.627.138-.138.307-.36.46-.54.154-.18.205-.308.308-.513.103-.205.051-.385-.026-.539-.077-.154-.695-1.677-.953-2.296-.25-.6-.505-.52-.695-.53l-.593-.01c-.205 0-.539.077-.82.385-.283.308-1.08 1.056-1.08 2.578s1.106 2.99 1.26 3.196c.154.205 2.176 3.322 5.27 4.658.736.318 1.31.508 1.758.65.738.235 1.41.202 1.94.123.592-.088 1.817-.743 2.073-1.46.256-.717.256-1.332.18-1.46-.077-.128-.283-.205-.59-.36Z" />
-    </svg>
-  );
-}
 
 /**
  * Auto-looping ad/promo banner slideshow — managed from the dashboard (Pengaturan > Banner
@@ -254,6 +246,7 @@ export default function PublicBookingPage() {
   const [lookupLoading, setLookupLoading] = useState(false);
 
   const [banners, setBanners] = useState<BannerSlide[] | null>(null);
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
 
   const loadAvailability = useCallback((outletId: string) => {
     fetch(`/api/public/rental-units?outletId=${outletId}`)
@@ -274,6 +267,10 @@ export default function PublicBookingPage() {
         if (data.error) { setLoadError(data.error); return; }
         setOutlet(data);
         loadAvailability(data.id);
+        fetch(`/api/public/outlet-profile?slug=${encodeURIComponent(slug)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((p) => { if (p && Array.isArray(p.photos)) setProfile(p); })
+          .catch(() => {});
         fetch(`/api/public/banners?outletId=${data.id}`)
           .then((r) => r.json())
           .then((rows) => { if (Array.isArray(rows)) setBanners(rows); })
@@ -437,21 +434,13 @@ export default function PublicBookingPage() {
             <h1 className="font-semibold text-lg tracking-wide">{outlet.name}</h1>
             {outlet.address && <p className="text-xs text-[#93a2c4]">{outlet.address}</p>}
           </div>
-          {outlet.phone && (
-            <a
-              href={`https://wa.me/${outlet.phone.replace(/[^0-9]/g, "")}`}
-              target="_blank"
-              rel="noreferrer"
-              className="ml-auto flex items-center gap-1.5 text-sm text-blue-300 font-medium hover:text-blue-200"
-            >
-              <WhatsAppIcon size={18} className="text-emerald-400" />
-              Hubungi via WA
-            </a>
-          )}
+          <HeaderContactButtons profile={profile} fallbackPhone={outlet.phone} />
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-8">
+        {profile && <PhotoGallery photos={profile.photos} outletName={outlet.name} />}
+
         <section>
           <h2 className={`${titleCls} mb-3`}>Status Unit PlayStation</h2>
           {!units ? (
@@ -675,6 +664,8 @@ export default function PublicBookingPage() {
 
         {banners && banners.length > 0 && <BannerCarousel slides={banners} />}
 
+        <ContactLocationSection profile={profile} address={outlet.address} fallbackPhone={outlet.phone} cardCls={cardCls} titleCls={titleCls} />
+
         <section className={`${cardCls} p-4`}>
           <h2 className={`${titleCls} mb-3`}>Cek Status Booking</h2>
           <form onSubmit={handleLookup} className="flex gap-2 mb-3">
@@ -694,6 +685,8 @@ export default function PublicBookingPage() {
             </div>
           )}
         </section>
+
+        {profile && <BranchesSection branches={profile.branches} cardCls={cardCls} titleCls={titleCls} />}
       </main>
 
       <footer className="max-w-5xl mx-auto px-4 py-6 text-center text-xs text-[#566485]">

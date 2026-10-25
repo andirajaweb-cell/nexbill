@@ -3249,3 +3249,70 @@ export const timeCreditTransactions = pgTable(
   },
   (t) => [index("time_credit_tx_customer_idx").on(t.customerId, t.createdAt), index("time_credit_tx_session_idx").on(t.rentalSessionId)]
 );
+
+/** ================= BLACKLIST NO-SHOW BOOKING & PROFIL PUBLIK BOOKING (migrasi 0036) ================= */
+
+/** Aturan blokir otomatis: nomor dengan >= threshold no-show dalam windowDays hari tidak bisa booking online. */
+export const bookingNoShowPolicies = pgTable("booking_no_show_policies", {
+  outletId: text("outlet_id").primaryKey().references(() => outlets.id),
+  enabled: boolean("enabled").notNull().default(true),
+  threshold: integer("threshold").notNull().default(3),
+  windowDays: integer("window_days").notNull().default(90),
+  updatedBy: text("updated_by"),
+  ...timestamps,
+});
+
+/** block = diblokir manual (aktif selama liftedAt kosong) · forgive = blokir dilepas; no-show sebelum createdAt tidak dihitung lagi. */
+export const bookingBlacklist = pgTable(
+  "booking_blacklist",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    /** Nomor WhatsApp yang sudah dinormalkan (lib/booking/no-show-core.ts normalizePhone). */
+    phone: text("phone").notNull(),
+    kind: text("kind", { enum: ["block", "forgive"] }).notNull(),
+    reason: text("reason"),
+    createdBy: text("created_by"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+    liftedAt: text("lifted_at"),
+    liftedBy: text("lifted_by"),
+  },
+  (t) => [index("booking_blacklist_outlet_phone_idx").on(t.outletId, t.phone)]
+);
+
+export const outletPublicProfiles = pgTable("outlet_public_profiles", {
+  outletId: text("outlet_id").primaryKey().references(() => outlets.id),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  mapsUrl: text("maps_url"),
+  showBranches: boolean("show_branches").notNull().default(true),
+  updatedBy: text("updated_by"),
+  ...timestamps,
+});
+
+export const outletPublicPhotos = pgTable(
+  "outlet_public_photos",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    url: text("url").notNull(),
+    caption: text("caption"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("outlet_public_photos_outlet_idx").on(t.outletId, t.sortOrder)]
+);
+
+export const outletWhatsappContacts = pgTable(
+  "outlet_whatsapp_contacts",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    label: text("label").notNull(),
+    phone: text("phone").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [index("outlet_whatsapp_contacts_outlet_idx").on(t.outletId, t.sortOrder)]
+);

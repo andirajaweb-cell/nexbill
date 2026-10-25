@@ -4,6 +4,7 @@ import { outlets, bookings } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { createBooking } from "@/lib/rental/bookings";
 import { describeError } from "@/lib/api/error";
+import { checkBookingBlock, ONLINE_BLOCK_MESSAGE } from "@/lib/booking/no-show";
 
 const ACTIVE_STATUSES = ["pending", "confirmed", "waitlisted"] as const;
 const MAX_ACTIVE_PER_PHONE = 3;
@@ -43,6 +44,10 @@ export async function POST(req: NextRequest) {
     if (!outlet.acceptOnlineBooking) {
       return NextResponse.json({ error: "Booking online sedang tidak tersedia — silakan hubungi kami langsung." }, { status: 403 });
     }
+
+    // Blacklist no-show (lib/booking/no-show.ts): nomor yang berulang kali tidak datang tidak bisa booking online.
+    const block = await checkBookingBlock(outletId, phone);
+    if (block.blocked) return NextResponse.json({ error: ONLINE_BLOCK_MESSAGE, blocked: true }, { status: 403 });
 
     const activeForPhone = await db
       .select({ id: bookings.id })

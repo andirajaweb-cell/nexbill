@@ -13,6 +13,8 @@ import { BookingMap, toLocalYmd } from "./BookingMap";
 import { OPEN_BOOKING_EVENT, BOOKINGS_CHANGED_EVENT } from "@/lib/rental/booking-events";
 import { PageGuide } from "@/components/dashboard/PageGuide";
 import { ShareBookingLink } from "./share-booking-link";
+import { NoShowBlacklistCard, NoShowPhoneWarning } from "./no-show-blacklist";
+import { BookingPageProfileCard } from "./booking-page-profile";
 import "@/lib/i18n/dict-setup";
 
 interface Booking {
@@ -247,6 +249,7 @@ export default function BookingPage() {
             value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("booking.phonePlaceholder", "No. HP")}
             value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <NoShowPhoneWarning phone={form.phone} />
           <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
             value={form.rentalUnitId} onChange={(e) => setForm({ ...form, rentalUnitId: e.target.value })}>
             <option value="">{t("booking.anyUnitOption", "Unit apa saja (pilih jenis konsol)")}</option>
@@ -385,6 +388,10 @@ export default function BookingPage() {
           </div>
         )}
       </div>
+
+      <NoShowBlacklistCard />
+
+      <BookingPageProfileCard />
     </div>
   );
 }
