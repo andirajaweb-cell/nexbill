@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }[] = [
     { path: "", priority: 1, changeFrequency: "weekly" },
     { path: "/about", priority: 0.8, changeFrequency: "monthly" },
+    { path: "/kalkulator-kebocoran", priority: 0.7, changeFrequency: "monthly" },
     // SEO pillar pages (docs/SEO-ARCHITECTURE.md §2-3, Phase 1) — 4 Indonesian + 4 English
     // counterparts, each targeting one distinct primary keyword. Priority just below the
     // homepage since these are the site's main organic-acquisition surfaces alongside it.
