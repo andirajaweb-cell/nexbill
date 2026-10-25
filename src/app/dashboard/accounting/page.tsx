@@ -16,6 +16,7 @@ import { AuditTab } from "./AuditTab";
 import { CalkTab } from "./CalkTab";
 import { TabGuide, WorkflowGuide } from "./TabGuide";
 import { HistoricalImportSection } from "./HistoricalImport";
+import { MigrationSop } from "./MigrationSop";
 import { ProfitLossSteps } from "./ProfitLossSteps";
 import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
 import { BookOpen, Lock } from "lucide-react";
@@ -2383,15 +2384,9 @@ function PeriodLockTab() {
 }
 
 function DataMigrationTab({ outletId }: { outletId: string }) {
-  const { t } = useDashboardLang();
   return (
     <div className="space-y-6">
-      <Card className="border-amber-500/30">
-        <h2 className="font-medium mb-1">{t("accounting.migration.recoHeading", "Rekomendasi Alur Migrasi")}</h2>
-        <p className="text-xs text-neutral-500">
-          {t("accounting.migration.recoPart1", "1) Isi ")}<strong>{t("accounting.migration.recoSaldoAwalBold", "Saldo Awal")}</strong>{t("accounting.migration.recoPart2", " di bawah dengan saldo kas/bank/piutang/hutang/aset/modal per tanggal cutover (hari mulai pakai app ini) — ini cukup untuk Neraca yang benar ke depannya. 2) Kalau kamu juga mau riwayat Penjualan/Pembelian/Pendapatan Lain-lain/Pengeluaran lama tetap muncul di laporan (Laba Rugi historis, tren), pakai ")}<strong>{t("accounting.migration.recoImporBold", "Impor Data Historis")}</strong>{t("accounting.migration.recoPart3", " lewat template Excel di bawah dengan mode \"Hanya riwayat Laba Rugi\" — supaya kas/bank tidak terhitung dua kali dengan Saldo Awal. Aset tetap lama dicatat lewat menu Aset → Pembelian Aset (Saldo awal), stok awal barang lewat Inventory.")}
-        </p>
-      </Card>
+      <MigrationSop />
 
       <OpeningBalanceCard outletId={outletId} />
 
@@ -2409,6 +2404,33 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
   const [lines, setLines] = useState<{ accountId: string; debit: string; credit: string }[]>([{ accountId: "", debit: "", credit: "" }, { accountId: "", debit: "", credit: "" }]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  // Impor Saldo Awal dari Excel (template → isi → unggah): hanya MENGISI formulir di bawah; posting
+  // tetap lewat tombol "Posting Saldo Awal" setelah pemilik memeriksa barisnya.
+  const [importing, setImporting] = useState(false);
+  const [importInfo, setImportInfo] = useState<{ count: number; errors: { row: number; message: string }[]; warnings: string[] } | null>(null);
+
+  const importFromExcel = async (file: File) => {
+    setImporting(true);
+    setImportInfo(null);
+    setMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("lang", lang);
+      const res = await fetch("/api/accounting/opening-balance/parse", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return setMsg(data.error ?? t("accounting.openingBalance.importFailed", "Gagal membaca file."));
+      const parsed = (data.lines ?? []) as { accountId: string; debit: number; credit: number }[];
+      if (parsed.length > 0) {
+        setLines(parsed.map((l) => ({ accountId: l.accountId, debit: l.debit > 0 ? String(l.debit) : "", credit: l.credit > 0 ? String(l.credit) : "" })));
+      }
+      setImportInfo({ count: parsed.length, errors: data.errors ?? [], warnings: data.warnings ?? [] });
+    } catch {
+      setMsg(t("accounting.openingBalance.importFailed", "Gagal membaca file."));
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const load = () => {
     fetchJsonObject(`/api/accounting/opening-balance?outletId=${outletId}`).then(setExisting);
@@ -2484,6 +2506,46 @@ function OpeningBalanceCard({ outletId }: { outletId: string }) {
           <Field label={t("accounting.openingBalance.fieldCutoverDate", "Tanggal Cutover")}>
             <input type="date" className={inputClsSm} value={cutoverDate} onChange={(e) => setCutoverDate(e.target.value)} />
           </Field>
+          <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-3 space-y-2">
+            <p className="text-xs text-neutral-400">{t("accounting.openingBalance.importHint", "Isi saldo per akun di template Excel, lalu unggah di sini. Tidak ada yang diposting sebelum Anda menekan Posting Saldo Awal.")}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <a href={`/api/accounting/opening-balance/template?lang=${lang}`} className="text-xs rounded-lg bg-neutral-800 hover:bg-neutral-700 px-3 py-2 font-medium transition">
+                {t("accounting.openingBalance.downloadTemplate", "Unduh Template Excel")}
+              </a>
+              <label className={`text-xs rounded-lg px-3 py-2 font-medium transition cursor-pointer ${importing ? "bg-neutral-800 text-neutral-500" : "bg-cyan-600/80 hover:bg-cyan-600 text-white"}`}>
+                {importing ? t("accounting.openingBalance.importing", "Membaca file...") : t("accounting.openingBalance.importExcel", "Impor dari Excel")}
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  disabled={importing}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) importFromExcel(f);
+                  }}
+                />
+              </label>
+            </div>
+            {importInfo && (
+              <div className="space-y-1 text-xs">
+                <div className="text-emerald-400">{t("accounting.openingBalance.importResult", "{n} akun terbaca dari Excel. Periksa barisnya, lalu klik Posting Saldo Awal.").replace("{n}", String(importInfo.count))}</div>
+                {importInfo.warnings.map((w, i) => (
+                  <div key={`w${i}`} className="text-amber-300">{w}</div>
+                ))}
+                {importInfo.errors.length > 0 && (
+                  <div className="text-red-400">
+                    <div>{t("accounting.openingBalance.importErrorsTitle", "{n} baris tidak dipakai:").replace("{n}", String(importInfo.errors.length))}</div>
+                    <ul className="list-disc pl-4">
+                      {importInfo.errors.slice(0, 20).map((er, i) => (
+                        <li key={`e${i}`}>{er.row > 0 ? t("accounting.openingBalance.importRow", "Baris {row}: {msg}").replace("{row}", String(er.row)).replace("{msg}", er.message) : er.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-neutral-500">{t("accounting.openingBalance.lineCount", "{n} baris").replace("{n}", String(lines.length))}</span>
             <div className="flex gap-2">
