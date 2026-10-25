@@ -1,4 +1,4 @@
-# Build aplikasi NEXBILL TV (Android TV) di Windows — memakai JDK 17 & Android SDK yang SUDAH
+# Build aplikasi NEXBILL TV (Android TV) di Windows - memakai JDK 17 & Android SDK yang SUDAH
 # dipasang Bubblewrap saat membangun aplikasi NEXBILL Android (folder ..\android). Tidak perlu
 # Android Studio.
 #
@@ -30,7 +30,7 @@ $KeyAlias = "nexbilltv"
 function Use-BubblewrapToolchain {
   $cfgPath = Join-Path $env:USERPROFILE ".bubblewrap\config.json"
   if (-not (Test-Path $cfgPath)) {
-    throw "Bubblewrap belum disiapkan ($cfgPath tidak ada). Jalankan dulu build aplikasi NEXBILL Android: ..\android\build.ps1 — itu memasang JDK 17 dan Android SDK yang juga dipakai di sini."
+    throw "Bubblewrap belum disiapkan ($cfgPath tidak ada). Jalankan dulu build aplikasi NEXBILL Android: ..\android\build.ps1 - itu memasang JDK 17 dan Android SDK yang juga dipakai di sini."
   }
   $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json
   if (-not $cfg.jdkPath -or -not (Test-Path (Join-Path $cfg.jdkPath "bin\java.exe"))) { throw "JDK di $($cfg.jdkPath) tidak ditemukan. Jalankan ..\android\build.ps1 sekali lagi." }
