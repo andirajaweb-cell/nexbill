@@ -12,6 +12,7 @@ import { CookieConsentBanner } from "./cookie-consent-banner";
 import { LoadingScreen } from "./loading-screen";
 import { LanguageProvider, useLanguage } from "./landing-i18n";
 import { DEFAULT_PRICING } from "@/lib/subscription/pricing";
+import { PlanCompare } from "./plan-compare";
 import { DEMO_PUBLIC_EMAIL, DEMO_PUBLIC_PASSWORD } from "@/lib/demo-public";
 import { AppShowcase } from "./landing-showcase";
 
@@ -1317,6 +1318,9 @@ function LandingPageInner() {
           </div>
 
           <p className="harga-multi">{t.harga.multiNote.replace("{pct}", String(multiDiscountPct))}</p>
+
+          {/* Checklist fitur per paket — dihitung dari aturan paket (lib/subscription/plan-matrix.ts). */}
+          <PlanCompare lang={lang} minUnits={starterMinUnits} multiDiscountPct={multiDiscountPct} starterPrice={`${starterView.now}${t.harga.starter.priceSuffix}`} proPrice={`${proView.now}${t.harga.pro.priceSuffix}`} />
 
           <div className="harga-bundle">
             <div className="price-card price-card-extras">
