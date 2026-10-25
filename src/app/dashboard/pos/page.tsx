@@ -422,48 +422,6 @@ export default function PosPage() {
           />
         )}
 
-        {openOrders.length > 0 && (
-          <Card>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-medium text-neutral-400">{t("pos.openOrders", "Order Terbuka (belum dibayar)")}</h2>
-            </div>
-            <div className="space-y-2">
-              {openOrders.map((o) => (
-                <div key={o.id} className="flex items-center justify-between gap-2 text-sm border-b border-neutral-900 pb-2">
-                  {/* Checkbox "pilih untuk digabung" dan tombol "Split" dihapus bersama kedua fitur
-                      itu — lihat komentar panjang di atas filteredProducts. Tiap bill sekarang
-                      selalu dibayar sendiri-sendiri, sehingga satu pembayaran = satu baris di
-                      Transaction Center, tanpa baris "Dibatalkan" yang menyertainya. */}
-                  {(() => {
-                    // Order dari Rental PS: tampilkan unit PS, pelanggan, tanggal, jam mulai–selesai, dan lama main.
-                    // Order F&B biasa: tanggal & jam order dibuat.
-                    const time = o.rentalSessionId
-                      ? buildOrderTimeLabel(o.rentalStartedAt ?? o.createdAt, o.rentalEndedAt, { dateStyle, units: durationUnits })
-                      : buildOrderTimeLabel(o.createdAt, null, { dateStyle, units: durationUnits });
-                    return (
-                      <div className="min-w-0">
-                        <div>
-                          {o.rentalSessionId ? t("pos.orderTypeRental", "Rental") : t("pos.orderTypeFnb", "F&B")}
-                          {o.rentalUnitName ? <span className="font-medium text-cyan-300"> · {o.rentalUnitName}</span> : null} #{o.id.slice(0, 8)} — {rupiah(o.total)}
-                        </div>
-                        {(time || o.rentalCustomerName) && (
-                          <div className="text-xs text-neutral-500 mt-0.5">
-                            {time ? `${time.date} · ${time.timeRange}${time.duration ? ` (${time.duration})` : ""}` : ""}
-                            {o.rentalCustomerName ? `${time ? " · " : ""}${o.rentalCustomerName}` : ""}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  <div className="flex gap-1">
-                    <Button variant="secondary" className="text-xs" onClick={() => payOpenOrder(o.id)} disabled={payingOrderId === o.id}>{payingOrderId === o.id ? t("pos.payBusy", "Memproses...") : t("pos.payWithMethod", "Bayar ({method})").replace("{method}", method)}</Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
         {isSearching ? (
           <div>
             <h2 className="text-sm font-medium text-neutral-400 mb-2">{t("pos.searchResults", "Hasil pencarian ({n})").replace("{n}", String(filteredProducts.length))}</h2>
@@ -532,7 +490,8 @@ export default function PosPage() {
         )}
       </div>
 
-      <Card className="h-fit lg:sticky lg:top-16 space-y-4 scroll-mt-16" id="pos-cart">
+      <div className="h-fit space-y-4 lg:sticky lg:top-16">
+      <Card className="space-y-4 scroll-mt-16" id="pos-cart">
         <h2 className="font-medium">{t("pos.cart", "Keranjang")}</h2>
         {cart.length === 0 && <p className="text-sm text-neutral-500">{t("pos.emptyCart", "Belum ada item.")}</p>}
         <div className="space-y-2">
@@ -617,6 +576,51 @@ export default function PosPage() {
           </div>
         )}
       </Card>
+        {/* Order terbuka di kolom kanan, di bawah keranjang — daftar produk di kiri tetap bebas
+            untuk transaksi kasir. Daftar bisa digulir sendiri supaya tidak memanjangkan kolom. */}
+        {openOrders.length > 0 && (
+          <Card className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-neutral-400">{t("pos.openOrders", "Order Terbuka (belum dibayar)")}</h2>
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-200">{openOrders.length}</span>
+            </div>
+            <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+              {openOrders.map((o) => (
+                <div key={o.id} className="flex items-start justify-between gap-2 border-b border-neutral-900 pb-2 text-xs">
+                  {/* Checkbox "pilih untuk digabung" dan tombol "Split" dihapus bersama kedua fitur
+                      itu — lihat komentar panjang di atas filteredProducts. Tiap bill sekarang
+                      selalu dibayar sendiri-sendiri, sehingga satu pembayaran = satu baris di
+                      Transaction Center, tanpa baris "Dibatalkan" yang menyertainya. */}
+                  {(() => {
+                    // Order dari Rental PS: tampilkan unit PS, pelanggan, tanggal, jam mulai–selesai, dan lama main.
+                    // Order F&B biasa: tanggal & jam order dibuat.
+                    const time = o.rentalSessionId
+                      ? buildOrderTimeLabel(o.rentalStartedAt ?? o.createdAt, o.rentalEndedAt, { dateStyle, units: durationUnits })
+                      : buildOrderTimeLabel(o.createdAt, null, { dateStyle, units: durationUnits });
+                    return (
+                      <div className="min-w-0">
+                        <div className="text-sm">
+                          {o.rentalSessionId ? t("pos.orderTypeRental", "Rental") : t("pos.orderTypeFnb", "F&B")}
+                          {o.rentalUnitName ? <span className="font-medium text-cyan-300"> · {o.rentalUnitName}</span> : null}
+                          <span className="font-medium"> — {rupiah(o.total)}</span>
+                        </div>
+                        <div className="text-neutral-500 mt-0.5">
+                          #{o.id.slice(0, 8)}
+                          {time ? ` · ${time.date} · ${time.timeRange}${time.duration ? ` (${time.duration})` : ""}` : ""}
+                          {o.rentalCustomerName ? ` · ${o.rentalCustomerName}` : ""}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <Button variant="secondary" className="shrink-0 px-2 py-1 text-xs" onClick={() => payOpenOrder(o.id)} disabled={payingOrderId === o.id}>
+                    {payingOrderId === o.id ? t("pos.payBusy", "Memproses...") : t("pos.payWithMethod", "Bayar ({method})").replace("{method}", method)}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
       {/* Ponsel/tablet: keranjang ada di bawah daftar produk, jadi tampilkan bilah ringkas yang
           selalu terlihat untuk langsung loncat ke keranjang & bayar. */}
       {cart.length > 0 && (
