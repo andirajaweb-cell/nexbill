@@ -118,7 +118,7 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
   };
   const [form, setForm] = useState<any>({
     name: "", category: "playstation", rentalUnitId: "", acquisitionCost: 0, salvageValue: 0, usefulLifeMonths: 36,
-    supplierId: "", notes: "", recordAsPayable: false, paymentMethod: "cash", cashBankAccountId: "",
+    acquisitionDate: "", notes: "",
   });
   const [disposeFor, setDisposeFor] = useState<{ id: string; disposalAmount: number; reason: string; cashBankAccountId: string } | null>(null);
   const [maintFor, setMaintFor] = useState<{ id: string; description: string; cost: number; createExpenseFor: boolean; accountId: string; cashBankAccountId: string } | null>(null);
@@ -134,14 +134,15 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
 
   const submitCreate = async () => {
     if (!form.name || !form.acquisitionCost || !form.usefulLifeMonths) return showAlert(t("assets.alertRequiredFields", "Nama, harga perolehan, dan umur ekonomis wajib diisi."));
-    if (!form.recordAsPayable && !form.cashBankAccountId) return showAlert(t("assets.alertSelectCashOrPayable", "Pilih akun kas/bank, atau centang 'Catat sebagai hutang'."));
     const res = await fetch("/api/assets", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, outletId, acquisitionCost: Number(form.acquisitionCost), salvageValue: Number(form.salvageValue) || 0, usefulLifeMonths: Number(form.usefulLifeMonths) }),
+      // Daftar Aset = mendata aset yang SUDAH dimiliki: tanpa kas keluar dan tanpa utang (saldo awal).
+      // Aset yang baru dibeli dicatat lewat "+ Pembelian Aset" (ada kas keluar / utang).
+      body: JSON.stringify({ ...form, acquisitionCost: Number(form.acquisitionCost), salvageValue: Number(form.salvageValue) || 0, usefulLifeMonths: Number(form.usefulLifeMonths) }),
     });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
-    setForm({ name: "", category: "playstation", rentalUnitId: "", acquisitionCost: 0, salvageValue: 0, usefulLifeMonths: 36, supplierId: "", notes: "", recordAsPayable: false, paymentMethod: "cash", cashBankAccountId: "" });
+    setForm({ name: "", category: "playstation", rentalUnitId: "", acquisitionCost: 0, salvageValue: 0, usefulLifeMonths: 36, acquisitionDate: "", notes: "" });
     setShowForm(false);
     load();
   };
@@ -248,7 +249,7 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
       {showForm && (
         <Card className="space-y-3">
           <h2 className="font-medium">{t("assets.formTitle", "Form Aset Baru")}</h2>
-          <p className="text-xs text-neutral-500">{t("assets.formPurchaseHint", "Satu aset, dicatat sebagai Pembelian Aset 1 baris. Untuk beberapa unit sekaligus, ongkos kirim/pasang, uang muka, atau aset saldo awal, gunakan tab Pembelian Aset.")}</p>
+          <p className="text-xs text-neutral-500">{t("assets.formExistingHint", "Untuk mendata aset yang sudah dimiliki outlet — tidak ada kas keluar dan tidak ada utang (dicatat sebagai saldo awal aset). Membeli aset baru? Gunakan \"+ Pembelian Aset\" supaya pembayarannya tercatat.")}</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" placeholder={t("assets.placeholderName", "Nama aset (mis. PS5 Unit 5)")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
@@ -262,23 +263,9 @@ function AssetListTab({ outletId, role, onOpenPurchase }: { outletId: string; ro
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("assets.placeholderAcquisitionCost", "Harga Perolehan")} value={form.acquisitionCost || ""} onChange={(e) => setForm({ ...form, acquisitionCost: e.target.value })} />
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("assets.placeholderSalvageValue", "Nilai Sisa (Salvage)")} value={form.salvageValue || ""} onChange={(e) => setForm({ ...form, salvageValue: e.target.value })} />
             <input type="number" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" placeholder={t("assets.placeholderUsefulLife", "Umur Ekonomis (bulan)")} value={form.usefulLifeMonths || ""} onChange={(e) => setForm({ ...form, usefulLifeMonths: e.target.value })} />
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>
-              <option value="">{t("assets.optionSupplier", "Supplier (opsional)")}</option>
-              {bundle.suppliers.filter((s: { id: string; archivedAt?: string | null }) => !s.archivedAt || s.id === form.supplierId).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-
-            <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} disabled={form.recordAsPayable}>
-              <option value="cash">{t("assets.paymentCash", "Cash")}</option><option value="bank">{t("assets.paymentBank", "Bank")}</option><option value="transfer">{t("assets.paymentTransfer", "Transfer")}</option><option value="qris">{t("assets.paymentQris", "QRIS")}</option>
-            </select>
-            <SearchableSelect
-              value={form.cashBankAccountId}
-              onChange={(v) => setForm({ ...form, cashBankAccountId: v })}
-              disabled={form.recordAsPayable}
-              placeholder={t("assets.optionCashBankAccount", "Akun Kas/Bank")}
-              options={bundle.cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
-            />
-            <label className="flex items-center gap-2 text-xs text-neutral-400">
-              <input type="checkbox" checked={form.recordAsPayable} onChange={(e) => setForm({ ...form, recordAsPayable: e.target.checked })} /> {t("assets.checkboxRecordAsPayable", "Catat sebagai hutang")}
+            <label className="flex flex-col gap-0.5 text-[10px] text-neutral-500">
+              {t("assets.labelAcquisitionDate", "Tanggal perolehan")}
+              <input type="date" className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-neutral-100" value={form.acquisitionDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setForm({ ...form, acquisitionDate: e.target.value })} />
             </label>
             <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm col-span-2" placeholder={t("assets.placeholderNotes", "Catatan (opsional)")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>

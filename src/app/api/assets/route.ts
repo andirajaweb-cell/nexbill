@@ -51,14 +51,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Role kamu tidak punya izin mengelola aset." }, { status: 403 });
     }
 
-    // "+ Aset Baru" (one asset) is a one-line Pembelian Aset: same journal, and when recorded as a
-    // payable it now shows up in Accounting → Utang and can actually be paid off — the old
-    // createFixedAsset path booked the payable with no document to pay it against.
+    // "+ Aset Baru" di Daftar Aset = MENDATA aset yang sudah dimiliki outlet. Tidak ada kas keluar dan
+    // tidak ada utang: dicatat sebagai Pembelian Aset 1 baris dengan cara "saldo awal"
+    // (Dr Aset / Cr 3400 Ekuitas Saldo Awal). Membeli aset baru (kas keluar / utang) lewat
+    // /api/asset-purchases ("+ Pembelian Aset"). Sumber kas apa pun dari body sengaja diabaikan.
     const body = await req.json();
     const result = await createAssetPurchase({
       outletId: session.outletId,
       staffUserId: session.sub,
-      supplierId: body.supplierId || null,
+      supplierId: null,
       purchaseDate: body.acquisitionDate || null,
       items: [
         {
@@ -71,9 +72,8 @@ export async function POST(req: NextRequest) {
           rentalUnitId: body.rentalUnitId || null,
         },
       ],
-      funding: body.funding ?? (body.recordAsPayable ? "payable" : "paid"),
-      cashBankAccountId: body.cashBankAccountId || null,
-      paymentMethod: body.paymentMethod,
+      funding: "opening_balance",
+      cashBankAccountId: null,
       notes: body.notes,
     });
     return NextResponse.json(result.assets[0]);
