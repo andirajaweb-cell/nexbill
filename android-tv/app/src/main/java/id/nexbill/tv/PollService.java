@@ -126,27 +126,48 @@ public class PollService extends Service {
         }
     };
 
-    /** Hanya bekerja di mode "Pindah input TV" ketika layar NEXBILL tidak sedang di depan. */
+    /**
+     * Setiap 0,5 detik:
+     *  - Mode "Pindah input TV": timer kecil di atas HDMI; saat waktu habis / tanpa sesi, layar NEXBILL
+     *    dibawa ke depan lagi.
+     *  - Mode HDMI di dalam aplikasi (bawaan) + Penjaga layar: bila aplikasi ditinggalkan (tombol Home,
+     *    tombol input/source, aplikasi lain), NEXBILL TV dikembalikan ke depan dalam ±1 detik — baik saat
+     *    sesi berjalan (HDMI tampil lagi di dalam aplikasi, timer & batas waktu tetap berlaku) maupun di
+     *    luar sesi (layar terkunci).
+     * Tidak berjalan bila layar belum terpasang, dimatikan dari dashboard, dimatikan owner, atau dijeda
+     * staf (mis. sedang membuka Pengaturan TV).
+     */
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
             Context c = PollService.this;
             long now = SystemClock.elapsedRealtime();
-            if (!StateRepo.switchInputMode(c) || StateRepo.activityVisible) {
-                overlay.hide();
-            } else if (StateRepo.showGame(now)) {
-                TvState s = StateRepo.state();
-                overlay.show(TvState.timerText(c, s, now, StateRepo.staffLeftMs(now)), s != null && s.isWarning(now));
+            TvState s = StateRepo.state();
+            boolean paired = !StateRepo.token(c).isEmpty();
+            boolean active = paired && s != null && s.enabled && !StateRepo.guardPaused(now);
+            if (StateRepo.switchInputMode(c)) {
+                if (StateRepo.activityVisible) {
+                    overlay.hide();
+                } else if (StateRepo.showGame(now)) {
+                    overlay.show(TvState.timerText(c, s, now, StateRepo.staffLeftMs(now)), s != null && s.isWarning(now));
+                } else {
+                    overlay.hide();
+                    if (active || !paired || s == null) bringToFront(now, 5000);
+                }
             } else {
                 overlay.hide();
-                bringToFront(now);
+                if (active && StateRepo.guardEnabled(c) && !StateRepo.activityVisible) bringToFront(now, GUARD_RETRY_MS);
             }
-            main.postDelayed(this, 1000);
+            main.postDelayed(this, TICK_MS);
         }
     };
 
-    private void bringToFront(long now) {
-        if (now - lastBroughtFront < 5000) return;
+    private static final long TICK_MS = 500;
+    /** Jeda antar-percobaan membawa layar ke depan saat penjaga aktif (target pulih ≤ 1 detik). */
+    private static final long GUARD_RETRY_MS = 800;
+
+    private void bringToFront(long now, long minGapMs) {
+        if (now - lastBroughtFront < minGapMs) return;
         lastBroughtFront = now;
         Intent i = new Intent(this, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);

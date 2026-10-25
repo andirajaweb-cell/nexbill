@@ -43,4 +43,11 @@
     <string name="staff_duration_title">Mở màn hình game trong bao lâu?</string>
     <string name="minutes_fmt">%1$d phút</string>
     <string name="pin_offline_ok">Mất internet — PIN được so với PIN dùng gần nhất trên TV này.</string>
+    <string name="menu_guard">Khóa màn hình</string>
+    <string name="guard_on">Bật</string>
+    <string name="guard_off">Tắt</string>
+    <string name="guard_enabled_toast">Đã bật khóa màn hình: không thể dùng nút Home hoặc đổi nguồn vào để thoát NEXBILL TV.</string>
+    <string name="guard_disabled_toast">Đã tắt khóa màn hình: TV có thể dùng ứng dụng khác. Đồng hồ và khóa khi hết giờ chỉ áp dụng trong NEXBILL TV.</string>
+    <string name="guard_need_overlay">Để khóa màn hình hoạt động, hãy cho phép \"Hiển thị trên ứng dụng khác\" cho NEXBILL TV (menu nhân viên → Hiển thị trên ứng dụng khác).</string>
+    <string name="info_guard">Khóa màn hình: %1$s</string>
 </resources>

@@ -127,10 +127,11 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
       ],
     },
     {
-      title: t("devices.guide.tvFull.s5Title", "Jadikan NEXBILL TV aplikasi utama TV (disarankan)"),
+      title: t("devices.guide.tvFull.s5Title", "Aktifkan penjaga layar (wajib)"),
       items: [
-        t("devices.guide.tvFull.s5a", "Menu staf → \"Jadikan aplikasi utama TV\" → pilih NEXBILL TV. Tombol Home dan TV yang baru dinyalakan langsung kembali ke NEXBILL TV, jadi pelanggan tidak bisa keluar ke menu TV."),
-        t("devices.guide.tvFull.s5b", "Sebagian merek TV tidak menyediakan pilihan ini. Tidak apa-apa: NEXBILL TV tetap menyala sendiri setelah TV restart pada kebanyakan TV."),
+        t("devices.guide.tvFull.s5a", "Menu staf → \"Izin tampil di atas aplikasi lain\" → izinkan NEXBILL TV."),
+        t("devices.guide.tvFull.s5b", "Lalu menu staf → \"Jadikan aplikasi utama TV\" → pilih NEXBILL TV."),
+        t("devices.guide.tvFull.s5c", "TV juga dipakai untuk keperluan lain? Menu staf → \"Penjaga layar\" untuk mematikannya."),
       ],
     },
     {

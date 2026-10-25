@@ -56,6 +56,8 @@ import java.util.List;
  */
 public class MainActivity extends Activity {
     private static final long LONG_PRESS_MS = 2500;
+    /** Lama penjaga layar dijeda saat staf membuka Pengaturan TV dari menu staf. */
+    private static final long GUARD_PAUSE_MS = 10 * 60_000L;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private TvView tvView;
@@ -252,7 +254,9 @@ public class MainActivity extends Activity {
             web.setVisibility(View.VISIBLE);
             web.requestFocus();
         }
-        showHint(null);
+        // Penjaga layar butuh izin "tampil di atas aplikasi lain" untuk kembali ke depan dari latar.
+        boolean guardBlocked = StateRepo.guardEnabled(this) && !StateRepo.token(this).isEmpty() && !OverlayTimer.permitted(this);
+        showHint(guardBlocked ? getString(R.string.guard_need_overlay) : null);
     }
 
     /** Menghentikan gambar DAN suara HDMI — TvView yang hanya disembunyikan tetap memutar suara. */
@@ -418,6 +422,7 @@ public class MainActivity extends Activity {
                 getString(R.string.menu_mode) + ": " + getString(switchMode ? R.string.mode_switch : R.string.mode_inapp),
                 getString(R.string.menu_overlay),
                 getString(R.string.menu_home),
+                getString(R.string.menu_guard) + ": " + getString(StateRepo.guardEnabled(this) ? R.string.guard_on : R.string.guard_off),
                 getString(R.string.menu_reload),
                 getString(R.string.menu_update),
                 getString(R.string.menu_info),
@@ -434,8 +439,9 @@ public class MainActivity extends Activity {
                         case 3: pickMode(); break;
                         case 4: openSettings(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))); break;
                         case 5: openSettings(new Intent(Settings.ACTION_HOME_SETTINGS)); break;
-                        case 6: web.loadUrl(Config.TV_PAGE); break;
-                        case 7: checkUpdate(); break;
+                        case 6: toggleGuard(); break;
+                        case 7: web.loadUrl(Config.TV_PAGE); break;
+                        case 8: checkUpdate(); break;
                         default: showInfo(); break;
                     }
                 })
@@ -494,7 +500,20 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    /** Penjaga layar aktif/nonaktif (menu staf, ber-PIN). Mengaktifkan tanpa izin overlay → diarahkan ke izinnya. */
+    private void toggleGuard() {
+        boolean on = !StateRepo.guardEnabled(this);
+        StateRepo.setGuardEnabled(this, on);
+        Toast.makeText(this, on ? R.string.guard_enabled_toast : R.string.guard_disabled_toast, Toast.LENGTH_LONG).show();
+        if (on && !OverlayTimer.permitted(this)) {
+            Toast.makeText(this, R.string.guard_need_overlay, Toast.LENGTH_LONG).show();
+            openSettings(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+        }
+    }
+
     private void openSettings(Intent i) {
+        // Staf sengaja keluar ke Pengaturan TV: penjaga layar dijeda 10 menit supaya tidak menarik kembali.
+        StateRepo.pauseGuard(SystemClock.elapsedRealtime() + GUARD_PAUSE_MS);
         try {
             startActivity(i);
         } catch (ActivityNotFoundException | SecurityException e) {
@@ -535,7 +554,8 @@ public class MainActivity extends Activity {
                 + (token.isEmpty() ? getString(R.string.info_unpaired) : getString(R.string.info_paired, unit)) + "\n"
                 + getString(R.string.info_input, input == null ? "-" : input) + "\n"
                 + getString(R.string.info_mode, getString(StateRepo.switchInputMode(this) ? R.string.mode_switch : R.string.mode_inapp)) + "\n"
-                + getString(R.string.info_overlay, getString(OverlayTimer.permitted(this) ? R.string.yes : R.string.no));
+                + getString(R.string.info_overlay, getString(OverlayTimer.permitted(this) ? R.string.yes : R.string.no)) + "\n"
+                + getString(R.string.info_guard, getString(StateRepo.guardEnabled(this) ? R.string.guard_on : R.string.guard_off));
         new AlertDialog.Builder(this).setTitle(R.string.menu_info).setMessage(msg).setPositiveButton(R.string.ok, null).show();
     }
 

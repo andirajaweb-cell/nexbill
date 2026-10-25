@@ -23,10 +23,13 @@ final class StateRepo {
     private static final String K_MODE_SWITCH = "mode_switch_input";
     private static final String K_PIN_SALT = "pin_salt";
     private static final String K_PIN_HASH = "pin_hash";
+    private static final String K_GUARD = "screen_guard";
 
     private static volatile TvState state;
     private static volatile long staffUntil;
     static volatile boolean activityVisible;
+    /** Penjaga layar dijeda sampai waktu ini (elapsedRealtime) — mis. staf sedang membuka Pengaturan TV. */
+    private static volatile long guardPausedUntil;
 
     private static final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private static final Handler main = new Handler(Looper.getMainLooper());
@@ -129,6 +132,29 @@ final class StateRepo {
         byte[] out = new byte[s.length() / 2];
         for (int i = 0; i < out.length; i++) out[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16);
         return out;
+    }
+
+    /**
+     * Penjaga layar (bawaan AKTIF): selama layar terpasang & tidak dimatikan dari dashboard, NEXBILL TV
+     * selalu dikembalikan ke depan bila ditinggalkan — tombol Home, tombol input/source, atau aplikasi
+     * lain tidak bisa dipakai untuk main tanpa sesi atau melewati waktu habis. Owner bisa mematikannya
+     * dari menu staf (ber-PIN) bila TV juga dipakai untuk keperluan lain.
+     */
+    static boolean guardEnabled(Context c) {
+        return prefs(c).getBoolean(K_GUARD, true);
+    }
+
+    static void setGuardEnabled(Context c, boolean on) {
+        prefs(c).edit().putBoolean(K_GUARD, on).apply();
+        notifyListeners();
+    }
+
+    static void pauseGuard(long untilRealtime) {
+        guardPausedUntil = untilRealtime;
+    }
+
+    static boolean guardPaused(long nowRealtime) {
+        return nowRealtime < guardPausedUntil;
     }
 
     static long staffLeftMs(long nowRealtime) {

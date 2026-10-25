@@ -43,4 +43,11 @@
     <string name="staff_duration_title">เปิดหน้าจอเกมนานเท่าไร?</string>
     <string name="minutes_fmt">%1$d นาที</string>
     <string name="pin_offline_ok">อินเทอร์เน็ตหลุด — ตรวจ PIN กับ PIN ล่าสุดที่ใช้บนทีวีนี้</string>
+    <string name="menu_guard">ตัวป้องกันหน้าจอ</string>
+    <string name="guard_on">เปิด</string>
+    <string name="guard_off">ปิด</string>
+    <string name="guard_enabled_toast">เปิดตัวป้องกันหน้าจอแล้ว: ปุ่ม Home หรือการเปลี่ยนอินพุตใช้ออกจาก NEXBILL TV ไม่ได้</string>
+    <string name="guard_disabled_toast">ปิดตัวป้องกันหน้าจอแล้ว: ทีวีใช้แอปอื่นได้ ตัวจับเวลาและการล็อกเมื่อหมดเวลาใช้ได้เฉพาะใน NEXBILL TV</string>
+    <string name="guard_need_overlay">เพื่อให้ตัวป้องกันหน้าจอทำงาน ให้อนุญาต \"แสดงทับแอปอื่น\" สำหรับ NEXBILL TV (เมนูพนักงาน → แสดงทับแอปอื่น)</string>
+    <string name="info_guard">ตัวป้องกันหน้าจอ: %1$s</string>
 </resources>

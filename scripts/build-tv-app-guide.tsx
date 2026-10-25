@@ -40,7 +40,7 @@ function article(lang: LangCode) {
   ${step(2, "devices.guide.tvFull.s2Title", ["devices.guide.tvFull.s2a", "devices.guide.tvFull.s2b", "devices.guide.tvFull.s2c"])}
   ${step(3, "devices.guide.tvFull.s3Title", ["devices.guide.tvFull.s3a", "devices.guide.tvFull.s3b"])}
   ${step(4, "devices.guide.tvFull.s4Title", ["devices.guide.tvFull.s4a", "devices.guide.tvFull.s4b", "devices.guide.tvFull.s4c"])}
-  ${step(5, "devices.guide.tvFull.s5Title", ["devices.guide.tvFull.s5a", "devices.guide.tvFull.s5b"])}
+  ${step(5, "devices.guide.tvFull.s5Title", ["devices.guide.tvFull.s5a", "devices.guide.tvFull.s5b", "devices.guide.tvFull.s5c"])}
   ${step(6, "devices.guide.tvFull.s6Title", ["devices.guide.tvFull.s6a", "devices.guide.tvFull.s6b"])}
   <section class="trouble"><h2>⚠ ${t("devices.guide.tvFull.troubleTitle")}</h2><ul>${li(["devices.guide.tvFull.t1", "devices.guide.tvFull.t2", "devices.guide.tvFull.t3", "devices.guide.tvFull.t4"])}</ul></section>
   <p class="note" style="margin-top:14px">${t("devices.guide.tvApp.updateNote")}</p>

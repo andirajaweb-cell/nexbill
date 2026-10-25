@@ -43,4 +43,11 @@
     <string name="staff_duration_title">Buka skrin permainan berapa lama?</string>
     <string name="minutes_fmt">%1$d minit</string>
     <string name="pin_offline_ok">Internet terputus — PIN dipadankan dengan PIN terakhir yang digunakan pada TV ini.</string>
+    <string name="menu_guard">Pengawal skrin</string>
+    <string name="guard_on">Aktif</string>
+    <string name="guard_off">Tidak aktif</string>
+    <string name="guard_enabled_toast">Pengawal skrin aktif: butang Home atau tukar input tidak boleh digunakan untuk keluar dari NEXBILL TV.</string>
+    <string name="guard_disabled_toast">Pengawal skrin tidak aktif: TV boleh digunakan aplikasi lain. Pemasa dan kunci masa tamat hanya berlaku dalam NEXBILL TV.</string>
+    <string name="guard_need_overlay">Supaya pengawal skrin berfungsi, benarkan \"Paparan di atas aplikasi lain\" untuk NEXBILL TV (menu staf → Paparan di atas aplikasi lain).</string>
+    <string name="info_guard">Pengawal skrin: %1$s</string>
 </resources>

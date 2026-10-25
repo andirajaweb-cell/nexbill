@@ -43,4 +43,11 @@
     <string name="staff_duration_title">Gaano katagal bubuksan ang game screen?</string>
     <string name="minutes_fmt">%1$d minuto</string>
     <string name="pin_offline_ok">Walang internet — inihambing ang PIN sa huling PIN na ginamit sa TV na ito.</string>
+    <string name="menu_guard">Screen guard</string>
+    <string name="guard_on">Naka-on</string>
+    <string name="guard_off">Naka-off</string>
+    <string name="guard_enabled_toast">Naka-on ang screen guard: hindi magagamit ang Home o pagpalit ng input para lumabas sa NEXBILL TV.</string>
+    <string name="guard_disabled_toast">Naka-off ang screen guard: puwedeng gamitin ng ibang app ang TV. Sa loob lang ng NEXBILL TV gumagana ang timer at time-up lock.</string>
+    <string name="guard_need_overlay">Para gumana ang screen guard, payagan ang \"Ipakita sa ibabaw ng ibang app\" para sa NEXBILL TV (staff menu → Ipakita sa ibabaw ng ibang app).</string>
+    <string name="info_guard">Screen guard: %1$s</string>
 </resources>
