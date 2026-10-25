@@ -8,6 +8,7 @@ import { executeRefundOrder } from "@/lib/pos/refund";
 import { hasPermission, StaffRole, canReviewRequestOf, roleLabel } from "@/lib/auth/permissions";
 import { logAudit } from "@/lib/audit/log";
 import { executeCashTransfer, rejectCashTransferRecord } from "@/lib/cash/transfers";
+import { reverseTimeCreditsForOrder } from "@/lib/rental/time-credit";
 
 /**
  * Shared by approveRequest/rejectRequest: an approval-hierarchy check on top of the
@@ -38,6 +39,9 @@ export async function executeVoidOrder(orderId: string, reason: string, staffUse
     const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) throw new Error("Order tidak ditemukan.");
     if (order.status === "cancelled") throw new Error("Order sudah dibatalkan.");
+
+    // Saldo waktu member dari sesi ini (simpan sisa / pakai) — jurnalnya ikut dibalik di bawah.
+    await reverseTimeCreditsForOrder(orderId, tx);
 
     const relatedJournals = await tx.select().from(journalEntries).where(and(eq(journalEntries.sourceId, orderId), eq(journalEntries.status, "posted")));
     for (const j of relatedJournals) {

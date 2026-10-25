@@ -16,6 +16,7 @@ import { isPaidTier, summarizeTierBenefits, isMembershipActive, sisaHariKeanggot
 import { usePaymentMethods } from "@/lib/payments/use-payment-methods";
 import { PaymentInstructions } from "@/components/payments/PaymentInstructions";
 import { PageGuide } from "@/components/dashboard/PageGuide";
+import { MemberTimeCreditPanel } from "../rental/time-credit-ui";
 
 const rupiah = (n: number) => `Rp${Math.round(n ?? 0).toLocaleString("id-ID")}`;
 const TABS = ["Customer", "Membership Tier", "Reward", "Voucher"] as const;
@@ -386,6 +387,7 @@ function CustomerTab({ outletId, initialCustomerId }: { outletId: string; initia
                 })}
               </div>
             </div>
+            <MemberTimeCreditPanel key={selected.id} customerId={selected.id} />
             {redemptions.length > 0 && (
               <div>
                 <h3 className="text-xs text-neutral-500 uppercase mb-1">{t("membership.redeemHistoryTitle", "Riwayat Redeem")}</h3>

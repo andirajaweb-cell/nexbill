@@ -55,6 +55,7 @@ const SOURCE_LABEL: Record<string, string> = {
   membership_fee: "Iuran keanggotaan",
   cash_deposit: "Setoran/tarikan kas",
   cash_transfer: "Pemindahan antar akun kas",
+  time_credit: "Saldo waktu member (simpan/pakai)",
 };
 
 export async function GET(req: NextRequest) {

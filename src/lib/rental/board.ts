@@ -3,6 +3,7 @@ import { rentalSessions, rentalUnits, customers, orders, orderItems, sessionAcce
 import { eq, and, inArray } from "drizzle-orm";
 import { estimateAccessoryCharge, type AccessoryBillingMode } from "@/lib/rental/accessories";
 import { computeSessionCharge } from "@/lib/rental/pricing";
+import { creditMinutesForSessions } from "@/lib/rental/time-credit";
 
 export interface LiveBillingBoardRow {
   sessionId: string;
@@ -74,12 +75,13 @@ export async function getLiveBillingBoard(outletId: string): Promise<LiveBilling
   // Batched like every other lookup here rather than queried per session — see the PERF note above.
   const promoIds = [...new Set(sessions.map((s) => s.promoId).filter((id): id is string => !!id))];
 
-  const [units, customerRows, openOrders, accessoryRows, promoRows] = await Promise.all([
+  const [units, customerRows, openOrders, accessoryRows, promoRows, creditBySession] = await Promise.all([
     db.select().from(rentalUnits).where(inArray(rentalUnits.id, unitIds)),
     customerIds.length ? db.select().from(customers).where(inArray(customers.id, customerIds)) : Promise.resolve([]),
     db.select().from(orders).where(and(inArray(orders.rentalSessionId, sessionIds), eq(orders.status, "open"))),
     db.select().from(sessionAccessories).where(inArray(sessionAccessories.rentalSessionId, sessionIds)),
     promoIds.length ? db.select().from(promos).where(inArray(promos.id, promoIds)) : Promise.resolve([]),
+    creditMinutesForSessions(sessionIds),
   ]);
 
   const unitById = new Map(units.map((u) => [u.id, u]));
@@ -132,6 +134,7 @@ export async function getLiveBillingBoard(outletId: string): Promise<LiveBilling
       ratePerHour: session.ratePerHour,
       elapsedMinutes,
       roundingMinutes,
+      creditMinutes: creditBySession.get(session.id)?.minutes ?? 0,
     }).subtotal;
 
     const bill = openOrderBySessionId.get(session.id) ?? null;

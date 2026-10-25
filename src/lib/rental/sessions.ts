@@ -90,6 +90,7 @@ import { computeEffectiveHourlyRate, computeSessionCharge, type SessionChargeInp
 import { openBillForSession, getOpenBillForSession, upsertRentalLineItem, addItemsToBill } from "@/lib/pos/bill";
 import { finalizeAccessoryCharges } from "./accessories";
 import { recordDeposit, confirmDeposit, settleOrderAfterPayment } from "@/lib/payments";
+import { assertCanUseTimeCredit, creditMinutesForSessions, postTimeCreditUseJournal, useTimeCreditForSession } from "./time-credit";
 
 export interface StartSessionInput {
   outletId?: string; // derived from the unit if omitted — trust the DB, not the caller
@@ -132,6 +133,11 @@ export interface StartSessionInput {
   id?: string;
   startedAt?: string;
   skipDevices?: boolean;
+  /**
+   * Saldo waktu member (lib/rental/time-credit.ts): menit saldo yang dipakai. Ditambahkan ke durasi
+   * sesi (sesi menjadi durasi tetap) tetapi tidak ditagih. Tidak bisa digabung paket promo.
+   */
+  useTimeCreditMinutes?: number | null;
 }
 
 export async function startRentalSession(input: StartSessionInput) {
@@ -194,6 +200,12 @@ export async function startRentalSession(input: StartSessionInput) {
     }
   }
 
+  const creditMinutes = input.useTimeCreditMinutes ? Number(input.useTimeCreditMinutes) : 0;
+  if (creditMinutes) {
+    await assertCanUseTimeCredit({ outletId, customerId: input.customerId, minutes: creditMinutes, promo: !!input.promoId });
+    plannedMinutes = (plannedMinutes ?? 0) + creditMinutes;
+  }
+
   // Atomic claim — this, not the early check above, is what actually prevents two sessions
   // landing on the same unit. A plain read-then-write left a race window: two "Mulai Sesi"
   // clicks fired close enough together (a double-click, an impatient retry on a slow network, two
@@ -238,6 +250,17 @@ export async function startRentalSession(input: StartSessionInput) {
     // session behind it.
     await db.update(rentalUnits).set({ status: unit.status }).where(eq(rentalUnits.id, input.rentalUnitId));
     throw err;
+  }
+
+  if (creditMinutes && input.customerId) {
+    try {
+      await useTimeCreditForSession({ outletId, customerId: input.customerId, sessionId: session.id, minutes: creditMinutes, staffUserId: input.staffUserId });
+    } catch (err) {
+      // Saldo berubah di antara pengecekan dan pemotongan (dipakai di kasir lain) — batalkan sesi baru ini.
+      await db.delete(rentalSessions).where(eq(rentalSessions.id, session.id));
+      await db.update(rentalUnits).set({ status: unit.status }).where(eq(rentalUnits.id, input.rentalUnitId));
+      throw err;
+    }
   }
 
   // deviceWarning surfaces back to the API response (and from there, a non-blocking toast in the
@@ -427,6 +450,7 @@ export async function stopRentalSession(sessionId: string, opts: { endedAt?: str
   // Single source of truth, shared with the live estimates on the Rental page and the Billing
   // Board — see computeSessionCharge's doc comment in pricing.ts for the three billing modes, the
   // no-extra-charge policy, and the scheduler dependency that policy rests on.
+  const credit = (await creditMinutesForSessions([session.id])).get(session.id);
   const charge = computeSessionCharge({
     promo: promoInput,
     plannedMinutes: session.plannedMinutes,
@@ -434,6 +458,7 @@ export async function stopRentalSession(sessionId: string, opts: { endedAt?: str
     ratePerHour: session.ratePerHour,
     elapsedMinutes: elapsedMinutesRaw,
     roundingMinutes,
+    creditMinutes: credit?.minutes ?? 0,
   });
   const subtotal = charge.subtotal;
   const billingNote = charge.billingNote;
@@ -518,6 +543,8 @@ export async function stopRentalSession(sessionId: string, opts: { endedAt?: str
     const [dated] = await db.update(orders).set({ businessDate: new Date(now).toISOString() }).where(eq(orders.id, bill.id)).returning();
     order = dated ?? order;
   }
+
+  if (credit) await postTimeCreditUseJournal(session, bill.id, order.businessDate ?? new Date(now).toISOString());
 
   // Now that the bill's total is the REAL final amount (not the placeholder
   // estimate from an optional "bayar di muka" deposit), re-evaluate

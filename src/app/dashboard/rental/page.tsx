@@ -23,6 +23,7 @@ import { confirmPaymentReceived } from "@/lib/payments/confirm-client";
 import { computeSessionCharge, estimateAccessoryCharge } from "@/lib/rental/charge";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { QuickRateEditor } from "./quick-rate-editor";
+import { SaveLeftoverCredit, TimeCreditStartOption } from "./time-credit-ui";
 import "@/lib/i18n/dict-setup";
 import { describeError } from "@/lib/api/error";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -82,6 +83,8 @@ interface RentalSession {
   // declared here.
   promoId: string | null;
   promoPackagePrice: number | null;
+  /** Menit Saldo waktu member yang dipakai sesi ini (tidak ditagih) — dari GET /api/rental-sessions. */
+  timeCreditMinutes?: number;
 }
 
 const CONSOLE_TYPES = [
@@ -384,6 +387,7 @@ function OnlineRentalPage() {
   // Mirrors the outlet's billing rounding so the card estimate matches what stopRentalSession bills.
   const [billingRoundingMinutes, setBillingRoundingMinutes] = useState(1);
   const [selectedPromoId, setSelectedPromoId] = useState<string | null>(null);
+  const [useCreditMinutes, setUseCreditMinutes] = useState(0);
   // "Bayar Dimuka" — optional prepayment collected right when a session starts (see
   // StartSessionInput.prepay in lib/rental/sessions.ts). Only cash/qris are offered here.
   const [collectPrepay, setCollectPrepay] = useState(false);
@@ -682,6 +686,7 @@ function OnlineRentalPage() {
         // Promo package takes over billing (flat rate at stop time) — see startRentalSession,
         // which also overrides plannedMinutes from promo.durationMinutes server-side.
         promoId: selectedPromoId || undefined,
+        useTimeCreditMinutes: useCreditMinutes > 0 && !selectedPromoId ? useCreditMinutes : undefined,
         prepay: collectPrepay && prepayAmount > 0 ? { amount: prepayAmount, method: prepayMethod } : undefined,
       }),
     });
@@ -715,6 +720,7 @@ function OnlineRentalPage() {
     setGameName("");
     setPlannedMinutes("");
     setSelectedPromoId(null);
+    setUseCreditMinutes(0);
     setSelectedCustomerId(null);
     setCustomerQuery("");
     setActiveUnitId(null);
@@ -1364,6 +1370,7 @@ function OnlineRentalPage() {
                 <span className="text-xs font-normal text-neutral-500">{t("rental.otherFinishedSessionsWaiting", "({n} sesi selesai menunggu)").replace("{n}", String(finishedBills.length))}</span>
               )}
             </h2>
+            <SaveLeftoverCredit sessionId={entry.sessionId} />
             <div className="text-sm space-y-1 mb-3">
               <div className="flex justify-between"><span className="text-neutral-500">{t("rental.rentalLabel", "Rental")}</span><span>{rupiah(bill.rentalSubtotal)}</span></div>
               {bill.accessorySubtotal > 0 && <div className="flex justify-between"><span className="text-neutral-500">{t("rental.accessoriesLabel", "Aksesoris")}</span><span>{rupiah(bill.accessorySubtotal)}</span></div>}
@@ -1500,6 +1507,7 @@ function OnlineRentalPage() {
                   ratePerHour: session.ratePerHour,
                   elapsedMinutes: elapsedHours * 60,
                   roundingMinutes: billingRoundingMinutes,
+                  creditMinutes: session.timeCreditMinutes ?? 0,
                 }).subtotal
               : 0;
             const sessionAccessories = session ? accessories[session.id] ?? [] : [];
@@ -1940,6 +1948,7 @@ function OnlineRentalPage() {
                         <BadgeCheck size={11} /> {t("rental.memberRegisteredNote", "Member terdaftar — tarif & pendapatan otomatis pakai akun Member.")}
                         <button type="button" className="text-neutral-500 underline ml-1" onClick={() => { setSelectedCustomerId(null); if (customerMode === "member") setCustomerQuery(""); }}>{t("rental.unlink", "Lepas")}</button>
                       </div>
+                      <TimeCreditStartOption customerId={selectedCustomerId} promoSelected={!!selectedPromoId} value={useCreditMinutes} onChange={setUseCreditMinutes} />
                       {customerMode === "member" && (
                         <a
                           href={`/dashboard/membership?customerId=${selectedCustomerId}`}

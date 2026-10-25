@@ -6,13 +6,16 @@ import { startRentalSession } from "@/lib/rental/sessions";
 import { getSession } from "@/lib/auth/session";
 import { describeError, errorStatus } from "@/lib/api/error";
 import { resolveDrawerShiftId } from "@/lib/shift/drawer";
+import { creditMinutesForSessions } from "@/lib/rental/time-credit";
 
 export async function GET() {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
     const rows = await db.select().from(rentalSessions).where(eq(rentalSessions.outletId, session.outletId));
-    return NextResponse.json(rows);
+    // Menit saldo waktu member yang dipakai sesi aktif — estimasi tagihan di halaman Rental tidak menagihnya.
+    const credit = await creditMinutesForSessions(rows.filter((r) => r.status === "running" || r.status === "paused").map((r) => r.id));
+    return NextResponse.json(credit.size ? rows.map((r) => (credit.has(r.id) ? { ...r, timeCreditMinutes: credit.get(r.id)!.minutes } : r)) : rows);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }

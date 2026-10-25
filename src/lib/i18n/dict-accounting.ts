@@ -278,6 +278,7 @@ registerDict({
   "accounting.journal.source.ppob": { id: "PPOB", en: "PPOB", ms: "PPOB", th: "PPOB", fil: "PPOB", vi: "PPOB" },
   "accounting.journal.source.otherIncome": { id: "Pendapatan Lain-lain", en: "Other Income", ms: "Pendapatan Lain", th: "รายได้อื่น", fil: "Ibang Kita", vi: "Thu nhập khác" },
   "accounting.journal.source.homeRental": { id: "Home Rental", en: "Home Rental", ms: "Home Rental", th: "Home Rental", fil: "Home Rental", vi: "Home Rental" },
+  "accounting.journal.source.timeCredit": { id: "Saldo Waktu Member", en: "Member Time Credit", ms: "Baki Masa Ahli", th: "เวลาสะสมสมาชิก", fil: "Time Credit ng Member", vi: "Thời gian tích lũy hội viên" },
   "accounting.journal.source.membershipFee": { id: "Iuran Membership", en: "Membership Fee", ms: "Yuran Keahlian", th: "ค่าสมาชิก", fil: "Membership Fee", vi: "Phí thành viên" },
   "accounting.journal.source.cashDeposit": { id: "Setoran Kas", en: "Cash Deposit", ms: "Setoran Tunai", th: "การนำส่งเงินสด", fil: "Deposito ng Cash", vi: "Nộp tiền mặt" },
   "accounting.journal.source.cashTransfer": { id: "Pindah Kas", en: "Cash Transfer", ms: "Pindahan Tunai", th: "โอนเงินสด", fil: "Paglipat ng Cash", vi: "Chuyển quỹ tiền mặt" },

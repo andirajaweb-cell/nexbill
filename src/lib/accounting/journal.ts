@@ -26,7 +26,8 @@ export type JournalSourceType =
   | "membership_fee"
   | "cash_deposit"
   | "cash_transfer"
-  | "inventory_adjustment";
+  | "inventory_adjustment"
+  | "time_credit";
 
 export interface JournalLineInput {
   /** Either accountCode (COA code, resolved automatically) or a raw accountId. */

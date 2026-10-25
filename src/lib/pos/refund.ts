@@ -6,6 +6,7 @@ import { restockForItem } from "@/lib/inventory/stock";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { logAudit } from "@/lib/audit/log";
 import { resolveDrawerShiftId } from "@/lib/shift/drawer";
+import { reverseTimeCreditsForOrder } from "@/lib/rental/time-credit";
 
 /**
  * Full refund of a paid or partially-paid bill: reverses every posted journal
@@ -30,6 +31,9 @@ export async function executeRefundOrder(orderId: string, reason: string, staffU
     if (order.status === "open" || order.status === "awaiting_payment") {
       throw new Error("Bill ini belum ada pembayaran yang berhasil — gunakan void, bukan refund.");
     }
+
+    // Saldo waktu member dari sesi ini (simpan sisa / pakai) — jurnalnya ikut dibalik di bawah.
+    await reverseTimeCreditsForOrder(orderId, tx);
 
     const relatedJournals = await tx.select().from(journalEntries).where(and(eq(journalEntries.sourceId, orderId), eq(journalEntries.status, "posted")));
     for (const j of relatedJournals) {
