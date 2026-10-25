@@ -652,8 +652,18 @@ export async function postReceivableSettlement(receivableId: string, payment: ty
 // below only as a category->COA-code suggestion helper for the new module's UI.
 
 /** Atomic (Task #61): the journal and the invoice's journalEntryId stamp are one transaction. */
-export async function postPurchaseInvoiceJournal(purchaseInvoiceId: string) {
-  return db.transaction(async (tx) => {
+export async function postPurchaseInvoiceJournal(purchaseInvoiceId: string, dbc: DbOrTx = db) {
+  // Di dalam transaksi pemanggil bila diberikan (Edit invoice). Dulu Edit memanggil fungsi ini dari
+  // dalam transaksinya sendiri dengan koneksi BARU: koneksi baru itu menunggu kunci baris invoice
+  // yang dipegang transaksi Edit, sementara Edit menunggu fungsi ini — macet sampai batas waktu
+  // server (simpan Edit "sangat lama" lalu gagal, dan invoice tidak bisa dihapus selama kunci itu
+  // tertahan). Selain itu ia membaca jumlah invoice LAMA, jadi jurnalnya bisa salah nominal.
+  if (dbc !== db) return postPurchaseInvoiceJournalTx(purchaseInvoiceId, dbc);
+  return db.transaction((tx) => postPurchaseInvoiceJournalTx(purchaseInvoiceId, tx));
+}
+
+async function postPurchaseInvoiceJournalTx(purchaseInvoiceId: string, tx: DbOrTx) {
+  {
     const [invoice] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
     if (!invoice) throw new Error("Purchase invoice tidak ditemukan.");
     // Dibukukan pada tanggal belanja (invoiceDate), bukan hari input — belanja kemarin yang baru
@@ -680,7 +690,7 @@ export async function postPurchaseInvoiceJournal(purchaseInvoiceId: string) {
 
     await tx.update(purchaseInvoices).set({ journalEntryId: journalId }).where(eq(purchaseInvoices.id, purchaseInvoiceId));
     return journalId;
-  });
+  }
 }
 
 /** Atomic (Task #61): the journal and the payment's journalEntryId stamp are one transaction. */

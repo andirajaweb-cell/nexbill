@@ -10,13 +10,34 @@ import {
   products,
   journalEntries,
   journalLines,
+  cashBankAccounts,
 } from "@/db/schema";
 import { voidJournal } from "@/lib/accounting/journal";
 import { postPurchaseInvoiceJournal } from "@/lib/accounting/postings";
-import { payPurchaseInvoice, prorateLandedCosts } from "@/lib/inventory/purchasing";
+import { payPurchaseInvoiceTx, prorateLandedCosts } from "@/lib/inventory/purchasing";
 import { recomputeCostPriceExcludingRef } from "@/lib/inventory/cost-replay";
 import { getCostMethod, onStockIn, onStockOut } from "@/lib/inventory/costing";
 import { logAudit } from "@/lib/audit/log";
+
+/**
+ * Edit/Batal invoice memegang kunci per invoice. Kalau proses sebelumnya masih berjalan (atau macet),
+ * proses berikutnya menunggu paling lama 15 detik lalu gagal dengan pesan jelas — bukan diam
+ * sampai batas waktu server.
+ */
+async function setInvoiceLockTimeout(tx: DbOrTx) {
+  await tx.execute(sql`set local lock_timeout = '15s'`);
+}
+
+export function friendlyInvoiceLockError(err: unknown): Error {
+  const e = err as { code?: string; cause?: { code?: string }; message?: string };
+  if (e?.code === "55P03" || e?.cause?.code === "55P03" || /lock timeout/i.test(e?.message ?? "")) {
+    return new Error("Invoice ini sedang diproses oleh permintaan lain (mungkin penyimpanan sebelumnya belum selesai). Tunggu sebentar lalu coba lagi.");
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+/** Cara bayar setelah koreksi: keep = ulangi pembayaran lama, paid = lunas dari akun kas/bank terpilih, unpaid = jadi hutang. */
+export type EditPaymentChoice = { mode: "keep" } | { mode: "unpaid" } | { mode: "paid"; cashBankAccountId: string };
 
 export interface ReconstructedInvoiceLine {
   productId: string;
@@ -88,26 +109,33 @@ export async function reverseInvoiceEffects(purchaseInvoiceId: string, reason: s
 
   const { lines } = await reconstructInvoiceLines(purchaseInvoiceId, tx);
 
-  const affectedProductIds = new Set<string>();
-  for (const line of lines) {
-    if (line.qty <= 0) continue;
-    // FIFO: take the units back out of this invoice's own layer first.
+  // Kinerja: invoice belanja bisa berisi puluhan item. Pergerakan stok disisipkan SEKALI (bukan per
+  // item) dan stok dikurangi sekali per produk — dulu ±4 kueri per item membuat koreksi/pembatalan
+  // invoice besar melewati batas waktu server.
+  const activeLines = lines.filter((l) => l.qty > 0);
+  const qtyByProduct = new Map<string, number>();
+  for (const line of activeLines) {
+    // FIFO: take the units back out of this invoice's own layer first (no-op on rata-rata outlets).
     await onStockOut(tx, { productId: line.productId, qty: Math.abs(line.qty), preferRefId: invoice.id });
-    await tx.insert(stockMovements).values({
-      productId: line.productId,
-      type: "adjustment",
-      qty: -Math.abs(line.qty),
-      unitCost: line.landedUnitCost,
-      note: `Pembatalan/koreksi invoice pembelian ${invoice.invoiceNumber ?? invoice.id.slice(0, 8)} — ${reason}`,
-      refOrderId: invoice.id,
-      staffUserId,
-    });
-    await tx
-      .update(products)
-      .set({ stockQty: sql`${products.stockQty} - ${Math.abs(line.qty)}` })
-      .where(eq(products.id, line.productId));
-    affectedProductIds.add(line.productId);
+    qtyByProduct.set(line.productId, (qtyByProduct.get(line.productId) ?? 0) + Math.abs(line.qty));
   }
+  if (activeLines.length) {
+    await tx.insert(stockMovements).values(
+      activeLines.map((line) => ({
+        productId: line.productId,
+        type: "adjustment" as const,
+        qty: -Math.abs(line.qty),
+        unitCost: line.landedUnitCost,
+        note: `Pembatalan/koreksi invoice pembelian ${invoice.invoiceNumber ?? invoice.id.slice(0, 8)} — ${reason}`,
+        refOrderId: invoice.id,
+        staffUserId,
+      }))
+    );
+  }
+  for (const [productId, qty] of qtyByProduct) {
+    await tx.update(products).set({ stockQty: sql`${products.stockQty} - ${qty}` }).where(eq(products.id, productId));
+  }
+  const affectedProductIds = new Set(qtyByProduct.keys());
 
   // Recompute costPrice for every affected product, excluding THIS invoice's movements
   // (original purchase_in + the reversal adjustment just inserted, both tagged refOrderId =
@@ -132,12 +160,11 @@ export async function reverseInvoiceEffects(purchaseInvoiceId: string, reason: s
   // otherwise the PO would keep showing qty received that this invoice's reversal no longer
   // supports.
   if (invoice.purchaseOrderId) {
-    for (const line of lines) {
-      if (line.qty <= 0) continue;
+    for (const [productId, qty] of qtyByProduct) {
       await tx
         .update(purchaseOrderItems)
-        .set({ qtyReceived: sql`GREATEST(0, ${purchaseOrderItems.qtyReceived} - ${Math.abs(line.qty)})` })
-        .where(and(eq(purchaseOrderItems.purchaseOrderId, invoice.purchaseOrderId), eq(purchaseOrderItems.productId, line.productId)));
+        .set({ qtyReceived: sql`GREATEST(0, ${purchaseOrderItems.qtyReceived} - ${qty})` })
+        .where(and(eq(purchaseOrderItems.purchaseOrderId, invoice.purchaseOrderId), eq(purchaseOrderItems.productId, productId)));
     }
   }
 
@@ -173,42 +200,58 @@ export async function applyInvoiceLines(purchaseInvoiceId: string, lines: Invoic
   for (const line of lines) {
     if (line.qty <= 0) throw new Error("Qty item harus lebih dari 0.");
     if (line.unitCost < 0 || line.landedUnitCost < 0) throw new Error("Harga beli tidak boleh negatif.");
-
-    const [product] = await tx.select().from(products).where(eq(products.id, line.productId)).limit(1);
-    if (!product) throw new Error("Produk tidak ditemukan.");
-    const existingQty = Math.max(0, product.stockQty);
-    const existingValue = existingQty * (product.costPrice ?? 0);
-    const incomingValue = line.qty * line.landedUnitCost;
+  }
+  // Satu kueri untuk semua produk (dulu satu per item). Stok & harga modal dilacak di memori supaya
+  // produk yang muncul dua kali di invoice tetap dihitung berurutan seperti sebelumnya.
+  const productIds = [...new Set(lines.map((l) => l.productId))];
+  const productRows = productIds.length ? await tx.select().from(products).where(inArray(products.id, productIds)) : [];
+  const state = new Map(productRows.map((p) => [p.id, { stockQty: p.stockQty, costPrice: p.costPrice ?? 0, outletId: p.outletId }]));
+  for (const id of productIds) {
+    const st = state.get(id);
+    if (!st || st.outletId !== invoice.outletId) throw new Error("Produk tidak ditemukan.");
+  }
+  const startStock = new Map([...state].map(([id, st]) => [id, st.stockQty]));
+  const stockBeforeByLine: number[] = [];
+  for (const line of lines) {
+    const st = state.get(line.productId)!;
+    stockBeforeByLine.push(st.stockQty);
+    const existingQty = Math.max(0, st.stockQty);
     const newQty = existingQty + line.qty;
-    const newCostPrice = newQty > 0 ? (existingValue + incomingValue) / newQty : line.landedUnitCost;
-
-    await tx.insert(stockMovements).values({
+    st.costPrice = newQty > 0 ? (existingQty * st.costPrice + line.qty * line.landedUnitCost) / newQty : line.landedUnitCost;
+    st.stockQty += line.qty;
+  }
+  await tx.insert(stockMovements).values(
+    lines.map((line) => ({
       productId: line.productId,
-      type: "purchase_in",
+      type: "purchase_in" as const,
       qty: line.qty,
       unitCost: line.landedUnitCost,
       note: `Belanja supplier ${invoice.invoiceNumber ?? invoice.id.slice(0, 8)} (dikoreksi)`,
       refOrderId: invoice.id,
       staffUserId,
-    });
+    }))
+  );
+  for (const [productId, st] of state) {
+    const added = st.stockQty - (startStock.get(productId) ?? 0);
     await tx
       .update(products)
-      .set({ stockQty: sql`${products.stockQty} + ${line.qty}`, costPrice: Math.round(newCostPrice * 100) / 100 })
-      .where(eq(products.id, line.productId));
-    await onStockIn(tx, { productId: line.productId, qty: line.qty, unitCost: line.landedUnitCost, source: "purchase", refId: invoice.id, stockBefore: product.stockQty });
-
-    await tx.insert(purchaseInvoiceItems).values({
-      purchaseInvoiceId: invoice.id,
-      productId: line.productId,
-      qty: line.qty,
-      unitCost: line.unitCost,
-      landedUnitCost: line.landedUnitCost,
-    });
+      .set({ stockQty: sql`${products.stockQty} + ${added}`, costPrice: Math.round(st.costPrice * 100) / 100 })
+      .where(eq(products.id, productId));
   }
+  // FIFO: satu lapisan per item, SETELAH stok diperbarui (urutan sama seperti sebelumnya) — onStockIn
+  // menghitung ulang harga modal dari lapisan, menimpa rata-rata di atas. No-op di outlet rata-rata.
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    await onStockIn(tx, { productId: line.productId, qty: line.qty, unitCost: line.landedUnitCost, source: "purchase", refId: invoice.id, stockBefore: stockBeforeByLine[i] });
+  }
+  await tx.insert(purchaseInvoiceItems).values(
+    lines.map((line) => ({ purchaseInvoiceId: invoice.id, productId: line.productId, qty: line.qty, unitCost: line.unitCost, landedUnitCost: line.landedUnitCost }))
+  );
 
   await tx.update(purchaseInvoices).set({ amount, paidAmount: 0, status: "unpaid" }).where(eq(purchaseInvoices.id, purchaseInvoiceId));
 
-  const journalId = await postPurchaseInvoiceJournal(invoice.id);
+  // Di dalam transaksi yang sama — lihat catatan di postPurchaseInvoiceJournal (penyebab Edit macet).
+  const journalId = await postPurchaseInvoiceJournal(invoice.id, tx);
   return { invoice, journalId };
 }
 
@@ -220,6 +263,7 @@ export async function applyInvoiceLines(purchaseInvoiceId: string, lines: Invoic
  */
 export async function voidPurchaseInvoice(purchaseInvoiceId: string, reason: string, staffUserId: string | undefined) {
   return db.transaction(async (tx) => {
+    await setInvoiceLockTimeout(tx);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${purchaseInvoiceId}))`);
     const before = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
     const { invoice } = await reverseInvoiceEffects(purchaseInvoiceId, reason, staffUserId, tx);
@@ -236,6 +280,8 @@ export async function voidPurchaseInvoice(purchaseInvoiceId: string, reason: str
     });
 
     return invoice;
+  }).catch((err) => {
+    throw friendlyInvoiceLockError(err);
   });
 }
 
@@ -261,7 +307,8 @@ export async function editPurchaseInvoiceLines(
   inputLines: { productId: string; qty: number; unitCost: number }[],
   additionalCost: number | undefined,
   reason: string,
-  staffUserId: string | undefined
+  staffUserId: string | undefined,
+  payment: EditPaymentChoice = { mode: "keep" }
 ) {
   if (!inputLines.length) throw new Error("Invoice harus punya minimal 1 item.");
   for (const l of inputLines) {
@@ -270,7 +317,8 @@ export async function editPurchaseInvoiceLines(
   }
   if (additionalCost !== undefined && !(Number(additionalCost) >= 0)) throw new Error("Ongkos tidak boleh negatif.");
 
-  const { invoice, journalId, amount, priorPayment } = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    await setInvoiceLockTimeout(tx);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${purchaseInvoiceId}))`);
 
     const [before] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
@@ -289,8 +337,8 @@ export async function editPurchaseInvoiceLines(
     // Capture what was already paid BEFORE reversing — reverseInvoiceEffects voids the payment
     // journal(s) but (deliberately) leaves the purchasePayments rows themselves untouched as
     // history. Since applyInvoiceLines below resets the invoice to unpaid/paidAmount=0, we replay
-    // an equivalent payment afterwards (outside this transaction — see the payPurchaseInvoice call
-    // below, and why it can't safely run inside this same transaction) so an invoice that was
+    // an equivalent payment at the end of this same transaction (or the cash/bank source the user
+    // picked in the edit form — see EditPaymentChoice) so an invoice that was
     // already paid comes back out the other side of an edit still paid, rather than silently
     // reverting to "unpaid" while a stale, journal-voided payment row sits unexplained in history.
     const existingPayments = await tx.select().from(purchasePayments).where(eq(purchasePayments.purchaseInvoiceId, purchaseInvoiceId));
@@ -312,24 +360,22 @@ export async function editPurchaseInvoiceLines(
       after: { amount, lines: newLines, reason },
     });
 
-    return {
-      invoice,
-      journalId,
-      amount,
-      priorPayment: priorPaidTotal > 0 && lastPayment ? { amount: priorPaidTotal, method: lastPayment.method, cashBankAccountId: lastPayment.cashBankAccountId } : null,
-    };
+    // Pembayaran ulang DI DALAM transaksi yang sama: koreksi + pembayaran tersimpan bersama atau
+    // tidak sama sekali (dulu dijalankan sesudahnya, jadi kegagalan bayar meninggalkan invoice "unpaid").
+    if (payment.mode === "paid") {
+      const [cb] = await tx.select({ id: cashBankAccounts.id, outletId: cashBankAccounts.outletId, type: cashBankAccounts.type }).from(cashBankAccounts).where(eq(cashBankAccounts.id, payment.cashBankAccountId)).limit(1);
+      if (!cb || cb.outletId !== invoice.outletId) throw new Error("Akun kas/bank tidak ditemukan di outlet ini.");
+      if (amount > 0) await payPurchaseInvoiceTx(tx, invoice.id, amount, cb.type === "bank" ? "transfer" : "cash", cb.id, staffUserId);
+    } else if (payment.mode === "keep" && priorPaidTotal > 0 && lastPayment) {
+      await payPurchaseInvoiceTx(tx, invoice.id, Math.min(priorPaidTotal, amount), lastPayment.method, lastPayment.cashBankAccountId, staffUserId);
+    }
+
+    return { invoice, journalId };
+  }).catch((err) => {
+    throw friendlyInvoiceLockError(err);
   });
 
-  // Deliberately OUTSIDE the transaction above: payPurchaseInvoice runs its own db.transaction
-  // internally (see lib/inventory/purchasing.ts) and would read stale/uncommitted data if nested
-  // inside the one above. Composing it as a follow-up step matches how recordSupplierPurchase
-  // itself already calls receiveStockForItem → postPurchaseInvoiceJournal → payPurchaseInvoice as
-  // sequential (not nested-transactional) steps elsewhere in this codebase.
-  if (priorPayment) {
-    await payPurchaseInvoice(invoice.id, Math.min(priorPayment.amount, amount), priorPayment.method, priorPayment.cashBankAccountId, staffUserId);
-  }
-
-  return { invoice, journalId };
+  return result;
 }
 
 /**

@@ -13,11 +13,13 @@ import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { resolveSendToKitchen } from "@/lib/kitchen/routing";
 import "@/lib/i18n/dict-inventory";
+import "@/lib/i18n/dict-inventory-draft";
 import "@/lib/i18n/dict-accounting";
 import { SupplierTab } from "./SupplierTab";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 import { useProsesTunggal } from "@/lib/ui/use-proses-tunggal";
 import { CostMethodCard, FifoLayerList, type CostMethodInfo } from "./CostMethodCard";
+import { clearAutosave, draftTotal, isEmptyDraft, loadAutosave, loadDrafts, removeDraft, saveAutosave, storeDraft, type PurchaseDraftData, type SavedPurchaseDraft } from "./purchase-draft";
 import { outletDateYmd } from "@/lib/time/outlet-time";
 import { BarcodeField } from "@/components/scanner/BarcodeField";
 import { ProductScanButton } from "@/components/scanner/ProductScanButton";
@@ -1029,11 +1031,86 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   // pesan itu tidak tertutup modal.
   const [overlay, setOverlay] = useState<null | { message: string; hint: string }>(null);
   const [viewing, setViewing] = useState<{ invoice: any; lines: any[]; isLegacy: boolean; additionalCost: number | null } | null>(null);
-  const [editing, setEditing] = useState<{ invoiceId: string; invoiceNumber: string; cart: { productId: string; qty: number; unitCost: number }[]; additionalCost: number; reason: string } | null>(null);
+  const [editing, setEditing] = useState<{
+    invoiceId: string;
+    invoiceNumber: string;
+    cart: { productId: string; qty: number; unitCost: number }[];
+    additionalCost: number;
+    reason: string;
+    /** Cara bayar setelah koreksi: lunas dari akun kas/bank, hutang, atau ulangi pembayaran sebagian yang lama. */
+    payMode: "paid" | "unpaid" | "keep";
+    payAccountId: string;
+    priorPaid: number;
+    originalAmount: number;
+  } | null>(null);
+  // Draf Belanja Supplier (lihat purchase-draft.ts): simpan otomatis + daftar draf tersimpan.
+  const [drafts, setDrafts] = useState<SavedPurchaseDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
   const [editItemForm, setEditItemForm] = useState({ productId: "", qty: 1, unitCost: 0 });
   const [busyInvoiceId, setBusyInvoiceId] = useState<string | null>(null);
 
   const load = () => fetchJsonArray(`/api/purchase-invoices?outletId=${outletId}`).then(setInvoices);
+
+  const currentDraft = (): PurchaseDraftData => ({ supplierId, purchaseDate, cart, transportCost, parkingCost, otherCost, paidNow, cashBankAccountId, itemForm });
+  const applyDraft = (d: PurchaseDraftData) => {
+    setSupplierId(d.supplierId);
+    setPurchaseDate(d.purchaseDate || outletDateYmd(new Date()));
+    setCart(d.cart);
+    setTransportCost(d.transportCost);
+    setParkingCost(d.parkingCost);
+    setOtherCost(d.otherCost);
+    setPaidNow(d.paidNow);
+    if (d.cashBankAccountId) setCashBankAccountId(d.cashBankAccountId);
+    setItemForm(d.itemForm ?? { productId: "", qty: 1, unitCost: 0 });
+  };
+  const resetForm = () => {
+    setCart([]);
+    setSupplierId("");
+    setPurchaseDate(outletDateYmd(new Date()));
+    setTransportCost(0);
+    setParkingCost(0);
+    setOtherCost(0);
+    setItemForm({ productId: "", qty: 1, unitCost: 0 });
+    setActiveDraftId(null);
+  };
+
+  // Pulihkan isian terakhir (pindah tab/menu/muat ulang tidak menghapus belanja yang sedang diketik).
+  useEffect(() => {
+    const saved = loadAutosave(outletId);
+    if (saved && !isEmptyDraft(saved)) applyDraft(saved);
+    setDrafts(loadDrafts(outletId));
+    setRestored(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outletId]);
+  // Simpan otomatis setiap ada perubahan (setelah pemulihan selesai, supaya tidak menimpa dengan form kosong).
+  useEffect(() => {
+    if (!restored) return;
+    saveAutosave(outletId, currentDraft());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restored, outletId, supplierId, purchaseDate, cart, transportCost, parkingCost, otherCost, paidNow, cashBankAccountId, itemForm]);
+
+  const saveAsDraft = async () => {
+    const d = currentDraft();
+    if (isEmptyDraft(d)) return showAlert(t("inventory.draft.emptyAlert", "Belum ada isian untuk disimpan sebagai draf."));
+    setDrafts(storeDraft(outletId, d, activeDraftId ?? undefined));
+    clearAutosave(outletId);
+    resetForm();
+    await showAlert(t("inventory.draft.savedAlert", "Draf belanja tersimpan di perangkat ini. Lanjutkan kapan saja dari daftar draf."));
+  };
+  const resumeDraft = async (draft: SavedPurchaseDraft) => {
+    if (!isEmptyDraft(currentDraft()) && activeDraftId !== draft.id) {
+      const ok = await showConfirm(t("inventory.draft.replaceConfirm", "Isian belanja yang sedang dibuka akan diganti draf ini. Simpan dulu sebagai draf bila masih diperlukan. Lanjutkan?"));
+      if (!ok) return;
+    }
+    applyDraft(draft.data);
+    setActiveDraftId(draft.id);
+  };
+  const deleteDraft = async (draft: SavedPurchaseDraft) => {
+    if (!(await showConfirm(t("inventory.draft.deleteConfirm", "Hapus draf ini?"), { tone: "danger" }))) return;
+    setDrafts(removeDraft(outletId, draft.id));
+    if (activeDraftId === draft.id) setActiveDraftId(null);
+  };
   useEffect(() => {
     load();
     fetchJsonArray(`/api/suppliers?outletId=${outletId}`).then(setSuppliers);
@@ -1119,6 +1196,9 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       setOverlay(null);
       if (!res.ok) return showAlert(data.error);
       setLastResult(data);
+      clearAutosave(outletId);
+      if (activeDraftId) setDrafts(removeDraft(outletId, activeDraftId));
+      setActiveDraftId(null);
       // Refresh products (new harga modal) and FIFO layers so the result card shows real numbers.
       fetchJsonArray<Product>("/api/products").then(setProducts);
       loadCostInfo();
@@ -1147,12 +1227,25 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   };
 
   const openEdit = async (invoiceId: string, invoiceNumber: string) => {
-    const data = await fetchJsonObject<{ invoice: any; lines: any[]; isLegacy: boolean; additionalCost: number | null }>(`/api/purchase-invoices/${invoiceId}`);
+    const data = await fetchJsonObject<{ invoice: any; lines: any[]; isLegacy: boolean; additionalCost: number | null; payment?: { paidTotal: number; cashBankAccountId: string | null } }>(`/api/purchase-invoices/${invoiceId}`);
     if (!data) return;
     if (data.isLegacy) {
       return showAlert(t("inventory.supplierPurchase.legacyNoEdit", "Invoice ini dibuat sebelum fitur edit tersedia, jadi rinciannya tidak bisa dipastikan ulang — hanya bisa dilihat atau dibatalkan."));
     }
-    setEditing({ invoiceId, invoiceNumber, cart: data.lines.map((l: any) => ({ productId: l.productId, qty: l.qty, unitCost: l.unitCost })), additionalCost: data.additionalCost ?? 0, reason: "" });
+    const paidTotal = data.payment?.paidTotal ?? data.invoice?.paidAmount ?? 0;
+    const amount = data.invoice?.amount ?? 0;
+    const defaultAccount = data.payment?.cashBankAccountId || cashBankAccounts.find((r: any) => r.isDefault)?.id || cashBankAccounts[0]?.id || "";
+    setEditing({
+      invoiceId,
+      invoiceNumber,
+      cart: data.lines.map((l: any) => ({ productId: l.productId, qty: l.qty, unitCost: l.unitCost })),
+      additionalCost: data.additionalCost ?? 0,
+      reason: "",
+      payMode: paidTotal <= 0 ? "unpaid" : paidTotal >= amount - 1 ? "paid" : "keep",
+      payAccountId: defaultAccount,
+      priorPaid: paidTotal,
+      originalAmount: amount,
+    });
   };
 
   const addEditItem = () => {
@@ -1168,6 +1261,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
   const submitEdit = async () => {
     if (!editing || busyInvoiceId) return;
     if (editing.cart.length === 0) return showAlert(t("inventory.supplierPurchase.needItemAlert", "Tambah minimal 1 item belanja."));
+    if (editing.payMode === "paid" && !editing.payAccountId) return showAlert(t("inventory.supplierPurchase.chooseCashBankAlert", "Pilih sumber kas/bank yang dipakai untuk membayar belanja ini."));
     setBusyInvoiceId(editing.invoiceId);
     setOverlay({
       message: t("inventory.supplierPurchase.editingOverlay", "Menyimpan koreksi invoice..."),
@@ -1180,14 +1274,24 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       const res = await fetch(`/api/purchase-invoices/${editing.invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines, additionalCost: editing.additionalCost, reason: editing.reason || undefined }),
+        body: JSON.stringify({
+          lines,
+          additionalCost: editing.additionalCost,
+          reason: editing.reason || undefined,
+          payment: editing.payMode === "paid" ? { mode: "paid", cashBankAccountId: editing.payAccountId } : { mode: editing.payMode },
+        }),
       });
       const data = await res.json().catch(() => ({ error: t("inventory.supplierPurchase.serverError", "Server tidak merespons dengan benar. Cek daftar belanja sebelum mencoba lagi.") }));
       setOverlay(null);
       if (!res.ok) return showAlert(data.error);
       setEditing(null);
       load();
+      fetchJsonArray<Product>("/api/products").then(setProducts);
       await showAlert(t("inventory.supplierPurchase.editSaved", "Koreksi invoice {invoiceNumber} tersimpan.").replace("{invoiceNumber}", editing.invoiceNumber));
+    } catch (err) {
+      setOverlay(null);
+      showAlert(t("inventory.supplierPurchase.networkError", "Gagal menghubungi server: {pesan}. Cek daftar belanja sebelum mencoba lagi — bisa jadi sudah tersimpan.").replace("{pesan}", err instanceof Error ? err.message : String(err)));
+      load();
     } finally {
       setOverlay(null);
       setBusyInvoiceId(null);
@@ -1215,6 +1319,11 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       setOverlay(null);
       if (!res.ok) return showAlert(data.error ?? t("inventory.invoice.cancelFailed", "Gagal membatalkan invoice."));
       load();
+      fetchJsonArray<Product>("/api/products").then(setProducts);
+    } catch (err) {
+      setOverlay(null);
+      showAlert(t("inventory.supplierPurchase.networkError", "Gagal menghubungi server: {pesan}. Cek daftar belanja sebelum mencoba lagi — bisa jadi sudah tersimpan.").replace("{pesan}", err instanceof Error ? err.message : String(err)));
+      load();
     } finally {
       setOverlay(null);
       setBusyInvoiceId(null);
@@ -1241,6 +1350,10 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
       setOverlay(null);
       if (!res.ok) return showAlert(data.error ?? t("inventory.invoice.deleteFailed", "Gagal menghapus invoice."));
       load();
+    } catch (err) {
+      setOverlay(null);
+      showAlert(t("inventory.supplierPurchase.networkError", "Gagal menghubungi server: {pesan}. Cek daftar belanja sebelum mencoba lagi — bisa jadi sudah tersimpan.").replace("{pesan}", err instanceof Error ? err.message : String(err)));
+      load();
     } finally {
       setOverlay(null);
       setBusyInvoiceId(null);
@@ -1249,7 +1362,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
 
   return (
     <div className="space-y-4">
-      {overlay && <ProcessingOverlay message={overlay.message} hint={overlay.hint} />}
+      {overlay && <ProcessingOverlay message={overlay.message} hint={overlay.hint} elapsedLabel={t("inventory.supplierPurchase.elapsed", "{s} detik berjalan…")} />}
       <CostMethodCard info={costInfo} onChanged={() => { loadCostInfo(); fetchJsonArray<Product>("/api/products").then(setProducts); }} />
       <Card className="space-y-3">
         <h2 className="font-medium">{t("inventory.supplierPurchase.title", "Belanja Supplier")}</h2>
@@ -1389,10 +1502,58 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
           </div>
         )}
 
-        <Button onClick={submit} disabled={submitting}>
-          {submitting ? t("inventory.supplierPurchase.saving", "Menyimpan...") : t("inventory.supplierPurchase.saveButton", "Simpan Belanja — {amount}").replace("{amount}", rupiah(grandTotal))}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={submit} disabled={submitting}>
+            {submitting ? t("inventory.supplierPurchase.saving", "Menyimpan...") : t("inventory.supplierPurchase.saveButton", "Simpan Belanja — {amount}").replace("{amount}", rupiah(grandTotal))}
+          </Button>
+          <Button variant="secondary" onClick={saveAsDraft} disabled={submitting}>
+            {t("inventory.draft.saveButton", "Simpan Draft")}
+          </Button>
+          {(cart.length > 0 || supplierId) && (
+            <Button
+              variant="ghost"
+              className="text-xs"
+              disabled={submitting}
+              onClick={async () => {
+                if (!(await showConfirm(t("inventory.draft.clearConfirm", "Kosongkan form belanja? Isian yang belum disimpan sebagai draf akan hilang."), { tone: "danger" }))) return;
+                clearAutosave(outletId);
+                resetForm();
+              }}
+            >
+              {t("inventory.draft.clearButton", "Kosongkan")}
+            </Button>
+          )}
+        </div>
+        <p className="text-[11px] text-neutral-500">
+          {activeDraftId
+            ? t("inventory.draft.editingDraft", "Sedang melanjutkan draf — tekan Simpan Draft untuk memperbarui draf ini.")
+            : t("inventory.draft.autosaveNote", "Isian tersimpan otomatis di perangkat ini — aman pindah tab (mis. menambah produk baru) lalu kembali.")}
+        </p>
       </Card>
+
+      {drafts.length > 0 && (
+        <Card className="space-y-2 text-xs">
+          <h3 className="text-sm font-medium">{t("inventory.draft.listTitle", "Draf belanja ({n})").replace("{n}", String(drafts.length))}</h3>
+          <div className="divide-y divide-neutral-800">
+            {drafts.map((d) => (
+              <div key={d.id} className={`flex flex-wrap items-center justify-between gap-2 py-1.5 ${activeDraftId === d.id ? "text-amber-200" : ""}`}>
+                <div>
+                  <div className="font-medium">
+                    {suppliers.find((s) => s.id === d.data.supplierId)?.name ?? t("inventory.draft.noSupplier", "Tanpa supplier")} · {rupiah(draftTotal(d.data))}
+                  </div>
+                  <div className="text-neutral-500">
+                    {t("inventory.draft.itemsCount", "{n} item").replace("{n}", String(d.data.cart.length))} · {t("inventory.draft.savedAt", "disimpan {date}").replace("{date}", new Date(d.savedAt).toLocaleString(DATE_LOCALE[lang], { dateStyle: "medium", timeStyle: "short" }))}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="secondary" className="text-xs px-2 py-1" onClick={() => resumeDraft(d)}>{t("inventory.draft.resume", "Lanjutkan")}</Button>
+                  <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => deleteDraft(d)}>{t("inventory.cart.removeItem", "Hapus")}</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {lastResult && (
         <Card className="border-emerald-500/40 text-xs space-y-1">
@@ -1479,6 +1640,39 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
           <div className="flex justify-between font-semibold">
             <span>{t("inventory.supplierPurchase.totalLabel", "Total Belanja")}</span>
             <span>{rupiah(editing.cart.reduce((s, c) => s + c.qty * c.unitCost, 0) + editing.additionalCost)}</span>
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-neutral-700 p-2">
+            <div className="text-neutral-400">{t("inventory.supplierPurchase.editPaymentTitle", "Pembayaran setelah koreksi")}</div>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="edit-pay" checked={editing.payMode === "paid"} onChange={() => setEditing({ ...editing, payMode: "paid" })} />
+              {t("inventory.supplierPurchase.editPayPaid", "Lunas dibayar dari kas/bank")}
+            </label>
+            {editing.payMode === "paid" && (
+              <div className="space-y-1 pl-5">
+                <label className="text-neutral-500">{t("inventory.supplierPurchase.cashSourceLabel", "Sumber kas/bank yang dipakai bayar")}</label>
+                {cashBankAccounts.length > 0 ? (
+                  <SearchableSelect
+                    value={editing.payAccountId}
+                    onChange={(v) => setEditing({ ...editing, payAccountId: v })}
+                    placeholder={t("inventory.supplierPurchase.cashSourcePlaceholder", "Pilih akun kas/bank")}
+                    options={cashBankAccounts.map((c: any) => ({ value: c.id, label: c.name }))}
+                  />
+                ) : (
+                  <div className="text-amber-400">{t("inventory.supplierPurchase.noCashBankHint", "Belum ada akun kas/bank dikonfigurasi — akan pakai default sistem.")}</div>
+                )}
+              </div>
+            )}
+            <label className="flex items-center gap-2">
+              <input type="radio" name="edit-pay" checked={editing.payMode === "unpaid"} onChange={() => setEditing({ ...editing, payMode: "unpaid" })} />
+              {t("inventory.supplierPurchase.editPayUnpaid", "Belum dibayar (hutang ke supplier)")}
+            </label>
+            {editing.priorPaid > 0 && editing.priorPaid < editing.originalAmount - 1 && (
+              <label className="flex items-center gap-2">
+                <input type="radio" name="edit-pay" checked={editing.payMode === "keep"} onChange={() => setEditing({ ...editing, payMode: "keep" })} />
+                {t("inventory.supplierPurchase.editPayKeep", "Tetap dibayar sebagian ({amount}), sisanya hutang").replace("{amount}", rupiah(editing.priorPaid))}
+              </label>
+            )}
           </div>
 
           <input

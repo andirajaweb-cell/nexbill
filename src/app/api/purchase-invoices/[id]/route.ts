@@ -4,6 +4,13 @@ import { requireOwnedRow } from "@/lib/auth/scope";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { reconstructInvoiceLines, editPurchaseInvoiceLines, voidPurchaseInvoice } from "@/lib/inventory/purchase-invoice-correction";
 import { describeError, errorStatus } from "@/lib/api/error";
+import { db } from "@/db/client";
+import { purchasePayments } from "@/db/schema";
+import { asc, eq } from "drizzle-orm";
+import type { EditPaymentChoice } from "@/lib/inventory/purchase-invoice-correction";
+
+// Koreksi/pembatalan invoice besar (puluhan item) butuh lebih dari batas bawaan 10 detik.
+export const maxDuration = 60;
 
 /** Detail view (View) — reconstructs line items alongside the invoice row. Restricted to
  *  owner/superuser/supervisor/manager via manage_supplier_purchase_history, same as Edit/Delete —
@@ -16,7 +23,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Role kamu tidak punya izin melihat riwayat belanja supplier." }, { status: 403 });
     }
     const { lines, isLegacy, additionalCost } = await reconstructInvoiceLines(id);
-    return NextResponse.json({ invoice: row, lines, isLegacy, additionalCost });
+    // Untuk form Edit: dari akun kas/bank mana invoice ini dibayar (pembayaran terakhir).
+    const pays = await db.select({ amount: purchasePayments.amount, cashBankAccountId: purchasePayments.cashBankAccountId }).from(purchasePayments).where(eq(purchasePayments.purchaseInvoiceId, id)).orderBy(asc(purchasePayments.paidAt));
+    const payment = { paidTotal: pays.reduce((s, p) => s + p.amount, 0), cashBankAccountId: pays.length ? pays[pays.length - 1].cashBankAccountId : null };
+    return NextResponse.json({ invoice: row, lines, isLegacy, additionalCost, payment });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });
   }
@@ -37,7 +47,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     const reason = typeof body.reason === "string" && body.reason.trim() ? body.reason.trim() : "Koreksi manual";
     const additionalCost = body.additionalCost == null ? undefined : Number(body.additionalCost);
-    const result = await editPurchaseInvoiceLines(id, body.lines, additionalCost, reason, session.sub);
+    const p = body.payment;
+    const payment: EditPaymentChoice =
+      p?.mode === "paid" && typeof p.cashBankAccountId === "string" && p.cashBankAccountId
+        ? { mode: "paid", cashBankAccountId: p.cashBankAccountId }
+        : p?.mode === "unpaid"
+          ? { mode: "unpaid" }
+          : { mode: "keep" };
+    const result = await editPurchaseInvoiceLines(id, body.lines, additionalCost, reason, session.sub, payment);
     return NextResponse.json(result);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });

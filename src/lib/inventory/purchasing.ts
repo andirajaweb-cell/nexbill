@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db, type DbOrTx } from "@/db/client";
 import {
   purchaseOrders,
   purchaseOrderItems,
@@ -169,7 +169,13 @@ export async function receivePurchaseOrder(
  */
 export async function payPurchaseInvoice(purchaseInvoiceId: string, amount: number, method: string, cashBankAccountId: string, staffUserId?: string, paidAt?: string) {
   if (!(amount > 0)) throw new Error("Nominal pembayaran harus lebih dari 0.");
-  return db.transaction(async (tx) => {
+  return db.transaction((tx) => payPurchaseInvoiceTx(tx, purchaseInvoiceId, amount, method, cashBankAccountId, staffUserId, paidAt));
+}
+
+/** Sama dengan payPurchaseInvoice, tetapi di dalam transaksi pemanggil (dipakai Edit invoice supaya koreksi + pembayaran ulang atomik). */
+export async function payPurchaseInvoiceTx(tx: DbOrTx, purchaseInvoiceId: string, amount: number, method: string, cashBankAccountId: string, staffUserId?: string, paidAt?: string) {
+  if (!(amount > 0)) throw new Error("Nominal pembayaran harus lebih dari 0.");
+  {
     await lockEntity(tx, `purchase_invoice:${purchaseInvoiceId}`);
     const [invoice] = await tx.select().from(purchaseInvoices).where(eq(purchaseInvoices.id, purchaseInvoiceId)).limit(1);
     if (!invoice) throw new Error("Invoice tidak ditemukan.");
@@ -193,7 +199,7 @@ export async function payPurchaseInvoice(purchaseInvoiceId: string, amount: numb
       .where(eq(purchaseInvoices.id, purchaseInvoiceId));
 
     return { ...payment, journalEntryId };
-  });
+  }
 }
 
 export async function createPurchaseReturn(input: {

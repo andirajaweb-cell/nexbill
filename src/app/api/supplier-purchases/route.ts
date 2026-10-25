@@ -4,6 +4,9 @@ import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 import { forbidUnless } from "@/lib/auth/require-permission";
 
+// Belanja/invoice berisi puluhan item butuh lebih dari batas bawaan 10 detik.
+export const maxDuration = 60;
+
 /** Quick "belanja supplier" purchase — see recordSupplierPurchase for the landed-cost/HPP logic. */
 export async function POST(req: NextRequest) {
   try {

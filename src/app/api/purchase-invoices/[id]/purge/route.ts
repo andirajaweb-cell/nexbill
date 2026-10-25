@@ -5,6 +5,9 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { permanentlyDeletePurchaseInvoice } from "@/lib/inventory/purchase-invoice-correction";
 import { describeError, errorStatus } from "@/lib/api/error";
 
+// Belanja/invoice berisi puluhan item butuh lebih dari batas bawaan 10 detik.
+export const maxDuration = 60;
+
 /** Hard delete (never recoverable) — see permanentlyDeletePurchaseInvoice for exactly what gets
  *  removed (invoice + items + stock movements + payments + journal entries, including the void
  *  reversal). Deliberately a separate route/permission from the regular void DELETE on
