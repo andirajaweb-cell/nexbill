@@ -46,7 +46,7 @@
     <string name="menu_guard">Screen guard</string>
     <string name="guard_on">On</string>
     <string name="guard_off">Off</string>
-    <string name="guard_enabled_toast">Screen guard on: the Home button or switching input can't be used to leave NEXBILL TV.</string>
+    <string name="guard_enabled_toast">Screen guard on: the Home button or switching input can\'t be used to leave NEXBILL TV.</string>
     <string name="guard_disabled_toast">Screen guard off: the TV may be used by other apps. The timer and time-up lock only apply inside NEXBILL TV.</string>
     <string name="guard_need_overlay">For the screen guard to work, allow \"Display over other apps\" for NEXBILL TV (staff menu → Display over other apps).</string>
     <string name="info_guard">Screen guard: %1$s</string>
