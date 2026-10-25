@@ -4,6 +4,7 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { requestCashTransfer, listCashTransfers } from "@/lib/cash/transfers";
 import { describeError } from "@/lib/api/error";
 import { resolveDrawerShiftId } from "@/lib/shift/drawer";
+import { isTodayYmd, ymdToEntryIso } from "@/lib/time/entry-date";
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,10 +33,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    const date = typeof body.date === "string" ? body.date : null;
+    const entryDate = ymdToEntryIso(date);
     const row = await requestCashTransfer({
       outletId: session.outletId,
-      // Server-resolved drawer shift — never the client value (see resolveDrawerShiftId).
-      shiftId: await resolveDrawerShiftId(session.outletId, session.sub),
+      // Server-resolved drawer shift — never the client value (see resolveDrawerShiftId). Pindah kas
+      // bertanggal mundur tidak ditautkan ke shift yang sedang buka.
+      shiftId: isTodayYmd(date) ? await resolveDrawerShiftId(session.outletId, session.sub) : null,
+      entryDate,
       amount: Number(body.amount),
       sourceCashBankAccountId: body.sourceCashBankAccountId,
       destinationCashBankAccountId: body.destinationCashBankAccountId,

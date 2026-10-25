@@ -15,6 +15,8 @@ import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import { useOutletFormat } from "@/lib/format/client";
 import "@/lib/i18n/dict-shift";
+import "@/lib/i18n/dict-cash-date";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 import { filterShifts, summarizeShifts, shiftYears, defaultFilterValue, type ShiftPeriodMode, type ShiftHistoryFilter } from "@/lib/shift/history-filter";
 
 /** Geser nilai filter satu langkah (hari/bulan/tahun) untuk tombol ‹ ›. */
@@ -1049,6 +1051,7 @@ function CashDepositTab({
   const [destinationId, setDestinationId] = useState("");
   const [receivedBy, setReceivedBy] = useState("");
   const [notes, setNotes] = useState("");
+  const [date, setDate] = useState(() => outletDateYmd(new Date()));
   const [submitting, setSubmitting] = useState(false);
 
   const load = () => {
@@ -1088,6 +1091,7 @@ function CashDepositTab({
           destinationCashBankAccountId: isInternalTransfer ? destinationId : null,
           receivedByStaffUserId: receivedBy,
           notes: notes || null,
+          date,
         }),
       });
       const data = await res.json();
@@ -1096,6 +1100,7 @@ function CashDepositTab({
       setDestinationId("");
       setReceivedBy("");
       setNotes("");
+      setDate(outletDateYmd(new Date()));
       load();
       showAlert(t("cashDeposit.saved", "Setoran kas berhasil dicatat."));
     } finally {
@@ -1124,6 +1129,7 @@ function CashDepositTab({
             <label className="text-xs text-neutral-500">{t("cashDeposit.amountLabel", "Jumlah")}</label>
             <input type="number" className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} />
           </div>
+          <CashEntryDateField value={date} onChange={setDate} />
           <div>
             <label className="text-xs text-neutral-500">{t("cashDeposit.purposeLabel", "Peruntukan")}</label>
             <select className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={purposeType} onChange={(e) => { setPurposeType(e.target.value); setDestinationId(""); }}>
@@ -1183,7 +1189,7 @@ function CashDepositTab({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-500 border-b border-neutral-800">
-              <th className="py-2">{t("cashDeposit.col.time", "Waktu")}</th>
+              <th className="py-2">{t("cashDate.col", "Tanggal")}</th>
               <th>{t("cashDeposit.col.purpose", "Peruntukan")}</th>
               <th>{t("cashDeposit.col.amount", "Jumlah")}</th>
               <th>{t("cashDeposit.col.fromTo", "Dari → Ke")}</th>
@@ -1249,6 +1255,7 @@ function CashTransferTab({
   const [sourceId, setSourceId] = useState("");
   const [destinationId, setDestinationId] = useState("");
   const [notes, setNotes] = useState("");
+  const [date, setDate] = useState(() => outletDateYmd(new Date()));
   const [submitting, setSubmitting] = useState(false);
   const [decidingId, setDecidingId] = useState<string | null>(null);
 
@@ -1277,13 +1284,14 @@ function CashTransferTab({
       const res = await fetch("/api/cash-transfers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shiftId: currentShiftId, amount, sourceCashBankAccountId: sourceId, destinationCashBankAccountId: destinationId, notes: notes || null }),
+        body: JSON.stringify({ shiftId: currentShiftId, amount, sourceCashBankAccountId: sourceId, destinationCashBankAccountId: destinationId, notes: notes || null, date }),
       });
       const data = await res.json();
       if (!res.ok) return showAlert(data.error);
       setAmount(0);
       setDestinationId("");
       setNotes("");
+      setDate(outletDateYmd(new Date()));
       load();
       showAlert(t("cashTransfer.submitted", "Permintaan pindah kas diajukan — menunggu persetujuan Owner/Manager sebelum tercatat ke jurnal."));
     } finally {
@@ -1337,7 +1345,7 @@ function CashTransferTab({
             <label className="text-xs text-neutral-500">{t("cashTransfer.amountLabel", "Jumlah")}</label>
             <input type="number" className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} />
           </div>
-          <div />
+          <CashEntryDateField value={date} onChange={setDate} />
           <div>
             <label className="text-xs text-neutral-500">{t("cashTransfer.sourceLabel", "Dari Akun Kas")}</label>
             <SearchableSelect
@@ -1374,7 +1382,7 @@ function CashTransferTab({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-500 border-b border-neutral-800">
-              <th className="py-2">{t("cashDeposit.col.time", "Waktu")}</th>
+              <th className="py-2">{t("cashDate.col", "Tanggal")}</th>
               <th>{t("cashDeposit.col.amount", "Jumlah")}</th>
               <th>{t("cashDeposit.col.fromTo", "Dari → Ke")}</th>
               <th>{t("cashTransfer.col.requestedBy", "Diajukan Oleh")}</th>
@@ -1411,6 +1419,36 @@ function CashTransferTab({
           </tbody>
         </table>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Tanggal transaksi Setoran Kas / Pindah Kas. Bawaan hari ini; boleh mundur (mis. setoran kemarin
+ * yang baru dicatat hari ini), tidak boleh ke depan. Tanggal lampau tidak ditautkan ke shift yang
+ * sedang buka — lihat /api/cash-deposits & /api/cash-transfers.
+ */
+function CashEntryDateField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t, lang } = useDashboardLang();
+  const today = outletDateYmd(new Date());
+  return (
+    <div>
+      <label className="text-xs text-neutral-500">{t("cashDate.label", "Tanggal")}</label>
+      <input
+        type="date"
+        className="w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
+        value={value}
+        max={today}
+        onChange={(e) => onChange(e.target.value || today)}
+      />
+      {value !== today && (
+        <p className="text-xs text-amber-400 mt-1">
+          {t("cashDate.backdateHint", "Dicatat pada {date} — jurnal memakai tanggal ini dan tidak ditautkan ke shift yang sedang buka.").replace(
+            "{date}",
+            new Date(`${value}T12:00:00+07:00`).toLocaleDateString(DATE_LOCALE[lang], { day: "numeric", month: "long", year: "numeric" })
+          )}
+        </p>
+      )}
     </div>
   );
 }

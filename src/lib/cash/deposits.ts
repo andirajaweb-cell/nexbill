@@ -31,6 +31,8 @@ export interface CreateCashDepositInput {
   receivedByStaffUserId: string;
   recordedByStaffUserId?: string;
   notes?: string | null;
+  /** Tanggal setoran (ISO, lihat ymdToEntryIso). Kosong = sekarang. Dipakai untuk jurnal & riwayat. */
+  entryDate?: string;
 }
 
 /**
@@ -73,8 +75,10 @@ export async function createCashDeposit(input: CreateCashDepositInput) {
     ? { accountId: destination!.accountId, debit: amount, credit: 0, description: label }
     : { accountCode: EQUITY_ACCOUNT_CODE[input.purposeType as "prive" | "dividen"], debit: amount, credit: 0, description: label };
 
+  const entryDate = input.entryDate ?? new Date().toISOString();
   const journalId = await postJournal({
     outletId: input.outletId,
+    entryDate,
     description: label,
     sourceType: "cash_deposit",
     staffUserId: input.recordedByStaffUserId,
@@ -94,6 +98,8 @@ export async function createCashDeposit(input: CreateCashDepositInput) {
       recordedByStaffUserId: input.recordedByStaffUserId ?? null,
       notes: input.notes ?? null,
       journalEntryId: journalId,
+      // Tanggal transaksi (bisa mundur) — riwayat & laporan memakai tanggal ini.
+      createdAt: entryDate,
     })
     .returning();
 

@@ -4,6 +4,7 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { createCashDeposit, listCashDeposits } from "@/lib/cash/deposits";
 import { describeError } from "@/lib/api/error";
 import { resolveDrawerShiftId } from "@/lib/shift/drawer";
+import { isTodayYmd, ymdToEntryIso } from "@/lib/time/entry-date";
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,10 +28,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    const date = typeof body.date === "string" ? body.date : null;
+    const entryDate = ymdToEntryIso(date);
     const row = await createCashDeposit({
       outletId: session.outletId,
-      // Server-resolved drawer shift — never the client value (see resolveDrawerShiftId).
-      shiftId: await resolveDrawerShiftId(session.outletId, session.sub),
+      // Server-resolved drawer shift — never the client value (see resolveDrawerShiftId). Setoran
+      // bertanggal mundur tidak diambil dari laci shift yang sedang buka, jadi tidak ditautkan ke shift.
+      shiftId: isTodayYmd(date) ? await resolveDrawerShiftId(session.outletId, session.sub) : null,
+      entryDate,
       amount: Number(body.amount),
       purposeType: body.purposeType,
       sourceCashBankAccountId: body.sourceCashBankAccountId,

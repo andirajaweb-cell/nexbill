@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { cashTransfers, cashBankAccounts, staffUsers, approvalRequests } from "@/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { postJournal, voidJournal, lockEntity } from "@/lib/accounting/journal";
+import { isPeriodLocked } from "@/lib/accounting/periods";
 import { logAudit } from "@/lib/audit/log";
 import type { StaffRole } from "@/lib/auth/permissions";
 
@@ -16,6 +17,8 @@ export interface RequestCashTransferInput {
   notes?: string | null;
   requestedByStaffUserId: string;
   requesterRole: StaffRole;
+  /** Tanggal pindah kas (ISO, lihat ymdToEntryIso). Kosong = sekarang. Jurnal memakai tanggal ini saat disetujui. */
+  entryDate?: string;
 }
 
 /**
@@ -50,6 +53,7 @@ export async function requestCashTransfer(input: RequestCashTransferInput) {
       notes: input.notes ?? null,
       requestedByStaffUserId: input.requestedByStaffUserId,
       status: "pending_approval",
+      ...(input.entryDate ? { createdAt: input.entryDate } : {}),
     })
     .returning();
 
@@ -88,8 +92,12 @@ export async function executeCashTransfer(transferId: string, reviewerId: string
   if (!source || !destination) throw new Error("Akun kas sumber/tujuan pada permintaan ini sudah tidak ada.");
 
   const label = `Pindah Kas: ${source.name} → ${destination.name}`;
+  // Jurnal bertanggal sesuai tanggal pindah kas yang diajukan (createdAt). Bila periode itu sudah
+  // ditutup saat disetujui, jatuh ke hari ini — persetujuan tidak boleh macet karena tutup buku.
+  const entryDate = (await isPeriodLocked(transfer.outletId, transfer.createdAt, tx)) ? new Date().toISOString() : transfer.createdAt;
   const journalId = await postJournal({
     outletId: transfer.outletId,
+    entryDate,
     description: transfer.notes ? `${label} (${transfer.notes})` : label,
     sourceType: "cash_transfer",
     sourceId: transfer.id,
