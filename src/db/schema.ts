@@ -3202,3 +3202,50 @@ export const platformVendorRecommendationEvents = pgTable(
   },
   (t) => [index("pvr_events_rec_time_idx").on(t.recommendationId, t.createdAt), index("pvr_events_outlet_rec_idx").on(t.outletId, t.recommendationId, t.event)]
 );
+
+/** ---------------- PAPAN LOBI & SALDO WAKTU MEMBER — migrasi 0035 ---------------- */
+
+/** Papan lobi publik /lobi/[slug]: status unit untuk pelanggan di layar lobi. Baris tidak ada = bawaan (aktif, tanpa pengumuman). */
+export const outletLobbySettings = pgTable("outlet_lobby_settings", {
+  outletId: text("outlet_id").primaryKey().references(() => outlets.id),
+  enabled: boolean("enabled").notNull().default(true),
+  announcement: text("announcement"),
+  updatedBy: text("updated_by"),
+  ...timestamps,
+});
+
+/**
+ * Saldo waktu member (lib/rental/time-credit.ts): sisa menit sesi paket/durasi tetap yang sudah
+ * dibayar, dipakai lagi di kunjungan berikutnya. `value` = nilai rupiahnya, dicatat sebagai
+ * Pendapatan Diterima di Muka (2134) sampai menitnya dipakai.
+ */
+export const customerTimeCredits = pgTable(
+  "customer_time_credits",
+  {
+    customerId: text("customer_id").primaryKey().references(() => customers.id),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    minutes: integer("minutes").notNull().default(0),
+    value: doublePrecision("value").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [index("customer_time_credits_outlet_idx").on(t.outletId)]
+);
+
+/** save = sisa sesi disimpan · use = dipakai saat mulai sesi · refund = menit tak terpakai kembali · reverse = simpanan dibatalkan (tagihan di-void) · adjust = koreksi. */
+export const timeCreditTransactions = pgTable(
+  "time_credit_transactions",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    customerId: text("customer_id").notNull().references(() => customers.id),
+    rentalSessionId: text("rental_session_id").references(() => rentalSessions.id),
+    type: text("type", { enum: ["save", "use", "refund", "reverse", "adjust"] }).notNull(),
+    minutes: integer("minutes").notNull(),
+    value: doublePrecision("value").notNull().default(0),
+    journalEntryId: text("journal_entry_id"),
+    staffUserId: text("staff_user_id"),
+    note: text("note"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("time_credit_tx_customer_idx").on(t.customerId, t.createdAt), index("time_credit_tx_session_idx").on(t.rentalSessionId)]
+);

@@ -8,6 +8,7 @@ import { useApi } from "@/lib/api/use-api";
 import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-billing-board";
+import { LobbyBoardCard } from "./lobby-board-card";
 
 interface BoardRow {
   sessionId: string;
@@ -106,6 +107,8 @@ export default function BillingBoardPage() {
           {lastUpdated ? t("billingBoard.updatedAt", "Diperbarui {time}").replace("{time}", lastUpdated.toLocaleTimeString(DATE_LOCALE[lang])) : t("billingBoard.loading", "Memuat...")}
         </div>
       </div>
+
+      <LobbyBoardCard />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="text-center py-3">

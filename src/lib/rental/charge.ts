@@ -35,6 +35,12 @@ export interface SessionChargeInput {
   elapsedMinutes: number;
   /** Outlet's billingRoundingMinutes. Only ever applied to open-ended sessions. */
   roundingMinutes: number;
+  /**
+   * Menit dari Saldo waktu member (lib/rental/time-credit-core.ts) yang sudah termasuk di
+   * plannedMinutes tetapi TIDAK ditagih. Hanya berlaku untuk sesi durasi tetap — saldo tidak bisa
+   * dipakai bersama paket promo, dan sesi terbuka tidak bisa memakai saldo.
+   */
+  creditMinutes?: number;
 }
 
 export interface SessionCharge {
@@ -117,14 +123,16 @@ export function computeSessionCharge(input: SessionChargeInput): SessionCharge {
   if (plannedMinutes) {
     const allowedMinutes = plannedMinutes + extendedMinutes;
     const overtimeMinutes = roundUpMinutes(Math.max(0, elapsedMinutes - allowedMinutes), roundingMinutes);
+    const creditMinutes = Math.min(allowedMinutes, Math.max(0, Math.floor(input.creditMinutes ?? 0)));
     return {
       mode: "fixed",
       billedMinutes: allowedMinutes,
-      subtotal: Math.round((allowedMinutes / 60) * ratePerHour),
+      subtotal: Math.round(((allowedMinutes - creditMinutes) / 60) * ratePerHour),
       overtimeMinutes,
       isRounded: false,
       billingNote:
         `${allowedMinutes} menit (durasi tetap, sesuai paket main yang diset)` +
+        (creditMinutes > 0 ? ` — ${creditMinutes} menit dari saldo waktu member (tidak ditagih)` : "") +
         (overtimeMinutes > 0
           ? ` — sesi berhenti ${overtimeMinutes} menit setelah waktu habis, harga tetap sesuai durasi yang diset (tanpa biaya tambahan)`
           : ""),
