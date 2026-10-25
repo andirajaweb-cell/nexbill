@@ -1,6 +1,6 @@
 import { db, type DbOrTx } from "@/db/client";
 import { products, stockMovements } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 export interface ReplayableMovement {
   /** Signed: positive for an inflow (purchase_in or a positive adjustment), negative for an outflow. */
@@ -76,4 +76,32 @@ export async function recomputeCostPriceExcludingRef(productId: string, excludeR
   await dbc.update(products).set({ costPrice: result.costPrice }).where(eq(products.id, productId));
 
   return result;
+}
+
+/**
+ * Versi banyak produk sekaligus dari recomputeCostPriceExcludingRef: SATU kueri baca untuk semua
+ * produk dan SATU UPDATE untuk semuanya. Dipakai pembatalan/koreksi invoice belanja yang berisi
+ * puluhan produk — versi per produk butuh 2 kueri per produk, dan dengan jarak server aplikasi ke
+ * database yang jauh itu saja bisa memakan puluhan detik.
+ */
+export async function recomputeCostPricesExcludingRef(productIds: string[], excludeRefOrderId: string, dbc: DbOrTx = db) {
+  const ids = [...new Set(productIds)];
+  if (!ids.length) return new Map<string, number>();
+  const rows = await dbc
+    .select({ productId: stockMovements.productId, qty: stockMovements.qty, unitCost: stockMovements.unitCost, createdAt: stockMovements.createdAt, refOrderId: stockMovements.refOrderId })
+    .from(stockMovements)
+    .where(inArray(stockMovements.productId, ids));
+  const byProduct = new Map<string, ReplayableMovement[]>(ids.map((id) => [id, []]));
+  for (const r of rows) {
+    if (r.refOrderId === excludeRefOrderId) continue;
+    byProduct.get(r.productId)?.push(r);
+  }
+  const costs = new Map<string, number>();
+  for (const [id, mv] of byProduct) costs.set(id, replayCostPrice(mv).costPrice);
+  const values = sql.join(
+    [...costs].map(([id, c]) => sql`(${id}, ${c}::double precision)`),
+    sql`, `
+  );
+  await dbc.execute(sql`update products set cost_price = v.c from (values ${values}) as v(id, c) where products.id = v.id`);
+  return costs;
 }

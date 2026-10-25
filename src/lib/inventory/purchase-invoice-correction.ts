@@ -15,7 +15,7 @@ import {
 import { voidJournal } from "@/lib/accounting/journal";
 import { postPurchaseInvoiceJournal } from "@/lib/accounting/postings";
 import { payPurchaseInvoiceTx, prorateLandedCosts } from "@/lib/inventory/purchasing";
-import { recomputeCostPriceExcludingRef } from "@/lib/inventory/cost-replay";
+import { recomputeCostPricesExcludingRef } from "@/lib/inventory/cost-replay";
 import { getCostMethod, onStockIn, onStockOut } from "@/lib/inventory/costing";
 import { logAudit } from "@/lib/audit/log";
 
@@ -113,10 +113,12 @@ export async function reverseInvoiceEffects(purchaseInvoiceId: string, reason: s
   // item) dan stok dikurangi sekali per produk — dulu ±4 kueri per item membuat koreksi/pembatalan
   // invoice besar melewati batas waktu server.
   const activeLines = lines.filter((l) => l.qty > 0);
+  const isFifo = (await getCostMethod(invoice.outletId, tx)) === "fifo";
   const qtyByProduct = new Map<string, number>();
   for (const line of activeLines) {
-    // FIFO: take the units back out of this invoice's own layer first (no-op on rata-rata outlets).
-    await onStockOut(tx, { productId: line.productId, qty: Math.abs(line.qty), preferRefId: invoice.id });
+    // FIFO: take the units back out of this invoice's own layer first. Outlet rata-rata dilewati
+    // sama sekali (onStockOut sendiri butuh 2 kueri per item hanya untuk tahu bahwa itu no-op).
+    if (isFifo) await onStockOut(tx, { productId: line.productId, qty: Math.abs(line.qty), preferRefId: invoice.id });
     qtyByProduct.set(line.productId, (qtyByProduct.get(line.productId) ?? 0) + Math.abs(line.qty));
   }
   if (activeLines.length) {
@@ -132,8 +134,9 @@ export async function reverseInvoiceEffects(purchaseInvoiceId: string, reason: s
       }))
     );
   }
-  for (const [productId, qty] of qtyByProduct) {
-    await tx.update(products).set({ stockQty: sql`${products.stockQty} - ${qty}` }).where(eq(products.id, productId));
+  if (qtyByProduct.size) {
+    const values = sql.join([...qtyByProduct].map(([id, q]) => sql`(${id}, ${q}::integer)`), sql`, `);
+    await tx.execute(sql`update products set stock_qty = products.stock_qty - v.q from (values ${values}) as v(id, q) where products.id = v.id`);
   }
   const affectedProductIds = new Set(qtyByProduct.keys());
 
@@ -142,10 +145,8 @@ export async function reverseInvoiceEffects(purchaseInvoiceId: string, reason: s
   // invoice.id) entirely from the replay — see recomputeCostPriceExcludingRef's doc comment.
   // Rata-rata only — on a FIFO outlet onStockOut above already re-derived harga modal from the
   // remaining layers, and an average replay would overwrite it with the wrong method.
-  if ((await getCostMethod(invoice.outletId, tx)) !== "fifo") {
-    for (const productId of affectedProductIds) {
-      await recomputeCostPriceExcludingRef(productId, invoice.id, tx);
-    }
+  if (!isFifo) {
+    await recomputeCostPricesExcludingRef([...affectedProductIds], invoice.id, tx);
   }
 
   if (invoice.journalEntryId) {
@@ -231,16 +232,16 @@ export async function applyInvoiceLines(purchaseInvoiceId: string, lines: Invoic
       staffUserId,
     }))
   );
-  for (const [productId, st] of state) {
-    const added = st.stockQty - (startStock.get(productId) ?? 0);
-    await tx
-      .update(products)
-      .set({ stockQty: sql`${products.stockQty} + ${added}`, costPrice: Math.round(st.costPrice * 100) / 100 })
-      .where(eq(products.id, productId));
-  }
+  // Satu UPDATE untuk semua produk (stok + harga modal rata-rata).
+  const updValues = sql.join(
+    [...state].map(([id, st]) => sql`(${id}, ${st.stockQty - (startStock.get(id) ?? 0)}::integer, ${Math.round(st.costPrice * 100) / 100}::double precision)`),
+    sql`, `
+  );
+  await tx.execute(sql`update products set stock_qty = products.stock_qty + v.added, cost_price = v.cost from (values ${updValues}) as v(id, added, cost) where products.id = v.id`);
   // FIFO: satu lapisan per item, SETELAH stok diperbarui (urutan sama seperti sebelumnya) — onStockIn
   // menghitung ulang harga modal dari lapisan, menimpa rata-rata di atas. No-op di outlet rata-rata.
-  for (let i = 0; i < lines.length; i++) {
+  const isFifo = (await getCostMethod(invoice.outletId, tx)) === "fifo";
+  for (let i = 0; isFifo && i < lines.length; i++) {
     const line = lines[i];
     await onStockIn(tx, { productId: line.productId, qty: line.qty, unitCost: line.landedUnitCost, source: "purchase", refId: invoice.id, stockBefore: stockBeforeByLine[i] });
   }

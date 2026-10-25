@@ -27,6 +27,23 @@ describe("Edit / batal invoice Belanja Supplier", () => {
   });
 });
 
+describe("jumlah kueri koreksi invoice (latensi ke database)", () => {
+  it("tidak ada kueri per item untuk outlet rata-rata", () => {
+    const reverse = src.slice(src.indexOf("export async function reverseInvoiceEffects"), src.indexOf("export interface InvoiceLineInput"));
+    expect(reverse).toContain("if (isFifo) await onStockOut");
+    expect(reverse).toContain("recomputeCostPricesExcludingRef([...affectedProductIds]");
+    expect(reverse).not.toMatch(/for \(const \[productId, qty\] of qtyByProduct\) \{\s*await tx\.update\(products\)/);
+    const apply = src.slice(src.indexOf("export async function applyInvoiceLines"), src.indexOf("export async function voidPurchaseInvoice"));
+    expect(apply).toContain("isFifo && i < lines.length");
+    expect(apply).not.toMatch(/tx\s*\.update\(products\)/);
+  });
+
+  it("server aplikasi berada di region yang sama dengan database (Seoul)", () => {
+    const cfg = JSON.parse(readFileSync(join(__dirname, "..", "..", "..", "vercel.json"), "utf8"));
+    expect(cfg.regions).toEqual(["icn1"]);
+  });
+});
+
 describe("draf Belanja Supplier", () => {
   it("membersihkan data rusak & menghitung total", () => {
     const d = sanitizeDraft({ supplierId: "s1", purchaseDate: "2026-10-25", cart: [{ productId: "p", qty: 2, unitCost: 1500 }, { productId: "", qty: 1 }, { qty: 3 }], transportCost: 1000, parkingCost: "x", paidNow: false });
