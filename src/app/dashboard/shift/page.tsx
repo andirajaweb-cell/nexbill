@@ -16,6 +16,7 @@ import { useCurrency } from "@/lib/currency/client";
 import { useOutletFormat } from "@/lib/format/client";
 import "@/lib/i18n/dict-shift";
 import "@/lib/i18n/dict-cash-date";
+import "@/lib/i18n/dict-cash-move";
 import { outletDateYmd } from "@/lib/time/outlet-time";
 import { filterShifts, summarizeShifts, shiftYears, defaultFilterValue, type ShiftPeriodMode, type ShiftHistoryFilter } from "@/lib/shift/history-filter";
 
@@ -121,7 +122,11 @@ export default function ShiftPage() {
   // with their live trial-balance-derived balance, used both for the "Modal Awal" quick-fill below
   // and the Setoran Kas tab's source/destination pickers.
   const [cashAccounts, setCashAccounts] = useState<{ id: string; name: string; type: string; isDefault: boolean; includeInShiftFloat: boolean; balance: number }[]>([]);
-  const [pageTab, setPageTab] = useState<"shift" | "deposit" | "transfer">("shift");
+  // Semua akun kas DAN bank (dengan saldo) — untuk tujuan/sumber Setoran & Pindah Kas. Dulu hanya
+  // akun tipe "cash" yang ikut, sehingga outlet dengan satu kas + rekening bank melihat "Ke Akun Kas
+  // Tujuan" kosong (tidak bisa menyetor ke bank).
+  const [moneyAccounts, setMoneyAccounts] = useState<{ id: string; name: string; type: string; isDefault: boolean; balance: number }[]>([]);
+  const [pageTab, setPageTab] = useState<"shift" | "cash">("shift");
 
   // Closing form state — the cashier fills this in blind (no expected figures shown
   // anywhere on this screen until after they submit; closeResult below is the reveal).
@@ -217,7 +222,10 @@ export default function ShiftPage() {
     if (!outlet) return;
     setOutletId(outlet.id);
     fetchJsonArray(`/api/shifts?outletId=${outlet.id}`).then(setHistory);
-    fetchJsonArray(`/api/cash-bank-accounts?withBalance=1`).then((rows: any[]) => setCashAccounts(rows.filter((r) => r.type === "cash")));
+    fetchJsonArray(`/api/cash-bank-accounts?withBalance=1`).then((rows: any[]) => {
+      setCashAccounts(rows.filter((r) => r.type === "cash"));
+      setMoneyAccounts(rows.filter((r) => r.isActive !== false));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outlet]);
 
@@ -422,21 +430,14 @@ export default function ShiftPage() {
           {t("shift.tab.shift", "Shift")}
         </button>
         {hasPermission((user?.role ?? "cashier") as any, "manage_cash_deposit") && (
-          <button onClick={() => setPageTab("deposit")} className={`px-3 py-2 text-sm ${pageTab === "deposit" ? "border-b-2 border-emerald-500 text-emerald-400" : "text-neutral-500 hover:text-neutral-300"}`}>
-            {t("shift.tab.cashDeposit", "Setoran Kas")}
-          </button>
-        )}
-        {hasPermission((user?.role ?? "cashier") as any, "manage_cash_deposit") && (
-          <button onClick={() => setPageTab("transfer")} className={`px-3 py-2 text-sm ${pageTab === "transfer" ? "border-b-2 border-emerald-500 text-emerald-400" : "text-neutral-500 hover:text-neutral-300"}`}>
-            {t("shift.tab.cashTransfer", "Pindah Kas")}
+          <button onClick={() => setPageTab("cash")} className={`px-3 py-2 text-sm ${pageTab === "cash" ? "border-b-2 border-emerald-500 text-emerald-400" : "text-neutral-500 hover:text-neutral-300"}`}>
+            {t("shift.tab.cashMovement", "Setoran & Pindah Kas")}
           </button>
         )}
       </div>
 
-      {pageTab === "deposit" ? (
-        <CashDepositTab outletId={outletId} currentShiftId={currentShift?.id ?? null} cashAccounts={cashAccounts} rupiah={rupiah} />
-      ) : pageTab === "transfer" ? (
-        <CashTransferTab outletId={outletId} currentShiftId={currentShift?.id ?? null} cashAccounts={cashAccounts} rupiah={rupiah} />
+      {pageTab === "cash" ? (
+        <CashMovementTab outletId={outletId} currentShiftId={currentShift?.id ?? null} cashAccounts={moneyAccounts} rupiah={rupiah} />
       ) : (
       <>
       <Card className="border-cyan-500/30">
@@ -1145,7 +1146,7 @@ function CashDepositTab({
               value={sourceId}
               onChange={(v) => setSourceId(v)}
               placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
-              options={cashAccounts.map((a) => ({ value: a.id, label: `${a.name} (${rupiah(a.balance)})` }))}
+              options={cashAccounts.map((a) => ({ value: a.id, label: accountLabel(a, rupiah, t) }))}
             />
           </div>
           {isInternalTransfer && (
@@ -1156,10 +1157,11 @@ function CashDepositTab({
                 value={destinationId}
                 onChange={(v) => setDestinationId(v)}
                 placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
-                options={destinationOptions.map((a) => ({ value: a.id, label: `${a.name} (${rupiah(a.balance)})` }))}
+                options={destinationOptions.map((a) => ({ value: a.id, label: accountLabel(a, rupiah, t) }))}
               />
               {destinationOptions.length === 0 && (
-                <p className="text-xs text-amber-400 mt-1">{t("cashDeposit.noDestinationHint", "Belum ada akun kas lain — tambahkan dulu di Admin Data > Akun Kas/Bank (mis. \"Kas Besar\").")}</p>
+                <p className="text-xs text-amber-400 mt-1">{t("cashMove.noDestinationHint", "Belum ada akun kas/bank lain sebagai tujuan.")}{" "}
+                  <a href="/dashboard/admin" className="underline">{t("cashMove.addAccountLink", "Tambah di Admin Data → Akun Kas/Bank")}</a></p>
               )}
             </div>
           )}
@@ -1353,7 +1355,7 @@ function CashTransferTab({
               value={sourceId}
               onChange={(v) => setSourceId(v)}
               placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
-              options={cashAccounts.map((a) => ({ value: a.id, label: `${a.name} (${rupiah(a.balance)})` }))}
+              options={cashAccounts.map((a) => ({ value: a.id, label: accountLabel(a, rupiah, t) }))}
             />
           </div>
           <div>
@@ -1363,10 +1365,11 @@ function CashTransferTab({
               value={destinationId}
               onChange={(v) => setDestinationId(v)}
               placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
-              options={destinationOptions.map((a) => ({ value: a.id, label: `${a.name} (${rupiah(a.balance)})` }))}
+              options={destinationOptions.map((a) => ({ value: a.id, label: accountLabel(a, rupiah, t) }))}
             />
             {destinationOptions.length === 0 && (
-              <p className="text-xs text-amber-400 mt-1">{t("cashDeposit.noDestinationHint", "Belum ada akun kas lain — tambahkan dulu di Admin Data > Akun Kas/Bank (mis. \"Kas Besar\").")}</p>
+              <p className="text-xs text-amber-400 mt-1">{t("cashMove.noDestinationHint", "Belum ada akun kas/bank lain sebagai tujuan.")}{" "}
+                  <a href="/dashboard/admin" className="underline">{t("cashMove.addAccountLink", "Tambah di Admin Data → Akun Kas/Bank")}</a></p>
             )}
           </div>
           <div className="sm:col-span-2">
@@ -1449,6 +1452,60 @@ function CashEntryDateField({ value, onChange }: { value: string; onChange: (v: 
           )}
         </p>
       )}
+    </div>
+  );
+}
+
+/** "Kas Utama (Rp13.065.719)" / "Rekening Bank Utama · Bank (Rp…)". */
+function accountLabel(a: { name: string; type: string; balance: number }, rupiah: (n: number) => string, t: (k: string, f: string) => string) {
+  return `${a.name}${a.type === "bank" ? ` · ${t("cashMove.bankTag", "Bank")}` : ""} (${rupiah(a.balance)})`;
+}
+
+/**
+ * Satu tab "Setoran & Pindah Kas" (dulu dua tab terpisah yang membingungkan). Pengguna memilih
+ * dulu jenis gerakan uangnya:
+ *  - Setoran Kas: uang diambil/diserahkan ke Owner/Manager/Supervisor/Accounting — langsung
+ *    tercatat, wajib memilih penerima (lib/cash/deposits.ts).
+ *  - Pindah Kas: memindahkan saldo antar kas/bank outlet sendiri — perlu persetujuan
+ *    Owner/Manager sebelum dijurnal (lib/cash/transfers.ts).
+ * Masing-masing tetap memakai form & riwayatnya sendiri.
+ */
+function CashMovementTab(props: {
+  outletId: string | null;
+  currentShiftId: string | null;
+  cashAccounts: { id: string; name: string; type: string; isDefault: boolean; balance: number }[];
+  rupiah: (n: number) => string;
+}) {
+  const { t } = useDashboardLang();
+  const [mode, setMode] = useState<"deposit" | "transfer">("deposit");
+  const options: { key: "deposit" | "transfer"; title: string; desc: string }[] = [
+    {
+      key: "deposit",
+      title: t("shift.tab.cashDeposit", "Setoran Kas"),
+      desc: t("cashMove.depositDesc", "Uang diambil atau diserahkan ke Owner/Manager/Supervisor/Accounting — langsung tercatat, wajib pilih penerima."),
+    },
+    {
+      key: "transfer",
+      title: t("shift.tab.cashTransfer", "Pindah Kas"),
+      desc: t("cashMove.transferDesc", "Pindah saldo antar kas/bank outlet sendiri (mis. Kas Utama ke rekening bank) — perlu persetujuan Owner/Manager."),
+    },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            onClick={() => setMode(o.key)}
+            className={`rounded-xl border px-4 py-3 text-left transition ${mode === o.key ? "border-emerald-500/60 bg-emerald-500/10" : "border-neutral-800 bg-neutral-900/40 hover:border-neutral-600"}`}
+          >
+            <div className={`text-sm font-medium ${mode === o.key ? "text-emerald-300" : "text-neutral-200"}`}>{o.title}</div>
+            <div className="mt-0.5 text-xs text-neutral-500">{o.desc}</div>
+          </button>
+        ))}
+      </div>
+      {mode === "deposit" ? <CashDepositTab {...props} /> : <CashTransferTab {...props} />}
     </div>
   );
 }
