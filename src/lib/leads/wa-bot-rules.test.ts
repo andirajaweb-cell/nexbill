@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BOT_STALE_AFTER_MS,
+  RESET_UNLINKED_AFTER_FAILURES,
   DEFAULT_DAILY_LIMIT,
   SEND_DELAY_MAX_MS,
   SEND_DELAY_MIN_MS,
@@ -13,6 +14,9 @@ import {
   phoneVariants,
   sendDelayMs,
   startOfTodayWibIso,
+  closeCodeName,
+  closeNote,
+  reconnectDelayMs,
 } from "./wa-bot-rules";
 
 const now = Date.parse("2026-09-29T10:00:00Z");
@@ -78,5 +82,24 @@ describe("teks aktivitas", () => {
   it("pesan keluar menyebut template & cuplikan", () => {
     expect(outboundActivityText("Perkenalan", "Halo\nkak")).toBe('Kirim WA via bot — template "Perkenalan": Halo kak');
     expect(outboundActivityText(null, "Hai")).toBe("Kirim WA via bot — pesan bebas: Hai");
+  });
+});
+
+describe("sambung ulang & QR", () => {
+  it("jeda sambung ulang naik bertahap, maks 60 dtk", () => {
+    expect([1, 2, 3, 4, 5, 6, 9].map(reconnectDelayMs)).toEqual([3000, 6000, 12000, 24000, 48000, 60000, 60000]);
+  });
+  it("QR habis tanpa scan hanya bila socket sempat menampilkan QR", () => {
+    expect(closeNote({ statusCode: 408, linked: false, hadQr: true, failuresWithoutQr: 0, retryInMs: 3000 })).toMatch(/kedaluwarsa/);
+    const gagal = closeNote({ statusCode: 405, linked: false, hadQr: false, failuresWithoutQr: 2, retryInMs: 6000 });
+    expect(gagal).toMatch(/^Gagal mendapat QR/);
+    expect(gagal).toContain("405");
+    expect(gagal).not.toMatch(/dibuang/);
+    expect(closeNote({ statusCode: 405, linked: false, hadQr: false, failuresWithoutQr: RESET_UNLINKED_AFTER_FAILURES, retryInMs: 12000 })).toMatch(/dibuang/);
+  });
+  it("logout & terputus setelah tertaut", () => {
+    expect(closeNote({ statusCode: 401, linked: true, hadQr: false, failuresWithoutQr: 0, retryInMs: 3000 })).toMatch(/^Logout/);
+    expect(closeNote({ statusCode: 428, linked: true, hadQr: false, failuresWithoutQr: 0, retryInMs: 3000 })).toMatch(/^Terputus \(koneksi ditutup 428\)/);
+    expect(closeCodeName(undefined)).toBe("tanpa kode");
   });
 });

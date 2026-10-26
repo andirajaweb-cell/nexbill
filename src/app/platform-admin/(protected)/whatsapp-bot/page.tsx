@@ -148,7 +148,14 @@ export default function WhatsappBotPage() {
 
           {state === "menghubungkan" && (
             <div className="rounded-xl border border-sky-400/30 bg-sky-500/5 p-4 text-sm text-sky-100">
-              Bot berjalan dan sedang menyiapkan QR baru / menyambung ulang. Biasanya hanya beberapa detik — halaman ini memperbarui otomatis, QR akan muncul di sini.
+              <p>Bot berjalan dan sedang menyiapkan QR baru / menyambung ulang. Biasanya hanya beberapa detik — halaman ini memperbarui otomatis, QR akan muncul di sini.</p>
+              {data?.status?.lastError?.startsWith("Gagal") && (
+                <p className="mt-2 text-xs text-amber-200">
+                  Bot sudah mencoba ulang otomatis (jeda makin panjang, sesi sementara dibuang setelah 3 kali gagal). Kalau tetap tidak muncul: lihat log bot di server
+                  (<code className="text-neutral-200">pm2 logs</code>), pastikan server bisa membuka web.whatsapp.com, lalu{" "}
+                  <code className="text-neutral-200">git pull</code> dan restart bot (<code className="text-neutral-200">pm2 restart</code>).
+                </p>
+              )}
             </div>
           )}
 

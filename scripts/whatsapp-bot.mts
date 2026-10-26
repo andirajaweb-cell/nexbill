@@ -43,7 +43,13 @@ import {
 } from "../src/lib/leads/wa-bot";
 import {
   BOT_HEARTBEAT_INTERVAL_MS,
+  NO_QR_WATCHDOG_MS,
+  RESET_UNLINKED_AFTER_FAILURES,
+  VERSION_FETCH_TIMEOUT_MS,
+  closeCodeName,
+  closeNote,
   jidFromPhone,
+  reconnectDelayMs,
   parseDailyLimit,
   phoneFromJids,
   sendDelayMs,
@@ -99,36 +105,89 @@ async function drainOutbox(sock: ReturnType<typeof makeWASocket>) {
 /**
  * WhatsApp menolak pairing QR ("Couldn't link device") bila versi protokol yang diumumkan socket
  * sudah basi. Ambil versi langsung dari WhatsApp Web dulu; fallback ke default Baileys.
+ * Hasilnya disimpan (cachedVersion) supaya sambung ulang tidak mengambil versi lagi; setiap fetch dibatasi
+ * waktunya — fetch tanpa batas waktu bisa menggantung beberapa menit dan QR tidak pernah muncul.
  */
-async function resolveWaVersion() {
-  const fromWaWeb = await fetchLatestWaWebVersion({});
+type WaVersion = [number, number, number];
+let cachedVersion: WaVersion | null = null;
+
+async function resolveWaVersion(force = false): Promise<WaVersion> {
+  if (cachedVersion && !force) return cachedVersion;
+  const fromWaWeb = await fetchLatestWaWebVersion({ signal: AbortSignal.timeout(VERSION_FETCH_TIMEOUT_MS) } as any);
   if (fromWaWeb.isLatest) {
     console.log(`Versi WhatsApp Web terdeteksi: ${fromWaWeb.version.join(".")}`);
-    return fromWaWeb.version;
+    cachedVersion = fromWaWeb.version as WaVersion;
+    return cachedVersion;
   }
   console.warn("Gagal ambil versi langsung dari WhatsApp Web, coba fallback ke default Baileys.", (fromWaWeb.error as any)?.message ?? fromWaWeb.error);
-  const fromBaileys = await fetchLatestBaileysVersion();
-  if (!fromBaileys.isLatest) {
-    console.warn(`Pakai versi bundled (${fromBaileys.version.join(".")}) — kalau QR terus gagal "Couldn't link device", cek koneksi server ke web.whatsapp.com / GitHub.`);
+  const fromBaileys = await Promise.race([
+    fetchLatestBaileysVersion(),
+    sleep(VERSION_FETCH_TIMEOUT_MS).then(() => null),
+  ]);
+  if (!fromBaileys || !fromBaileys.isLatest) {
+    console.warn('Pakai versi bawaan Baileys — kalau QR tidak muncul / "Couldn\'t link device", cek koneksi server ke web.whatsapp.com / GitHub dan perbarui @whiskeysockets/baileys.');
   }
-  return fromBaileys.version;
+  // Versi bawaan tidak di-cache: percobaan berikutnya mencoba WhatsApp Web lagi.
+  return (fromBaileys?.version as WaVersion) ?? (fromWaWeb.version as WaVersion);
 }
 
 let heartbeat: NodeJS.Timeout | null = null;
 let outboxPoller: NodeJS.Timeout | null = null;
+let watchdog: NodeJS.Timeout | null = null;
 let lastConnected = false;
 let lastQr: string | null = null;
 let lastNumber: string | null = null;
+/** Socket yang sedang aktif — event dari socket lama diabaikan supaya tidak memicu sambung ulang ganda. */
+let generation = 0;
+let failuresWithoutQr = 0;
+let reconnectScheduled = false;
 
 function stopTimers() {
   if (outboxPoller) clearInterval(outboxPoller);
   outboxPoller = null;
+  if (watchdog) clearTimeout(watchdog);
+  watchdog = null;
+}
+
+/** Hapus sesi login yang BELUM pernah ditautkan (aman — tidak ada nomor yang logout). */
+function clearUnlinkedAuth() {
+  try {
+    for (const f of fs.readdirSync(AUTH_DIR)) fs.rmSync(path.join(AUTH_DIR, f), { recursive: true, force: true });
+    console.warn("Sesi login sementara (belum tertaut) dihapus — memulai dari awal.");
+  } catch (err) {
+    console.error("Gagal menghapus data/wa-auth:", err);
+  }
+}
+
+function scheduleReconnect(delayMs: number) {
+  if (reconnectScheduled) return;
+  reconnectScheduled = true;
+  setTimeout(() => {
+    reconnectScheduled = false;
+    start().catch(async (err) => {
+      // Sebelumnya error di sini tertelan: proses tetap hidup (heartbeat jalan) tapi tanpa socket → QR tidak pernah muncul.
+      failuresWithoutQr++;
+      const wait = reconnectDelayMs(failuresWithoutQr);
+      console.error("Gagal menyambung ulang bot WhatsApp:", err);
+      await status({ connected: false, qrDataUrl: null, number: null, lastError: `Gagal start ulang: ${String((err as Error)?.message ?? err)} — coba lagi dalam ${Math.round(wait / 1000)} dtk.` });
+      scheduleReconnect(wait);
+    });
+  }, delayMs);
 }
 
 async function start() {
+  const gen = ++generation;
+  stopTimers();
   await requeueStuckSending().catch((err) => console.error("Gagal mengembalikan antrean 'sending':", err));
+
+  // Sudah beberapa kali gagal tanpa QR & nomor belum tertaut → buang sesi sementara & ambil versi baru.
+  const peek = await useMultiFileAuthState(AUTH_DIR);
+  if (!peek.state.creds.me && failuresWithoutQr >= RESET_UNLINKED_AFTER_FAILURES) {
+    clearUnlinkedAuth();
+    cachedVersion = null;
+  }
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const version = await resolveWaVersion();
+  const version = await resolveWaVersion(failuresWithoutQr >= RESET_UNLINKED_AFTER_FAILURES);
 
   const sock = makeWASocket({
     version,
@@ -139,6 +198,7 @@ async function start() {
     syncFullHistory: false,
     markOnlineOnConnect: false,
   });
+  let hadQr = false;
 
   sock.ev.on("creds.update", saveCreds);
 
@@ -149,10 +209,20 @@ async function start() {
     }, BOT_HEARTBEAT_INTERVAL_MS);
   }
 
+  // Penjaga: belum terhubung & belum ada QR terlalu lama → socket macet, tutup supaya dibuat ulang.
+  watchdog = setTimeout(() => {
+    if (gen !== generation || lastConnected || hadQr) return;
+    console.warn(`Belum ada QR setelah ${NO_QR_WATCHDOG_MS / 1000} detik — membuat ulang koneksi.`);
+    sock.end(new Boom("Tidak ada QR", { statusCode: DisconnectReason.timedOut }) as any);
+  }, NO_QR_WATCHDOG_MS);
+
   sock.ev.on("connection.update", async (update) => {
+    if (gen !== generation) return; // socket lama
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      hadQr = true;
+      failuresWithoutQr = 0;
       lastQr = await qrcode.toDataURL(qr);
       lastConnected = false;
       await status({ connected: false, qrDataUrl: lastQr, number: null, lastError: null });
@@ -160,9 +230,12 @@ async function start() {
     }
 
     if (connection === "open") {
+      failuresWithoutQr = 0;
       lastConnected = true;
       lastQr = null;
       lastNumber = sock.user?.id ?? null;
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = null;
       await status({ connected: true, qrDataUrl: null, number: lastNumber, lastError: null });
       console.log(`Bot WhatsApp CRM terhubung sebagai ${lastNumber}. Batas harian: ${DAILY_LIMIT} pesan.`);
       if (!outboxPoller) {
@@ -172,26 +245,21 @@ async function start() {
     }
 
     if (connection === "close") {
+      const wasConnected = lastConnected;
       lastConnected = false;
       lastQr = null; // QR lama sudah tidak berlaku — jangan dipublikasikan ulang oleh heartbeat
       stopTimers();
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
-      const reasonName = Object.entries(DisconnectReason).find(([, v]) => v === statusCode)?.[0] ?? "unknown";
-      // Belum pernah ditautkan (creds.me kosong) + 408 = putaran QR habis tanpa di-scan. Itu normal,
-      // bukan gangguan — bot langsung membuat QR baru.
-      const belumTertaut = !state.creds.me;
-      const catatan = loggedOut
-        ? "Logout dari HP — hapus data/wa-auth lalu jalankan ulang untuk scan QR baru."
-        : belumTertaut
-          ? "QR sebelumnya kedaluwarsa tanpa di-scan — membuat QR baru…"
-          : `Terputus (${reasonName}) — menyambung ulang…`;
+      const linked = !!state.creds.me;
+      const restart = statusCode === DisconnectReason.restartRequired;
+      if (!hadQr && !wasConnected && !restart) failuresWithoutQr++;
+      const retryInMs = restart ? 1000 : reconnectDelayMs(failuresWithoutQr);
+      const catatan = closeNote({ statusCode, linked, hadQr, failuresWithoutQr, retryInMs });
       await status({ connected: false, qrDataUrl: null, number: null, lastError: catatan });
-      console.log("Koneksi WhatsApp terputus.", { statusCode, reason: reasonName });
-      if (statusCode === DisconnectReason.restartRequired) {
-        console.log('Normal setelah QR pertama kali di-scan — restart otomatis, tunggu "terhubung sebagai".');
-      }
-      if (!loggedOut) setTimeout(() => void start(), 3000);
+      console.log("Koneksi WhatsApp terputus.", { statusCode, reason: closeCodeName(statusCode), linked, hadQr, failuresWithoutQr, error: (lastDisconnect?.error as Error)?.message });
+      if (restart) console.log('Normal setelah QR pertama kali di-scan — restart otomatis, tunggu "terhubung sebagai".');
+      if (!loggedOut) scheduleReconnect(retryInMs);
       else console.warn("Sesi logout. Hapus folder data/wa-auth lalu jalankan ulang bot untuk login dengan QR baru.");
     }
   });

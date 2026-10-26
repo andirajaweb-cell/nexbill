@@ -46,6 +46,62 @@ export const BOT_STATE_LABEL: Record<BotState, string> = {
   belum_pernah: "Belum pernah dijalankan",
 };
 
+/* ------------------------------------------------------------ sambung ulang & QR ------------------------------------------------------------ */
+
+/** Kode tutup koneksi Baileys yang relevan (DisconnectReason + 405 "Connection Failure" yang tidak ada di enum). */
+const CLOSE_CODE_NAME: Record<number, string> = {
+  401: "logout",
+  403: "ditolak WhatsApp",
+  405: "Connection Failure",
+  408: "timeout",
+  411: "multi-device tidak cocok",
+  428: "koneksi ditutup",
+  440: "sesi dipakai di tempat lain",
+  500: "sesi rusak",
+  503: "layanan WhatsApp tidak tersedia",
+  515: "perlu restart",
+};
+
+export function closeCodeName(code: number | undefined): string {
+  return code == null ? "tanpa kode" : `${CLOSE_CODE_NAME[code] ?? "lainnya"} ${code}`;
+}
+
+/** Setelah sekian kali gagal berturut-turut TANPA pernah menampilkan QR, sesi belum-tertaut dibuang & versi diambil ulang. */
+export const RESET_UNLINKED_AFTER_FAILURES = 3;
+/** Bot belum terhubung dan belum punya QR selama ini → socket dianggap macet dan dibuat ulang. */
+export const NO_QR_WATCHDOG_MS = 90_000;
+/** Batas waktu ambil versi WhatsApp Web (tanpa ini fetch bisa menggantung beberapa menit → QR tidak pernah muncul). */
+export const VERSION_FETCH_TIMEOUT_MS = 10_000;
+
+/** Jeda sebelum mencoba lagi: 3 dtk, 6, 12, 24, 48, maks 60 dtk. */
+export function reconnectDelayMs(consecutiveFailures: number): number {
+  const n = Math.max(0, consecutiveFailures - 1);
+  return Math.min(60_000, 3_000 * 2 ** Math.min(n, 5));
+}
+
+export interface CloseInfo {
+  statusCode: number | undefined;
+  /** creds.me sudah ada = nomor pernah ditautkan. */
+  linked: boolean;
+  /** Socket yang baru ditutup sempat menampilkan QR. */
+  hadQr: boolean;
+  /** Berapa kali berturut-turut socket tutup tanpa QR & tanpa terhubung (termasuk yang ini). */
+  failuresWithoutQr: number;
+  retryInMs: number;
+}
+
+/** Catatan yang ditampilkan di halaman platform-admin saat koneksi tertutup — menyebut kode supaya bisa didiagnosis. */
+export function closeNote(c: CloseInfo): string {
+  const detik = Math.round(c.retryInMs / 1000);
+  if (c.statusCode === 401) return "Logout dari HP — hapus folder data/wa-auth di server bot lalu jalankan ulang untuk scan QR baru.";
+  if (!c.linked && c.hadQr && c.statusCode === 408) return "QR sebelumnya kedaluwarsa tanpa di-scan — membuat QR baru…";
+  if (!c.linked) {
+    const reset = c.failuresWithoutQr >= RESET_UNLINKED_AFTER_FAILURES ? " Sesi login sementara dibuang & versi WhatsApp diambil ulang." : "";
+    return `Gagal mendapat QR dari WhatsApp (${closeCodeName(c.statusCode)}), percobaan ke-${c.failuresWithoutQr} — coba lagi dalam ${detik} dtk.${reset} Bila terus berulang: cek internet server bot ke web.whatsapp.com dan log bot.`;
+  }
+  return `Terputus (${closeCodeName(c.statusCode)}) — menyambung ulang dalam ${detik} dtk…`;
+}
+
 export function sendDelayMs(rand = Math.random()): number {
   return Math.round(SEND_DELAY_MIN_MS + rand * (SEND_DELAY_MAX_MS - SEND_DELAY_MIN_MS));
 }
