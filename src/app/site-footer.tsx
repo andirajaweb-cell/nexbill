@@ -28,6 +28,7 @@ export function SiteFooter() {
           <Link href="/#fitur">{t.nav.fitur}</Link>
           <Link href="/#harga">{t.nav.harga}</Link>
           <Link href="/#faq">{t.nav.faq}</Link>
+          <Link href={`/kalkulator-kebocoran?lang=${lang}`}>{t.leak.footerLabel}</Link>
           <Link href="/about">{t.nav.about}</Link>
           <Link href={`/login?lang=${lang}`}>{t.nav.login}</Link>
           <Link href={`/daftar?lang=${lang}`}>{t.nav.daftar}</Link>

@@ -1080,6 +1080,33 @@ function LandingPageInner() {
         </div>
       </section>
 
+      {/* SECTION: KALKULATOR KEBOCORAN — tepat setelah SOLUSI (masalah), ajak pengunjung menghitung
+          kebocoran outletnya sendiri di /kalkulator-kebocoran (angka dari isian pengunjung, tanpa klaim). */}
+      <section id="kalkulator-kebocoran" style={{ backgroundColor: 'transparent' }}>
+        <div className="wrap">
+          <div className="section-head">
+            <div className="kicker">{t.leak.kicker}</div>
+            <h2>{t.leak.title}</h2>
+            <p>{t.leak.sub}</p>
+          </div>
+          <div className="feat-grid">
+            {t.leak.items.map((g, i) => (
+              <div className="feat-card" key={i} style={{ backdropFilter: 'blur(10px)', backgroundColor: 'rgba(13, 21, 38, 0.5)' }}>
+                <div className="feat-icon floating-3d-asset" style={{ boxShadow: 'inset 0 4px 6px rgba(255,255,255,0.1), 0 10px 15px -3px rgba(34, 211, 238, 0.3)' }}>
+                  {["💸", "⏱️", "⚡"][i] ?? "✓"}
+                </div>
+                <h3>{g.title}</h3>
+                <p>{g.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '22px' }}>
+            <Link href={`/kalkulator-kebocoran?lang=${lang}`} className="btn btn-primary">{t.leak.cta} →</Link>
+            <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '14px', margin: 0 }}>{t.leak.note}</p>
+          </div>
+        </div>
+      </section>
+
       {/* SECTION: SHOWCASE — horizontal marquee of varied-size cards, bajgartoffice.com style.
           Auto-scrolls left-to-right on its own at a fast tempo (see the gsap.ticker-driven
           autoScrollTick in the effect above), and is also drag/wheel-scrollable — dragging or

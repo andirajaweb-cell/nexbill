@@ -72,6 +72,8 @@ export interface LandingCopy {
   // Mockup HP + Android/Google Play + "Bekerja dengan" (landing-showcase.tsx).
   appShowcase: import("./landing-showcase").ShowcaseCopy;
   demo: { kicker: string; title: string; sub: string; emailLabel: string; passwordLabel: string; cta: string; copy: string; copied: string; note: string; signup: string };
+  // Ajakan ke Kalkulator Kebocoran (/kalkulator-kebocoran) — di bawah SOLUSI dan di footer.
+  leak: { kicker: string; title: string; sub: string; items: Feature[]; cta: string; note: string; footerLabel: string };
   // Struktur harga 2026-10 (lihat src/lib/subscription/pricing.ts): dua kartu Starter (per unit,
   // minimal N unit) & Pro (flat per outlet), toggle bulanan/tahunan. Angka harga TIDAK ditulis di
   // sini — diambil live dari /api/public/pricing (fallback ke DEFAULT_PRICING di page.tsx).
@@ -213,6 +215,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       copied: "Tersalin",
       note: "Akun demo dipakai bersama banyak orang — jangan masukkan data asli. Data dapat direset sewaktu-waktu.",
       signup: "Atau daftar gratis untuk outlet Anda",
+    },
+    leak: {
+      kicker: "Kalkulator Kebocoran",
+      title: "Berapa uang outlet Anda bocor tiap bulan?",
+      sub: "Isi angka outlet Anda sendiri — hasilnya langsung terlihat per bulan dan per tahun, lalu dibandingkan dengan biaya langganan NEXBILL.",
+      items: [
+        { title: "Selisih kas", desc: "Kas kurang di setiap tutup shift." },
+        { title: "Menit tak tertagih", desc: "Lupa mulai/stop timer, dibulatkan ke bawah, atau \"bonus\" dari staf." },
+        { title: "Listrik TV tanpa sesi", desc: "TV dan konsol yang tetap menyala saat tidak ada yang main." },
+      ],
+      cta: "Hitung kebocoran outlet saya",
+      note: "Gratis, tanpa daftar. Hasil bisa dikirim lewat WhatsApp.",
+      footerLabel: "Kalkulator Kebocoran",
     },
     mobile: {
       kicker: "Kasir tanpa PC", title: "Cukup HP Android — outlet langsung jalan",
@@ -428,6 +443,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       note: "The demo account is shared by many people — don't enter real data. Data may be reset at any time.",
       signup: "Or sign up free for your outlet",
     },
+    leak: {
+      kicker: "Leakage Calculator",
+      title: "How much money does your outlet lose each month?",
+      sub: "Enter your own outlet's numbers — see the result per month and per year, compared with the cost of NEXBILL.",
+      items: [
+        { title: "Cash shortfall", desc: "Cash short at every shift close." },
+        { title: "Unbilled minutes", desc: "Timer started late or stopped early, rounded down, or a \"bonus\" from staff." },
+        { title: "TV power with no session", desc: "TVs and consoles left on when nobody is playing." },
+      ],
+      cta: "Calculate my outlet's leakage",
+      note: "Free, no sign-up. Share the result via WhatsApp.",
+      footerLabel: "Leakage Calculator",
+    },
     mobile: {
       kicker: "Cashier without a PC", title: "Just an Android phone — your outlet is ready",
       sub: "No need to buy a cashier computer. Open NEXBILL on an Android phone, pair a Bluetooth thermal printer, and run daily operations from your hand.",
@@ -641,6 +669,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       copied: "Disalin",
       note: "Akaun demo dikongsi ramai orang — jangan masukkan data sebenar. Data boleh ditetapkan semula bila-bila masa.",
       signup: "Atau daftar percuma untuk outlet anda",
+    },
+    leak: {
+      kicker: "Kalkulator Ketirisan",
+      title: "Berapa wang outlet anda tiris setiap bulan?",
+      sub: "Isi angka outlet anda sendiri — hasil terus dipaparkan sebulan dan setahun, kemudian dibandingkan dengan kos langganan NEXBILL.",
+      items: [
+        { title: "Kekurangan tunai", desc: "Tunai kurang pada setiap tutup syif." },
+        { title: "Minit tidak dicaj", desc: "Lupa mula/henti pemasa, dibundarkan ke bawah, atau \"bonus\" daripada staf." },
+        { title: "Elektrik TV tanpa sesi", desc: "TV dan konsol yang terus menyala ketika tiada yang bermain." },
+      ],
+      cta: "Kira ketirisan outlet saya",
+      note: "Percuma, tanpa daftar. Hasil boleh dihantar melalui WhatsApp.",
+      footerLabel: "Kalkulator Ketirisan",
     },
     mobile: {
       kicker: "Juruwang tanpa PC", title: "Cukup telefon Android — outlet terus beroperasi",
@@ -859,6 +900,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       note: "บัญชีเดโมใช้ร่วมกันหลายคน — อย่าใส่ข้อมูลจริง ข้อมูลอาจถูกรีเซ็ตได้ตลอดเวลา",
       signup: "หรือสมัครฟรีสำหรับร้านของคุณ",
     },
+    leak: {
+      kicker: "เครื่องคิดเลขเงินรั่วไหล",
+      title: "ร้านของคุณเสียเงินไปเท่าไรในแต่ละเดือน?",
+      sub: "กรอกตัวเลขของร้านคุณเอง — ดูผลต่อเดือนและต่อปีทันที เทียบกับค่าใช้จ่าย NEXBILL",
+      items: [
+        { title: "เงินสดขาด", desc: "เงินสดขาดทุกครั้งที่ปิดกะ" },
+        { title: "นาทีที่ไม่ได้คิดเงิน", desc: "ลืมเริ่ม/หยุดจับเวลา ปัดเศษลง หรือพนักงาน \"แถม\"" },
+        { title: "ค่าไฟทีวีที่ไม่มีเซสชัน", desc: "ทีวีและเครื่องเกมที่เปิดทิ้งไว้ตอนไม่มีคนเล่น" },
+      ],
+      cta: "คำนวณเงินรั่วไหลของร้านฉัน",
+      note: "ฟรี ไม่ต้องสมัคร ส่งผลทาง WhatsApp ได้",
+      footerLabel: "เครื่องคิดเลขเงินรั่วไหล",
+    },
     mobile: {
       kicker: "แคชเชียร์ไม่ต้องมี PC", title: "แค่มือถือ Android — ร้านพร้อมใช้งาน",
       sub: "ไม่ต้องซื้อคอมพิวเตอร์แคชเชียร์ เปิด NEXBILL บนมือถือ Android จับคู่เครื่องพิมพ์ความร้อนบลูทูธ แล้วบริหารงานประจำวันได้จากมือถือ",
@@ -1076,6 +1130,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       note: "Tài khoản demo được nhiều người dùng chung — đừng nhập dữ liệu thật. Dữ liệu có thể bị đặt lại bất cứ lúc nào.",
       signup: "Hoặc đăng ký miễn phí cho cửa hàng của bạn",
     },
+    leak: {
+      kicker: "Máy tính thất thoát",
+      title: "Mỗi tháng tiệm của bạn thất thoát bao nhiêu tiền?",
+      sub: "Nhập số liệu của chính tiệm bạn — xem ngay kết quả theo tháng và theo năm, so với chi phí NEXBILL.",
+      items: [
+        { title: "Thiếu tiền mặt", desc: "Thiếu tiền mỗi lần chốt ca." },
+        { title: "Phút không tính tiền", desc: "Quên bật/tắt đồng hồ, làm tròn xuống, hoặc nhân viên \"tặng thêm\"." },
+        { title: "Điện TV khi không có phiên", desc: "TV và máy chơi game vẫn bật khi không ai chơi." },
+      ],
+      cta: "Tính thất thoát của tiệm tôi",
+      note: "Miễn phí, không cần đăng ký. Gửi kết quả qua WhatsApp.",
+      footerLabel: "Máy tính thất thoát",
+    },
     mobile: {
       kicker: "Thu ngân không cần PC", title: "Chỉ cần điện thoại Android — cửa hàng sẵn sàng",
       sub: "Không cần mua máy tính thu ngân. Mở NEXBILL trên điện thoại Android, ghép máy in nhiệt Bluetooth và vận hành hằng ngày ngay trong tay.",
@@ -1292,6 +1359,19 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       copied: "Nakopya",
       note: "Ginagamit ng maraming tao ang demo account — huwag maglagay ng totoong data. Maaaring ma-reset ang data anumang oras.",
       signup: "O mag-sign up nang libre para sa iyong outlet",
+    },
+    leak: {
+      kicker: "Leakage Calculator",
+      title: "Magkano ang nawawalang pera ng outlet ninyo bawat buwan?",
+      sub: "Ilagay ang sariling numero ng outlet — makikita agad ang resulta bawat buwan at bawat taon, kumpara sa gastos ng NEXBILL.",
+      items: [
+        { title: "Kulang na cash", desc: "Kulang ang cash sa bawat pagsara ng shift." },
+        { title: "Minutong hindi nasingil", desc: "Nakalimutang simulan/ihinto ang timer, binilog pababa, o \"bonus\" ng staff." },
+        { title: "Kuryente ng TV na walang session", desc: "TV at console na nakabukas kahit walang naglalaro." },
+      ],
+      cta: "Kalkulahin ang leakage ng outlet ko",
+      note: "Libre, walang sign-up. Puwedeng ipadala ang resulta sa WhatsApp.",
+      footerLabel: "Leakage Calculator",
     },
     mobile: {
       kicker: "Cashier na walang PC", title: "Android phone lang — handa na ang outlet",
