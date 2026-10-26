@@ -3373,3 +3373,18 @@ export const telegramSupportMessages = pgTable(
     uniqueIndex("telegram_support_messages_update_idx").on(t.updateId),
   ]
 );
+
+/**
+ * Jawaban tim yang disimpan dari tiket selesai (Platform Admin › Jawaban Bot) — dipakai bot support
+ * (Customer Service & Telegram) untuk masalah berulang. Ditulis umum, tanpa data outlet tertentu. Migrasi 0037.
+ */
+export const supportKbAnswers = pgTable("support_kb_answers", {
+  id: id(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  tags: text("tags"),
+  sourceThreadId: text("source_thread_id").references(() => supportThreads.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: text("created_by"),
+  ...timestamps,
+});

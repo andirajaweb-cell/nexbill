@@ -55,3 +55,8 @@ export function hasTranslation(lang: LangCode, key: string): boolean {
 export function registeredIndonesian(): Readonly<Record<string, string>> {
   return registry.id;
 }
+
+/** Semua teks terdaftar untuk satu bahasa (hanya baca) — dipakai bot support untuk membaca panduan perangkat. */
+export function registeredFor(lang: LangCode): Readonly<Record<string, string>> {
+  return registry[lang];
+}

@@ -215,3 +215,12 @@ export function categoryToText(c: HelpCategory): string {
   }
   return lines.join("\n");
 }
+
+/**
+ * Petugas jaga diberi tahu untuk prioritas ini ke atas. Default P2 (P1 & P2) — cocok untuk support
+ * yang diurus satu orang; ubah lewat env SUPPORT_NOTIFY_MIN_PRIORITY (mis. "P1" = hanya darurat).
+ */
+export function shouldNotifyOnCall(p: SupportPriority, threshold: string | undefined = process.env.SUPPORT_NOTIFY_MIN_PRIORITY): boolean {
+  const t = PRIORITIES.includes(threshold as SupportPriority) ? (threshold as SupportPriority) : "P2";
+  return PRIORITIES.indexOf(p) <= PRIORITIES.indexOf(t);
+}

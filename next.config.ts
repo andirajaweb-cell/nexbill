@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
   // paths resolve correctly.
   serverExternalPackages: ["pdfkit"],
 
+  // Bot support 24 jam (lib/support-bot/knowledge.ts) membaca kendala NEXBILL TV yang diketahui dari
+  // file ini saat runtime — ikut di-deploy hanya ke rute yang menjalankan bot.
+  outputFileTracingIncludes: {
+    "/api/telegram/**": ["./android-tv/RISIKO.md", "./android-tv/README.md", "./public/downloads/nexbill-tv/latest.json"],
+    "/api/support-chat/**": ["./android-tv/RISIKO.md", "./android-tv/README.md", "./public/downloads/nexbill-tv/latest.json"],
+  },
+
   // Digital Asset Links untuk aplikasi Android (TWA) — lihat src/app/api/assetlinks/route.ts.
   async rewrites() {
     return [{ source: "/.well-known/assetlinks.json", destination: "/api/assetlinks" }];

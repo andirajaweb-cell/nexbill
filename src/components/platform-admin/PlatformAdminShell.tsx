@@ -54,6 +54,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/platform-admin/telegram-bot", label: "Telegram Bot (Support)", icon: Send },
       { href: "/platform-admin/announcements", label: "Pengumuman", icon: Megaphone },
       { href: "/platform-admin/support", label: "Customer Service", icon: LifeBuoy },
+      { href: "/platform-admin/support-kb", label: "Jawaban Bot", icon: Sparkles },
       { href: "/platform-admin/marketplace-disputes", label: "Sengketa Marketplace", icon: Scale },
       { href: "/platform-admin/account-deletions", label: "Hapus Akun (Privasi)", icon: UserX },
     ],

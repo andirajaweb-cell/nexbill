@@ -4,7 +4,7 @@
  * terjawab / tiket / P1. Balasan merchant ke pesan tim masuk langsung ke tiketnya.
  */
 import { sendTelegramText, sendTyping, type TgMessage, type TgUpdate } from "./api";
-import { runSupportBot } from "./support-ai";
+import { escalateWithNotify, runSupportBrain, type BrainInput } from "@/lib/support-bot/brain";
 import { botText } from "./bot-text";
 import {
   accountStatus,
@@ -14,7 +14,6 @@ import {
   getLinkByChat,
   logMessage,
   logUserMessage,
-  notifyOnCall,
   outletLang,
   outletName,
   recentConversation,
@@ -114,13 +113,33 @@ export async function handleTelegramUpdate(update: TgUpdate) {
   const outlet = await outletName(link.outletId);
   try {
     const turns = await recentConversation(chatId);
-    const result = await runSupportBot(link, { outlet, lang }, turns);
-    await reply(chatId, result.reply, link.outletId, { resolution: result.resolution, priority: result.priority, threadId: result.threadId });
+    const result = await runSupportBrain({ ...brainBase(link, outlet, lang), turns });
+    await reply(chatId, result.reply, link.outletId, { resolution: result.resolution, priority: result.priority, threadId: result.ref ? threadIdByRef.get(result.ref) ?? null : null });
   } catch (err) {
     // AI gagal → pesan tidak boleh hilang: langsung jadi tiket.
     console.error("Bot Telegram support gagal menjawab:", err);
     await escalateToTeam(link, lang, text, true);
   }
+}
+
+/** Nomor tiket pendek (ref) → id tiket penuh, untuk log percakapan. Hanya hidup selama satu update. */
+const threadIdByRef = new Map<string, string>();
+
+/** Kanal Telegram untuk otak bot: meneruskan = membuat tiket baru di Customer Service. */
+function brainBase(link: TelegramLink, outlet: string, lang: string): Omit<BrainInput, "turns"> {
+  return {
+    channel: "telegram",
+    outletId: link.outletId,
+    outletName: outlet,
+    staffName: link.staffName ?? "Staf",
+    lang,
+    escalate: async (e) => {
+      const { threadId } = await createSupportTicket({ link, ...e });
+      const ref = threadId.slice(0, 8);
+      threadIdByRef.set(ref, threadId);
+      return { ref };
+    },
+  };
 }
 
 /** /tim, atau AI gagal: ringkas percakapan berjalan menjadi tiket. */
@@ -131,22 +150,18 @@ async function escalateToTeam(link: TelegramLink, lang: string, note: string, bo
   const summary = (note || userLines.slice(-3).join(" / ") || "Merchant minta bicara dengan tim lewat Telegram.").slice(0, 2000);
   const priority = enforcedPriority(botFailed ? "P2" : "P3", { text: [note, ...userLines].join(" ") });
   const status = await accountStatus(link.outletId).catch(() => null);
-  const { threadId } = await createSupportTicket({
-    link,
+  const outlet = await outletName(link.outletId);
+  const { ref } = await escalateWithNotify(brainBase(link, outlet, lang), {
     priority,
     category: priority === "P1" || priority === "P2" ? "kendala_teknis" : "lainnya",
     summary,
     tried: botFailed ? "Bot AI gagal menjawab (gangguan sementara) — diteruskan otomatis." : "Merchant memilih /tim.",
     accountStatus: status ? statusLine(status) : undefined,
   });
-  if (priority === "P1") {
-    await notifyOnCall(`P1 DARURAT — ${await outletName(link.outletId)}\n${link.staffName ?? "Staf"}: ${summary}\nTiket #${threadId.slice(0, 8)} · ${DASHBOARD_URL}/platform-admin/support`);
-  }
   const key = isSupportHours() ? "ticketInHours" : priority === "P1" ? "ticketUrgentAfterHours" : "ticketAfterHours";
-  await reply(chatId, botText(lang, key, { ticket: threadId.slice(0, 8) }), link.outletId, {
+  await reply(chatId, botText(lang, key, { ticket: ref }), link.outletId, {
     resolution: priority === "P1" ? "urgent" : "ticket",
     priority,
-    threadId,
+    threadId: threadIdByRef.get(ref) ?? null,
   });
 }
-

@@ -1,9 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { db } from "@/db/client";
 import { supportThreads, supportMessages } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { autoReplySupportThread } from "@/lib/support-bot/dashboard-autoreply";
+
+/** Bot support membalas otomatis setelah respons dikirim (after) — butuh waktu untuk AI. */
+export const maxDuration = 60;
 
 async function getOwnedThread(id: string, outletId: string) {
   const [thread] = await db.select().from(supportThreads).where(eq(supportThreads.id, id)).limit(1);
@@ -66,6 +70,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // having read the thread up to this point, so it shouldn't show as unread to them afterward.
     await db.update(supportThreads).set({ lastMessageAt: now, outletLastReadAt: now, status: "open" }).where(eq(supportThreads.id, id));
 
+    // Bot support 24 jam menjawab otomatis (diam bila tim sedang menangani tiket ini).
+    after(() => autoReplySupportThread(id));
     return NextResponse.json(message);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

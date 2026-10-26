@@ -1,9 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { db } from "@/db/client";
 import { supportThreads, supportMessages } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
+import { autoReplySupportThread } from "@/lib/support-bot/dashboard-autoreply";
+
+/** Bot support membalas otomatis setelah respons dikirim (after) — butuh waktu untuk AI. */
+export const maxDuration = 60;
 
 /** Lists this outlet's own support tickets with NEXBILL customer service — always scoped by session.outletId. Each row gets an `unread` flag: true when the thread has activity (lastMessageAt) more recent than the outlet's own last view/reply (outletLastReadAt). */
 export async function GET() {
@@ -57,6 +61,8 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
+    // Bot support 24 jam menjawab otomatis (diam bila tim sedang menangani tiket ini).
+    after(() => autoReplySupportThread(thread.id));
     return NextResponse.json({ thread, message });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
-import { showAlert } from "@/lib/ui/dialog";
+import Link from "next/link";
+import { showAlert, showPrompt } from "@/lib/ui/dialog";
+import { isBotSender, escalatedPriorityOf } from "@/lib/support-bot/autoreply-rules";
 import { LANG_OPTIONS, type LangCode } from "@/lib/i18n/registry";
 import { Paperclip, Download, X, FileVideo } from "lucide-react";
 
@@ -17,6 +19,10 @@ interface Thread {
   status: "open" | "resolved";
   lastMessageAt: string | null;
   createdAt: string;
+  needsHuman?: boolean;
+  escalatedPriority?: "P1" | "P2" | "P3" | "P4" | null;
+  botReplies?: number;
+  autoReply?: boolean;
 }
 
 interface Message {
@@ -82,7 +88,7 @@ export default function PlatformSupportPage() {
   const [selected, setSelected] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [reply, setReply] = useState("");
-  const [filter, setFilter] = useState<"open" | "resolved" | "all">("open");
+  const [filter, setFilter] = useState<"mine" | "open" | "resolved" | "all">("mine");
   const [translating, setTranslating] = useState(false);
   const [translatedInto, setTranslatedInto] = useState<LangCode | null>(null);
   const [replyAttachment, setReplyAttachment] = useState<PendingAttachment | null>(null);
@@ -170,7 +176,26 @@ export default function PlatformSupportPage() {
     await loadThreads();
   };
 
-  const visibleThreads = threads.filter((t) => filter === "all" || t.status === filter);
+  const visibleThreads = threads.filter((t) => (filter === "mine" ? !!t.needsHuman : filter === "all" || t.status === filter));
+  const mineCount = threads.filter((t) => t.needsHuman).length;
+  const autoReplyOn = threads[0]?.autoReply ?? true;
+
+  // Kurasi mingguan: jawaban tim yang bagus disimpan supaya bot bisa menjawab masalah yang sama sendiri.
+  const saveAsBotAnswer = async (m: Message) => {
+    const idx = messages.findIndex((x) => x.id === m.id);
+    const question = [...messages.slice(0, idx)].reverse().find((x) => x.sender === "outlet")?.body ?? selected?.subject ?? "";
+    const q = await showPrompt("Pertanyaan/masalah (tulis umum, tanpa nama outlet):", { defaultValue: question, required: true, multiline: true, confirmLabel: "Lanjut" });
+    if (!q) return;
+    const a = await showPrompt("Jawaban yang boleh dipakai bot untuk semua outlet:", { defaultValue: m.body, required: true, multiline: true, confirmLabel: "Simpan" });
+    if (!a) return;
+    const res = await fetch("/api/platform-admin/support-kb", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, answer: a, sourceThreadId: selected?.id }),
+    });
+    const d = await res.json().catch(() => null);
+    await showAlert(res.ok ? "Tersimpan. Bot memakai jawaban ini mulai sekarang." : d?.error ?? "Gagal menyimpan.");
+  };
 
   return (
     <div className="space-y-6">
@@ -178,15 +203,21 @@ export default function PlatformSupportPage() {
         <div>
           <h1 className="gm-display text-2xl font-bold text-amber-300">Customer Service</h1>
           <p className="text-sm text-neutral-500 mt-1">Keluhan, saran, dan kendala teknis dari seluruh outlet/merchant — balas di sini sebagai tim pusat NEXBILL.</p>
+          <p className={`text-xs mt-1 ${autoReplyOn ? "text-sky-300" : "text-rose-300"}`}>
+            {autoReplyOn
+              ? "Bot NEXBILL membalas otomatis 24 jam dari Panduan, panduan perangkat, kendala NEXBILL TV, status akun, dan Jawaban Bot. Bot diam 2 jam setelah kamu membalas di tiket itu."
+              : "Balas otomatis MATI (SUPPORT_AUTOREPLY=off atau ANTHROPIC_API_KEY kosong)."}{" "}
+            <Link href="/platform-admin/support-kb" className="underline">Jawaban Bot</Link>
+          </p>
         </div>
         <div className="flex gap-1">
-          {(["open", "resolved", "all"] as const).map((f) => (
+          {(["mine", "open", "resolved", "all"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`text-xs px-3 py-1.5 rounded-lg border ${filter === f ? "border-amber-400/40 bg-amber-400/10 text-amber-300" : "border-white/10 text-neutral-500 hover:text-neutral-300"}`}
             >
-              {f === "open" ? "Dibuka" : f === "resolved" ? "Selesai" : "Semua"}
+              {f === "mine" ? `Perlu saya (${mineCount})` : f === "open" ? "Dibuka" : f === "resolved" ? "Selesai" : "Semua"}
             </button>
           ))}
         </div>
@@ -206,8 +237,17 @@ export default function PlatformSupportPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate font-medium text-neutral-200">{t.outletName}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${t.status === "open" ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}>
-                    {t.status === "open" ? "Dibuka" : "Selesai"}
+                  <span className="flex gap-1 shrink-0">
+                    {t.needsHuman ? (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${t.escalatedPriority === "P1" ? "bg-rose-500/20 text-rose-300" : "bg-orange-500/15 text-orange-300"}`}>
+                        Perlu saya{t.escalatedPriority ? ` ${t.escalatedPriority}` : ""}
+                      </span>
+                    ) : t.status === "open" && (t.botReplies ?? 0) > 0 ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-300">Dijawab bot</span>
+                    ) : null}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${t.status === "open" ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}>
+                      {t.status === "open" ? "Dibuka" : "Selesai"}
+                    </span>
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-xs text-neutral-500">
@@ -238,16 +278,28 @@ export default function PlatformSupportPage() {
                 </Button>
               </div>
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                {messages.map((m) => (
-                  <div key={m.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.sender === "outlet" ? "bg-white/5" : "bg-amber-400/10 ml-auto"}`}>
-                    <div className="flex items-center justify-between gap-3 mb-0.5">
-                      <span className="text-[10px] text-neutral-500">{m.senderName || (m.sender === "outlet" ? selected.outletName : "NEXBILL Support")}</span>
-                      <span className="text-[10px] text-neutral-600 shrink-0">{formatDateTime(m.createdAt)}</span>
+                {messages.map((m) => {
+                  const bot = m.sender === "platform_admin" && isBotSender(m.senderName);
+                  const esc = bot ? escalatedPriorityOf(m.senderName) : null;
+                  return (
+                    <div
+                      key={m.id}
+                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${m.sender === "outlet" ? "bg-white/5" : bot ? `ml-auto ${esc ? "bg-orange-500/10 border border-orange-400/30" : "bg-sky-500/10"}` : "bg-amber-400/10 ml-auto"}`}
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-0.5">
+                        <span className={`text-[10px] ${bot ? "text-sky-300" : "text-neutral-500"}`}>{m.senderName || (m.sender === "outlet" ? selected.outletName : "NEXBILL Support")}</span>
+                        <span className="text-[10px] text-neutral-600 shrink-0">{formatDateTime(m.createdAt)}</span>
+                      </div>
+                      {m.body}
+                      {m.attachmentUrl && <AttachmentPreview url={m.attachmentUrl} type={m.attachmentType} name={m.attachmentName} />}
+                      {m.sender === "platform_admin" && !bot && m.body.trim() && (
+                        <button type="button" onClick={() => saveAsBotAnswer(m)} className="mt-1 block text-[10px] text-sky-300 hover:underline">
+                          Jadikan jawaban bot
+                        </button>
+                      )}
                     </div>
-                    {m.body}
-                    {m.attachmentUrl && <AttachmentPreview url={m.attachmentUrl} type={m.attachmentType} name={m.attachmentName} />}
-                  </div>
-                ))}
+                  );
+                })}
                 {messages.length === 0 && <p className="text-xs text-neutral-500 m-auto">Belum ada pesan.</p>}
               </div>
               <div className="pt-2 border-t border-white/10 mt-2 space-y-1.5">

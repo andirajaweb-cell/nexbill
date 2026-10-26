@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       configured,
       hasSecret: !!telegramWebhookSecret(),
       hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
-      model: process.env.TELEGRAM_SUPPORT_MODEL || "claude-haiku-5-5",
+      model: process.env.SUPPORT_BOT_MODEL || process.env.TELEGRAM_SUPPORT_MODEL || "claude-haiku-5-5",
       bot: bot && { username: bot.username, name: bot.first_name },
       webhook: webhook && {
         url: webhook.url,
