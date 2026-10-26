@@ -31,13 +31,20 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.DateFormat;
+import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Layar utama NEXBILL TV.
@@ -64,6 +71,16 @@ public class MainActivity extends Activity {
     private WebView web;
     private TextView timer;
     private TextView hint;
+    /** Screensaver bawaan aplikasi: tampil bila halaman /tv tidak bisa dimuat (internet putus). */
+    private LinearLayout offlineView;
+    private TextView offlineTitle;
+    private TextView offlineUnit;
+    private TextView offlineClock;
+    private TextView offlineStatus;
+    private TextView offlineFooter;
+    private boolean webFailed;
+    private boolean loadError;
+    private boolean okConsumed;
 
     private String tunedInput;
     private boolean videoAvailable;
@@ -74,6 +91,7 @@ public class MainActivity extends Activity {
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
+            PollService.expireLocalSession(MainActivity.this);
             render();
             ui.postDelayed(this, 1000);
         }
@@ -111,7 +129,22 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                loadError = false;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                // Halaman /tv termuat tanpa galat → screensaver dari server; galat → screensaver bawaan.
+                webFailed = loadError;
+                render();
+            }
+
+            @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                loadError = true;
+                webFailed = true;
+                render();
                 ui.postDelayed(() -> web.loadUrl(Config.TV_PAGE), 10_000);
             }
         });
@@ -137,7 +170,12 @@ public class MainActivity extends Activity {
         hlp.setMargins(40, 0, 0, 32);
         root.addView(hint, hlp);
 
+        offlineView = buildOfflineView();
+        offlineView.setVisibility(View.GONE);
+        root.addView(offlineView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
         setContentView(root);
+        StateRepo.restore(this);
 
         tvView.setCallback(new TvView.TvInputCallback() {
             @Override
@@ -203,11 +241,67 @@ public class MainActivity extends Activity {
 
     private void render() {
         long now = SystemClock.elapsedRealtime();
-        if (StateRepo.showGame(now)) showGame(now);
+        if (StateRepo.showGame(this, now)) showGame(now);
         else showLock();
     }
 
+    /** ---------------- Screensaver bawaan (offline) ---------------- */
+
+    private LinearLayout buildOfflineView() {
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.VERTICAL);
+        v.setGravity(Gravity.CENTER);
+        v.setBackgroundColor(0xFF050914);
+        offlineTitle = label(40, Color.WHITE, true);
+        offlineUnit = label(26, 0xFF67E8F9, true);
+        offlineClock = label(72, Color.WHITE, true);
+        offlineStatus = label(28, 0xFF34D399, true);
+        offlineFooter = label(16, 0xFF94A3B8, false);
+        v.addView(offlineTitle);
+        v.addView(offlineUnit);
+        v.addView(offlineClock);
+        v.addView(offlineStatus);
+        v.addView(offlineFooter);
+        return v;
+    }
+
+    private TextView label(float sp, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(24, 12, 24, 12);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        return t;
+    }
+
+    private void updateOfflineView() {
+        boolean paired = !StateRepo.token(this).isEmpty();
+        TvState s = StateRepo.state();
+        JSONObject cat = LocalStore.catalog(this);
+        String outlet = s != null && s.outletName != null && !s.outletName.isEmpty() ? s.outletName : cat != null ? cat.optString("outletName", "NEXBILL") : "NEXBILL";
+        JSONObject unit = cat != null ? cat.optJSONObject("unit") : null;
+        String unitName = s != null && s.unitName != null && !s.unitName.isEmpty() ? s.unitName : unit != null ? unit.optString("name", "") : "";
+        offlineTitle.setText(outlet);
+        offlineUnit.setText(unitName);
+        offlineClock.setText(DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date()));
+        if (!paired) {
+            offlineStatus.setText(R.string.offline_need_internet_pair);
+            offlineStatus.setTextColor(0xFFFBBF24);
+        } else {
+            LocalStore.Session l = LocalStore.session(this);
+            boolean timeUp = (l != null && l.ended) || (s != null && s.timeUp);
+            offlineStatus.setText(timeUp ? R.string.offline_time_up : R.string.offline_available);
+            offlineStatus.setTextColor(timeUp ? 0xFFF87171 : 0xFF34D399);
+        }
+        int pending = LocalStore.pendingCount(this);
+        String footer = getString(R.string.offline_footer);
+        if (pending > 0) footer += "\n" + getString(R.string.offline_pending, pending);
+        offlineFooter.setText(footer);
+    }
+
     private void showGame(long now) {
+        offlineView.setVisibility(View.GONE);
         String input = chosenInput();
         if (input == null) {
             showLock();
@@ -250,6 +344,14 @@ public class MainActivity extends Activity {
         releaseHdmi();
         externalLaunched = false;
         timer.setVisibility(View.GONE);
+        // Halaman /tv tidak bisa dimuat (internet putus): tampilkan screensaver bawaan aplikasi, bukan
+        // halaman galat WebView. Kasir tetap bisa menekan OK untuk mengatur sesi.
+        if (webFailed) {
+            updateOfflineView();
+            offlineView.setVisibility(View.VISIBLE);
+        } else {
+            offlineView.setVisibility(View.GONE);
+        }
         if (web.getVisibility() != View.VISIBLE) {
             web.setVisibility(View.VISIBLE);
             web.requestFocus();
@@ -320,18 +422,32 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int k = e.getKeyCode();
+        boolean paired = !StateRepo.token(this).isEmpty();
         if (k == KeyEvent.KEYCODE_MENU) {
-            if (e.getAction() == KeyEvent.ACTION_UP) openStaffMenu();
+            if (e.getAction() == KeyEvent.ACTION_UP) {
+                if (paired) openCashierPanel();
+                else openStaffMenu();
+            }
             return true;
         }
         if (k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER) {
-            if (e.getAction() == KeyEvent.ACTION_DOWN) {
-                if (e.getRepeatCount() == 0) okDownAt = SystemClock.elapsedRealtime();
-                else if (!menuOpen && SystemClock.elapsedRealtime() - okDownAt >= LONG_PRESS_MS) {
+            // Layar belum dipasangkan: tombol OK dipakai halaman pairing (ketik kode 6 digit).
+            if (!paired) {
+                if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() > 0 && !menuOpen
+                        && SystemClock.elapsedRealtime() - okDownAt >= LONG_PRESS_MS) {
                     openStaffMenu();
                     return true;
                 }
+                if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) okDownAt = SystemClock.elapsedRealtime();
+                return super.dispatchKeyEvent(e);
             }
+            // Sudah dipasangkan: tekan OK = panel kasir (PIN → mulai sesi / tambah waktu / akhiri).
+            if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) okConsumed = false;
+            if (e.getAction() == KeyEvent.ACTION_UP && !okConsumed && !menuOpen) {
+                okConsumed = true;
+                openCashierPanel();
+            }
+            return true;
         }
         if (k == KeyEvent.KEYCODE_BACK) {
             // Tombol Back tidak menutup aplikasi — layar bilik harus tetap NEXBILL.
@@ -346,18 +462,18 @@ public class MainActivity extends Activity {
         TvState s = StateRepo.state();
         // TV yang baru menyala tanpa internet belum punya status dari server: kalau PIN pernah dipakai di
         // sini, tetap minta PIN (mencabut internet tidak boleh membuka menu staf tanpa PIN).
-        if ((s != null && s.requiresPin) || (s == null && StateRepo.hasRememberedPin(this))) askPin();
+        if ((s != null && s.requiresPin) || (s == null && StateRepo.hasRememberedPin(this))) askPin(this::showStaffMenu);
         else showStaffMenu();
     }
 
-    private void askPin() {
+    private void askPin(final Runnable onSuccess) {
         menuOpen = true;
         final EditText pin = new EditText(this);
         pin.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.pin_title)
                 .setView(pin)
-                .setPositiveButton(R.string.ok, (d, w) -> checkPin(pin.getText().toString()))
+                .setPositiveButton(R.string.ok, (d, w) -> checkPin(pin.getText().toString(), onSuccess))
                 .setNegativeButton(R.string.cancel, (d, w) -> menuOpen = false)
                 .setOnCancelListener(d -> menuOpen = false)
                 .show();
@@ -367,7 +483,7 @@ public class MainActivity extends Activity {
     private int offlinePinFails;
     private long offlinePinLockedUntil;
 
-    private void checkPin(final String pin) {
+    private void checkPin(final String pin, final Runnable onSuccess) {
         final String token = StateRepo.token(this);
         new Thread(() -> {
             boolean ok;
@@ -402,7 +518,7 @@ public class MainActivity extends Activity {
                 menuOpen = false;
                 if (pass) {
                     if (offline) Toast.makeText(this, R.string.pin_offline_ok, Toast.LENGTH_SHORT).show();
-                    showStaffMenu();
+                    onSuccess.run();
                 } else if (noMemory) {
                     Toast.makeText(this, R.string.pin_error, Toast.LENGTH_LONG).show();
                 } else {
@@ -433,7 +549,7 @@ public class MainActivity extends Activity {
                     menuOpen = false;
                     long now = SystemClock.elapsedRealtime();
                     switch (which) {
-                        case 0: pickStaffDuration(); break;
+                        case 0: StateRepo.setStaffUntil(now + Config.STAFF_BYPASS_MS); break;
                         case 1: StateRepo.setStaffUntil(0); break;
                         case 2: pickHdmi(); break;
                         case 3: pickMode(); break;
@@ -446,21 +562,6 @@ public class MainActivity extends Activity {
                     }
                 })
                 .setOnCancelListener(d -> menuOpen = false)
-                .show();
-    }
-
-    /**
-     * "Buka layar game" tanpa sesi: dipakai untuk tes, dan sebagai cadangan saat internet putus (sesi
-     * baru tidak sampai ke TV) — staf memilih lamanya sesuai sesi yang dicatat di Mode Offline kasir.
-     * Layar terkunci lagi otomatis saat waktunya habis.
-     */
-    private void pickStaffDuration() {
-        final int[] minutes = new int[] { 10, 30, 60, 120, 180 };
-        String[] labels = new String[minutes.length];
-        for (int i = 0; i < minutes.length; i++) labels[i] = getString(R.string.minutes_fmt, minutes[i]);
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.staff_duration_title)
-                .setItems(labels, (d, which) -> StateRepo.setStaffUntil(SystemClock.elapsedRealtime() + minutes[which] * 60_000L))
                 .show();
     }
 
@@ -559,6 +660,286 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle(R.string.menu_info).setMessage(msg).setPositiveButton(R.string.ok, null).show();
     }
 
+    /** ---------------- Panel kasir: sesi rental dari TV ---------------- */
+
+    /**
+     * Tekan OK di remote → PIN kasir → mulai sesi (paket / durasi / bebas), tambah waktu, atau akhiri
+     * sesi. Bekerja juga saat internet putus: sesi disimpan di TV dan dikirim otomatis ke
+     * dashboard.nexbill.id begitu online (PollService → SyncEngine). Tagihannya masuk ke kasir sebagai
+     * Order Terbuka. Tanpa PIN layar di dashboard, sesi tidak bisa dimulai dari TV.
+     */
+    private void openCashierPanel() {
+        if (menuOpen) return;
+        TvState s = StateRepo.state();
+        boolean needPin = (s != null && s.requiresPin) || (s == null && StateRepo.hasRememberedPin(this));
+        if (needPin) askPin(this::showCashierPanel);
+        else showCashierPanel();
+    }
+
+    private void showCashierPanel() {
+        menuOpen = true;
+        long now = SystemClock.elapsedRealtime();
+        boolean inSession = StateRepo.inSession(this, now);
+        int pending = LocalStore.pendingCount(this);
+        int failed = LocalStore.failedCount(this);
+        final List<String> labels = new ArrayList<>();
+        final List<Runnable> actions = new ArrayList<>();
+        if (inSession) {
+            labels.add(getString(R.string.cashier_extend));
+            actions.add(this::extendFlow);
+            labels.add(getString(R.string.cashier_stop));
+            actions.add(this::stopFlow);
+        } else {
+            labels.add(getString(R.string.cashier_start));
+            actions.add(this::startFlow);
+        }
+        labels.add(getString(R.string.cashier_sync_status, pending, failed));
+        actions.add(this::syncStatusDialog);
+        labels.add(getString(R.string.cashier_settings));
+        actions.add(this::showStaffMenu);
+        TvState s = StateRepo.state();
+        JSONObject cat = LocalStore.catalog(this);
+        JSONObject unit = cat != null ? cat.optJSONObject("unit") : null;
+        String title = getString(R.string.cashier_title) + (unit != null ? " · " + unit.optString("name") : s != null && s.unitName != null ? " · " + s.unitName : "");
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setItems(labels.toArray(new String[0]), (d, which) -> {
+                    menuOpen = false;
+                    actions.get(which).run();
+                })
+                .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    private String rupiah(long n) {
+        return "Rp" + NumberFormat.getIntegerInstance(new Locale("id", "ID")).format(n);
+    }
+
+    private void startFlow() {
+        final JSONObject cat = LocalStore.catalog(this);
+        if (cat == null) {
+            message(getString(R.string.cashier_no_catalog));
+            return;
+        }
+        if (!cat.optBoolean("canStartFromTv", false)) {
+            String reason = cat.isNull("reason") ? "" : cat.optString("reason", "");
+            message(getString(R.string.cashier_cannot_start) + (reason.isEmpty() ? "" : "\n\n" + reason));
+            return;
+        }
+        final JSONObject unit = cat.optJSONObject("unit");
+        if (unit == null) {
+            message(getString(R.string.cashier_cannot_start));
+            return;
+        }
+        final long rate = unit.optLong("ratePerHour", 0L);
+        final List<String> labels = new ArrayList<>();
+        final List<Object[]> options = new ArrayList<>(); // {minutes, promoId|null, label, price}
+        JSONArray pk = cat.optJSONArray("packages");
+        for (int i = 0; pk != null && i < pk.length(); i++) {
+            JSONObject p = pk.optJSONObject(i);
+            if (p == null) continue;
+            int m = p.optInt("durationMinutes", 0);
+            long price = p.optLong("price", 0L);
+            String l = getString(R.string.cashier_package_fmt, p.optString("name"), durationText(m), rupiah(price));
+            labels.add(l);
+            options.add(new Object[] { m, p.optString("id"), p.optString("name"), price });
+        }
+        JSONArray du = cat.optJSONArray("durations");
+        for (int i = 0; du != null && i < du.length(); i++) {
+            JSONObject d = du.optJSONObject(i);
+            if (d == null) continue;
+            int m = d.optInt("minutes", 0);
+            if (m <= 0) continue;
+            long price = Math.round(rate * m / 60.0);
+            labels.add(getString(R.string.cashier_duration_fmt, durationText(m), rupiah(price)));
+            options.add(new Object[] { m, null, durationText(m), price });
+        }
+        labels.add(getString(R.string.cashier_open_session, rupiah(rate)));
+        options.add(new Object[] { 0, null, getString(R.string.cashier_open_label), 0L });
+        menuOpen = true;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.cashier_pick_title)
+                .setItems(labels.toArray(new String[0]), (d, which) -> {
+                    menuOpen = false;
+                    Object[] o = options.get(which);
+                    confirmStart((Integer) o[0], (String) o[1], (String) o[2], (Long) o[3], unit.optString("id"));
+                })
+                .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    private void confirmStart(final int minutes, final String promoId, final String label, final long price, final String unitId) {
+        String msg = getString(R.string.cashier_confirm_start, label, minutes > 0 ? durationText(minutes) : getString(R.string.cashier_open_label))
+                + (price > 0 ? "\n" + getString(R.string.cashier_estimate, rupiah(price)) : "")
+                + "\n\n" + getString(R.string.cashier_bill_note);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.cashier_start)
+                .setMessage(msg)
+                .setPositiveButton(R.string.cashier_start_button, (d, w) -> doStart(minutes, promoId, label, price, unitId))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void doStart(int minutes, String promoId, String label, long price, String unitId) {
+        long now = LocalStore.serverNow(this);
+        LocalStore.Session l = new LocalStore.Session();
+        l.sessionId = UUID.randomUUID().toString();
+        l.startAt = now;
+        l.plannedMinutes = minutes;
+        l.label = label;
+        l.priceEstimate = price;
+        LocalStore.setSession(this, l);
+        try {
+            JSONObject extra = new JSONObject().put("rentalUnitId", unitId);
+            if (minutes > 0) extra.put("plannedMinutes", minutes);
+            if (promoId != null && !promoId.isEmpty()) extra.put("promoId", promoId);
+            LocalStore.enqueue(this, "start", l.sessionId, now, extra);
+        } catch (Exception ignored) {
+        }
+        StateRepo.setStaffUntil(0);
+        Toast.makeText(this, R.string.cashier_started, Toast.LENGTH_LONG).show();
+        syncSoon();
+        render();
+    }
+
+    /**
+     * Sesi yang dimulai dari dashboard (tidak ada sesi lokal): dibuat cerminan lokal dari status server
+     * supaya tambah waktu / stop dari TV langsung berlaku di layar walau internet putus.
+     */
+    private LocalStore.Session sessionForChange() {
+        LocalStore.Session l = LocalStore.session(this);
+        if (l != null && !l.ended) return l;
+        TvState s = StateRepo.state();
+        if (s == null || s.sessionId == null || s.sessionId.isEmpty()) return null;
+        long nowRt = SystemClock.elapsedRealtime();
+        long serverNow = LocalStore.serverNow(this);
+        Integer remaining = s.liveRemaining(nowRt);
+        long elapsed = s.liveElapsed(nowRt);
+        LocalStore.Session m = new LocalStore.Session();
+        m.sessionId = s.sessionId;
+        m.startAt = serverNow - elapsed * 1000L;
+        m.plannedMinutes = remaining == null ? 0 : (int) Math.max(1, Math.round((elapsed + remaining) / 60.0));
+        m.label = "";
+        return m;
+    }
+
+    private void extendFlow() {
+        final LocalStore.Session l = sessionForChange();
+        if (l == null) {
+            message(getString(R.string.cashier_no_session));
+            return;
+        }
+        if (l.plannedMinutes <= 0) {
+            message(getString(R.string.cashier_open_no_extend));
+            return;
+        }
+        final int[] mins = { 15, 30, 60, 120 };
+        String[] labels = new String[mins.length];
+        for (int i = 0; i < mins.length; i++) labels[i] = "+ " + durationText(mins[i]);
+        menuOpen = true;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.cashier_extend)
+                .setItems(labels, (d, which) -> {
+                    menuOpen = false;
+                    l.extendedMinutes += mins[which];
+                    LocalStore.setSession(this, l);
+                    try {
+                        LocalStore.enqueue(this, "extend", l.sessionId, LocalStore.serverNow(this), new JSONObject().put("minutes", mins[which]));
+                    } catch (Exception ignored) {
+                    }
+                    Toast.makeText(this, getString(R.string.cashier_extended, durationText(mins[which])), Toast.LENGTH_LONG).show();
+                    syncSoon();
+                    render();
+                })
+                .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    private void stopFlow() {
+        final LocalStore.Session l = sessionForChange();
+        if (l == null) {
+            message(getString(R.string.cashier_no_session));
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.cashier_stop)
+                .setMessage(R.string.cashier_confirm_stop)
+                .setPositiveButton(R.string.cashier_stop_button, (d, w) -> {
+                    l.ended = true;
+                    LocalStore.setSession(this, l);
+                    LocalStore.enqueue(this, "stop", l.sessionId, LocalStore.serverNow(this), null);
+                    Toast.makeText(this, R.string.cashier_stopped, Toast.LENGTH_LONG).show();
+                    syncSoon();
+                    render();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void syncStatusDialog() {
+        int pending = LocalStore.pendingCount(this);
+        int failed = LocalStore.failedCount(this);
+        long last = LocalStore.lastSyncWall(this);
+        String err = LocalStore.lastSyncError(this);
+        StringBuilder msg = new StringBuilder();
+        msg.append(getString(R.string.sync_pending, pending)).append('\n');
+        msg.append(getString(R.string.sync_last, last > 0 ? DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(last)) : "-"));
+        if (!err.isEmpty()) msg.append('\n').append(err);
+        if (failed > 0) msg.append("\n\n").append(getString(R.string.sync_failed, failed)).append('\n').append(LocalStore.failedSummary(this));
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle(R.string.sync_title)
+                .setMessage(msg.toString())
+                .setPositiveButton(R.string.sync_now, (d, w) -> syncSoon())
+                .setNegativeButton(R.string.ok, null);
+        if (failed > 0) {
+            b.setNeutralButton(R.string.sync_failed_actions, (d, w) -> failedActionsDialog());
+        }
+        b.show();
+    }
+
+    private void failedActionsDialog() {
+        String[] items = { getString(R.string.sync_retry_failed), getString(R.string.sync_drop_failed) };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.sync_failed_actions)
+                .setItems(items, (d, which) -> {
+                    if (which == 0) {
+                        LocalStore.retryFailed(this);
+                        syncSoon();
+                    } else {
+                        new AlertDialog.Builder(this)
+                                .setMessage(R.string.sync_drop_confirm)
+                                .setPositiveButton(R.string.yes, (d2, w2) -> {
+                                    LocalStore.dropFailed(this);
+                                    LocalStore.Session l = LocalStore.session(this);
+                                    if (l != null && !LocalStore.hasPendingFor(this, l.sessionId) && l.ended) LocalStore.setSession(this, null);
+                                    render();
+                                })
+                                .setNegativeButton(R.string.no, null)
+                                .show();
+                    }
+                })
+                .show();
+    }
+
+    /** Kirim antrean sekarang juga (tidak menunggu putaran PollService berikutnya). */
+    private void syncSoon() {
+        new Thread(() -> {
+            SyncEngine.syncQueue(getApplicationContext());
+            SyncEngine.refreshCatalogIfDue(getApplicationContext(), false);
+        }).start();
+    }
+
+    private String durationText(int minutes) {
+        if (minutes <= 0) return getString(R.string.cashier_open_label);
+        if (minutes % 60 == 0) return getString(R.string.hours_fmt, minutes / 60);
+        if (minutes > 60) return getString(R.string.hours_minutes_fmt, minutes / 60, minutes % 60);
+        return getString(R.string.minutes_fmt, minutes);
+    }
+
+    private void message(String text) {
+        new AlertDialog.Builder(this).setMessage(text).setPositiveButton(R.string.ok, null).show();
+    }
+
     /** ---------------- Jembatan dari halaman /tv ---------------- */
 
     private final class Bridge {
@@ -566,6 +947,8 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void setToken(String token) {
             StateRepo.setToken(MainActivity.this, token);
+            // Katalog harga/paket untuk layar baru diambil segera (dipakai panel kasir saat offline).
+            new Thread(() -> SyncEngine.refreshCatalogIfDue(getApplicationContext(), true)).start();
         }
 
         @JavascriptInterface

@@ -48,9 +48,13 @@ final class StateRepo {
     static void setToken(Context c, String token) {
         String t = token == null ? "" : token.trim();
         if (t.equals(token(c))) return;
-        // Layar dipasangkan ulang / dilepas: PIN yang diingat untuk layar lama tidak berlaku lagi.
+        // Layar dipasangkan ulang / dilepas: PIN yang diingat untuk layar lama tidak berlaku lagi, begitu
+        // juga sesi lokal, katalog, dan status terakhirnya (antrean yang belum terkirim tetap dikirim
+        // dengan token lamanya — lihat SyncEngine).
         prefs(c).edit().putString(K_TOKEN, t).remove(K_PIN_SALT).remove(K_PIN_HASH).apply();
-        if (t.isEmpty()) state = null;
+        LocalStore.clearForNewScreen(c);
+        state = null;
+        stateWall = 0L;
         notifyListeners();
     }
 
@@ -60,7 +64,62 @@ final class StateRepo {
 
     static void setState(TvState s) {
         state = s;
+        stateWall = System.currentTimeMillis();
         notifyListeners();
+    }
+
+    /** Jam dinding saat status server terakhir diterima (0 bila hasil pemulihan setelah menyala ulang). */
+    private static volatile long stateWall;
+
+    /** Status dari server dianggap segar bila diterima kurang dari ini. */
+    private static final long FRESH_MS = 20_000L;
+
+    static boolean stateFresh(long nowRealtime) {
+        TvState s = state;
+        return s != null && stateWall > 0 && nowRealtime - s.receivedAt < FRESH_MS;
+    }
+
+    /**
+     * Memulihkan status server terakhir yang tersimpan saat aplikasi/TV menyala ulang tanpa internet,
+     * supaya sesi yang sedang berjalan tetap tampil dan tetap terkunci tepat waktu. Jam monotonik
+     * (elapsedRealtime) mulai dari nol setelah reboot, jadi titik terimanya dihitung mundur dari jam
+     * dinding. Status lebih tua dari 12 jam diabaikan.
+     */
+    static void restore(Context c) {
+        if (state != null || token(c).isEmpty()) return;
+        String raw = LocalStore.savedState(c);
+        long wall = LocalStore.savedStateWall(c);
+        long age = System.currentTimeMillis() - wall;
+        if (raw.isEmpty() || wall <= 0 || age < 0 || age > 12 * 3_600_000L) return;
+        try {
+            state = TvState.parse(raw, android.os.SystemClock.elapsedRealtime() - age);
+            stateWall = 0L;
+            notifyListeners();
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** Beri tahu tampilan bahwa data lokal (antrean/katalog/sesi) berubah. */
+    static void touch() {
+        notifyListeners();
+    }
+
+    /**
+     * Sesi lokal (diatur dari TV) yang menentukan layar saat ini, atau null bila status server yang
+     * menjadi acuan. Sesi lokal berlaku selama aksinya belum diterima server ATAU status server sedang
+     * tidak segar (internet putus). Begitu semua aksinya terkirim dan server sudah membalas sesudahnya,
+     * sesi lokal dilepas — mis. kasir menghentikan sesi dari dashboard, TV ikut terkunci.
+     */
+    static LocalStore.Session localAuthority(Context c, long nowRealtime) {
+        LocalStore.Session l = LocalStore.session(c);
+        if (l == null) return null;
+        boolean pending = LocalStore.hasPendingFor(c, l.sessionId);
+        if (pending) return l;
+        if (stateFresh(nowRealtime) && stateWall > LocalStore.lastSyncWall(c)) {
+            LocalStore.setSession(c, null);
+            return null;
+        }
+        return stateFresh(nowRealtime) ? null : l;
     }
 
     static String hdmiInput(Context c) {
@@ -167,9 +226,21 @@ final class StateRepo {
     }
 
     /** Layar game (HDMI) yang seharusnya tampil sekarang. */
-    static boolean showGame(long nowRealtime) {
+    static boolean showGame(Context c, long nowRealtime) {
+        if (staffLeftMs(nowRealtime) > 0) return true;
         TvState s = state;
-        return staffLeftMs(nowRealtime) > 0 || (s != null && s.shouldShowGame(nowRealtime));
+        if (s != null && !s.enabled) return true; // layar dimatikan dari dashboard → pasif
+        LocalStore.Session l = localAuthority(c, nowRealtime);
+        if (l != null) return l.active(LocalStore.serverNow(c));
+        return s != null && s.shouldShowGame(nowRealtime);
+    }
+
+    /** Sesi yang sedang berjalan menurut TV (lokal atau server) — untuk panel kasir. */
+    static boolean inSession(Context c, long nowRealtime) {
+        LocalStore.Session l = localAuthority(c, nowRealtime);
+        if (l != null) return l.active(LocalStore.serverNow(c));
+        TvState s = state;
+        return s != null && s.inSession() && !s.timeUp && (s.liveRemaining(nowRealtime) == null || s.liveRemaining(nowRealtime) > 0);
     }
 
     static void addListener(Runnable r) {

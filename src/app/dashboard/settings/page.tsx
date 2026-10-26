@@ -14,6 +14,7 @@ import { getDevicePrinterSettings, saveDevicePrinterSettings, clearDevicePrinter
 import { isWebBluetoothSupported, pairPrinter, disconnectPrinter, PrinterError } from "@/lib/printer/bluetooth-printer";
 import { printTestReceipt } from "@/lib/printer/print-receipt";
 import "@/lib/i18n/dict-printer";
+import "@/lib/i18n/dict-tv-sessions";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { SEA_BANKS, findSeaBank } from "@/lib/data/sea-banks";
 import { currencyForCountry, flagForCountry } from "@/lib/currency/format";
@@ -2064,7 +2065,7 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
       <Card className="space-y-3">
         <h2 className="font-medium">{t("settings.tv.pinTitle", "PIN Staf")}</h2>
         <p className="text-xs text-neutral-500">
-          {t("settings.tv.pinText", "Tanpa PIN, siapa pun yang menekan tombol remote bisa menutup screensaver. PIN 4-6 digit, dan hanya dipakai untuk menutup screensaver — ia tidak memberi akses ke transaksi, pelanggan, atau kasir.")}
+          {t("settings.tv.pinTextTvSessions", "PIN 4-6 digit untuk kasir di TV. Di aplikasi NEXBILL TV, kasir menekan OK di remote, mengetik PIN ini, lalu memulai sesi (paket/durasi), menambah waktu, atau mengakhiri sesi — juga saat internet putus; sesinya dikirim otomatis ke dashboard dan tagihannya masuk ke Order Terbuka. Tanpa PIN, sesi tidak bisa dimulai dari TV. PIN tidak memberi akses ke pembayaran, pelanggan, atau laporan.")}
           {settings.hasPin && <span className="text-emerald-400"> {t("settings.tv.pinSet", "PIN sudah diatur.")}</span>}
         </p>
         <div className="flex flex-wrap gap-2 items-end">

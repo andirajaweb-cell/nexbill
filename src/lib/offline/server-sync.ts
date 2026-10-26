@@ -364,7 +364,7 @@ async function execute(ctx: SyncContext, action: OfflineAction, touchedUnits: Se
   }
 }
 
-const DEFAULT_DEPS: SyncDeps = {
+export const DEFAULT_DEPS: SyncDeps = {
   claim: claimAction,
   finish: finishAction,
   execute,

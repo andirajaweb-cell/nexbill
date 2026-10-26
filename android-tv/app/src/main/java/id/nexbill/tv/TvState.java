@@ -22,10 +22,15 @@ final class TvState {
     final Integer warnMinutes;
     final boolean requiresPin;
     final String unitName;
+    /** Sesi aktif unit ini di server (untuk tambah waktu / stop dari TV); null bila tidak ada. */
+    final String sessionId;
+    final String outletName;
+    /** Jam server saat balasan dibuat (epoch ms, 0 bila tidak ada). */
+    final long serverTimeMs;
     final long receivedAt;
 
     private TvState(boolean enabled, String disabledReason, String status, Integer remainingSeconds, Integer elapsedSeconds, boolean timeUp,
-                    Integer warnMinutes, boolean requiresPin, String unitName, long receivedAt) {
+                    Integer warnMinutes, boolean requiresPin, String unitName, String sessionId, String outletName, long serverTimeMs, long receivedAt) {
         this.enabled = enabled;
         this.disabledReason = disabledReason;
         this.status = status;
@@ -35,6 +40,9 @@ final class TvState {
         this.warnMinutes = warnMinutes;
         this.requiresPin = requiresPin;
         this.unitName = unitName;
+        this.sessionId = sessionId;
+        this.outletName = outletName;
+        this.serverTimeMs = serverTimeMs;
         this.receivedAt = receivedAt;
     }
 
@@ -52,8 +60,11 @@ final class TvState {
         boolean requiresPin = display != null && display.optBoolean("requiresPin", false);
         String unitName = o.isNull("unitName") ? "" : o.optString("unitName", "");
         String reason = o.isNull("disabledReason") ? null : o.optString("disabledReason", null);
+        String sessionId = o.isNull("sessionId") ? null : o.optString("sessionId", null);
+        String outletName = o.isNull("outletName") ? "" : o.optString("outletName", "");
+        long serverTime = LocalStore.parseIso(o.optString("serverTime", ""));
         return new TvState(o.optBoolean("enabled", false), reason, status, remaining, elapsed, o.optBoolean("timeUp", false),
-                warn, requiresPin, unitName, receivedAt);
+                warn, requiresPin, unitName, sessionId, outletName, serverTime, receivedAt);
     }
 
     boolean inSession() {
@@ -93,6 +104,12 @@ final class TvState {
 
     /** Teks timer kecil di pojok layar game. */
     static String timerText(Context ctx, TvState s, long now, long staffLeftMs) {
+        LocalStore.Session l = StateRepo.localAuthority(ctx, now);
+        if (l != null && l.active(LocalStore.serverNow(ctx))) {
+            long sn = LocalStore.serverNow(ctx);
+            Integer r = l.remainingSeconds(sn);
+            return r == null ? "▶ " + clock(l.elapsedSeconds(sn)) : clock(r);
+        }
         if (staffLeftMs > 0 && (s == null || !s.shouldShowGame(now))) {
             return ctx.getString(R.string.timer_staff) + "  " + clock(staffLeftMs / 1000);
         }

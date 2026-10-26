@@ -441,6 +441,8 @@ export interface TvStateResponse {
   timeUp: boolean;
   /** Unit punya QR Pelanggan → layar peringatan/Waktu Habis menampilkan QR-nya (lihat /api/tv/qr?kind=unit). */
   hasUnitQr: boolean;
+  /** Sesi aktif unit ini (aplikasi NEXBILL TV memakainya untuk tambah waktu / stop dari TV). */
+  sessionId: string | null;
   serverTime: string;
 }
 
@@ -562,6 +564,7 @@ export async function getTvState(token: string): Promise<TvStateResponse> {
     bookingUrl: showBookingQr && outlet?.slug ? `/book/${outlet.slug}` : null,
     timeUp,
     hasUnitQr: !!unit?.customerQrToken,
+    sessionId: session?.id ?? null,
     serverTime: now.toISOString(),
   };
 }

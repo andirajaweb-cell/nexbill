@@ -12,9 +12,22 @@ Aplikasi kecil yang dipasang langsung di Android TV / Google TV. Ini cara kontro
 
 Kalau merek TV tidak mengizinkan HDMI tampil di dalam aplikasi, aplikasi beralih ke mode **Pindah input TV**. TV dipindah ke input HDMI-nya, timer tampil sebagai overlay, dan layar NEXBILL dibawa kembali saat waktu habis. Mode ini butuh izin *Tampil di atas aplikasi lain*.
 
-**Menu staf:** tahan OK di remote 3 detik, atau tekan tombol Menu. Kalau layar diberi PIN di Pengaturan › TV Screensaver, PIN itu yang diminta. Isinya:
+## Sesi dari TV & internet putus (versi 1.2.0)
 
-- buka layar game 10 menit (untuk tes);
+- **Tampilan utama = screensaver.** Online: halaman `/tv` dari server. Internet putus (halaman tidak bisa dimuat): screensaver bawaan aplikasi — nama outlet, unit, jam, status (Tersedia / Waktu habis), dan jumlah transaksi yang menunggu dikirim.
+- **Kasir di TV:** tekan **OK** di remote → **PIN layar** (Pengaturan › TV Screensaver) → panel kasir:
+  - **Mulai sesi** — pilih paket promo unit ini, durasi (harga ± dari tarif per jam), atau Bebas (stop manual);
+  - **Tambah waktu** / **Akhiri sesi** — juga untuk sesi yang dimulai dari dashboard;
+  - **Status sinkron** — antrean yang menunggu, yang ditolak server (bisa dicoba lagi / dihapus dari TV);
+  - **Pengaturan TV** — menu staf di bawah.
+- **Offline:** sesi disimpan di TV (`LocalStore`), timer & kunci layar tetap jalan walau TV dinyalakan ulang, dan waktu habis dicatat tepat pada jamnya. Begitu online, `PollService` mengirim antrean ke `POST /api/tv/sync` (format Mode Offline kasir, idempoten per aksi) — sesi masuk ke dashboard dan tagihannya ke **Order Terbuka** di Kasir.
+- **Terpisah per outlet:** outlet & unit selalu diambil dari token layar; TV hanya bisa mengatur unit yang dipasangkan ke layar itu, dan hanya mulai/tambah waktu/stop (bukan pembayaran). Tanpa PIN layar, sesi tidak bisa dimulai dari TV.
+- **PIN saat offline:** dicocokkan dengan PIN terakhir yang berhasil dipakai di TV itu saat online — masukkan PIN sekali saat online setelah pairing.
+- Harga, paket, dan durasi diambil dari `GET /api/tv/catalog` (disimpan di TV, disegarkan tiap 10 menit).
+
+**Menu staf:** tekan OK → PIN → Pengaturan TV (sebelum dipasangkan: tahan OK 3 detik atau tombol Menu). Isinya:
+
+- buka layar game 10 menit (tes, tidak ditagih — sesi sungguhan lewat panel kasir);
 - pilih input HDMI;
 - ganti mode tampilan;
 - izin overlay;

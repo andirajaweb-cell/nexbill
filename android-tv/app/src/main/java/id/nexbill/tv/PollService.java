@@ -61,6 +61,7 @@ public class PollService extends Service {
         thread.start();
         worker = new Handler(thread.getLooper());
         lastToken = StateRepo.token(this);
+        StateRepo.restore(this);
         StateRepo.addListener(onRepoChange);
         worker.post(poll);
         main.post(tick);
@@ -110,17 +111,28 @@ public class PollService extends Service {
         public void run() {
             String token = StateRepo.token(PollService.this);
             if (!token.isEmpty()) {
+                boolean online = false;
                 try {
+                    long t0 = System.currentTimeMillis();
                     Http.Result r = Http.request("GET", Config.STATE_URL, token, null);
+                    long t1 = System.currentTimeMillis();
                     if (r.code == 401) {
                         // Layar dilepas dari dashboard. Halaman /tv juga akan kembali ke layar pairing.
                         StateRepo.setToken(PollService.this, "");
                     } else if (r.code == 200) {
-                        StateRepo.setState(TvState.parse(r.body, SystemClock.elapsedRealtime()));
+                        TvState st = TvState.parse(r.body, SystemClock.elapsedRealtime());
+                        // Selisih jam server − jam TV, dipakai untuk waktu aksi yang direkam saat offline.
+                        if (st.serverTimeMs > 0) LocalStore.setClockOffset(PollService.this, st.serverTimeMs - (t0 + t1) / 2);
+                        LocalStore.saveState(PollService.this, r.body);
+                        online = true;
+                        // Kirim dulu antrean sesi dari TV, baru status dipakai (supaya status sesudah sinkron yang menentukan).
+                        if (LocalStore.queue(PollService.this).length() > 0) SyncEngine.syncQueue(PollService.this);
+                        StateRepo.setState(st);
                     }
                 } catch (Exception ignored) {
                     // Jaringan putus: status terakhir dipertahankan dan timer terus dihitung di TV.
                 }
+                if (online) SyncEngine.refreshCatalogIfDue(PollService.this, false);
             }
             worker.postDelayed(this, Config.POLL_MS);
         }
@@ -142,13 +154,14 @@ public class PollService extends Service {
         public void run() {
             Context c = PollService.this;
             long now = SystemClock.elapsedRealtime();
+            expireLocalSession(c);
             TvState s = StateRepo.state();
             boolean paired = !StateRepo.token(c).isEmpty();
             boolean active = paired && s != null && s.enabled && !StateRepo.guardPaused(now);
             if (StateRepo.switchInputMode(c)) {
                 if (StateRepo.activityVisible) {
                     overlay.hide();
-                } else if (StateRepo.showGame(now)) {
+                } else if (StateRepo.showGame(c, now)) {
                     overlay.show(TvState.timerText(c, s, now, StateRepo.staffLeftMs(now)), s != null && s.isWarning(now));
                 } else {
                     overlay.hide();
@@ -163,6 +176,26 @@ public class PollService extends Service {
     };
 
     private static final long TICK_MS = 500;
+
+    /**
+     * Sesi yang diatur dari TV dan waktunya habis: dicatat "stop" tepat pada waktu habisnya (bukan saat
+     * TV online lagi), lalu layar terkunci. Sesi lokal yang sudah berhenti dan semua aksinya sudah
+     * diterima server dilepas.
+     */
+    static void expireLocalSession(Context c) {
+        LocalStore.Session l = LocalStore.session(c);
+        if (l == null) return;
+        long serverNow = LocalStore.serverNow(c);
+        if (!l.ended && l.plannedMinutes > 0 && serverNow >= l.endAt()) {
+            l.ended = true;
+            LocalStore.setSession(c, l);
+            LocalStore.enqueue(c, "stop", l.sessionId, l.endAt(), null);
+            StateRepo.touch();
+        } else if (l.ended && !LocalStore.hasPendingFor(c, l.sessionId)) {
+            LocalStore.setSession(c, null);
+            StateRepo.touch();
+        }
+    }
     /** Jeda antar-percobaan membawa layar ke depan saat penjaga aktif (target pulih ≤ 1 detik). */
     private static final long GUARD_RETRY_MS = 800;
 
