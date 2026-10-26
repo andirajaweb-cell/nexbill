@@ -245,6 +245,11 @@ public class MainActivity extends Activity {
         else showLock();
     }
 
+    private boolean startRejectedNow() {
+        LocalStore.Session l = LocalStore.session(this);
+        return l != null && !l.ended && LocalStore.startRejected(this, l.sessionId);
+    }
+
     /** ---------------- Screensaver bawaan (offline) ---------------- */
 
     private LinearLayout buildOfflineView() {
@@ -335,8 +340,14 @@ public class MainActivity extends Activity {
         if (s != null && !s.enabled) {
             showHint(getString(R.string.disabled_hint) + (s.disabledReason == null ? "" : " " + s.disabledReason));
             timer.setVisibility(View.GONE);
+        } else if (startRejectedNow()) {
+            // Sesi dari TV ditolak server (mis. unit sudah dipakai sesi lain): tampil jelas di layar supaya
+            // kasir segera mencatatnya di dashboard — tanpa itu sesi ini tidak tertagih.
+            showHint(getString(R.string.sync_start_rejected_hint));
         } else if (!videoAvailable) {
             showHint(getString(R.string.waiting_signal));
+        } else {
+            showHint(null);
         }
     }
 

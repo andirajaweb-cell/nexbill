@@ -91,4 +91,5 @@
     <string name="sync_offline">No internet — will be sent automatically once online.</string>
     <string name="hours_fmt">%1$d hr</string>
     <string name="hours_minutes_fmt">%1$d hr %2$d min</string>
+    <string name="sync_start_rejected_hint">⚠ The dashboard rejected this session and it is NOT billed yet — cashier: open Sync status (press OK) and record the session in Rental.</string>
 </resources>

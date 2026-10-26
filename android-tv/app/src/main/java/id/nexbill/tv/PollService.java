@@ -157,7 +157,9 @@ public class PollService extends Service {
             expireLocalSession(c);
             TvState s = StateRepo.state();
             boolean paired = !StateRepo.token(c).isEmpty();
-            boolean active = paired && s != null && s.enabled && !StateRepo.guardPaused(now);
+            // Belum ada status server (TV menyala tanpa internet & status lama tidak bisa dipulihkan): tetap
+            // dianggap aktif — penjaga layar tidak boleh mati hanya karena internet putus.
+            boolean active = paired && (s == null || s.enabled) && !StateRepo.guardPaused(now);
             if (StateRepo.switchInputMode(c)) {
                 if (StateRepo.activityVisible) {
                     overlay.hide();

@@ -91,4 +91,5 @@
     <string name="sync_offline">ไม่มีอินเทอร์เน็ต — จะส่งอัตโนมัติเมื่อออนไลน์</string>
     <string name="hours_fmt">%1$d ชม.</string>
     <string name="hours_minutes_fmt">%1$d ชม. %2$d นาที</string>
+    <string name="sync_start_rejected_hint">⚠ แดชบอร์ดปฏิเสธเซสชันนี้และยังไม่ได้คิดเงิน — แคชเชียร์: เปิดสถานะซิงก์ (กด OK) แล้วบันทึกเซสชันในหน้า Rental</string>
 </resources>

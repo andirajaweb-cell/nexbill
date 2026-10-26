@@ -188,7 +188,7 @@ final class LocalStore {
 
     static synchronized void setSession(Context c, Session s) {
         try {
-            p(c).edit().putString(K_SESSION, s == null ? "" : s.toJson().toString()).apply();
+            p(c).edit().putString(K_SESSION, s == null ? "" : s.toJson().toString()).commit();
         } catch (Exception ignored) {
         }
     }
@@ -203,8 +203,12 @@ final class LocalStore {
         }
     }
 
+    /**
+     * Antrean & sesi ditulis SINKRON (commit, bukan apply): listrik bilik bisa padam kapan saja, dan
+     * aksi yang hilang sebelum sempat tertulis = sesi yang tidak pernah tertagih.
+     */
     private static void saveQueue(Context c, JSONArray q) {
-        p(c).edit().putString(K_QUEUE, q.toString()).apply();
+        p(c).edit().putString(K_QUEUE, q.toString()).commit();
     }
 
     /** Menambah aksi Mode Offline ke antrean (dikirim PollService begitu online). */
@@ -276,6 +280,16 @@ final class LocalStore {
         for (int i = 0; i < q.length(); i++) {
             JSONObject a = q.optJSONObject(i);
             if (a != null && sessionId.equals(a.optString("sessionId"))) return true;
+        }
+        return false;
+    }
+
+    /** Aksi "start" sesi ini sudah ditolak server setidaknya sekali (sesi belum tercatat di dashboard). */
+    static synchronized boolean startRejected(Context c, String sessionId) {
+        JSONArray q = queue(c);
+        for (int i = 0; i < q.length(); i++) {
+            JSONObject a = q.optJSONObject(i);
+            if (a != null && sessionId.equals(a.optString("sessionId")) && "start".equals(a.optString("kind")) && a.optInt("attempts", 0) > 0) return true;
         }
         return false;
     }

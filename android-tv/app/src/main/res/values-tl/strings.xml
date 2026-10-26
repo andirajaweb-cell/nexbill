@@ -91,4 +91,5 @@
     <string name="sync_offline">Walang internet — awtomatikong ipapadala pag online na.</string>
     <string name="hours_fmt">%1$d oras</string>
     <string name="hours_minutes_fmt">%1$d oras %2$d minuto</string>
+    <string name="sync_start_rejected_hint">⚠ Tinanggihan ng dashboard ang session na ito at HINDI pa nasisingil — kahera: buksan ang Status ng sync (pindutin ang OK) at itala ang session sa Rental.</string>
 </resources>

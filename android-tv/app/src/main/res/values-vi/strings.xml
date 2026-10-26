@@ -91,4 +91,5 @@
     <string name="sync_offline">Mất mạng — sẽ tự gửi khi có mạng.</string>
     <string name="hours_fmt">%1$d giờ</string>
     <string name="hours_minutes_fmt">%1$d giờ %2$d phút</string>
+    <string name="sync_start_rejected_hint">⚠ Dashboard đã từ chối phiên này và CHƯA tính tiền — thu ngân: mở Trạng thái đồng bộ (bấm OK) rồi ghi phiên ở trang Rental.</string>
 </resources>
