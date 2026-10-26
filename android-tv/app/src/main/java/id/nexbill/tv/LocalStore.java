@@ -344,6 +344,66 @@ final class LocalStore {
         return p(c).getString(K_LAST_SYNC_ERROR, "");
     }
 
+    /* ---------------- kejadian non-tagihan (mode staf / tes) ---------------- */
+
+    private static final String K_EVENTS = "event_queue";
+    private static final String K_TEST_DAY = "staff_test_day";
+    private static final String K_TEST_COUNT = "staff_test_count";
+    /** Mode staf (tes, tidak ditagih) paling banyak sekian kali per TV per hari (kalender TV). */
+    static final int STAFF_TEST_PER_DAY = 3;
+
+    static synchronized JSONArray events(Context c) {
+        try {
+            return new JSONArray(p(c).getString(K_EVENTS, "[]"));
+        } catch (Exception e) {
+            return new JSONArray();
+        }
+    }
+
+    private static String today() {
+        return new SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(new Date());
+    }
+
+    /** Sisa jatah mode staf hari ini. */
+    static synchronized int staffTestsLeft(Context c) {
+        int used = today().equals(p(c).getString(K_TEST_DAY, "")) ? p(c).getInt(K_TEST_COUNT, 0) : 0;
+        return Math.max(0, STAFF_TEST_PER_DAY - used);
+    }
+
+    /**
+     * Mencatat pemakaian mode staf (dikirim ke dashboard — kartu Pengawasan NEXBILL TV) dan menghitung
+     * jatah harian. false bila jatah hari ini habis.
+     */
+    static synchronized boolean recordStaffTest(Context c, int minutes) {
+        if (staffTestsLeft(c) <= 0) return false;
+        String day = today();
+        int used = day.equals(p(c).getString(K_TEST_DAY, "")) ? p(c).getInt(K_TEST_COUNT, 0) : 0;
+        try {
+            JSONObject e = new JSONObject()
+                    .put("id", UUID.randomUUID().toString())
+                    .put("kind", "staffTest")
+                    .put("at", iso(serverNow(c)))
+                    .put("minutes", minutes)
+                    .put("token", StateRepo.token(c));
+            JSONArray q = events(c);
+            q.put(e);
+            p(c).edit().putString(K_EVENTS, q.toString()).putString(K_TEST_DAY, day).putInt(K_TEST_COUNT, used + 1).commit();
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    static synchronized void removeEvents(Context c, java.util.Set<String> ids) {
+        JSONArray q = events(c);
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < q.length(); i++) {
+            JSONObject a = q.optJSONObject(i);
+            if (a != null && !ids.contains(a.optString("id"))) out.put(a);
+        }
+        p(c).edit().putString(K_EVENTS, out.toString()).commit();
+    }
+
     /* ---------------- katalog & status terakhir ---------------- */
 
     static JSONObject catalog(Context c) {

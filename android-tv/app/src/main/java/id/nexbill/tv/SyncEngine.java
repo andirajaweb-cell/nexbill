@@ -22,29 +22,39 @@ final class SyncEngine {
 
     private SyncEngine() {}
 
-    /** Kirim semua aksi yang menunggu, dikelompokkan per token (antrean dari pairing lama tetap terkirim). */
+    /**
+     * Kirim semua aksi sesi & kejadian (mode staf) yang menunggu, dikelompokkan per token — antrean dari
+     * pairing lama tetap terkirim dengan token lamanya.
+     */
     static void syncQueue(Context c) {
         JSONArray q = LocalStore.queue(c);
-        if (q.length() == 0) return;
-        Map<String, JSONArray> byToken = new LinkedHashMap<>();
+        JSONArray ev = LocalStore.events(c);
+        if (q.length() == 0 && ev.length() == 0) return;
+        Map<String, JSONArray[]> byToken = new LinkedHashMap<>();
         for (int i = 0; i < q.length(); i++) {
             JSONObject a = q.optJSONObject(i);
             if (a == null || a.optInt("attempts", 0) >= LocalStore.MAX_ATTEMPTS) continue;
-            String token = a.optString("token", "");
-            if (token.isEmpty()) token = StateRepo.token(c);
-            if (token.isEmpty()) continue;
-            JSONArray list = byToken.get(token);
-            if (list == null) {
-                list = new JSONArray();
-                byToken.put(token, list);
+            group(c, byToken, a)[0].put(clean(a));
+        }
+        for (int i = 0; i < ev.length(); i++) {
+            JSONObject e = ev.optJSONObject(i);
+            if (e == null) continue;
+            JSONObject out = new JSONObject();
+            try {
+                out.put("id", e.optString("id")).put("kind", e.optString("kind")).put("at", e.optString("at")).put("minutes", e.optInt("minutes", 10));
+            } catch (Exception ignored) {
             }
-            list.put(clean(a));
+            group(c, byToken, e)[1].put(out);
         }
         String lastError = null;
-        for (Map.Entry<String, JSONArray> e : byToken.entrySet()) {
+        for (Map.Entry<String, JSONArray[]> entry : byToken.entrySet()) {
+            if (entry.getKey().isEmpty()) continue;
             try {
-                JSONObject body = new JSONObject().put("clockOffsetMs", LocalStore.clockOffset(c)).put("actions", e.getValue());
-                Http.Result r = Http.request("POST", Config.SYNC_URL, e.getKey(), body.toString());
+                JSONObject body = new JSONObject()
+                        .put("clockOffsetMs", LocalStore.clockOffset(c))
+                        .put("actions", entry.getValue()[0])
+                        .put("events", entry.getValue()[1]);
+                Http.Result r = Http.request("POST", Config.SYNC_URL, entry.getKey(), body.toString());
                 if (r.code == 401) {
                     lastError = c.getString(R.string.sync_token_revoked);
                     continue;
@@ -53,7 +63,8 @@ final class SyncEngine {
                     lastError = "HTTP " + r.code;
                     continue;
                 }
-                JSONArray results = new JSONObject(r.body).optJSONArray("results");
+                JSONObject resp = new JSONObject(r.body);
+                JSONArray results = resp.optJSONArray("results");
                 Set<String> done = new HashSet<>();
                 for (int i = 0; results != null && i < results.length(); i++) {
                     JSONObject res = results.optJSONObject(i);
@@ -64,6 +75,14 @@ final class SyncEngine {
                     else if (!id.isEmpty()) LocalStore.markFailed(c, id, res.optString("error", ""));
                 }
                 LocalStore.removeActions(c, done);
+                JSONArray evResults = resp.optJSONArray("events");
+                Set<String> evDone = new HashSet<>();
+                for (int i = 0; evResults != null && i < evResults.length(); i++) {
+                    JSONObject res = evResults.optJSONObject(i);
+                    // Kejadian yang ditolak (bentuk salah) juga dibuang — tidak ada yang bisa diperbaiki di TV.
+                    if (res != null) evDone.add(res.optString("id", ""));
+                }
+                LocalStore.removeEvents(c, evDone);
             } catch (Exception ex) {
                 // Internet putus di tengah kirim: antrean tetap utuh, dicoba lagi di putaran berikutnya.
                 lastError = c.getString(R.string.sync_offline);
@@ -72,6 +91,17 @@ final class SyncEngine {
         }
         LocalStore.setLastSync(c, System.currentTimeMillis(), lastError);
         StateRepo.touch();
+    }
+
+    private static JSONArray[] group(Context c, Map<String, JSONArray[]> byToken, JSONObject a) {
+        String token = a.optString("token", "");
+        if (token.isEmpty()) token = StateRepo.token(c);
+        JSONArray[] g = byToken.get(token);
+        if (g == null) {
+            g = new JSONArray[] { new JSONArray(), new JSONArray() };
+            byToken.put(token, g);
+        }
+        return g;
     }
 
     private static JSONObject clean(JSONObject a) {

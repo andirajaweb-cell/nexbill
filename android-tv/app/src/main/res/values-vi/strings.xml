@@ -92,4 +92,6 @@
     <string name="hours_fmt">%1$d giờ</string>
     <string name="hours_minutes_fmt">%1$d giờ %2$d phút</string>
     <string name="sync_start_rejected_hint">⚠ Dashboard đã từ chối phiên này và CHƯA tính tiền — thu ngân: mở Trạng thái đồng bộ (bấm OK) rồi ghi phiên ở trang Rental.</string>
+    <string name="staff_test_limit">Đã đạt giới hạn chế độ nhân viên hôm nay (%1$d lần). Muốn chơi, hãy bắt đầu phiên từ bảng thu ngân để tính tiền.</string>
+    <string name="staff_test_started">Đã mở chế độ nhân viên 10 phút (không tính tiền, có ghi trên dashboard). Còn lại hôm nay: %1$d.</string>
 </resources>

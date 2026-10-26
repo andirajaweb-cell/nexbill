@@ -3138,7 +3138,8 @@ export const offlineSyncActions = pgTable(
     rentalSessionId: text("rental_session_id"),
     occurredAt: text("occurred_at").notNull(),
     payloadJson: text("payload_json").notNull(),
-    status: text("status", { enum: ["processing", "done", "failed"] }).notNull().default("processing"),
+    // reviewed = gagal, sudah ditinjau owner di kartu Pengawasan NEXBILL TV (tidak ada CHECK di DB — tanpa migrasi).
+    status: text("status", { enum: ["processing", "done", "failed", "reviewed"] }).notNull().default("processing"),
     resultJson: text("result_json"),
     error: text("error"),
     clockFlagged: boolean("clock_flagged").notNull().default(false),

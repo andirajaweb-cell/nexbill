@@ -92,4 +92,6 @@
     <string name="hours_fmt">%1$d ชม.</string>
     <string name="hours_minutes_fmt">%1$d ชม. %2$d นาที</string>
     <string name="sync_start_rejected_hint">⚠ แดชบอร์ดปฏิเสธเซสชันนี้และยังไม่ได้คิดเงิน — แคชเชียร์: เปิดสถานะซิงก์ (กด OK) แล้วบันทึกเซสชันในหน้า Rental</string>
+    <string name="staff_test_limit">ใช้โหมดพนักงานครบ %1$d ครั้งของวันนี้แล้ว ถ้าจะเล่น ให้เริ่มเซสชันจากแผงแคชเชียร์เพื่อให้คิดเงิน</string>
+    <string name="staff_test_started">เปิดโหมดพนักงาน 10 นาที (ไม่คิดเงิน บันทึกในแดชบอร์ด) เหลือวันนี้: %1$d</string>
 </resources>

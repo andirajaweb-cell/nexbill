@@ -560,7 +560,7 @@ public class MainActivity extends Activity {
                     menuOpen = false;
                     long now = SystemClock.elapsedRealtime();
                     switch (which) {
-                        case 0: StateRepo.setStaffUntil(now + Config.STAFF_BYPASS_MS); break;
+                        case 0: startStaffTest(now); break;
                         case 1: StateRepo.setStaffUntil(0); break;
                         case 2: pickHdmi(); break;
                         case 3: pickMode(); break;
@@ -574,6 +574,22 @@ public class MainActivity extends Activity {
                 })
                 .setOnCancelListener(d -> menuOpen = false)
                 .show();
+    }
+
+    /**
+     * Mode staf / tes: layar game dibuka 10 menit tanpa sesi & tanpa tagihan. Dibatasi 3 kali per TV per
+     * hari dan SELALU dicatat — dikirim ke dashboard (kartu Pengawasan NEXBILL TV & Audit Log) begitu online.
+     * Main sungguhan harus lewat panel kasir supaya tertagih.
+     */
+    private void startStaffTest(long nowRealtime) {
+        int minutes = (int) (Config.STAFF_BYPASS_MS / 60_000L);
+        if (!LocalStore.recordStaffTest(this, minutes)) {
+            message(getString(R.string.staff_test_limit, LocalStore.STAFF_TEST_PER_DAY));
+            return;
+        }
+        StateRepo.setStaffUntil(nowRealtime + Config.STAFF_BYPASS_MS);
+        Toast.makeText(this, getString(R.string.staff_test_started, LocalStore.staffTestsLeft(this)), Toast.LENGTH_LONG).show();
+        syncSoon();
     }
 
     private void pickHdmi() {

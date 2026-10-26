@@ -93,4 +93,6 @@
     <string name="hours_fmt">%1$d jam</string>
     <string name="hours_minutes_fmt">%1$d jam %2$d menit</string>
     <string name="sync_start_rejected_hint">⚠ Sesi ini ditolak dashboard dan BELUM tertagih — kasir: buka Status sinkron (tekan OK) lalu catat sesinya di Rental.</string>
+    <string name="staff_test_limit">Batas mode staf hari ini (%1$d kali) sudah tercapai. Untuk main, mulai sesi lewat panel kasir supaya tertagih.</string>
+    <string name="staff_test_started">Mode staf dibuka 10 menit (tidak ditagih, dicatat di dashboard). Sisa jatah hari ini: %1$d.</string>
 </resources>

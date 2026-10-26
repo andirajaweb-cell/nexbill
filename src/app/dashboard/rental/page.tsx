@@ -24,6 +24,7 @@ import { computeSessionCharge, estimateAccessoryCharge } from "@/lib/rental/char
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { QuickRateEditor } from "./quick-rate-editor";
 import { SaveLeftoverCredit, TimeCreditStartOption } from "./time-credit-ui";
+import { TvWatchCard } from "./tv-watch-card";
 import "@/lib/i18n/dict-setup";
 import { describeError } from "@/lib/api/error";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -1191,6 +1192,8 @@ function OnlineRentalPage() {
       </div>
 
       <PageGuide page="rental" title={t("nav.rental", "Rental PS")} />
+
+      <TvWatchCard />
 
       {bulkGroup && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">

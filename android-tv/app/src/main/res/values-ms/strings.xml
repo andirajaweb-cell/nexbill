@@ -92,4 +92,6 @@
     <string name="hours_fmt">%1$d jam</string>
     <string name="hours_minutes_fmt">%1$d jam %2$d minit</string>
     <string name="sync_start_rejected_hint">⚠ Sesi ini ditolak papan pemuka dan BELUM dicaj — juruwang: buka Status segerak (tekan OK) dan rekod sesi di Rental.</string>
+    <string name="staff_test_limit">Had mod staf hari ini (%1$d kali) telah dicapai. Untuk bermain, mulakan sesi melalui panel juruwang supaya dicaj.</string>
+    <string name="staff_test_started">Mod staf dibuka 10 minit (tidak dicaj, direkod di papan pemuka). Baki hari ini: %1$d.</string>
 </resources>

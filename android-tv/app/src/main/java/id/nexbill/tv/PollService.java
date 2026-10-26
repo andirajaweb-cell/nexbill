@@ -126,7 +126,7 @@ public class PollService extends Service {
                         LocalStore.saveState(PollService.this, r.body);
                         online = true;
                         // Kirim dulu antrean sesi dari TV, baru status dipakai (supaya status sesudah sinkron yang menentukan).
-                        if (LocalStore.queue(PollService.this).length() > 0) SyncEngine.syncQueue(PollService.this);
+                        if (LocalStore.queue(PollService.this).length() > 0 || LocalStore.events(PollService.this).length() > 0) SyncEngine.syncQueue(PollService.this);
                         StateRepo.setState(st);
                     }
                 } catch (Exception ignored) {

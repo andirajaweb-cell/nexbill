@@ -8,7 +8,7 @@
  * mulai/tambah waktu/jeda/lanjut/stop (bukan bayar atau menambah item), dan hanya bila outlet
  * memasang PIN layar (sesi dari TV selalu lewat PIN kasir).
  */
-import type { OfflineActionKind } from "@/lib/offline/protocol";
+import { isUuid, type OfflineActionKind } from "@/lib/offline/protocol";
 
 export const TV_ALLOWED_KINDS: OfflineActionKind[] = ["start", "extend", "pause", "resume", "stop"];
 
@@ -60,3 +60,22 @@ export function packagesForConsole(
 }
 
 export const DEFAULT_TV_DURATIONS = [30, 60, 90, 120, 180];
+
+/** Label perangkat untuk semua yang dikirim aplikasi NEXBILL TV (offline_sync_actions.deviceLabel). */
+export const TV_DEVICE_PREFIX = "NEXBILL TV · ";
+
+/** Mode staf (layar game dibuka tanpa sesi, untuk tes) — dibatasi per TV per hari di aplikasi. */
+export const TV_STAFF_TEST_KIND = "staffTest";
+export const TV_STAFF_TEST_MAX_MINUTES = 10;
+
+export type TvEvent = { id: string; kind: typeof TV_STAFF_TEST_KIND; at: string; minutes: number };
+
+export function parseTvEvent(raw: unknown): { ok: true; event: TvEvent } | { ok: false; error: string } {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  if (!isUuid(r.id)) return { ok: false, error: "ID kejadian tidak valid." };
+  if (r.kind !== TV_STAFF_TEST_KIND) return { ok: false, error: "Jenis kejadian tidak dikenal." };
+  if (typeof r.at !== "string" || Number.isNaN(Date.parse(r.at))) return { ok: false, error: "Waktu tidak valid." };
+  const minutes = Number(r.minutes);
+  if (!Number.isInteger(minutes) || minutes <= 0 || minutes > 60) return { ok: false, error: "Durasi tidak valid." };
+  return { ok: true, event: { id: r.id, kind: TV_STAFF_TEST_KIND, at: new Date(r.at).toISOString(), minutes } };
+}

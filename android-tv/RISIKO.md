@@ -8,9 +8,9 @@ Belum ada uji di TV sungguhan — semua penilaian di bawah dari membaca kode. Uj
 
 | # | Risiko | Dampak | Status | Penanganan |
 |---|---|---|---|---|
-| U1 | Sesi dari TV **ditolak server** (unit sudah dipakai sesi lain, layar dinonaktifkan, aksi > 72 jam) → pelanggan tetap main tapi tidak ada tagihan | Tinggi | Dikurangi | Layar game menampilkan peringatan "ditolak dashboard dan BELUM tertagih"; daftar gagal ada di Status sinkron. **Sisa:** dashboard belum menampilkan aksi TV yang gagal (hanya ringkasan di Audit Log) — owner tidak tahu kecuali melihat TV. |
+| U1 | Sesi dari TV **ditolak server** (unit sudah dipakai sesi lain, layar dinonaktifkan, aksi > 72 jam) → pelanggan tetap main tapi tidak ada tagihan | Tinggi | Ditutup (1.2.1) | Tercatat di dashboard: kartu **Pengawasan NEXBILL TV** di halaman Rental (merah, "belum tertagih") sampai owner menandai sudah ditangani; juga peringatan di layar game TV dan di Status sinkron. Termasuk aksi yang ditolak sebelum diproses. |
 | U2 | Listrik padam tepat setelah kasir memulai sesi → aksi belum tertulis → sesi hilang | Tinggi | Ditutup | Antrean & sesi ditulis sinkron (`commit`). |
-| U3 | **Mode staf 10 menit** (tes) tidak ditagih dan bisa diulang | Sedang | Terbuka | Dibatasi 10 menit & ber-PIN (dulu 30–180 menit). Belum tercatat di mana pun — usul: catat ke Audit Log saat online. |
+| U3 | **Mode staf 10 menit** (tes) tidak ditagih dan bisa diulang | Sedang | Dikurangi (1.2.1) | Maksimal 3 kali per TV per hari, ber-PIN, dan setiap pemakaian dicatat (antrean offline) → kartu Pengawasan NEXBILL TV + Audit Log. |
 | U4 | Sesi Bebas (tanpa batas) dari TV lupa dihentikan | Sedang | Dikurangi | Ditagih per menit sampai dihentikan (dari TV atau dashboard), jadi pelanggan tetap membayar. |
 | U5 | Harga di TV (katalog tersimpan) berbeda dengan harga terbaru saat offline | Rendah | Ditutup | Harga di TV hanya perkiraan; tagihan dihitung server dari tarif/paket yang berlaku. |
 
@@ -55,6 +55,5 @@ Belum ada uji di TV sungguhan — semua penilaian di bawah dari membaca kode. Uj
 ## Langkah berikutnya yang disarankan
 
 1. Uji lapangan 7 hari di XTREAM ps (O5).
-2. Tampilkan aksi TV yang gagal di dashboard (U1) — supaya owner tahu tanpa melihat TV.
-3. Catat mode staf 10 menit ke Audit Log (U3).
-4. PIN per staf untuk sesi dari TV (A2).
+2. PIN per staf untuk sesi dari TV (A2).
+3. Notifikasi (push/WA) ke owner saat ada sesi dari TV yang ditolak — sekarang baru terlihat di halaman Rental.

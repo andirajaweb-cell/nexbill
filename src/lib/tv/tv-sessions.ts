@@ -1,12 +1,12 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { outlets, promos, rentalDurationPresets, rentalSessions, rentalUnits, staffUsers, tvScreens } from "@/db/schema";
+import { auditLogs, offlineSyncActions, outlets, promos, rentalDurationPresets, rentalSessions, rentalUnits, staffUsers, tvScreens } from "@/db/schema";
 import { computeEffectiveHourlyRate } from "@/lib/rental/pricing";
 import { DEFAULT_DEPS, processOfflineBatch, type SyncDeps } from "@/lib/offline/server-sync";
-import { SYNC_BATCH_LIMIT, type SyncActionResult } from "@/lib/offline/protocol";
+import { isUuid, SYNC_BATCH_LIMIT, type SyncActionResult } from "@/lib/offline/protocol";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 import { getOrCreateTvSettings } from "./service";
-import { checkTvAction, DEFAULT_TV_DURATIONS, packagesForConsole, type TvCatalogPackage } from "./tv-session-rules";
+import { checkTvAction, DEFAULT_TV_DURATIONS, packagesForConsole, parseTvEvent, TV_DEVICE_PREFIX, type TvCatalogPackage } from "./tv-session-rules";
 
 /**
  * Sesi rental dari aplikasi NEXBILL TV (lihat tv-session-rules.ts). Outlet & unit SELALU diambil
@@ -79,7 +79,15 @@ async function tvActor(outletId: string): Promise<string> {
   return pick.id;
 }
 
-export async function syncTvActions(token: string, body: { actions?: unknown; clockOffsetMs?: unknown }) {
+const PROTOCOL_KEYS = ["id", "kind", "at", "clockOffsetMs", "sessionId", "rentalUnitId", "plannedMinutes", "promoId", "minutes", "customerName", "gameName"];
+
+function cleanAction(r: Record<string, unknown>) {
+  const clean: Record<string, unknown> = { recordedBy: null };
+  for (const k of PROTOCOL_KEYS) if (r[k] !== undefined) clean[k] = r[k];
+  return clean;
+}
+
+export async function syncTvActions(token: string, body: { actions?: unknown; clockOffsetMs?: unknown; events?: unknown }) {
   const screen = await screenByToken(token);
   const actions = Array.isArray(body.actions) ? body.actions.slice(0, SYNC_BATCH_LIMIT) : [];
   const [moduleOn, hasPin] = await Promise.all([isFeatureEnabled(screen.outletId, "TV_SCREENSAVER_ENABLED"), pinConfigured(screen.outletId)]);
@@ -106,23 +114,73 @@ export async function syncTvActions(token: string, body: { actions?: unknown; cl
       sessionUnitId: typeof r.sessionId === "string" ? unitOfSession.get(r.sessionId) ?? null : null,
     });
     if (!check.ok) rejected.push({ id, status: "failed", error: check.error });
-    else {
-      // Hanya kolom protokol Mode Offline yang diteruskan (tidak ada token/jejak lain yang ikut tersimpan).
-      const clean: Record<string, unknown> = { recordedBy: null };
-      for (const k of ["id", "kind", "at", "clockOffsetMs", "sessionId", "rentalUnitId", "plannedMinutes", "promoId", "minutes", "customerName", "gameName"]) {
-        if (r[k] !== undefined) clean[k] = r[k];
-      }
-      accepted.push(clean);
-    }
+    // Hanya kolom protokol Mode Offline yang diteruskan (tidak ada token/jejak lain yang ikut tersimpan).
+    else accepted.push(cleanAction(r));
   }
 
   const actor = await tvActor(screen.outletId);
   const [unit] = screen.rentalUnitId ? await db.select({ name: rentalUnits.name }).from(rentalUnits).where(eq(rentalUnits.id, screen.rentalUnitId)).limit(1) : [];
+  const deviceLabel = `${TV_DEVICE_PREFIX}${unit?.name ?? screen.name}`;
+
+  // Aksi yang ditolak SEBELUM diputar ulang tetap dicatat sebagai "failed" di offline_sync_actions,
+  // supaya muncul di dashboard (kartu Pengawasan NEXBILL TV) — bukan hanya di layar TV.
+  for (const rej of rejected) {
+    const raw = actions.find((a) => (a as { id?: unknown })?.id === rej.id) as Record<string, unknown> | undefined;
+    if (!raw || !isUuid(rej.id)) continue;
+    const at = typeof raw.at === "string" && !Number.isNaN(Date.parse(raw.at)) ? new Date(raw.at).toISOString() : new Date().toISOString();
+    await db
+      .insert(offlineSyncActions)
+      .values({
+        id: rej.id,
+        outletId: screen.outletId,
+        staffUserId: actor,
+        kind: typeof raw.kind === "string" ? raw.kind.slice(0, 20) : "unknown",
+        rentalSessionId: isUuid(raw.sessionId) ? raw.sessionId : null,
+        occurredAt: at,
+        payloadJson: JSON.stringify(cleanAction(raw)),
+        status: "failed",
+        error: rej.error ?? null,
+        deviceLabel,
+      })
+      .onConflictDoUpdate({ target: offlineSyncActions.id, set: { error: rej.error ?? null, updatedAt: new Date().toISOString() }, setWhere: eq(offlineSyncActions.status, "failed") });
+  }
+
+  // Kejadian non-tagihan dari TV (mis. mode staf/tes 10 menit) — dicatat supaya terlihat owner.
+  const eventResults: { id: string; status: "done" | "failed"; error?: string }[] = [];
+  const rawEvents = Array.isArray(body.events) ? body.events.slice(0, SYNC_BATCH_LIMIT) : [];
+  for (const raw of rawEvents) {
+    const ev = parseTvEvent(raw);
+    if (!ev.ok) {
+      eventResults.push({ id: typeof (raw as { id?: unknown })?.id === "string" ? String((raw as { id: string }).id) : "", status: "failed", error: ev.error });
+      continue;
+    }
+    const inserted = await db
+      .insert(offlineSyncActions)
+      .values({
+        id: ev.event.id,
+        outletId: screen.outletId,
+        staffUserId: actor,
+        kind: ev.event.kind,
+        occurredAt: ev.event.at,
+        payloadJson: JSON.stringify({ minutes: ev.event.minutes }),
+        status: "done",
+        deviceLabel,
+      })
+      .onConflictDoNothing()
+      .returning({ id: offlineSyncActions.id });
+    if (inserted.length) {
+      await db
+        .insert(auditLogs)
+        .values({ outletId: screen.outletId, staffUserId: actor, action: "tv_staff_test", entityType: "tv_screen", entityId: screen.id, afterData: JSON.stringify({ at: ev.event.at, minutes: ev.event.minutes, device: deviceLabel }) })
+        .catch((err) => console.error("[tv-sync] audit staff test gagal:", err));
+    }
+    eventResults.push({ id: ev.event.id, status: "done" });
+  }
   const offset = typeof body.clockOffsetMs === "number" && Number.isFinite(body.clockOffsetMs) ? body.clockOffsetMs : null;
   const deps: SyncDeps = DEFAULT_DEPS;
   const result = accepted.length
-    ? await processOfflineBatch({ outletId: screen.outletId, staffUserId: actor, currentClockOffsetMs: offset, deviceLabel: `NEXBILL TV · ${unit?.name ?? screen.name}` }, accepted, deps)
+    ? await processOfflineBatch({ outletId: screen.outletId, staffUserId: actor, currentClockOffsetMs: offset, deviceLabel }, accepted, deps)
     : { serverTime: new Date().toISOString(), results: [], clockFlagged: false };
   await db.update(tvScreens).set({ lastSeenAt: new Date().toISOString() }).where(eq(tvScreens.id, screen.id));
-  return { ...result, results: [...rejected, ...result.results] };
+  return { ...result, results: [...rejected, ...result.results], events: eventResults };
 }
