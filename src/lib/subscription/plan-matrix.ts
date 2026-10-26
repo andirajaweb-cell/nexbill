@@ -109,6 +109,18 @@ export const PLAN_MATRIX: MatrixGroupDef[] = [
     rows: [
       { key: "anti_fraud", feature: "anti_fraud", label: t6("Deteksi shift berisiko otomatis", "Automatic risky-shift detection", "Pengesanan syif berisiko automatik", "ตรวจจับกะที่มีความเสี่ยงอัตโนมัติ", "Tự động phát hiện ca rủi ro", "Awtomatikong pagtukoy ng delikadong shift") },
       {
+        key: "telegram_support",
+        all: true,
+        label: t6(
+          "Support 24 jam lewat bot Telegram, diteruskan ke tim bila perlu",
+          "24-hour support via Telegram bot, handed to the team when needed",
+          "Sokongan 24 jam melalui bot Telegram, dihantar kepada pasukan bila perlu",
+          "ซัพพอร์ต 24 ชม. ผ่านบอท Telegram ส่งต่อทีมเมื่อจำเป็น",
+          "Hỗ trợ 24 giờ qua bot Telegram, chuyển cho đội ngũ khi cần",
+          "24-oras na support sa Telegram bot, ipapasa sa team kung kailangan"
+        ),
+      },
+      {
         key: "ai",
         ai: true,
         label: t6("AI Business Assistant", "AI Business Assistant", "AI Business Assistant", "AI Business Assistant", "AI Business Assistant", "AI Business Assistant"),

@@ -8,6 +8,7 @@ import { usePollingWhenVisible } from "@/lib/api/use-polling";
 import { showAlert } from "@/lib/ui/dialog";
 import { Paperclip, Download, X, FileVideo } from "lucide-react";
 import "@/lib/i18n/dict-chat";
+import { TelegramSupportCard } from "./telegram-support-card";
 import { DATE_LOCALE, useDashboardLang, type LangCode } from "@/lib/i18n/dashboard-lang";
 
 interface Thread {
@@ -190,6 +191,8 @@ export default function SupportChatPage() {
         </div>
         <Button onClick={() => setShowNew((v) => !v)}>{showNew ? t("chat.cancelButton", "Batal") : t("chat.newTicketButton", "+ Tiket Baru")}</Button>
       </div>
+
+      <TelegramSupportCard />
 
       {showNew && (
         <Card className="p-4 space-y-3">

@@ -3317,3 +3317,59 @@ export const outletWhatsappContacts = pgTable(
   },
   (t) => [index("outlet_whatsapp_contacts_outlet_idx").on(t.outletId, t.sortOrder)]
 );
+
+/** ---------------- BOT TELEGRAM SUPPORT 24 JAM — migrasi 0037 ---------------- */
+
+/*
+ * Satu bot Telegram NEXBILL (env TELEGRAM_BOT_TOKEN) untuk support merchant. Staf menautkan akun
+ * Telegram-nya dari Chat Bantuan (kode sekali pakai → t.me/<bot>?start=<kode>); setelah itu chatId
+ * menentukan outlet & staf untuk setiap pesan. Lihat src/lib/telegram.
+ */
+export const telegramSupportLinks = pgTable(
+  "telegram_support_links",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    staffUserId: text("staff_user_id").notNull().references(() => staffUsers.id),
+    staffName: text("staff_name"),
+    chatId: text("chat_id"),
+    telegramUsername: text("telegram_username"),
+    linkCode: text("link_code"),
+    linkCodeExpiresAt: text("link_code_expires_at"),
+    linkedAt: text("linked_at"),
+    lastMessageAt: text("last_message_at"),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("telegram_support_links_staff_outlet_idx").on(t.staffUserId, t.outletId),
+    uniqueIndex("telegram_support_links_chat_idx").on(t.chatId),
+    uniqueIndex("telegram_support_links_code_idx").on(t.linkCode),
+  ]
+);
+
+/** Log percakapan bot: konteks AI, metrik "selesai di bot", dan tiket Chat Bantuan yang berasal dari Telegram. */
+export const telegramSupportMessages = pgTable(
+  "telegram_support_messages",
+  {
+    id: id(),
+    chatId: text("chat_id").notNull(),
+    outletId: text("outlet_id").references(() => outlets.id),
+    /** user = merchant, bot = jawaban AI/sistem, team = balasan tim NEXBILL yang diteruskan. */
+    role: text("role", { enum: ["user", "bot", "team"] }).notNull(),
+    body: text("body").notNull(),
+    priority: text("priority", { enum: ["P1", "P2", "P3", "P4"] }),
+    /** Hanya di pesan bot: answered = dijawab bot, ticket = tiket dibuat, urgent = tiket P1. */
+    resolution: text("resolution", { enum: ["answered", "ticket", "urgent"] }),
+    supportThreadId: text("support_thread_id").references(() => supportThreads.id),
+    /** update_id Telegram (pesan user) — mencegah pesan diproses dua kali saat Telegram mengirim ulang. */
+    updateId: text("update_id"),
+    /** message_id di Telegram (pesan tim yang diteruskan) — balasan merchant ke pesan itu masuk ke tiketnya. */
+    tgMessageId: text("tg_message_id"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [
+    index("telegram_support_messages_chat_idx").on(t.chatId, t.createdAt),
+    index("telegram_support_messages_thread_idx").on(t.supportThreadId),
+    uniqueIndex("telegram_support_messages_update_idx").on(t.updateId),
+  ]
+);

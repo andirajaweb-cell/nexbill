@@ -4,6 +4,7 @@ import { supportThreads, supportMessages } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
+import { forwardTeamReplyToTelegram } from "@/lib/telegram/forward";
 
 /** Lists messages in any outlet's ticket — cross-tenant read, gated by requirePlatformAdmin. */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -46,6 +47,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
       .returning();
     await db.update(supportThreads).set({ lastMessageAt: now }).where(eq(supportThreads.id, id));
+    // Tiket dari bot Telegram: balasan tim ikut dikirim ke chat Telegram merchant (gagal kirim tidak menggagalkan balasan).
+    await forwardTeamReplyToTelegram(id, messageText, hasAttachment);
 
     return NextResponse.json(message);
   } catch (err: unknown) {
