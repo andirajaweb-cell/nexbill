@@ -2,6 +2,7 @@ package id.nexbill.tv;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.SystemClock;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -56,12 +57,46 @@ final class LocalStore {
     }
 
     static void setClockOffset(Context c, long offsetMs) {
-        p(c).edit().putLong(K_OFFSET, offsetMs).apply();
+        // Jam dari server dipercaya: titik acuan "tidak boleh mundur" diatur ulang ke sana.
+        long trusted = System.currentTimeMillis() + offsetMs;
+        p(c).edit().putLong(K_OFFSET, offsetMs).putLong(K_HIGH, trusted).apply();
+        synchronized (LocalStore.class) {
+            monoBase = trusted;
+            monoStartRt = SystemClock.elapsedRealtime();
+            lastHighSaved = trusted;
+        }
     }
 
-    /** "Sekarang" menurut jam server (jam TV + selisih terakhir). */
-    static long serverNow(Context c) {
-        return System.currentTimeMillis() + clockOffset(c);
+    private static final String K_HIGH = "time_high_water";
+    private static long monoBase = -1L;
+    private static long monoStartRt;
+    private static long lastHighSaved;
+
+    /**
+     * "Sekarang" menurut jam server (jam TV + selisih terakhir) — dan TIDAK PERNAH mundur.
+     *
+     * Banyak TV tidak punya baterai jam: setelah listrik padam dan dinyalakan tanpa internet, jamnya
+     * bisa kembali ke tahun lama. Jam yang mundur membuat sesi lokal tampak belum habis (layar game
+     * terbuka terus), dan jam yang sengaja dimundurkan bisa dipakai main gratis. Karena itu waktu
+     * dihitung dari titik tertinggi yang pernah terlihat (disimpan) + jam monotonik sejak aplikasi
+     * berjalan; jam TV hanya dipakai bila lebih maju. Waktu selama TV mati tidak terhitung (sesi
+     * berlanjut setelah menyala) — lebih aman daripada layar yang tidak pernah terkunci.
+     */
+    static synchronized long serverNow(Context c) {
+        long wall = System.currentTimeMillis() + clockOffset(c);
+        long rt = SystemClock.elapsedRealtime();
+        if (monoBase < 0) {
+            monoBase = p(c).getLong(K_HIGH, 0L);
+            monoStartRt = rt;
+            lastHighSaved = monoBase;
+        }
+        long mono = monoBase > 0 ? monoBase + (rt - monoStartRt) : 0L;
+        long now = Math.max(wall, mono);
+        if (now - lastHighSaved > 10_000L) {
+            lastHighSaved = now;
+            p(c).edit().putLong(K_HIGH, now).apply();
+        }
+        return now;
     }
 
     static String iso(long epochMs) {
