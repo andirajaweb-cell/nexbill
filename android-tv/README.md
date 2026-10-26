@@ -11,6 +11,7 @@ Aplikasi kecil yang dipasang langsung di Android TV / Google TV. Ini cara kontro
 5. Timer tetap dihitung di TV kalau internet putus, jadi layar tetap terkunci tepat waktu.
 6. Saat internet jalan, semua kontrol sesi dari dashboard berlaku di TV dalam ±5 detik (satu putaran polling), tanpa ADB/relay: **mulai** membuka HDMI, **perpanjang** menambah timer, **jeda** mengunci layar ("DIJEDA", sejak 1.2.2), **lanjutkan** membuka lagi, **pindah unit** mengunci TV lama dan membuka TV baru, **selesai** mengunci layar.
 7. Server mengenali aplikasi dari User-Agent `NexbillTvApp/<versi>`; unit yang layarnya memakai aplikasi tampil "Siap — aplikasi NEXBILL TV" di Pengaturan › TV Screensaver (ADB tidak diperlukan).
+8. **Satu TV = satu outlet** (1.2.2): aplikasi mengirim sidik TV (hash ANDROID_ID, header `X-Nexbill-Device` dan saat pairing). Pairing ke outlet lain ditolak selama TV masih terdaftar di outlet pertamanya; setiap pairing memberi token baru sehingga satu layar hanya dipegang satu TV. Panduan kasir: Pusat Bantuan › NEXBILL TV.
 
 Kalau merek TV tidak mengizinkan HDMI tampil di dalam aplikasi, aplikasi beralih ke mode **Pindah input TV**. TV dipindah ke input HDMI-nya, timer tampil sebagai overlay, dan layar NEXBILL dibawa kembali saat waktu habis. Mode ini butuh izin *Tampil di atas aplikasi lain*.
 

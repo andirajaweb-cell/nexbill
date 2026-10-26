@@ -6,6 +6,8 @@ import { DEFAULT_DEPS, processOfflineBatch, type SyncDeps } from "@/lib/offline/
 import { isUuid, SYNC_BATCH_LIMIT, type SyncActionResult } from "@/lib/offline/protocol";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 import { getOrCreateTvSettings } from "./service";
+import { deviceIdOf } from "./app-marker";
+import { deviceMatches, isDeviceId } from "./device-binding";
 import { checkTvAction, DEFAULT_TV_DURATIONS, packagesForConsole, parseTvEvent, TV_DEVICE_PREFIX, type TvCatalogPackage } from "./tv-session-rules";
 
 /**
@@ -14,10 +16,12 @@ import { checkTvAction, DEFAULT_TV_DURATIONS, packagesForConsole, parseTvEvent, 
  * NEXBILL TV tidak pernah berbagi data apa pun.
  */
 
-async function screenByToken(token: string) {
+async function screenByToken(token: string, deviceId?: string | null) {
   if (!token) throw new Error("UNKNOWN_SCREEN");
   const [screen] = await db.select().from(tvScreens).where(eq(tvScreens.token, token)).limit(1);
   if (!screen) throw new Error("UNKNOWN_SCREEN");
+  // Satu TV = satu outlet: token layar yang terikat ke TV lain tidak berlaku (lib/tv/device-binding.ts).
+  if (!deviceMatches(deviceIdOf(screen.tvInfo), isDeviceId(deviceId) ? deviceId : null)) throw new Error("UNKNOWN_SCREEN");
   return screen;
 }
 
@@ -38,8 +42,8 @@ export interface TvCatalog {
 }
 
 /** Daftar harga & paket untuk unit layar ini — disimpan di TV supaya bisa dipakai saat offline. */
-export async function getTvCatalog(token: string): Promise<TvCatalog> {
-  const screen = await screenByToken(token);
+export async function getTvCatalog(token: string, deviceId?: string | null): Promise<TvCatalog> {
+  const screen = await screenByToken(token, deviceId);
   const [outlet] = await db.select({ name: outlets.name }).from(outlets).where(eq(outlets.id, screen.outletId)).limit(1);
   const nowIso = new Date().toISOString();
   const [moduleOn, hasPin] = await Promise.all([isFeatureEnabled(screen.outletId, "TV_SCREENSAVER_ENABLED"), pinConfigured(screen.outletId)]);
@@ -87,8 +91,8 @@ function cleanAction(r: Record<string, unknown>) {
   return clean;
 }
 
-export async function syncTvActions(token: string, body: { actions?: unknown; clockOffsetMs?: unknown; events?: unknown }) {
-  const screen = await screenByToken(token);
+export async function syncTvActions(token: string, body: { actions?: unknown; clockOffsetMs?: unknown; events?: unknown }, deviceId?: string | null) {
+  const screen = await screenByToken(token, deviceId);
   const actions = Array.isArray(body.actions) ? body.actions.slice(0, SYNC_BATCH_LIMIT) : [];
   const [moduleOn, hasPin] = await Promise.all([isFeatureEnabled(screen.outletId, "TV_SCREENSAVER_ENABLED"), pinConfigured(screen.outletId)]);
 

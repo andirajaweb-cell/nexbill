@@ -138,4 +138,20 @@ registerDict({
     fil: "Ang TV na hindi makapag-install ng app ay makokontrol pa rin sa Relay Agent sa Windows PC o Android phone (mga tab sa itaas), o smart plug para sa hindi-Android na TV.",
     vi: "TV không cài được ứng dụng vẫn điều khiển được qua Relay Agent trên PC Windows hoặc điện thoại Android (các tab phía trên), hoặc ổ cắm thông minh cho TV không phải Android.",
   },
+  "devices.guide.tvFull.t5": {
+    id: "Kode ditolak \"TV ini masih terdaftar di outlet lain\": satu TV hanya boleh dikontrol satu outlet. Owner outlet lama harus menghapus layar TV itu di Pengaturan › TV Screensaver dulu (ikatan yang tidak aktif lebih dari 30 hari dilepas otomatis).",
+    en: "Code rejected \"This TV is still registered at another outlet\": one TV can only be controlled by one outlet. The old outlet's Owner must delete that TV's screen in Settings › TV Screensaver first (links inactive for more than 30 days are released automatically).",
+    ms: "Kod ditolak \"TV ini masih berdaftar di outlet lain\": satu TV hanya boleh dikawal oleh satu outlet. Pemilik outlet lama mesti memadam skrin TV itu di Tetapan › TV Screensaver dahulu (pautan yang tidak aktif lebih 30 hari dilepaskan secara automatik).",
+    th: "รหัสถูกปฏิเสธ \"ทีวีนี้ยังลงทะเบียนกับร้านอื่น\": ทีวีหนึ่งเครื่องควบคุมได้โดยร้านเดียว เจ้าของร้านเดิมต้องลบหน้าจอของทีวีนั้นที่ ตั้งค่า › TV Screensaver ก่อน (การเชื่อมที่ไม่ใช้งานเกิน 30 วันจะถูกปลดอัตโนมัติ)",
+    fil: "Tinanggihan ang code \"Nakarehistro pa ang TV na ito sa ibang outlet\": isang outlet lang ang puwedeng kumontrol sa isang TV. Kailangan munang burahin ng Owner ng dating outlet ang screen ng TV na iyon sa Settings › TV Screensaver (awtomatikong inaalis ang link na hindi aktibo nang higit 30 araw).",
+    vi: "Mã bị từ chối \"TV này vẫn đăng ký ở cửa hàng khác\": mỗi TV chỉ được một cửa hàng điều khiển. Chủ cửa hàng cũ phải xóa màn hình của TV đó tại Cài đặt › TV Screensaver trước (liên kết không hoạt động quá 30 ngày được tự động gỡ).",
+  },
+  "devices.guide.tvApp.cashierGuide": {
+    id: "Panduan langkah demi langkah untuk kasir (pasang, izinkan APK, setup TV) ada di Pusat Bantuan › NEXBILL TV.",
+    en: "A step-by-step guide for cashiers (install, allow the APK, set up the TV) is in the Help Center › NEXBILL TV.",
+    ms: "Panduan langkah demi langkah untuk juruwang (pasang, benarkan APK, tetapan TV) ada di Pusat Bantuan › NEXBILL TV.",
+    th: "คู่มือทีละขั้นสำหรับแคชเชียร์ (ติดตั้ง อนุญาต APK ตั้งค่าทีวี) อยู่ที่ ศูนย์ช่วยเหลือ › NEXBILL TV",
+    fil: "Nasa Help Center › NEXBILL TV ang hakbang-hakbang na gabay para sa cashier (i-install, payagan ang APK, i-setup ang TV).",
+    vi: "Hướng dẫn từng bước cho thu ngân (cài đặt, cho phép APK, thiết lập TV) có trong Trung tâm trợ giúp › NEXBILL TV.",
+  },
 });

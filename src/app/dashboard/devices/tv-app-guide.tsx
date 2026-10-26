@@ -184,8 +184,15 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
           <li>{t("devices.guide.tvFull.t2", "Kode ditolak: kode berlaku 30 menit dan hanya sekali pakai. Buat kode baru di Pengaturan › TV Screensaver.")}</li>
           <li>{t("devices.guide.tvFull.t3", "TV kembali menampilkan kotak kode: layar itu dihapus atau dilepas di dashboard. Buat kode baru lalu ketik lagi.")}</li>
           <li>{t("devices.guide.tvFull.t4", "Downloader tidak bisa membuka nexbill.id/tvapk: pastikan TV tersambung internet dan alamat diketik tanpa spasi. Masih gagal? Kirim foto layar TV ke menu Chat/Bantuan.")}</li>
+          <li>{t("devices.guide.tvFull.t5", "Kode ditolak \"TV ini masih terdaftar di outlet lain\": satu TV hanya boleh dikontrol satu outlet. Owner outlet lama harus menghapus layar TV itu di Pengaturan › TV Screensaver dulu (ikatan yang tidak aktif lebih dari 30 hari dilepas otomatis).")}</li>
         </ul>
       </div>
+
+      <p>
+        <Link href="/dashboard/help?category=nexbill-tv" className="text-cyan-300 hover:underline">
+          {t("devices.guide.tvApp.cashierGuide", "Panduan langkah demi langkah untuk kasir (pasang, izinkan APK, setup TV) ada di Pusat Bantuan › NEXBILL TV.")}
+        </Link>
+      </p>
 
       {footer}
     </div>

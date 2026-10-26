@@ -36,5 +36,22 @@ export function withAppVersion(rawTvInfo: string | null | undefined, version: st
 /** Saat Relay Agent menulis ulang info TV, penanda aplikasi tidak boleh ikut terhapus. */
 export function keepAppVersion(newInfo: Record<string, unknown>, previousRaw: string | null | undefined): Record<string, unknown> {
   const v = appVersionOf(previousRaw);
-  return v ? { ...newInfo, nexbillApp: v } : newInfo;
+  const d = deviceIdOf(previousRaw);
+  return { ...newInfo, ...(v ? { nexbillApp: v } : {}), ...(d ? { deviceId: d } : {}) };
+}
+
+/** Sidik TV (hash) yang terikat ke layar ini — lihat lib/tv/device-binding.ts. */
+export function deviceIdOf(rawTvInfo: string | null | undefined): string | null {
+  const v = parse(rawTvInfo)?.deviceId;
+  return typeof v === "string" && v ? v : null;
+}
+
+/** tv_info dengan sidik TV; null = tidak ada perubahan. `deviceId: null` = lepaskan ikatan. */
+export function withDeviceId(rawTvInfo: string | null | undefined, deviceId: string | null): string | null {
+  const cur = deviceIdOf(rawTvInfo);
+  if (cur === deviceId) return null;
+  const obj = { ...(parse(rawTvInfo) ?? {}) };
+  if (deviceId) obj.deviceId = deviceId;
+  else delete obj.deviceId;
+  return JSON.stringify(obj);
 }

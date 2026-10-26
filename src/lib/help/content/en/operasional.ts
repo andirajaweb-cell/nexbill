@@ -462,6 +462,59 @@ export const OPERASIONAL: HelpCategory[] = [
     ],
   },
   {
+    id: "nexbill-tv",
+    group: "operasional",
+    label: "NEXBILL TV — Install & Use on the Booth TV (Cashier Guide)",
+    navHint: "App on the booth TV. Pairing codes are created by the Owner/Manager in Settings → TV Screensaver.",
+    summary:
+      "The NEXBILL TV app is installed directly on an Android TV / Google TV — no PC, no relay phone, no ADB. Once linked to one unit, the TV follows sessions from the dashboard: starting opens the game screen, pausing and ending lock it. This guide is for cashiers who install and use the booth TV.",
+    subsections: [
+      {
+        title: "1. Install the app (once per TV)",
+        steps: [
+          "Make sure the Android TV / Google TV is connected to the internet (outlet WiFi).",
+          "On the TV, open Google Play and install the free \"Downloader\" app (by AFTVnews).",
+          "Allow APK installs: open TV Settings → Apps (or Privacy / Security) → Unknown sources / Install unknown apps → enable it for Downloader. The menu differs by brand; if the TV asks while installing, choose Settings and enable the permission.",
+          "Open Downloader, type nexbill.id/tvapk and press Go — the NEXBILL TV file downloads; choose Install, then Open.",
+          "Only install NEXBILL TV from nexbill.id/tvapk. If Google Play Protect warns about an app from outside the Play Store, open the details and install anyway.",
+        ],
+      },
+      {
+        title: "2. Link the TV to a unit (pairing)",
+        steps: [
+          "Ask the Owner/Manager to create a screen for this unit in Settings → TV Screensaver; a 6-digit code appears, valid for 30 minutes.",
+          "Open NEXBILL TV on the TV and type the code with the remote's number keys.",
+          "The screen immediately shows that unit's screensaver — the TV is now linked to that unit in this outlet only.",
+        ],
+      },
+      {
+        title: "3. One-time setup after pairing",
+        steps: [
+          "Hold the remote's OK button for 3 seconds to open the staff menu (enter the screen PIN if asked).",
+          "Choose \"Choose HDMI input\", then pick the HDMI port the PlayStation is plugged into.",
+          "Choose \"Display over other apps\" and allow NEXBILL TV — required so the Home/Input buttons can't be used to play without a session.",
+          "Test: start a 1-minute session for this unit in the dashboard (PS Rental) — within ±5 seconds the game shows; end the session — the screen locks again.",
+        ],
+      },
+      {
+        title: "4. Everyday use",
+        steps: [
+          "Start, pause, extend, move unit, and end from the dashboard apply on the TV within ±5 seconds. Pause locks the screen (\"PAUSED\") until the session resumes.",
+          "From the TV: press OK → enter the PIN → start, extend, or stop a session. It works even when the internet drops; the data is sent to the dashboard automatically once online.",
+          "When time is up, the screen locks by itself and the game sound stops; the bill is still paid at the cashier.",
+          "Updating the app: hold OK for 3 seconds → \"Check for app update\"; if there is a new version, open Downloader and type nexbill.id/tvapk again — the pairing stays saved.",
+        ],
+      },
+    ],
+    notes: [
+      "One TV belongs to one outlet only: a TV still registered at another outlet is rejected when pairing. To move a TV to another outlet, the old outlet's Owner must first delete that TV's screen in Settings → TV Screensaver (links inactive for more than 30 days are released automatically).",
+      "One screen belongs to one TV only: entering a new code for the same screen on another TV disconnects the previous TV.",
+      "Never share the screen PIN with customers. Forgot the PIN → the Owner/Manager changes it in Settings → TV Screensaver.",
+      "Non-Android TVs (VIDAA, webOS, Tizen) cannot install this app — use a smart plug in Device Control.",
+    ],
+    roles: "Cashiers install the app, enter the pairing code, and use the cashier panel on the TV. Creating screens & pairing codes and setting the screen PIN: Owner, Superuser, Manager.",
+  },
+  {
     id: "home-rental",
     group: "operasional",
     label: "Home Rental (Take-Home Rentals)",

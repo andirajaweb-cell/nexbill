@@ -462,6 +462,59 @@ export const OPERASIONAL: HelpCategory[] = [
     ],
   },
   {
+    id: "nexbill-tv",
+    group: "operasional",
+    label: "NEXBILL TV — Cài đặt & Sử dụng trên TV phòng chơi (Hướng dẫn thu ngân)",
+    navHint: "Ứng dụng trên TV phòng chơi. Mã ghép nối do Chủ/Quản lý tạo tại Cài đặt → TV Screensaver.",
+    summary:
+      "Ứng dụng NEXBILL TV được cài trực tiếp trên Android TV / Google TV — không cần PC, điện thoại relay hay ADB. Sau khi liên kết với một máy, TV làm theo phiên từ dashboard: bắt đầu thì mở màn hình game, tạm dừng và kết thúc thì khóa màn hình. Hướng dẫn này dành cho thu ngân cài đặt và sử dụng TV ở phòng chơi.",
+    subsections: [
+      {
+        title: "1. Cài ứng dụng (mỗi TV một lần)",
+        steps: [
+          "Đảm bảo Android TV / Google TV đã kết nối internet (WiFi của cửa hàng).",
+          "Trên TV, mở Google Play và cài ứng dụng miễn phí \"Downloader\" (by AFTVnews).",
+          "Cho phép cài APK: mở Cài đặt TV → Ứng dụng (hoặc Quyền riêng tư / Bảo mật) → Nguồn không xác định / Install unknown apps → bật cho Downloader. Menu khác nhau tùy hãng; nếu TV hỏi khi cài, chọn Cài đặt rồi bật quyền.",
+          "Mở Downloader, gõ nexbill.id/tvapk rồi nhấn Go — tệp NEXBILL TV được tải về; chọn Install, rồi Mở.",
+          "Chỉ cài NEXBILL TV từ nexbill.id/tvapk. Nếu Google Play Protect cảnh báo về ứng dụng ngoài Play Store, mở chi tiết và vẫn tiếp tục cài.",
+        ],
+      },
+      {
+        title: "2. Liên kết TV với máy (ghép nối)",
+        steps: [
+          "Nhờ Chủ/Quản lý tạo màn hình cho máy này tại Cài đặt → TV Screensaver; mã 6 số hiện ra, có hiệu lực 30 phút.",
+          "Mở NEXBILL TV trên TV và nhập mã bằng các phím số trên điều khiển.",
+          "Màn hình hiện ngay trình bảo vệ màn hình của máy đó — TV giờ chỉ liên kết với máy đó tại cửa hàng này.",
+        ],
+      },
+      {
+        title: "3. Thiết lập một lần sau khi ghép nối",
+        steps: [
+          "Giữ nút OK trên điều khiển 3 giây để mở menu nhân viên (nhập PIN màn hình nếu được hỏi).",
+          "Chọn \"Chọn cổng HDMI\", rồi chọn cổng HDMI cắm PlayStation.",
+          "Chọn \"Hiển thị trên ứng dụng khác\" và cho phép NEXBILL TV — bắt buộc để không thể dùng nút Home/Input chơi khi không có phiên.",
+          "Thử: bắt đầu phiên 1 phút cho máy này trên dashboard (Thuê PS) — trong ±5 giây game hiện ra; kết thúc phiên — màn hình khóa lại.",
+        ],
+      },
+      {
+        title: "4. Sử dụng hằng ngày",
+        steps: [
+          "Bắt đầu, tạm dừng, gia hạn, chuyển máy và kết thúc từ dashboard có hiệu lực trên TV trong ±5 giây. Tạm dừng sẽ khóa màn hình (\"TẠM DỪNG\") cho đến khi phiên tiếp tục.",
+          "Từ TV: nhấn OK → nhập PIN → bắt đầu, gia hạn hoặc dừng phiên. Vẫn dùng được khi mất internet; dữ liệu tự gửi lên dashboard khi có mạng trở lại.",
+          "Khi hết giờ, màn hình tự khóa và âm thanh game dừng; hóa đơn vẫn thanh toán tại quầy.",
+          "Cập nhật ứng dụng: giữ OK 3 giây → \"Kiểm tra cập nhật ứng dụng\"; nếu có bản mới, mở Downloader và gõ lại nexbill.id/tvapk — ghép nối vẫn được giữ.",
+        ],
+      },
+    ],
+    notes: [
+      "Mỗi TV chỉ thuộc một cửa hàng: TV vẫn đăng ký ở cửa hàng khác sẽ bị từ chối khi ghép nối. Muốn chuyển TV sang cửa hàng khác, Chủ cửa hàng cũ phải xóa màn hình của TV đó tại Cài đặt → TV Screensaver trước (liên kết không hoạt động quá 30 ngày được tự động gỡ).",
+      "Mỗi màn hình chỉ dành cho một TV: nhập mã mới của cùng màn hình trên TV khác sẽ ngắt TV trước đó.",
+      "Không chia sẻ PIN màn hình cho khách. Quên PIN → Chủ/Quản lý đổi tại Cài đặt → TV Screensaver.",
+      "TV không phải Android (VIDAA, webOS, Tizen) không cài được ứng dụng này — dùng ổ cắm thông minh trong Điều khiển thiết bị.",
+    ],
+    roles: "Thu ngân cài ứng dụng, nhập mã ghép nối và dùng bảng thu ngân trên TV. Tạo màn hình & mã ghép nối và đặt PIN màn hình: Chủ, Superuser, Quản lý.",
+  },
+  {
     id: "home-rental",
     group: "operasional",
     label: "Cho thuê tại nhà (Thuê mang về)",

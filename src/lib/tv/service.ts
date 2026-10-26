@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
 import { tvScreens, tvScreensaverSettings, rentalUnits, rentalSessions, outlets, devices, orders } from "@/db/schema";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, isNotNull, sql } from "drizzle-orm";
 import { isTimeUpActive } from "@/lib/unit-qr/rules";
 import bcrypt from "bcryptjs";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
@@ -14,7 +14,8 @@ import {
 } from "@/lib/tv/pairing";
 import { computeUnitView, nightDimOpacity, type TvUnitView } from "@/lib/tv/view";
 import { assessTvEligibility, canPairScreen, type TvEligibility } from "@/lib/tv/eligibility";
-import { appVersionOf, withAppVersion } from "@/lib/tv/app-marker";
+import { appVersionOf, deviceIdOf, withAppVersion, withDeviceId } from "@/lib/tv/app-marker";
+import { decidePairing, deviceMatches, isDeviceId } from "@/lib/tv/device-binding";
 
 /**
  * Lapisan basis data TV Screensaver. Semua yang menyentuh `db` ada di sini; perhitungan murninya
@@ -368,7 +369,7 @@ export async function deleteTvScreen(outletId: string, screenId: string) {
  * tidak akan menemukan baris yang cocok lagi. Itu sebabnya penghangusan tidak dilakukan lewat
  * SELECT terpisah lalu UPDATE.
  */
-export async function pairTvScreen(rawCode: string): Promise<{ token: string; screenName: string; outletName: string }> {
+export async function pairTvScreen(rawCode: string, rawDeviceId?: unknown): Promise<{ token: string; screenName: string; outletName: string }> {
   const code = normalizePairingCode(rawCode);
   if (!code) throw new Error("Kode harus 6 digit angka.");
 
@@ -376,12 +377,37 @@ export async function pairTvScreen(rawCode: string): Promise<{ token: string; sc
   if (!screen) throw new Error("Kode tidak dikenal. Periksa lagi di Pengaturan > TV Screensaver.");
   if (!isPairingCodeValid(screen.pairingCodeExpiresAt)) throw new Error("Kode sudah kedaluwarsa. Buat kode baru di dashboard.");
 
+  // Satu TV = satu outlet (lib/tv/device-binding.ts): TV yang masih terdaftar di outlet lain ditolak;
+  // layar lain di outlet yang sama yang memegang TV ini dilepas (pindah unit).
+  const deviceId = isDeviceId(rawDeviceId) ? rawDeviceId : null;
+  let release: string[] = [];
+  if (deviceId) {
+    const bound = await db
+      .select({ id: tvScreens.id, outletId: tvScreens.outletId, lastSeenAt: tvScreens.lastSeenAt })
+      .from(tvScreens)
+      .where(and(isNotNull(tvScreens.pairedAt), sql`${tvScreens.tvInfo} LIKE ${`%"deviceId":"${deviceId}"%`}`));
+    const decision = decidePairing({ targetScreenId: screen.id, targetOutletId: screen.outletId, deviceId, bound, now: Date.now() });
+    if (!decision.ok) throw new Error(decision.reason);
+    release = decision.release;
+  }
+
   const now = new Date().toISOString();
+  // Token BARU di setiap pairing: TV lain yang masih memegang token lama layar ini langsung terputus (401).
+  const tvInfo = withDeviceId(screen.tvInfo, deviceId);
   const [paired] = await db
     .update(tvScreens)
-    .set({ pairingCode: null, pairingCodeExpiresAt: null, pairedAt: now, lastSeenAt: now, updatedAt: now })
+    .set({ pairingCode: null, pairingCodeExpiresAt: null, pairedAt: now, lastSeenAt: now, updatedAt: now, token: generateScreenToken(), ...(tvInfo ? { tvInfo } : {}) })
     .where(and(eq(tvScreens.id, screen.id), eq(tvScreens.pairingCode, code)))
     .returning();
+  if (paired && release.length > 0) {
+    const old = await db.select({ id: tvScreens.id, tvInfo: tvScreens.tvInfo }).from(tvScreens).where(inArray(tvScreens.id, release));
+    for (const o of old) {
+      await db
+        .update(tvScreens)
+        .set({ pairedAt: null, token: generateScreenToken(), tvInfo: withDeviceId(o.tvInfo, null) ?? o.tvInfo, updatedAt: now })
+        .where(eq(tvScreens.id, o.id));
+    }
+  }
   if (!paired) throw new Error("Kode sudah dipakai layar lain. Buat kode baru di dashboard.");
 
   const [outlet] = await db.select({ name: outlets.name }).from(outlets).where(eq(outlets.id, paired.outletId)).limit(1);
@@ -466,9 +492,12 @@ export interface TvStateResponse {
  * sandi WiFi di layar yang terlihat dari jalan adalah keputusan yang harus diambil merchant secara
  * sadar, bukan efek samping menyalakan screensaver.
  */
-export async function getTvState(token: string, opts: { appVersion?: string | null } = {}): Promise<TvStateResponse> {
+export async function getTvState(token: string, opts: { appVersion?: string | null; deviceId?: string | null } = {}): Promise<TvStateResponse> {
   const [screen] = await db.select().from(tvScreens).where(eq(tvScreens.token, token)).limit(1);
   if (!screen) throw new Error("UNKNOWN_SCREEN");
+  // Token layar ini dipakai TV lain (disalin) → ditolak seperti layar yang sudah dilepas.
+  const requestDevice = isDeviceId(opts.deviceId) ? opts.deviceId : null;
+  if (!deviceMatches(deviceIdOf(screen.tvInfo), requestDevice)) throw new Error("UNKNOWN_SCREEN");
 
   const now = new Date();
   // Denyut "terakhir terlihat" — DITUNGGU, bukan dilepas begitu saja. Versi pertama fungsi ini
@@ -478,7 +507,9 @@ export async function getTvState(token: string, opts: { appVersion?: string | nu
   // selamanya kosong — tepatnya satu-satunya cara merchant tahu layar di bilik masih hidup atau
   // sudah dicabut orang. Satu UPDATE berindeks jauh lebih murah daripada fitur yang berbohong.
   // Aplikasi NEXBILL TV dikenali dari User-Agent-nya → dicatat sekali per versi (lib/tv/app-marker.ts).
-  const tvInfo = withAppVersion(screen.tvInfo, opts.appVersion ?? null);
+  // TV 1.2.1 yang diperbarui ke 1.2.2 terikat ke layarnya di polling pertama.
+  const withApp = withAppVersion(screen.tvInfo, opts.appVersion ?? null) ?? screen.tvInfo;
+  const tvInfo = withDeviceId(withApp, requestDevice ?? deviceIdOf(withApp)) ?? (withApp !== screen.tvInfo ? withApp : null);
   await db
     .update(tvScreens)
     .set(tvInfo ? { lastSeenAt: now.toISOString(), tvInfo } : { lastSeenAt: now.toISOString() })

@@ -462,6 +462,59 @@ export const OPERASIONAL: HelpCategory[] = [
     ],
   },
   {
+    id: "nexbill-tv",
+    group: "operasional",
+    label: "NEXBILL TV — Pasang & Guna di TV Bilik (Panduan Juruwang)",
+    navHint: "Aplikasi di TV bilik. Kod pairing dibuat oleh Pemilik/Pengurus di Tetapan → TV Screensaver.",
+    summary:
+      "Aplikasi NEXBILL TV dipasang terus pada Android TV / Google TV — tanpa PC, tanpa telefon relay, tanpa ADB. Selepas dipautkan kepada satu unit, TV mengikut sesi daripada dashboard: mula membuka skrin permainan, jeda dan tamat mengunci skrin. Panduan ini untuk juruwang yang memasang dan menggunakan TV di bilik.",
+    subsections: [
+      {
+        title: "1. Pasang aplikasi (sekali bagi setiap TV)",
+        steps: [
+          "Pastikan Android TV / Google TV disambungkan ke internet (WiFi outlet).",
+          "Di TV, buka Google Play dan pasang aplikasi percuma \"Downloader\" (by AFTVnews).",
+          "Benarkan pemasangan APK: buka Tetapan TV → Aplikasi (atau Privasi / Keselamatan) → Sumber tidak diketahui / Install unknown apps → aktifkan untuk Downloader. Menu berbeza mengikut jenama; jika TV bertanya semasa memasang, pilih Tetapan dan aktifkan kebenarannya.",
+          "Buka Downloader, taip nexbill.id/tvapk dan tekan Go — fail NEXBILL TV dimuat turun; pilih Install, kemudian Buka.",
+          "Pasang NEXBILL TV hanya dari nexbill.id/tvapk. Jika Google Play Protect memberi amaran untuk aplikasi di luar Play Store, buka butirannya dan teruskan pemasangan.",
+        ],
+      },
+      {
+        title: "2. Pautkan TV kepada unit (pairing)",
+        steps: [
+          "Minta Pemilik/Pengurus membuat skrin untuk unit ini di Tetapan → TV Screensaver; kod 6 digit dipaparkan, sah selama 30 minit.",
+          "Buka NEXBILL TV di TV dan taip kod itu dengan butang nombor pada alat kawalan jauh.",
+          "Skrin terus memaparkan screensaver unit itu — TV kini dipautkan kepada unit itu di outlet ini sahaja.",
+        ],
+      },
+      {
+        title: "3. Tetapan sekali selepas pairing",
+        steps: [
+          "Tekan dan tahan butang OK pada alat kawalan jauh selama 3 saat untuk membuka menu staf (masukkan PIN skrin jika diminta).",
+          "Pilih \"Pilih input HDMI\", kemudian pilih port HDMI tempat PlayStation dipasang.",
+          "Pilih \"Paparan di atas aplikasi lain\" dan benarkan NEXBILL TV — wajib supaya butang Home/Input tidak boleh digunakan untuk bermain tanpa sesi.",
+          "Uji: mulakan sesi 1 minit untuk unit ini di dashboard (Sewa PS) — dalam ±5 saat permainan dipaparkan; tamatkan sesi — skrin dikunci semula.",
+        ],
+      },
+      {
+        title: "4. Penggunaan harian",
+        steps: [
+          "Mula, jeda, lanjut, pindah unit dan tamat daripada dashboard berkuat kuasa di TV dalam ±5 saat. Jeda mengunci skrin (\"DIJEDA\") sehingga sesi diteruskan.",
+          "Dari TV: tekan OK → masukkan PIN → mula, lanjut atau hentikan sesi. Tetap berfungsi ketika internet terputus; data dihantar ke dashboard secara automatik apabila dalam talian.",
+          "Apabila masa tamat, skrin dikunci sendiri dan bunyi permainan berhenti; bil tetap dibayar di kaunter.",
+          "Kemas kini aplikasi: tahan OK 3 saat → \"Semak kemas kini apl\"; jika ada versi baharu, buka Downloader dan taip nexbill.id/tvapk sekali lagi — pairing kekal tersimpan.",
+        ],
+      },
+    ],
+    notes: [
+      "Satu TV hanya untuk satu outlet: TV yang masih berdaftar di outlet lain ditolak semasa pairing. Untuk memindahkan TV ke outlet lain, Pemilik outlet lama mesti memadam skrin TV itu di Tetapan → TV Screensaver terlebih dahulu (pautan yang tidak aktif lebih 30 hari dilepaskan secara automatik).",
+      "Satu skrin hanya untuk satu TV: memasukkan kod baharu untuk skrin yang sama pada TV lain akan memutuskan TV sebelumnya.",
+      "Jangan kongsi PIN skrin dengan pelanggan. Lupa PIN → Pemilik/Pengurus menukarnya di Tetapan → TV Screensaver.",
+      "TV bukan Android (VIDAA, webOS, Tizen) tidak boleh memasang aplikasi ini — gunakan palam pintar di Kawalan Peranti.",
+    ],
+    roles: "Juruwang memasang aplikasi, memasukkan kod pairing dan menggunakan panel juruwang di TV. Membuat skrin & kod pairing serta menetapkan PIN skrin: Pemilik, Superuser, Pengurus.",
+  },
+  {
     id: "home-rental",
     group: "operasional",
     label: "Sewa Rumah (Home Rental — Sewa Bawa Pulang)",

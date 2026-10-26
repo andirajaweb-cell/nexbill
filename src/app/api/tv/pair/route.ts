@@ -17,7 +17,8 @@ import { pairTvScreen } from "@/lib/tv/service";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const result = await pairTvScreen(body.code);
+    // deviceId: sidik TV dari aplikasi NEXBILL TV 1.2.2+ — satu TV hanya boleh terhubung ke satu outlet.
+    const result = await pairTvScreen(body.code, body.deviceId);
     return NextResponse.json(result);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

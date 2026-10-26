@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     const token = bearer || (req.nextUrl.searchParams.get("token") ?? "").trim();
     if (!token) return NextResponse.json({ error: "Token layar tidak ada." }, { status: 401 });
 
-    const state = await getTvState(token, { appVersion: appVersionFromUserAgent(req.headers.get("user-agent")) });
+    const state = await getTvState(token, { appVersion: appVersionFromUserAgent(req.headers.get("user-agent")), deviceId: req.headers.get("x-nexbill-device") });
     return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
   } catch (err: unknown) {
     // Token yang tidak dikenal dibalas 401 supaya halaman /tv bisa membedakannya dari gangguan

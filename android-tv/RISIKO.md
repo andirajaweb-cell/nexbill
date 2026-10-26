@@ -41,6 +41,7 @@ Belum ada uji di TV sungguhan — semua penilaian di bawah dari membaca kode. Uj
 | A2 | PIN layar dipakai bersama → sesi dari TV tercatat atas nama Owner, bukan kasir | Sedang | Terbuka | Perangkat tercatat "NEXBILL TV · unit". Usul: PIN per staf. |
 | A3 | PIN bocor → orang lain memulai sesi | Sedang | Dikurangi | Sesi yang dimulai tetap jadi tagihan (bukan uang keluar); PIN tidak membuka pembayaran/laporan. Ganti PIN di dashboard. |
 | A4 | PIN offline belum pernah dipakai online di TV itu → kasir tidak bisa memulai sesi saat internet putus | Sedang | Dikurangi | Panduan: masukkan PIN sekali saat online setelah pairing. |
+| A6 | TV diambil alih outlet lain (data aplikasi dihapus / dipasang ulang lalu diketik kode outlet lain) | Tinggi | Ditutup (1.2.2) | Sidik TV (hash ANDROID_ID) dikirim saat pairing & polling: pairing ke outlet lain ditolak selama TV masih terdaftar (kecuali tidak terlihat > 30 hari); token layar diganti tiap pairing sehingga satu layar = satu TV; token dari TV lain ditolak (lib/tv/device-binding.ts). |
 | A5 | Token layar tersimpan di antrean | Rendah | Ditutup | Tidak ikut dikirim/tersimpan di server (hanya kolom protokol). |
 
 ## Operasional & distribusi

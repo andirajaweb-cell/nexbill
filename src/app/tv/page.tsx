@@ -118,6 +118,17 @@ export default function TvPage() {
 
 /** ---------------- PAIRING ---------------- */
 
+/** Sidik TV dari jembatan aplikasi NEXBILL TV (kosong di browser biasa / aplikasi versi lama). */
+function appDeviceId(): string | undefined {
+  try {
+    const bridge = (window as unknown as { NexbillTvApp?: { deviceId?: () => string } }).NexbillTvApp;
+    const id = bridge?.deviceId?.();
+    return id ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -136,7 +147,8 @@ function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
         const res = await fetch("/api/tv/pair", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code: clean }),
+          // Aplikasi NEXBILL TV 1.2.2+ menyertakan sidik TV: server menolak pairing ke outlet lain selama TV ini masih terdaftar.
+          body: JSON.stringify({ code: clean, deviceId: appDeviceId() }),
         });
         const data = await res.json();
         if (!res.ok) {

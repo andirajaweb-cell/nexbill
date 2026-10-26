@@ -32,6 +32,8 @@ final class Http {
             c.setRequestProperty("Accept", "application/json");
             c.setRequestProperty("User-Agent", "NexbillTvApp/" + Config.APP_VERSION);
             if (token != null && !token.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + token);
+            String device = DeviceId.get();
+            if (!device.isEmpty()) c.setRequestProperty("X-Nexbill-Device", device);
             if (jsonBody != null) {
                 c.setDoOutput(true);
                 c.setRequestProperty("Content-Type", "application/json");

@@ -462,6 +462,59 @@ export const OPERASIONAL: HelpCategory[] = [
     ],
   },
   {
+    id: "nexbill-tv",
+    group: "operasional",
+    label: "NEXBILL TV — I-install at Gamitin sa TV ng Booth (Gabay ng Cashier)",
+    navHint: "App sa TV ng booth. Ang pairing code ay ginagawa ng Owner/Manager sa Settings → TV Screensaver.",
+    summary:
+      "Ang NEXBILL TV app ay direktang ini-install sa Android TV / Google TV — walang PC, walang relay phone, walang ADB. Kapag naka-link na sa isang unit, sinusunod ng TV ang mga session mula sa dashboard: ang start ay nagbubukas ng game screen, ang pause at end ay nagla-lock nito. Para sa mga cashier na nag-i-install at gumagamit ng TV sa booth ang gabay na ito.",
+    subsections: [
+      {
+        title: "1. I-install ang app (isang beses bawat TV)",
+        steps: [
+          "Siguraduhing nakakonekta sa internet ang Android TV / Google TV (WiFi ng outlet).",
+          "Sa TV, buksan ang Google Play at i-install ang libreng \"Downloader\" app (by AFTVnews).",
+          "Payagan ang pag-install ng APK: buksan ang Settings ng TV → Apps (o Privacy / Security) → Unknown sources / Install unknown apps → i-on para sa Downloader. Iba-iba ang menu bawat brand; kung magtanong ang TV habang nag-i-install, piliin ang Settings at i-on ang pahintulot.",
+          "Buksan ang Downloader, i-type ang nexbill.id/tvapk at pindutin ang Go — mada-download ang NEXBILL TV; piliin ang Install, pagkatapos Open.",
+          "I-install lang ang NEXBILL TV mula sa nexbill.id/tvapk. Kung may babala ang Google Play Protect para sa app na galing sa labas ng Play Store, buksan ang detalye at ituloy ang pag-install.",
+        ],
+      },
+      {
+        title: "2. I-link ang TV sa unit (pairing)",
+        steps: [
+          "Hilingin sa Owner/Manager na gumawa ng screen para sa unit na ito sa Settings → TV Screensaver; lalabas ang 6-digit na code na valid nang 30 minuto.",
+          "Buksan ang NEXBILL TV sa TV at i-type ang code gamit ang mga number key ng remote.",
+          "Agad na ipapakita ng screen ang screensaver ng unit — naka-link na ang TV sa unit na iyon sa outlet na ito lang.",
+        ],
+      },
+      {
+        title: "3. Isang beses na setup pagkatapos ng pairing",
+        steps: [
+          "Pindutin nang matagal ang OK sa remote nang 3 segundo para buksan ang staff menu (ilagay ang screen PIN kung hingin).",
+          "Piliin ang \"Piliin ang HDMI input\", pagkatapos ang HDMI port kung saan nakasaksak ang PlayStation.",
+          "Piliin ang \"Ipakita sa ibabaw ng ibang app\" at payagan ang NEXBILL TV — kailangan ito para hindi magamit ang Home/Input button sa paglalaro nang walang session.",
+          "Subukan: magsimula ng 1-minutong session para sa unit na ito sa dashboard (PS Rental) — sa loob ng ±5 segundo lalabas ang game; tapusin ang session — muling magla-lock ang screen.",
+        ],
+      },
+      {
+        title: "4. Araw-araw na paggamit",
+        steps: [
+          "Ang start, pause, extend, paglipat ng unit, at end mula sa dashboard ay umiiral sa TV sa loob ng ±5 segundo. Ang pause ay nagla-lock ng screen (\"NAKA-PAUSE\") hanggang ituloy ang session.",
+          "Mula sa TV: pindutin ang OK → ilagay ang PIN → mag-start, mag-extend, o mag-stop ng session. Gumagana kahit mawala ang internet; awtomatikong naipapadala ang data sa dashboard pagbalik online.",
+          "Kapag naubos ang oras, kusang nagla-lock ang screen at humihinto ang tunog ng game; binabayaran pa rin ang bill sa cashier.",
+          "Pag-update ng app: pindutin nang matagal ang OK nang 3 segundo → \"Tingnan ang update ng app\"; kung may bagong bersyon, buksan ang Downloader at i-type muli ang nexbill.id/tvapk — nananatiling naka-save ang pairing.",
+        ],
+      },
+    ],
+    notes: [
+      "Isang outlet lang ang may-ari ng bawat TV: tinatanggihan sa pairing ang TV na nakarehistro pa sa ibang outlet. Para ilipat ang TV sa ibang outlet, kailangan munang burahin ng Owner ng dating outlet ang screen ng TV na iyon sa Settings → TV Screensaver (awtomatikong inaalis ang link na hindi aktibo nang higit 30 araw).",
+      "Isang TV lang bawat screen: ang paglagay ng bagong code para sa parehong screen sa ibang TV ay magdi-disconnect sa naunang TV.",
+      "Huwag ibahagi ang screen PIN sa mga customer. Nakalimutan ang PIN → papalitan ito ng Owner/Manager sa Settings → TV Screensaver.",
+      "Hindi ma-install ang app na ito sa mga non-Android TV (VIDAA, webOS, Tizen) — gumamit ng smart plug sa Device Control.",
+    ],
+    roles: "Ang cashier ang nag-i-install ng app, naglalagay ng pairing code, at gumagamit ng cashier panel sa TV. Paggawa ng screen at pairing code at pagtakda ng screen PIN: Owner, Superuser, Manager.",
+  },
+  {
     id: "home-rental",
     group: "operasional",
     label: "Home Rental (Paupahang Iuuwi)",

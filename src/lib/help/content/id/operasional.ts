@@ -462,6 +462,59 @@ export const OPERASIONAL: HelpCategory[] = [
     ],
   },
   {
+    id: "nexbill-tv",
+    group: "operasional",
+    label: "NEXBILL TV — Pasang & Pakai di TV Bilik (Panduan Kasir)",
+    navHint: "Aplikasi di TV bilik. Kode pairing dibuat Owner/Manager di Pengaturan → TV Screensaver.",
+    summary:
+      "Aplikasi NEXBILL TV dipasang langsung di Android TV / Google TV — tanpa PC, tanpa HP relay, tanpa ADB. Setelah terhubung ke satu unit, TV mengikuti sesi dari dashboard: mulai membuka layar game, jeda dan selesai mengunci layar. Panduan ini untuk kasir yang memasang dan memakai TV di bilik.",
+    subsections: [
+      {
+        title: "1. Pasang aplikasi (sekali per TV)",
+        steps: [
+          "Pastikan TV Android / Google TV tersambung ke internet (WiFi outlet).",
+          "Di TV, buka Google Play dan pasang aplikasi gratis \"Downloader\" (by AFTVnews).",
+          "Izinkan pemasangan APK: buka Pengaturan TV → Aplikasi (atau Privasi / Keamanan) → Sumber tidak dikenal / Install unknown apps → aktifkan untuk Downloader. Letak menunya berbeda per merek; kalau TV bertanya saat memasang, pilih Pengaturan lalu aktifkan izinnya.",
+          "Buka Downloader, ketik alamat nexbill.id/tvapk lalu Go — file NEXBILL TV terunduh, pilih Install, lalu Buka.",
+          "Pasang NEXBILL TV hanya dari alamat nexbill.id/tvapk. Kalau Google Play Protect menampilkan peringatan untuk aplikasi di luar Play Store, pilih detail lalu tetap pasang.",
+        ],
+      },
+      {
+        title: "2. Hubungkan TV ke unit (pairing)",
+        steps: [
+          "Minta Owner/Manager membuat layar untuk unit ini di Pengaturan → TV Screensaver; muncul kode 6 angka yang berlaku 30 menit.",
+          "Buka NEXBILL TV di TV, lalu ketik kode itu dengan tombol angka di remote.",
+          "Layar langsung menampilkan screensaver unit tersebut — TV sudah terhubung ke unit itu di outlet ini saja.",
+        ],
+      },
+      {
+        title: "3. Atur sekali setelah pairing",
+        steps: [
+          "Tahan tombol OK di remote 3 detik untuk membuka menu staf (masukkan PIN layar bila diminta).",
+          "Pilih \"Pilih input HDMI\", lalu pilih HDMI tempat PlayStation dicolok.",
+          "Pilih \"Izin tampil di atas aplikasi lain\" dan izinkan NEXBILL TV — wajib supaya tombol Home/Input tidak bisa dipakai main tanpa sesi.",
+          "Uji: mulai sesi 1 menit untuk unit ini di dashboard (Rental PS) — dalam ±5 detik game tampil; selesaikan sesinya — layar kembali terkunci.",
+        ],
+      },
+      {
+        title: "4. Memakai sehari-hari",
+        steps: [
+          "Mulai, jeda, perpanjang, pindah unit, dan selesai dari dashboard berlaku di TV dalam ±5 detik. Jeda mengunci layar (\"DIJEDA\") sampai sesi dilanjutkan.",
+          "Dari TV: tekan OK → masukkan PIN → mulai, perpanjang, atau hentikan sesi. Tetap bisa saat internet putus; datanya terkirim otomatis ke dashboard begitu online.",
+          "Saat waktu habis, layar terkunci sendiri dan suara game berhenti; tagihan tetap dibayar di kasir.",
+          "Memperbarui aplikasi: tahan OK 3 detik → \"Cek pembaruan aplikasi\"; bila ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi — pairing tetap tersimpan.",
+        ],
+      },
+    ],
+    notes: [
+      "Satu TV hanya untuk satu outlet: TV yang masih terdaftar di outlet lain ditolak saat pairing. Untuk memindahkan TV ke outlet lain, Owner outlet lama harus menghapus layar TV itu di Pengaturan → TV Screensaver dulu (ikatan yang tidak aktif lebih dari 30 hari dilepas otomatis).",
+      "Satu layar hanya untuk satu TV: memasukkan kode baru untuk layar yang sama di TV lain akan memutus TV sebelumnya.",
+      "Jangan bagikan PIN layar ke pelanggan. Lupa PIN → Owner/Manager menggantinya di Pengaturan → TV Screensaver.",
+      "TV non-Android (VIDAA, webOS, Tizen) tidak bisa memasang aplikasi ini — pakai smart plug di Kontrol Perangkat.",
+    ],
+    roles: "Kasir memasang aplikasi, memasukkan kode pairing, dan memakai panel kasir di TV. Membuat layar & kode pairing serta mengatur PIN layar: Owner, Superuser, Manager.",
+  },
+  {
     id: "home-rental",
     group: "operasional",
     label: "Home Rental (Sewa Dibawa Pulang)",

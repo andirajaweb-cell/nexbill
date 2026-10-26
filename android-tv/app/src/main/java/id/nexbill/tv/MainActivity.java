@@ -102,6 +102,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DeviceId.init(this);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
@@ -981,6 +982,13 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String appVersion() {
             return Config.APP_VERSION;
+        }
+
+        /** Sidik TV (hash) untuk pairing — server menolak pairing ke outlet lain selama TV ini masih terdaftar. */
+        @JavascriptInterface
+        public String deviceId() {
+            DeviceId.init(getApplicationContext());
+            return DeviceId.get();
         }
     }
 }

@@ -55,6 +55,7 @@ public class PollService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        DeviceId.init(this);
         overlay = new OverlayTimer(this);
         startAsForeground();
         thread = new HandlerThread("nexbill-poll");
