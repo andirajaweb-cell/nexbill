@@ -1831,7 +1831,7 @@ interface TvEligibilityData {
   level: "ready" | "warning" | "unsupported";
   label: string;
   reason: string;
-  control: "adb" | "smart_plug" | "none" | "n/a";
+  control: "app" | "adb" | "smart_plug" | "none" | "n/a";
 }
 
 interface TvUnitCompatData {

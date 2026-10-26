@@ -36,6 +36,16 @@ describe("assessTvEligibility — aturan pemilik: hanya setup TV Android", () =>
     }
   });
 
+  it("TV Android dengan aplikasi NEXBILL TV: siap tanpa ADB; smart plug tetap diberi peringatan", () => {
+    for (const protocol of [null, "android_tv_relay", "android_tv_adb"]) {
+      const e = assessTvEligibility("android_tv", protocol, true);
+      expect(e.level).toBe("ready");
+      expect(e.control).toBe("app");
+    }
+    expect(assessTvEligibility("android_tv", "tuya", true).control).toBe("smart_plug");
+    expect(assessTvEligibility("smart_tv", null, true).level).toBe("unsupported");
+  });
+
   it("TV Android tanpa perangkat kontrol siap dipakai", () => {
     const e = assessTvEligibility("android_tv", null);
     expect(e.level).toBe("ready");

@@ -6,6 +6,7 @@ import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 import { turnDeviceOff } from "@/lib/devices";
 import type { DeviceRecord } from "@/lib/devices/types";
 import { sendRelayCommand, parseRelayDeviceConfig } from "@/lib/devices/adapters/android-tv-relay";
+import { keepAppVersion } from "@/lib/tv/app-marker";
 import { parseStoredCapabilities, validateAndroidPackage, validateHdmiPort } from "@/lib/relay/capabilities";
 import type { RelayDispatchResponse } from "@/lib/relay/config";
 import {
@@ -295,7 +296,7 @@ export async function testScreenAutomation(outletId: string, screenId: string, k
   }
 
   if (kind === "getTvInfo" && result.ok && result.info) {
-    await db.update(tvScreens).set({ tvInfo: JSON.stringify(result.info), updatedAt: new Date().toISOString() }).where(eq(tvScreens.id, screenId));
+    await db.update(tvScreens).set({ tvInfo: JSON.stringify(keepAppVersion(result.info as Record<string, unknown>, ctx.screen.tvInfo)), updatedAt: new Date().toISOString() }).where(eq(tvScreens.id, screenId));
   }
   return result;
 }

@@ -12,7 +12,7 @@ public final class Config {
     /** Antrean sesi yang diatur kasir di TV (format Mode Offline). */
     public static final String SYNC_URL = BASE_URL + "/api/tv/sync";
     /** WAJIB sama dengan versionName/versionCode di app/build.gradle (dicek otomatis oleh GitHub Actions). */
-    public static final String APP_VERSION = "1.2.1";
+    public static final String APP_VERSION = "1.2.2";
     public static final int VERSION_CODE = 4;
     /** Info versi terbaru untuk menu staf "Cek pembaruan" (diterbitkan bersama APK). */
     public static final String LATEST_URL = BASE_URL + "/downloads/nexbill-tv/latest.json";

@@ -29,6 +29,11 @@
  *
  *   - TV Android tanpa perangkat kontrol: diizinkan. TV tetap menyala, hanya saja tidak ada yang
  *     otomatis memindahkan input kembali ke screensaver setelah sesi — staf yang melakukannya.
+ *
+ *   - TV Android dengan aplikasi NEXBILL TV (2026-10, lib/tv/app-marker.ts): jalur utama, TANPA ADB.
+ *     Aplikasi di TV mengambil status sesi dari dashboard setiap ±5 detik dan sendiri yang membuka
+ *     HDMI game (mulai/lanjutkan) atau menguncinya (selesai/jeda/waktu habis). Relay/ADB tidak
+ *     diperlukan; smart plug tetap diberi peringatan karena bisa memutus daya TV.
  */
 
 export type TvEligibilityLevel = "ready" | "warning" | "unsupported";
@@ -40,14 +45,14 @@ export interface TvEligibility {
   /** Satu-dua kalimat untuk merchant: apa artinya, dan kalau perlu, apa yang harus dilakukan. */
   reason: string;
   /** Jenis kontrol yang terdeteksi — dipakai dashboard untuk mengelompokkan unit. */
-  control: "adb" | "smart_plug" | "none" | "n/a";
+  control: "app" | "adb" | "smart_plug" | "none" | "n/a";
 }
 
 /** Disalin dari SMART_PLUG_PROTOCOLS / ANDROID_TV_PROTOCOLS di lib/subscription/config.ts — dan diuji tetap sinkron (lihat eligibility.test.ts). */
 const SMART_PLUG = new Set(["tuya", "tasmota_mqtt", "sonoff_ewelink", "http_generic"]);
 const ADB = new Set(["android_tv_adb", "android_tv_relay"]);
 
-export function assessTvEligibility(tvType: string | null | undefined, deviceProtocol: string | null | undefined): TvEligibility {
+export function assessTvEligibility(tvType: string | null | undefined, deviceProtocol: string | null | undefined, hasTvApp = false): TvEligibility {
   if (tvType === "analog_tv") {
     return {
       level: "unsupported",
@@ -76,6 +81,16 @@ export function assessTvEligibility(tvType: string | null | undefined, devicePro
     };
   }
 
+  if (hasTvApp && !(deviceProtocol && SMART_PLUG.has(deviceProtocol))) {
+    return {
+      level: "ready",
+      label: "Siap — aplikasi NEXBILL TV",
+      reason:
+        "Dikontrol aplikasi NEXBILL TV di TV ini: mulai, jeda, perpanjang, pindah, dan selesai dari dashboard membuka atau mengunci layar game dalam ±5 detik — tanpa ADB atau relay.",
+      control: "app",
+    };
+  }
+
   if (deviceProtocol && ADB.has(deviceProtocol)) {
     return {
       level: "ready",
@@ -99,7 +114,8 @@ export function assessTvEligibility(tvType: string | null | undefined, devicePro
   return {
     level: "ready",
     label: "Siap — tanpa kontrol",
-    reason: "TV tetap menyala karena tidak dikontrol perangkat apa pun. Setelah sesi selesai, staf perlu memindahkan input TV kembali ke NEXBILL.",
+    reason:
+      "TV tetap menyala karena tidak dikontrol perangkat apa pun. Pasang aplikasi NEXBILL TV di TV ini (tanpa ADB) supaya layar game terbuka dan terkunci otomatis mengikuti sesi dari dashboard.",
     control: "none",
   };
 }

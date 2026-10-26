@@ -10,8 +10,8 @@ android {
         applicationId 'id.nexbill.tv'
         minSdk 24
         targetSdk 35
-        versionCode 4
-        versionName '1.2.1'
+        versionCode 5
+        versionName '1.2.2'
     }
 
     // Kunci upload TIDAK pernah di-commit. Dua cara mengisinya (lihat README.md):

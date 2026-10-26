@@ -14,6 +14,7 @@ import {
 } from "@/lib/tv/pairing";
 import { computeUnitView, nightDimOpacity, type TvUnitView } from "@/lib/tv/view";
 import { assessTvEligibility, canPairScreen, type TvEligibility } from "@/lib/tv/eligibility";
+import { appVersionOf, withAppVersion } from "@/lib/tv/app-marker";
 
 /**
  * Lapisan basis data TV Screensaver. Semua yang menyentuh `db` ada di sini; perhitungan murninya
@@ -158,11 +159,17 @@ export async function listTvUnitCompatibility(outletId: string): Promise<TvUnitC
     ? await db.select({ id: devices.id, protocol: devices.protocol }).from(devices).where(inArray(devices.id, deviceIds))
     : [];
   const protocolById = new Map(deviceRows.map((d) => [d.id, d.protocol as string]));
+  // Unit yang layarnya sudah memakai aplikasi NEXBILL TV (aktif) — dikontrol aplikasi, tanpa ADB.
+  const screenRows = await db
+    .select({ rentalUnitId: tvScreens.rentalUnitId, tvInfo: tvScreens.tvInfo, isActive: tvScreens.isActive })
+    .from(tvScreens)
+    .where(eq(tvScreens.outletId, outletId));
+  const unitsWithApp = new Set(screenRows.filter((s) => s.isActive && s.rentalUnitId && appVersionOf(s.tvInfo)).map((s) => s.rentalUnitId as string));
 
   return units
     .map((u) => {
       const deviceProtocol = u.deviceId ? protocolById.get(u.deviceId) ?? null : null;
-      return { id: u.id, name: u.name, tvType: u.tvType, deviceProtocol, eligibility: assessTvEligibility(u.tvType, deviceProtocol) };
+      return { id: u.id, name: u.name, tvType: u.tvType, deviceProtocol, eligibility: assessTvEligibility(u.tvType, deviceProtocol, unitsWithApp.has(u.id)) };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "id", { numeric: true }));
 }
@@ -459,7 +466,7 @@ export interface TvStateResponse {
  * sandi WiFi di layar yang terlihat dari jalan adalah keputusan yang harus diambil merchant secara
  * sadar, bukan efek samping menyalakan screensaver.
  */
-export async function getTvState(token: string): Promise<TvStateResponse> {
+export async function getTvState(token: string, opts: { appVersion?: string | null } = {}): Promise<TvStateResponse> {
   const [screen] = await db.select().from(tvScreens).where(eq(tvScreens.token, token)).limit(1);
   if (!screen) throw new Error("UNKNOWN_SCREEN");
 
@@ -470,7 +477,12 @@ export async function getTvState(token: string): Promise<TvStateResponse> {
   // yang tidak ditunggu kerap hilang diam-diam. Akibatnya kolom "Terakhir aktif" di dashboard akan
   // selamanya kosong — tepatnya satu-satunya cara merchant tahu layar di bilik masih hidup atau
   // sudah dicabut orang. Satu UPDATE berindeks jauh lebih murah daripada fitur yang berbohong.
-  await db.update(tvScreens).set({ lastSeenAt: now.toISOString() }).where(eq(tvScreens.id, screen.id));
+  // Aplikasi NEXBILL TV dikenali dari User-Agent-nya → dicatat sekali per versi (lib/tv/app-marker.ts).
+  const tvInfo = withAppVersion(screen.tvInfo, opts.appVersion ?? null);
+  await db
+    .update(tvScreens)
+    .set(tvInfo ? { lastSeenAt: now.toISOString(), tvInfo } : { lastSeenAt: now.toISOString() })
+    .where(eq(tvScreens.id, screen.id));
 
   const [outlet] = await db.select().from(outlets).where(eq(outlets.id, screen.outletId)).limit(1);
   const settings = await getOrCreateTvSettings(screen.outletId);

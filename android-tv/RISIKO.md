@@ -12,6 +12,7 @@ Belum ada uji di TV sungguhan — semua penilaian di bawah dari membaca kode. Uj
 | U2 | Listrik padam tepat setelah kasir memulai sesi → aksi belum tertulis → sesi hilang | Tinggi | Ditutup | Antrean & sesi ditulis sinkron (`commit`). |
 | U3 | **Mode staf 10 menit** (tes) tidak ditagih dan bisa diulang | Sedang | Dikurangi (1.2.1) | Maksimal 3 kali per TV per hari, ber-PIN, dan setiap pemakaian dicatat (antrean offline) → kartu Pengawasan NEXBILL TV + Audit Log. |
 | U4 | Sesi Bebas (tanpa batas) dari TV lupa dihentikan | Sedang | Dikurangi | Ditagih per menit sampai dihentikan (dari TV atau dashboard), jadi pelanggan tetap membayar. |
+| U6 | Sesi **dijeda** dari dashboard tapi layar game tetap tampil → main gratis selama argo berhenti | Sedang | Ditutup (1.2.2) | Jeda mengunci layar ("DIJEDA"); Lanjutkan dari dashboard membuka HDMI lagi dalam ±5 detik. |
 | U5 | Harga di TV (katalog tersimpan) berbeda dengan harga terbaru saat offline | Rendah | Ditutup | Harga di TV hanya perkiraan; tagihan dihitung server dari tarif/paket yang berlaku. |
 
 ## Jam & waktu

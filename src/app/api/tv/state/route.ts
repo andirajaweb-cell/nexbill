@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { describeError } from "@/lib/api/error";
 import { getTvState } from "@/lib/tv/service";
+import { appVersionFromUserAgent } from "@/lib/tv/app-marker";
 
 /**
  * PUBLIK, hanya-baca, dikenali lewat token layar. Inilah yang di-polling TV setiap beberapa detik.
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     const token = bearer || (req.nextUrl.searchParams.get("token") ?? "").trim();
     if (!token) return NextResponse.json({ error: "Token layar tidak ada." }, { status: 401 });
 
-    const state = await getTvState(token);
+    const state = await getTvState(token, { appVersion: appVersionFromUserAgent(req.headers.get("user-agent")) });
     return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
   } catch (err: unknown) {
     // Token yang tidak dikenal dibalas 401 supaya halaman /tv bisa membedakannya dari gangguan

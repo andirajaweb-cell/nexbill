@@ -86,13 +86,14 @@ final class TvState {
     }
 
     /**
-     * Layar game (HDMI) boleh tampil: ada sesi berjalan/dijeda, bukan Waktu Habis, dan waktunya belum habis.
+     * Layar game (HDMI) boleh tampil: ada sesi BERJALAN (bukan dijeda — 1.2.2: jeda dari dashboard mengunci
+     * layar supaya tidak bisa main gratis selama argo berhenti), bukan Waktu Habis, dan waktunya belum habis.
      * Layar yang DIMATIKAN dari dashboard (enabled=false) tidak mengunci apa pun — aplikasi menjadi pasif
      * dan HDMI selalu tampil, supaya mematikan fitur tidak membuat bilik terkunci sepanjang hari.
      */
     boolean shouldShowGame(long nowRealtime) {
         if (!enabled) return true;
-        if (timeUp || !inSession()) return false;
+        if (timeUp || !"occupied".equals(status)) return false;
         Integer r = liveRemaining(nowRealtime);
         return r == null || r > 0;
     }
