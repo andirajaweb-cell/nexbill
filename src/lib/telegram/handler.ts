@@ -50,6 +50,7 @@ import {
   outletLang,
   outletName,
   recentConversation,
+  recordBotError,
   redeemLinkCode,
   statusLine,
   threadForTelegramMessage,
@@ -196,7 +197,8 @@ async function handleMenu(cq: TgCallbackQuery, data: string) {
     chatId,
     outletId: link.outletId,
     body: kind === "q" ? `📖 ${(await helpMenu()).find((x) => x.key === arg)?.question ?? arg}` : botText(lang, "btnTeam"),
-    updateId: `cb:${cq.id}`,
+    // Ketukan berulang pada tombol yang sama (HP lambat/merchant menekan berkali-kali) dalam 1 menit = satu aksi.
+    updateId: `cb:${chatId}:${cq.message.message_id}:${data}:${Math.floor(Date.now() / 60_000)}`,
   });
   if (!fresh) return;
   await touchLink(chatId);
@@ -224,6 +226,8 @@ export async function handleTelegramUpdate(update: TgUpdate) {
   if (!msg || msg.from?.is_bot) return;
   const chatId = String(msg.chat.id);
   const text = (msg.text ?? msg.caption ?? "").trim();
+  // Tanda "sedang mengetik…" langsung muncul di HP merchant selagi data dibaca.
+  if (msg.chat.type === "private") void sendTyping(chatId);
   const cmd = text ? parseCommand(text) : null;
 
   // /id — untuk mengisi TELEGRAM_ONCALL_CHAT_IDS (petugas jaga). Boleh di grup tim NEXBILL.
@@ -377,7 +381,7 @@ async function runAi(link: TelegramLink, lang: string, outlet: string, turns: Aw
     result = await runSupportBrain({ ...brainBase(link, outlet, lang), turns, tierNote });
   } catch (err) {
     // AI gagal → pesan tidak boleh hilang: langsung ke staf.
-    console.error("Bot Telegram support gagal menjawab:", err);
+    await recordBotError("asisten AI", err);
     await escalateToTeam(link, lang, latest, { tried: "Asisten AI sedang gangguan — diteruskan otomatis.", priority: "P2" });
     return;
   }

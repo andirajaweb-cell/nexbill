@@ -138,6 +138,27 @@ export async function botLogForChat(chatId: string, logId: string) {
   return row ?? null;
 }
 
+/** Baris log khusus untuk error bot (tanpa migrasi): chat "_sistem", tampil di Platform Admin › Telegram Bot. */
+export const SYSTEM_CHAT = "_sistem";
+
+export async function recordBotError(where: string, err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(`Bot Telegram (${where}):`, err);
+  await db
+    .insert(telegramSupportMessages)
+    .values({ chatId: SYSTEM_CHAT, role: "bot", body: `[${where}] ${msg}`.slice(0, 1000) })
+    .catch(() => undefined);
+}
+
+export async function recentBotErrors(limit = 5) {
+  return db
+    .select({ body: telegramSupportMessages.body, createdAt: telegramSupportMessages.createdAt })
+    .from(telegramSupportMessages)
+    .where(eq(telegramSupportMessages.chatId, SYSTEM_CHAT))
+    .orderBy(desc(telegramSupportMessages.createdAt))
+    .limit(limit);
+}
+
 /** Jumlah pesan merchant di chat ini dalam N menit terakhir (rem banjir pesan). */
 export async function userMessagesSince(chatId: string, minutes: number): Promise<number> {
   const since = new Date(Date.now() - minutes * 60_000).toISOString();

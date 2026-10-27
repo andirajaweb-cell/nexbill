@@ -15,7 +15,7 @@ import { aiAvailable, escalateWithNotify, runSupportBrain, type BrainInput } fro
 import { botSenderName, botTierOf, pendingEscalation, shouldAutoReply, threadToTurns, type ThreadMsg } from "./autoreply-rules";
 import { tier1Answer } from "./knowledge";
 import { composeTier1Reply, detectIntent, isFeedbackEcho, isFrustrated, nameVar, nextTier, type Feedback } from "./tiers";
-import { accountStatus, statusLine, type TicketCategory } from "@/lib/telegram/support-service";
+import { accountStatus, recordBotError, statusLine, type TicketCategory } from "@/lib/telegram/support-service";
 import { enforcedPriority, isSupportHours, type SupportPriority } from "@/lib/telegram/support-rules";
 import { botText } from "@/lib/telegram/bot-text";
 
@@ -101,7 +101,7 @@ export async function autoReplySupportThread(threadId: string, opts: { feedback?
         const result = await runSupportBrain({ ...base, turns: threadToTurns(msgs), tierNote });
         return { body: result.reply, tier: "ai", escalated: result.priority ?? pending };
       } catch (err) {
-        console.error("Bot Customer Service gagal menjawab:", err);
+        await recordBotError("asisten AI · Customer Service", err);
         return toTeam("Asisten AI sedang gangguan — diteruskan otomatis.", "P2");
       }
     };

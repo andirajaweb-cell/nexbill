@@ -1,14 +1,17 @@
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { telegramConfigured, telegramWebhookSecret, type TgUpdate } from "@/lib/telegram/api";
+import { answerCallbackQuery, telegramConfigured, telegramWebhookSecret, type TgUpdate } from "@/lib/telegram/api";
 import { handleTelegramUpdate } from "@/lib/telegram/handler";
-import { isMissingTable } from "@/lib/telegram/support-service";
+import { isMissingTable, recordBotError } from "@/lib/telegram/support-service";
 
 /**
  * Webhook bot Telegram support 24 jam. Telegram mengirim header X-Telegram-Bot-Api-Secret-Token
- * (dipasang dari /platform-admin/telegram-bot); tanpa rahasia yang cocok, update ditolak. Respons 200
- * dikirim segera dan update diproses lewat after() — Telegram mengirim ulang bila menunggu terlalu
- * lama, dan pesan yang sama tidak diproses dua kali (update_id unik di log).
+ * (dipasang dari /platform-admin/telegram-bot); tanpa rahasia yang cocok, update ditolak.
+ *
+ * Update diproses langsung di request ini (bukan after()) supaya tidak terputus di tengah jalan; Telegram
+ * mengirim ulang bila menunggu terlalu lama, dan pesan/tombol yang sama tidak diproses dua kali (update_id /
+ * kunci tombol unik di log). Tombol dijawab paling awal supaya ikon loading di HP merchant langsung hilang.
+ * Error dicatat ke log (Platform Admin › Telegram Bot › Error terakhir).
  */
 export const maxDuration = 60;
 
@@ -23,13 +26,15 @@ export async function POST(req: NextRequest) {
   if (!telegramConfigured() || !secretOk(req)) return NextResponse.json({ ok: false }, { status: 401 });
   const update = (await req.json().catch(() => null)) as TgUpdate | null;
   if (!update || typeof update.update_id !== "number") return NextResponse.json({ ok: true });
-  after(async () => {
-    try {
-      await handleTelegramUpdate(update);
-    } catch (err) {
-      if (isMissingTable(err)) console.error("Bot Telegram: migrasi 0037_telegram_support_bot.sql belum dijalankan.");
-      else console.error("Bot Telegram gagal memproses update:", err);
-    }
-  });
+  if (update.callback_query) await answerCallbackQuery(update.callback_query.id);
+  try {
+    await Promise.race([
+      handleTelegramUpdate(update),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Pemrosesan melebihi 55 detik")), 55_000)),
+    ]);
+  } catch (err) {
+    if (isMissingTable(err)) console.error("Bot Telegram: migrasi 0037_telegram_support_bot.sql belum dijalankan.");
+    else await recordBotError(update.callback_query ? "tombol" : "pesan", err);
+  }
   return NextResponse.json({ ok: true });
 }

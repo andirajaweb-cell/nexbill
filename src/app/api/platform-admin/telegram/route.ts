@@ -4,8 +4,8 @@ import { db } from "@/db/client";
 import { telegramSupportLinks, telegramSupportMessages } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
-import { getBotInfo, getWebhookInfo, setWebhook, telegramConfigured, telegramWebhookSecret } from "@/lib/telegram/api";
-import { isMissingTable } from "@/lib/telegram/support-service";
+import { getBotInfo, getWebhookInfo, sendTelegramText, setWebhook, telegramConfigured, telegramWebhookSecret } from "@/lib/telegram/api";
+import { isMissingTable, recentBotErrors, SYSTEM_CHAT } from "@/lib/telegram/support-service";
 import { conversationStats } from "@/lib/telegram/support-rules";
 
 /**
@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
 
     let stats = null;
     let linkedChats = 0;
+    let errors: { body: string; createdAt: string }[] = [];
     let migration = true;
     try {
       const since = new Date(Date.now() - 30 * 86400_000).toISOString();
@@ -34,7 +35,8 @@ export async function GET(req: NextRequest) {
         .select({ chatId: telegramSupportMessages.chatId, role: telegramSupportMessages.role, resolution: telegramSupportMessages.resolution, createdAt: telegramSupportMessages.createdAt })
         .from(telegramSupportMessages)
         .where(gte(telegramSupportMessages.createdAt, since));
-      stats = conversationStats(rows);
+      stats = conversationStats(rows.filter((r) => r.chatId !== SYSTEM_CHAT));
+      errors = await recentBotErrors(5);
       const [l] = await db.select({ n: count() }).from(telegramSupportLinks).where(isNotNull(telegramSupportLinks.chatId));
       linkedChats = l?.n ?? 0;
     } catch (err) {
@@ -59,6 +61,7 @@ export async function GET(req: NextRequest) {
       migration,
       linkedChats,
       stats,
+      errors,
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "UNAUTHENTICATED") return NextResponse.json({ error: "Belum login." }, { status: 401 });
@@ -72,6 +75,22 @@ export async function POST(req: NextRequest) {
     const secret = telegramWebhookSecret();
     if (!telegramConfigured() || !secret) {
       return NextResponse.json({ error: "Isi TELEGRAM_BOT_TOKEN dan TELEGRAM_WEBHOOK_SECRET di env Vercel lalu redeploy." }, { status: 400 });
+    }
+    const body = await req.json().catch(() => ({}));
+    // Tes kirim: memastikan token bot benar-benar bisa mengirim pesan (mis. setelah token di-/revoke).
+    if (body?.action === "test") {
+      const ids = (process.env.TELEGRAM_ONCALL_CHAT_IDS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      if (ids.length === 0) return NextResponse.json({ error: "Isi TELEGRAM_ONCALL_CHAT_IDS dulu (kirim /id ke bot untuk melihat chat id)." }, { status: 400 });
+      const results: { chatId: string; ok: boolean; error?: string }[] = [];
+      for (const id of ids) {
+        try {
+          await sendTelegramText(id, `✅ Tes dari Platform Admin NEXBILL — bot bisa mengirim pesan (${new Date().toISOString()}).`);
+          results.push({ chatId: id, ok: true });
+        } catch (e) {
+          results.push({ chatId: id, ok: false, error: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      return NextResponse.json({ ok: results.every((r) => r.ok), results });
     }
     const url = webhookUrl(req);
     await setWebhook(url, secret);

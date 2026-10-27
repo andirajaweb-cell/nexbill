@@ -17,6 +17,7 @@ interface TgData {
   oncallChats: number;
   migration: boolean;
   linkedChats: number;
+  errors?: { body: string; createdAt: string }[];
   stats: {
     conversations: number;
     resolvedByBot: number;
@@ -80,6 +81,22 @@ export default function TelegramBotPage() {
     }
   };
 
+  const testSend = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/platform-admin/telegram", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "test" }) });
+      const d = await res.json().catch(() => null);
+      if (!res.ok) await showAlert(d?.error ?? "Tes gagal.");
+      else
+        await showAlert(
+          (d.results as { chatId: string; ok: boolean; error?: string }[]).map((r) => `${r.chatId}: ${r.ok ? "terkirim ✅" : `GAGAL — ${r.error}`}`).join("\n")
+        );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const webhookOk = !!data?.webhook?.url && data.webhook.url === data.expectedWebhookUrl;
   const s = data?.stats;
 
@@ -103,9 +120,14 @@ export default function TelegramBotPage() {
               <div className="text-xs text-neutral-500">Bot</div>
               <div className="text-neutral-100 text-lg">{data?.bot ? `@${data.bot.username}` : "—"}</div>
             </div>
-            <Button onClick={installWebhook} disabled={busy || !data?.configured || !data?.hasSecret}>
-              {busy ? "Memasang…" : webhookOk ? "Pasang ulang webhook" : "Pasang webhook"}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={testSend} disabled={busy || !data?.configured}>
+                Kirim pesan tes
+              </Button>
+              <Button onClick={installWebhook} disabled={busy || !data?.configured || !data?.hasSecret}>
+                {busy ? "Memasang…" : webhookOk ? "Pasang ulang webhook" : "Pasang webhook"}
+              </Button>
+            </div>
           </div>
 
           <ul className="space-y-2">
@@ -125,6 +147,16 @@ export default function TelegramBotPage() {
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-neutral-400 space-y-1">
               <div>URL webhook: <span className="text-neutral-200 break-all">{data.webhook.url || "— (belum dipasang)"}</span></div>
               <div>Update menunggu: {data.webhook.pending}</div>
+              {(data.errors?.length ?? 0) > 0 && (
+                <div className="space-y-0.5 pt-1">
+                  <div className="text-neutral-300">Error pemrosesan terakhir (bot gagal membalas):</div>
+                  {data.errors!.map((e, i) => (
+                    <div key={i} className="text-rose-300 break-words">
+                      {fmt(e.createdAt)} — {e.body}
+                    </div>
+                  ))}
+                </div>
+              )}
               {data.webhook.lastError && (
                 <div className="text-rose-300">
                   Error terakhir ({fmt(data.webhook.lastErrorAt)}): {data.webhook.lastError}
