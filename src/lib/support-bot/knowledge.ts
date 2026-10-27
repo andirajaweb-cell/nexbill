@@ -6,6 +6,7 @@
  *  3. android-tv/RISIKO.md & README (catatan rilis) → kendala yang sudah diketahui + solusinya
  *  4. Status akun merchant                      → tool status_akun (support-service)
  *  5. Jawaban tim dari tiket selesai            → tabel support_kb_answers (kurasi mingguan)
+ *     + Jawaban Bot bawaan (starter-answers.ts: instalasi, pemakaian, masalah umum)
  * Sumber 2, 3, 5 dicari lewat tool cari_pengetahuan (searchChunks).
  *
  * File .md dibaca dari disk saat runtime; next.config.ts (outputFileTracingIncludes) memastikan
@@ -13,7 +14,7 @@
  */
 import { readFile } from "fs/promises";
 import path from "path";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { supportKbAnswers } from "@/db/schema";
 import { registeredFor, type LangCode } from "@/lib/i18n/registry";
@@ -25,6 +26,8 @@ import "@/lib/i18n/dict-devices-methods";
 import "@/lib/i18n/dict-devices-tvapp";
 import "@/lib/i18n/dict-devices-tvsetup";
 import "@/lib/i18n/dict-local-control";
+import { starterKeyOf, topicOfTags } from "./starter-tags";
+import { STARTER_ANSWERS } from "./starter-answers";
 import { formatChunks, groupDictEntries, searchChunks, splitMarkdownSections, type KnowledgeChunk } from "./knowledge-rules";
 
 const LANGS: LangCode[] = ["id", "en", "ms", "th", "fil", "vi"];
@@ -65,21 +68,29 @@ function deviceChunks(lang: string): KnowledgeChunk[] {
 
 let kbCache: { at: number; chunks: KnowledgeChunk[] } | null = null;
 
+/**
+ * Jawaban tim (tabel support_kb_answers) + Jawaban Bot bawaan (starter-answers.ts). Jawaban bawaan yang
+ * sudah diimpor (tag "starter:<key>") memakai versi database — termasuk bila diubah atau dinonaktifkan.
+ */
 async function savedAnswerChunks(): Promise<KnowledgeChunk[]> {
   if (kbCache && Date.now() - kbCache.at < 5 * 60_000) return kbCache.chunks;
+  let rows: { question: string; answer: string; tags: string | null; isActive: boolean }[] = [];
   try {
-    const rows = await db
-      .select({ question: supportKbAnswers.question, answer: supportKbAnswers.answer, tags: supportKbAnswers.tags })
+    rows = await db
+      .select({ question: supportKbAnswers.question, answer: supportKbAnswers.answer, tags: supportKbAnswers.tags, isActive: supportKbAnswers.isActive })
       .from(supportKbAnswers)
-      .where(eq(supportKbAnswers.isActive, true))
       .orderBy(desc(supportKbAnswers.updatedAt))
-      .limit(500);
-    const chunks = rows.map((r) => ({ source: "Jawaban tim NEXBILL", title: r.question, text: `${r.answer}${r.tags ? `\n(${r.tags})` : ""}` }));
-    kbCache = { at: Date.now(), chunks };
-    return chunks;
+      .limit(1000);
   } catch {
-    return []; // tabel belum ada (migrasi 0037) — bot tetap jalan dengan sumber lain
+    rows = []; // tabel belum ada (migrasi 0037) — jawaban bawaan tetap dipakai
   }
+  const overridden = new Set(rows.map((r) => starterKeyOf(r.tags)).filter((k): k is string => !!k));
+  const chunks: KnowledgeChunk[] = [
+    ...rows.filter((r) => r.isActive).map((r) => ({ source: "Jawaban tim NEXBILL", title: r.question, text: `${r.answer}${topicOfTags(r.tags) ? `\n(${topicOfTags(r.tags)})` : ""}` })),
+    ...STARTER_ANSWERS.filter((a) => !overridden.has(a.key)).map((a) => ({ source: "Jawaban tim NEXBILL", title: a.question, text: `${a.answer}\n(${a.topic})` })),
+  ];
+  kbCache = { at: Date.now(), chunks };
+  return chunks;
 }
 
 export function clearSavedAnswerCache() {
@@ -91,7 +102,7 @@ export async function searchKnowledge(query: string, lang: string): Promise<stri
   const saved = await savedAnswerChunks();
   const all = [...saved, ...(await docChunks()), ...deviceChunks(lang)];
   // Jawaban tim diutamakan: dicari terpisah lalu ditaruh di depan.
-  const fromSaved = searchChunks(query, saved, { limit: 2, maxChars: 2500 });
+  const fromSaved = searchChunks(query, saved, { limit: 3, maxChars: 3500 });
   const rest = searchChunks(query, all.filter((c) => !saved.includes(c)), { limit: 4, maxChars: 6000 });
   return formatChunks([...fromSaved, ...rest]);
 }

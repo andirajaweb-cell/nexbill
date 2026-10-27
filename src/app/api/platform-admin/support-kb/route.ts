@@ -7,6 +7,8 @@ import { describeError } from "@/lib/api/error";
 import { isBotSender } from "@/lib/support-bot/autoreply-rules";
 import { clearSavedAnswerCache } from "@/lib/support-bot/knowledge";
 import { isMissingTable } from "@/lib/telegram/support-service";
+import { STARTER_ANSWERS, STARTER_TOPICS } from "@/lib/support-bot/starter-answers";
+import { starterKeyOf } from "@/lib/support-bot/starter-tags";
 
 /**
  * Jawaban Bot (Platform Admin): jawaban tim yang dipakai bot support untuk masalah berulang.
@@ -51,7 +53,9 @@ export async function GET() {
         suggestions.push({ threadId: t.id, outletName: t.outletName, subject: t.subject, question, answer: human.map((m) => m.body).join("\n\n") });
       }
     }
-    return NextResponse.json({ migration, answers, suggestions });
+    const imported = new Set(answers.map((a) => starterKeyOf(a.tags)).filter((k): k is string => !!k));
+    const starter = STARTER_ANSWERS.map((a) => ({ ...a, imported: imported.has(a.key) }));
+    return NextResponse.json({ migration, answers, suggestions, starter, starterTopics: STARTER_TOPICS });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "UNAUTHENTICATED") return NextResponse.json({ error: "Belum login." }, { status: 401 });
     return NextResponse.json({ error: describeError(err) }, { status: 500 });

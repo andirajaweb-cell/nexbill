@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
+import { topicOfTags } from "@/lib/support-bot/starter-tags";
 
 interface Answer {
   id: string;
@@ -14,6 +15,14 @@ interface Answer {
   isActive: boolean;
   createdBy: string | null;
   updatedAt: string;
+}
+
+interface Starter {
+  key: string;
+  topic: string;
+  question: string;
+  answer: string;
+  imported: boolean;
 }
 
 interface Suggestion {
@@ -34,6 +43,9 @@ export default function SupportKbPage() {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [migration, setMigration] = useState(true);
+  const [starter, setStarter] = useState<Starter[]>([]);
+  const [topics, setTopics] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +57,8 @@ export default function SupportKbPage() {
       setAnswers(d.answers);
       setSuggestions(d.suggestions);
       setMigration(d.migration);
+      setStarter(d.starter ?? []);
+      setTopics(d.starterTopics ?? []);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -91,6 +105,23 @@ export default function SupportKbPage() {
     await load();
   };
 
+  const importStarter = async () => {
+    setImporting(true);
+    try {
+      const res = await fetch("/api/platform-admin/support-kb/import-starter", { method: "POST" });
+      const d = await res.json().catch(() => null);
+      await showAlert(res.ok ? `${d.inserted} jawaban bawaan diimpor ke daftar (total ${d.total}).` : d?.error ?? "Gagal mengimpor.");
+      await load();
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const starterShown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? starter.filter((a) => `${a.question} ${a.answer} ${a.topic}`.toLowerCase().includes(q)) : starter;
+  }, [starter, query]);
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? answers.filter((a) => `${a.question} ${a.answer} ${a.tags ?? ""}`.toLowerCase().includes(q)) : answers;
@@ -112,6 +143,48 @@ export default function SupportKbPage() {
 
       {error && <p className="text-sm text-rose-400">{error}</p>}
       {!migration && <p className="text-sm text-amber-300">Jalankan migrasi 0037_telegram_support_bot.sql di Supabase untuk mengaktifkan Jawaban Bot.</p>}
+
+      <Card className="space-y-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-sm font-medium text-neutral-100">
+              Jawaban bawaan NEXBILL ({starter.length} jawaban · {starter.filter((a) => a.imported).length} sudah diimpor)
+            </div>
+            <p className="text-xs text-neutral-500 mt-1 max-w-3xl">
+              Tanya-jawab lengkap dari instalasi, setup outlet, pemakaian harian, NEXBILL TV, kontrol perangkat, internet putus, sampai printer — disusun dari Pusat
+              Bantuan dan panduan NEXBILL TV. Bot sudah memakai semuanya otomatis. Impor ke daftar di bawah bila ingin mengubah atau menonaktifkan jawaban tertentu
+              (setelah diimpor, versi di daftar yang dipakai bot).
+            </p>
+          </div>
+          <Button onClick={importStarter} disabled={!migration || importing || starter.every((a) => a.imported)}>
+            {importing ? "Mengimpor…" : starter.every((a) => a.imported) ? "Semua sudah diimpor" : "Impor ke daftar (bisa diubah)"}
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {topics.map((topic) => {
+            const items = starterShown.filter((a) => a.topic === topic);
+            if (items.length === 0) return null;
+            return (
+              <details key={topic} className="rounded-lg border border-white/10 px-3 py-2" open={!!query.trim()}>
+                <summary className="cursor-pointer text-sm text-neutral-200">
+                  {topic} <span className="text-xs text-neutral-500">({items.length})</span>
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {items.map((a) => (
+                    <div key={a.key} className="rounded-lg bg-white/[0.03] p-3 text-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="font-medium text-neutral-100">{a.question}</div>
+                        {a.imported && <span className="shrink-0 text-[10px] rounded-full bg-emerald-500/15 text-emerald-300 px-2 py-0.5">Diimpor</span>}
+                      </div>
+                      <div className="mt-1 text-neutral-300 whitespace-pre-wrap">{a.answer}</div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      </Card>
 
       <Card className="space-y-3">
         <div className="text-sm font-medium text-neutral-100">Usulan minggu ini ({suggestions.length})</div>
@@ -153,6 +226,7 @@ export default function SupportKbPage() {
               <div className="text-neutral-300 whitespace-pre-wrap">{a.answer}</div>
               <div className="flex items-center gap-3 text-xs text-neutral-500 flex-wrap">
                 <span>
+                  {topicOfTags(a.tags) ? `${topicOfTags(a.tags)} · ` : ""}
                   {a.createdBy ?? "—"} · {fmt(a.updatedAt)}
                 </span>
                 <button type="button" className="text-sky-300 hover:underline" onClick={() => edit(a)}>
