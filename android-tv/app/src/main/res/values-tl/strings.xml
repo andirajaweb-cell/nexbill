@@ -33,6 +33,7 @@
     <string name="info_version">Bersyon ng app: %1$s</string>
     <string name="info_paired">Naka-pair sa unit: %1$s</string>
     <string name="info_unpaired">Hindi pa naka-pair — ilagay ang code mula sa dashboard</string>
+    <string name="info_outlet">Outlet: %1$s\nAddress: %2$s</string>
     <string name="info_input">HDMI input: %1$s</string>
     <string name="info_mode">Mode: %1$s</string>
     <string name="info_overlay">Ipakita sa ibabaw ng ibang app: %1$s</string>

@@ -33,6 +33,7 @@
     <string name="info_version">Phiên bản: %1$s</string>
     <string name="info_paired">Đã ghép với phòng: %1$s</string>
     <string name="info_unpaired">Chưa ghép — nhập mã từ bảng điều khiển</string>
+    <string name="info_outlet">Cửa hàng: %1$s\nĐịa chỉ: %2$s</string>
     <string name="info_input">Cổng HDMI: %1$s</string>
     <string name="info_mode">Chế độ: %1$s</string>
     <string name="info_overlay">Hiển thị trên ứng dụng khác: %1$s</string>

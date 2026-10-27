@@ -33,6 +33,7 @@
     <string name="info_version">เวอร์ชันแอป: %1$s</string>
     <string name="info_paired">จับคู่กับห้อง: %1$s</string>
     <string name="info_unpaired">ยังไม่จับคู่ — ใส่รหัสจากแดชบอร์ด</string>
+    <string name="info_outlet">ร้าน: %1$s\nที่อยู่: %2$s</string>
     <string name="info_input">อินพุต HDMI: %1$s</string>
     <string name="info_mode">โหมด: %1$s</string>
     <string name="info_overlay">แสดงทับแอปอื่น: %1$s</string>

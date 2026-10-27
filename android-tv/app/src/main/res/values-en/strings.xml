@@ -33,6 +33,7 @@
     <string name="info_version">App version: %1$s</string>
     <string name="info_paired">Paired to unit: %1$s</string>
     <string name="info_unpaired">Not paired yet — enter the code from the dashboard</string>
+    <string name="info_outlet">Outlet: %1$s\nAddress: %2$s</string>
     <string name="info_input">HDMI input: %1$s</string>
     <string name="info_mode">Mode: %1$s</string>
     <string name="info_overlay">Display over other apps: %1$s</string>

@@ -369,7 +369,15 @@ export async function deleteTvScreen(outletId: string, screenId: string) {
  * tidak akan menemukan baris yang cocok lagi. Itu sebabnya penghangusan tidak dilakukan lewat
  * SELECT terpisah lalu UPDATE.
  */
-export async function pairTvScreen(rawCode: string, rawDeviceId?: unknown): Promise<{ token: string; screenName: string; outletName: string }> {
+/** "Jl. Merdeka 10, Bandung" — alamat + kota tanpa duplikat; null bila kosong. */
+export function outletAddressLine(o: { address?: string | null; city?: string | null } | null | undefined): string | null {
+  const address = o?.address?.trim() ?? "";
+  const city = o?.city?.trim() ?? "";
+  const parts = [address, city && !address.toLowerCase().includes(city.toLowerCase()) ? city : ""].filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
+}
+
+export async function pairTvScreen(rawCode: string, rawDeviceId?: unknown): Promise<{ token: string; screenName: string; outletName: string; outletAddress: string | null }> {
   const code = normalizePairingCode(rawCode);
   if (!code) throw new Error("Kode harus 6 digit angka.");
 
@@ -410,8 +418,8 @@ export async function pairTvScreen(rawCode: string, rawDeviceId?: unknown): Prom
   }
   if (!paired) throw new Error("Kode sudah dipakai layar lain. Buat kode baru di dashboard.");
 
-  const [outlet] = await db.select({ name: outlets.name }).from(outlets).where(eq(outlets.id, paired.outletId)).limit(1);
-  return { token: paired.token, screenName: paired.name, outletName: outlet?.name ?? "Outlet" };
+  const [outlet] = await db.select({ name: outlets.name, address: outlets.address, city: outlets.city }).from(outlets).where(eq(outlets.id, paired.outletId)).limit(1);
+  return { token: paired.token, screenName: paired.name, outletName: outlet?.name ?? "Outlet", outletAddress: outletAddressLine(outlet) };
 }
 
 /** Sesi terakhir yang SELESAI + apakah tagihannya masih terbuka — untuk layar "Waktu Habis". */
@@ -443,6 +451,8 @@ export interface TvStateResponse {
   /** Kenapa `enabled` false, dalam kalimat yang bisa dibaca staf yang berdiri di depan TV. null bila menyala. */
   disabledReason: string | null;
   outletName: string;
+  /** Alamat outlet (alamat + kota) — tampil di layar supaya jelas TV ini terhubung ke outlet mana. */
+  outletAddress: string | null;
   logoUrl: string | null;
   screenName: string;
   unitName: string | null;
@@ -582,6 +592,7 @@ export async function getTvState(token: string, opts: { appVersion?: string | nu
     enabled: disabledReason === null,
     disabledReason,
     outletName: outlet?.name ?? "Outlet",
+    outletAddress: outletAddressLine(outlet),
     logoUrl: outlet?.logoUrl ?? null,
     screenName: screen.name,
     unitName: unit?.name ?? null,

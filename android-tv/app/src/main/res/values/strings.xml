@@ -34,6 +34,7 @@
     <string name="info_version">Versi aplikasi: %1$s</string>
     <string name="info_paired">Terpasang ke unit: %1$s</string>
     <string name="info_unpaired">Belum dipasangkan — masukkan kode dari dashboard</string>
+    <string name="info_outlet">Outlet: %1$s\nAlamat: %2$s</string>
     <string name="info_input">Input HDMI: %1$s</string>
     <string name="info_mode">Mode: %1$s</string>
     <string name="info_overlay">Izin tampil di atas aplikasi lain: %1$s</string>

@@ -35,6 +35,8 @@ interface TvState {
   enabled: boolean;
   disabledReason: string | null;
   outletName: string;
+  /** Alamat outlet — server lama tidak mengirim. */
+  outletAddress?: string | null;
   logoUrl: string | null;
   screenName: string;
   unitName: string | null;
@@ -68,6 +70,8 @@ interface TvState {
 export default function TvPage() {
   const [token, setToken] = useState<string | null>(null);
   const [booted, setBooted] = useState(false);
+  /** Baru saja dipasangkan → tampilkan konfirmasi "Terhubung ke <outlet>" sebentar. */
+  const [justPaired, setJustPaired] = useState(false);
 
   // localStorage hanya ada di browser — dibaca setelah mount, bukan saat render, supaya hasil
   // render di server dan di klien tidak berbeda (hydration mismatch).
@@ -87,6 +91,7 @@ export default function TvPage() {
       // Tetap lanjut dengan token di memori — layar jalan sampai TV dimatikan, lalu minta kode lagi.
     }
     setToken(newToken);
+    setJustPaired(true);
   }, []);
 
   const handleUnpair = useCallback(() => {
@@ -113,7 +118,7 @@ export default function TvPage() {
 
   if (!booted) return <div className="min-h-screen bg-black" />;
   if (!token) return <PairingScreen onPaired={handlePaired} />;
-  return <ScreenDisplay token={token} onUnpair={handleUnpair} />;
+  return <ScreenDisplay token={token} onUnpair={handleUnpair} justPaired={justPaired} />;
 }
 
 /** ---------------- PAIRING ---------------- */
@@ -204,50 +209,73 @@ function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
   }, [code, busy, submit]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-8 p-8 bg-black">
-      <div className="text-center space-y-2">
-        <div className="text-cyan-400 text-sm tracking-[0.3em] font-semibold">NEXBILL TV</div>
-        <h1 className="text-4xl md:text-5xl font-bold">Masukkan Kode Pairing</h1>
-        <p className="text-neutral-400 text-lg md:text-xl max-w-2xl">
-          Buka <span className="text-white">Pengaturan &rsaquo; TV Screensaver</span> di dashboard NEXBILL, tambahkan layar untuk bilik ini, lalu ketik 6 digit
-          kodenya memakai tombol angka remote.
-        </p>
+    <div className="relative min-h-screen overflow-hidden bg-[#04060c] text-white">
+      <Backdrop accent="#22d3ee" />
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center gap-10 p-10 nb-fade-in">
+        <Wordmark />
+        <div className="text-center space-y-3">
+          <h1 className="text-5xl md:text-6xl font-black tracking-tight">Hubungkan TV ini</h1>
+          <p className="text-neutral-300/80 text-xl md:text-2xl max-w-3xl leading-relaxed">
+            Ketik 6 digit kode pairing dengan tombol angka di remote. TV ini akan terhubung ke <span className="text-white font-semibold">satu outlet</span> dan satu unit saja.
+          </p>
+        </div>
+
+        <div className={`flex gap-4 p-6 rounded-3xl ${GLASS}`}>
+          {Array.from({ length: 6 }, (_, i) => {
+            const active = code.length === i && !busy;
+            const filled = !!code[i];
+            return (
+              <div
+                key={i}
+                className={`w-16 h-24 md:w-24 md:h-32 rounded-2xl flex items-center justify-center text-5xl md:text-6xl font-bold tabular-nums transition-all duration-300 ${
+                  active ? "border-2 border-cyan-300 bg-cyan-300/10 shadow-[0_0_40px_rgba(34,211,238,0.45)] scale-105" : filled ? "border border-white/25 bg-white/[0.07]" : "border border-white/10 bg-black/30"
+                }`}
+              >
+                {code[i] ?? ""}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="h-8 text-center">
+          {busy && <div className="text-cyan-300 text-2xl animate-pulse">Menghubungkan ke outlet…</div>}
+          {error && !busy && <div className="text-rose-300 text-xl md:text-2xl max-w-3xl">{error}</div>}
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "hapus", "0", "ok"].map((key) => (
+            <button
+              key={key}
+              disabled={busy}
+              onClick={() => {
+                if (key === "hapus") setCode((p) => p.slice(0, -1));
+                else if (key === "ok") void submit(code);
+                else setCode((p) => (p.length >= 6 ? p : p + key));
+              }}
+              className="w-24 h-16 md:w-28 md:h-[4.5rem] rounded-2xl bg-white/[0.05] border border-white/10 text-2xl font-semibold transition hover:bg-white/10 focus:outline-none focus:border-cyan-300 focus:bg-cyan-300/15 focus:shadow-[0_0_30px_rgba(34,211,238,0.35)] disabled:opacity-40"
+            >
+              {key === "hapus" ? "⌫" : key === "ok" ? "OK" : key}
+            </button>
+          ))}
+        </div>
+
+        <ol className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl w-full text-left">
+          {[
+            ["1", "Owner / Manager", "Buka Pengaturan › TV Screensaver di dashboard NEXBILL, lalu tambah layar untuk unit ini."],
+            ["2", "Kode 6 digit", "Kode muncul di dashboard dan berlaku 30 menit. Ketik di sini dengan remote."],
+            ["3", "Selesai", "TV langsung mengikuti sesi dari kasir. Tahan OK 3 detik untuk menu staf."],
+          ].map(([n, title, body]) => (
+            <li key={n} className={`rounded-2xl p-5 ${GLASS}`}>
+              <div className="flex items-center gap-3">
+                <span className="h-9 w-9 rounded-full bg-cyan-300/15 text-cyan-200 flex items-center justify-center font-bold">{n}</span>
+                <span className="text-lg font-semibold">{title}</span>
+              </div>
+              <p className="mt-2 text-neutral-400 text-base leading-relaxed">{body}</p>
+            </li>
+          ))}
+        </ol>
       </div>
-
-      <div className="flex gap-3">
-        {Array.from({ length: 6 }, (_, i) => (
-          <div
-            key={i}
-            className={`w-16 h-24 md:w-20 md:h-28 rounded-xl border-2 flex items-center justify-center text-4xl md:text-5xl font-bold ${
-              code.length === i ? "border-cyan-400 bg-cyan-400/10" : "border-neutral-700 bg-neutral-900"
-            }`}
-          >
-            {code[i] ?? ""}
-          </div>
-        ))}
-      </div>
-
-      {busy && <div className="text-cyan-300 text-xl">Memasangkan layar...</div>}
-      {error && !busy && <div className="text-red-400 text-xl text-center max-w-2xl">{error}</div>}
-
-      <div className="grid grid-cols-3 gap-3 mt-2">
-        {["1", "2", "3", "4", "5", "6", "7", "8", "9", "hapus", "0", "ok"].map((key) => (
-          <button
-            key={key}
-            disabled={busy}
-            onClick={() => {
-              if (key === "hapus") setCode((p) => p.slice(0, -1));
-              else if (key === "ok") void submit(code);
-              else setCode((p) => (p.length >= 6 ? p : p + key));
-            }}
-            className="w-20 h-14 md:w-24 md:h-16 rounded-lg bg-neutral-800 border border-neutral-700 text-xl font-semibold hover:bg-neutral-700 focus:bg-cyan-500/20 focus:border-cyan-400 focus:outline-none disabled:opacity-40"
-          >
-            {key === "hapus" ? "⌫" : key === "ok" ? "OK" : key}
-          </button>
-        ))}
-      </div>
-
-      <p className="text-neutral-600 text-sm">Kode berlaku 30 menit. Sudah lewat? Buat kode baru di dashboard.</p>
+      <GlobalTvStyles />
     </div>
   );
 }
@@ -256,8 +284,16 @@ function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
 
 type Mode = "screensaver" | "pin" | "panel";
 
-function ScreenDisplay({ token, onUnpair }: { token: string; onUnpair: () => void }) {
+function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string; onUnpair: () => void; justPaired?: boolean }) {
   const [state, setState] = useState<TvState | null>(null);
+  const [showConnected, setShowConnected] = useState(false);
+  const hasState = !!state;
+  useEffect(() => {
+    if (!justPaired || !hasState) return;
+    setShowConnected(true);
+    const id = setTimeout(() => setShowConnected(false), 9000);
+    return () => clearTimeout(id);
+  }, [justPaired, hasState]);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [unitQrDataUrl, setUnitQrDataUrl] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -389,20 +425,35 @@ function ScreenDisplay({ token, onUnpair }: { token: string; onUnpair: () => voi
 
   if (!state) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-neutral-500 text-2xl">{offline ? "Menyambungkan ulang..." : "Memuat..."}</div>
+      <div className="relative min-h-screen overflow-hidden bg-[#04060c] text-white">
+        <Backdrop accent="#22d3ee" />
+        <div className="relative z-10 min-h-screen flex flex-col items-center justify-center gap-6">
+          <Wordmark />
+          <div className="h-1 w-56 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-full w-1/3 rounded-full bg-cyan-300 nb-loading" />
+          </div>
+          <div className="text-neutral-400 text-2xl">{offline ? "Menyambungkan ulang…" : "Memuat…"}</div>
+        </div>
+        <GlobalTvStyles />
       </div>
     );
   }
 
   if (!state.enabled) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-black text-center p-8">
-        <div className="text-neutral-400 text-3xl font-semibold">Screensaver tidak aktif</div>
-        <p className="text-neutral-500 text-lg max-w-2xl">{state.disabledReason}</p>
-        <p className="text-neutral-600 text-base max-w-xl">
-          Layar <span className="text-neutral-300">{state.screenName}</span> masih terpasang dan akan menyala sendiri begitu masalah di atas dibereskan di dashboard.
-        </p>
+      <div className="relative min-h-screen overflow-hidden bg-[#04060c] text-white">
+        <Backdrop accent="#64748b" />
+        <div className="relative z-10 min-h-screen flex flex-col items-center justify-center gap-5 text-center p-10">
+          <OutletIdentity state={state} offline={offline} centered />
+          <div className={`mt-6 rounded-3xl p-8 max-w-3xl ${GLASS}`}>
+            <div className="text-neutral-200 text-3xl font-semibold">Screensaver tidak aktif</div>
+            <p className="text-neutral-400 text-xl mt-3">{state.disabledReason}</p>
+            <p className="text-neutral-500 text-lg mt-3">
+              Layar <span className="text-neutral-200">{state.screenName}</span> tetap terhubung dan menyala sendiri begitu masalah di atas dibereskan di dashboard.
+            </p>
+          </div>
+        </div>
+        <GlobalTvStyles />
       </div>
     );
   }
@@ -443,26 +494,151 @@ function ScreenDisplay({ token, onUnpair }: { token: string; onUnpair: () => voi
   const alertKind: "warning" | "timeUp" | null = state.timeUp ? "timeUp" : warningActive ? "warning" : null;
 
   return (
-    <div className="relative min-h-screen bg-black overflow-hidden">
-      {mode === "screensaver" && alertKind && (
-        <AlertScreen kind={alertKind} state={state} liveView={liveView} unitQrDataUrl={unitQrDataUrl} driftStyle={driftStyle} />
+    <div className="relative min-h-screen bg-[#04060c] text-white overflow-hidden">
+      <Backdrop accent={alertKind === "timeUp" ? "#f43f5e" : alertKind === "warning" ? "#f59e0b" : accent} />
+      <div className="relative z-10">
+        {mode === "screensaver" && alertKind && (
+          <AlertScreen kind={alertKind} state={state} liveView={liveView} unitQrDataUrl={unitQrDataUrl} driftStyle={driftStyle} />
+        )}
+        {mode === "screensaver" && !alertKind && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} offline={offline} />}
+        {mode === "pin" && <PinPrompt token={token} accent={accent} state={state} onOk={() => setMode("panel")} onCancel={() => setMode("screensaver")} />}
+        {mode === "panel" && <UnitPanel state={state} liveView={liveView} offline={offline} onBack={() => setMode("screensaver")} />}
+      </div>
+
+      {/* Baru dipasangkan: konfirmasi besar outlet & alamat, supaya staf yakin TV terhubung ke outlet yang benar. */}
+      {showConnected && (
+        <div className="fixed inset-x-0 top-10 z-30 flex justify-center pointer-events-none nb-fade-in">
+          <div className="rounded-3xl px-10 py-6 bg-emerald-500/15 border border-emerald-300/40 shadow-[0_0_60px_rgba(16,185,129,0.35)] text-center">
+            <div className="text-emerald-200 text-xl tracking-[0.2em] font-semibold">✓ TERHUBUNG</div>
+            <div className="text-3xl md:text-4xl font-bold mt-1">{state.outletName}</div>
+            {state.outletAddress && <div className="text-lg md:text-xl text-neutral-300 mt-1">{state.outletAddress}</div>}
+            {state.unitName && <div className="text-base text-neutral-400 mt-2">Unit: {state.unitName}</div>}
+          </div>
+        </div>
       )}
-      {mode === "screensaver" && !alertKind && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} />}
-      {mode === "pin" && <PinPrompt token={token} accent={accent} onOk={() => setMode("panel")} onCancel={() => setMode("screensaver")} />}
-      {mode === "panel" && <UnitPanel state={state} liveView={liveView} onBack={() => setMode("screensaver")} />}
 
       {/* Overlay mode malam — di atas segalanya, tidak menerima klik supaya tidak menghalangi remote. */}
       {state.display.nightDimOpacity > 0 && (
-        <div className="fixed inset-0 bg-black pointer-events-none" style={{ opacity: state.display.nightDimOpacity }} aria-hidden />
+        <div className="fixed inset-0 z-40 bg-black pointer-events-none" style={{ opacity: state.display.nightDimOpacity }} aria-hidden />
       )}
-
-      {/*
-        Penanda luring sengaja kecil dan di pojok, bukan pesan galat di tengah layar. Yang dilihat
-        pelanggan tetap branding outlet; yang perlu tahu jaringan terganggu hanyalah staf, dan
-        mereka tahu di mana melihatnya.
-      */}
-      {offline && <div className="fixed bottom-3 right-4 text-xs text-amber-400/70">Menyambungkan ulang...</div>}
+      <GlobalTvStyles />
     </div>
+  );
+}
+
+/** ---------------- BAHAN TAMPILAN BERSAMA ---------------- */
+
+/** Kaca gelap: dipakai semua kartu. Sengaja TANPA backdrop-blur — WebView TV murah tersendat karenanya. */
+const GLASS = "bg-white/[0.045] border border-white/10 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]";
+
+/** "#22d3ee" → "rgba(34,211,238,a)"; warna tak dikenal jatuh ke cyan. */
+function hexA(hex: string, a: number): string {
+  const h = (hex || "").replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = /^[0-9a-fA-F]{6}$/.test(full) ? parseInt(full, 16) : 0x22d3ee;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/**
+ * Latar hidup: dua cahaya lembut warna aksen yang bergerak sangat pelan + vinyet. Hanya transform &
+ * opacity yang dianimasikan (murah bagi GPU TV), dan geraknya juga ikut mencegah burn-in.
+ */
+function Backdrop({ accent }: { accent: string }) {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+      <div className="absolute -top-1/3 -left-1/4 h-[90vh] w-[90vh] rounded-full nb-orb-a" style={{ background: `radial-gradient(circle, ${hexA(accent, 0.42)} 0%, transparent 65%)` }} />
+      <div className="absolute -bottom-1/3 -right-1/4 h-[100vh] w-[100vh] rounded-full nb-orb-b" style={{ background: `radial-gradient(circle, ${hexA("#8b5cf6", 0.3)} 0%, transparent 65%)` }} />
+      <div
+        className="absolute inset-0 opacity-[0.07]"
+        style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)", backgroundSize: "80px 80px", maskImage: "radial-gradient(ellipse at center, black 30%, transparent 75%)", WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 75%)" }}
+      />
+      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.75) 100%)" }} />
+    </div>
+  );
+}
+
+function Wordmark({ small }: { small?: boolean }) {
+  return (
+    <div className={`flex items-center gap-2 font-black tracking-[0.35em] ${small ? "text-sm" : "text-lg"}`}>
+      <span className="bg-gradient-to-r from-cyan-200 via-white to-violet-200 bg-clip-text text-transparent">NEXBILL</span>
+      <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[0.7em] tracking-[0.2em] text-cyan-200">TV</span>
+    </div>
+  );
+}
+
+/** Nama & alamat outlet + status sambungan — selalu tampil supaya jelas TV ini milik outlet mana. */
+function OutletIdentity({ state, offline, centered }: { state: TvState; offline: boolean; centered?: boolean }) {
+  const initial = state.outletName.trim().charAt(0).toUpperCase() || "N";
+  return (
+    <div className={`flex items-center gap-5 ${centered ? "flex-col text-center" : ""}`}>
+      {state.logoUrl ? (
+        <img src={state.logoUrl} alt="" className="h-16 w-16 md:h-20 md:w-20 rounded-2xl object-contain bg-white/5 p-1.5 border border-white/10" />
+      ) : (
+        <div
+          className="h-16 w-16 md:h-20 md:w-20 rounded-2xl flex items-center justify-center text-3xl md:text-4xl font-black border border-white/15"
+          style={{ background: `linear-gradient(135deg, ${hexA(state.display.accentColor, 0.45)}, ${hexA("#8b5cf6", 0.35)})` }}
+        >
+          {initial}
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="text-2xl md:text-4xl font-bold tracking-tight truncate max-w-[52vw]">{state.outletName}</div>
+        {state.outletAddress && (
+          <div className="mt-1 text-base md:text-xl text-neutral-400 truncate max-w-[52vw]">
+            <span aria-hidden>📍</span> {state.outletAddress}
+          </div>
+        )}
+        <div className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm md:text-base ${offline ? "bg-amber-400/10 text-amber-200" : "bg-emerald-400/10 text-emerald-200"}`}>
+          <span className={`h-2 w-2 rounded-full ${offline ? "bg-amber-300" : "bg-emerald-300 nb-dot"}`} />
+          {offline ? "Menyambungkan ulang…" : `Terhubung${state.unitName ? ` · ${state.unitName}` : ""}`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Cincin progres SVG (0–1). */
+function Ring({ progress, size, stroke, color, children }: { progress: number; size: number; stroke: number; color: string; children?: React.ReactNode }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(1, progress));
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={color}
+          strokeWidth={stroke}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - p)}
+          style={{ transition: "stroke-dashoffset 1s linear", filter: `drop-shadow(0 0 12px ${color})` }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">{children}</div>
+    </div>
+  );
+}
+
+/** Animasi dipasang sekali sebagai <style> biasa — tanpa mengubah globals.css bersama. */
+function GlobalTvStyles() {
+  return (
+    <style>{`
+      @keyframes nbOrbA { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(18vw, 12vh) scale(1.15); } 100% { transform: translate(0,0) scale(1); } }
+      @keyframes nbOrbB { 0% { transform: translate(0,0) scale(1.1); } 50% { transform: translate(-16vw, -10vh) scale(0.95); } 100% { transform: translate(0,0) scale(1.1); } }
+      @keyframes nbFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+      @keyframes nbDot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+      @keyframes nbLoading { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+      .nb-orb-a { animation: nbOrbA 38s ease-in-out infinite; will-change: transform; }
+      .nb-orb-b { animation: nbOrbB 46s ease-in-out infinite; will-change: transform; }
+      .nb-fade-in { animation: nbFadeIn .8s ease-out both; }
+      .nb-dot { animation: nbDot 2s ease-in-out infinite; }
+      .nb-loading { animation: nbLoading 1.4s ease-in-out infinite; }
+    `}</style>
   );
 }
 
@@ -486,28 +662,44 @@ function AlertScreen({
   driftStyle: React.CSSProperties;
 }) {
   const timeUp = kind === "timeUp";
+  const color = timeUp ? "#fb7185" : "#fbbf24";
+  const warnTotal = Math.max(1, (state.display.timeWarningMinutes ?? 5) * 60);
+  const progress = timeUp ? 0 : (liveView.remainingSeconds ?? 0) / warnTotal;
   return (
-    <div
-      className={`min-h-screen flex flex-col items-center justify-center p-10 text-center ${timeUp ? "bg-gradient-to-b from-rose-950 to-black" : "bg-gradient-to-b from-amber-950 to-black"}`}
-      style={driftStyle}
-    >
-      <div className={`text-3xl md:text-4xl font-semibold tracking-[0.3em] ${timeUp ? "text-rose-300" : "text-amber-300"}`}>{state.unitName ?? state.outletName}</div>
-      <div className={`mt-6 text-7xl md:text-9xl font-extrabold ${timeUp ? "text-rose-400" : "text-amber-400"}`}>{timeUp ? "WAKTU HABIS" : "⏰ SISA WAKTU"}</div>
-      {!timeUp && <div className="mt-4 text-8xl md:text-[10rem] font-extrabold tabular-nums leading-none">{formatDuration(liveView.remainingSeconds)}</div>}
-      <div className="mt-8 text-3xl md:text-4xl text-neutral-200 max-w-4xl">
+    <div className="min-h-screen flex flex-col items-center justify-center p-10 text-center nb-fade-in" style={driftStyle}>
+      <div className="text-2xl md:text-3xl font-semibold tracking-[0.35em] text-neutral-200">{(state.unitName ?? state.outletName).toUpperCase()}</div>
+      <div className="mt-8 flex items-center gap-14">
+        <Ring progress={progress} size={340} stroke={18} color={color}>
+          {timeUp ? (
+            <div className="text-5xl md:text-6xl font-black" style={{ color }}>
+              WAKTU
+              <br />
+              HABIS
+            </div>
+          ) : (
+            <>
+              <div className="text-lg tracking-[0.3em] text-amber-200/80">SISA WAKTU</div>
+              <div className="text-7xl md:text-8xl font-black tabular-nums leading-none mt-2">{formatDuration(liveView.remainingSeconds)}</div>
+            </>
+          )}
+        </Ring>
+        {unitQrDataUrl && (
+          <div className={`rounded-3xl p-6 ${GLASS}`}>
+            <img src={unitQrDataUrl} alt="QR unit" className="w-52 h-52 md:w-60 md:h-60 rounded-2xl bg-white p-2" />
+            <div className="mt-4 text-lg md:text-xl text-neutral-300 max-w-[15rem]">
+              {timeUp ? "Scan untuk lihat tagihan & panggil kasir" : "Scan untuk tambah waktu, pesan makanan, atau panggil kasir"}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mt-10 text-3xl md:text-4xl text-neutral-100 max-w-4xl font-medium">
         {timeUp ? "Terima kasih sudah bermain! Silakan selesaikan pembayaran di kasir." : "Mau lanjut main? Tambah waktu sekarang sebelum habis."}
       </div>
-      {unitQrDataUrl ? (
-        <div className="mt-10 flex flex-col items-center gap-3">
-          <img src={unitQrDataUrl} alt="QR unit" className="w-48 h-48 md:w-60 md:h-60 rounded-2xl bg-white p-2" />
-          <div className="text-xl md:text-2xl text-neutral-300">
-            {timeUp ? "Scan untuk lihat tagihan & panggil kasir" : "Scan untuk tambah waktu, pesan makanan, atau panggil kasir"}
-          </div>
-        </div>
-      ) : (
-        <div className="mt-10 text-2xl text-neutral-400">Hubungi kasir untuk {timeUp ? "pembayaran" : "tambah waktu"}.</div>
-      )}
-      <div className="mt-10 text-neutral-600 text-sm md:text-base tracking-[0.25em]">{state.outletName.toUpperCase()} · NEXBILL</div>
+      {!unitQrDataUrl && <div className="mt-4 text-2xl text-neutral-400">Hubungi kasir untuk {timeUp ? "pembayaran" : "tambah waktu"}.</div>}
+      <div className="mt-12 flex flex-col items-center gap-1 text-neutral-500">
+        <div className="text-lg md:text-xl tracking-[0.2em]">{state.outletName.toUpperCase()}</div>
+        {state.outletAddress && <div className="text-base">{state.outletAddress}</div>}
+      </div>
     </div>
   );
 }
@@ -520,63 +712,93 @@ function Screensaver({
   qrDataUrl,
   now,
   driftStyle,
+  offline,
 }: {
   state: TvState;
   liveView: TvUnitView;
   qrDataUrl: string | null;
   now: number;
   driftStyle: React.CSSProperties;
+  offline: boolean;
 }) {
   const d = state.display;
   const accent = d.accentColor;
   const clock = new Date(now);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-10 text-center" style={driftStyle}>
-      {d.showClock && (
-        <div className="mb-6">
-          <div className="text-6xl md:text-8xl font-bold tabular-nums tracking-tight">
-            {clock.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}
+    <div className="min-h-screen flex flex-col px-12 py-10 md:px-16 md:py-12" style={driftStyle}>
+      {/* Atas: identitas outlet (nama + alamat + status sambungan) · jam */}
+      <div className="flex items-start justify-between gap-8 nb-fade-in">
+        <OutletIdentity state={state} offline={offline} />
+        {d.showClock && (
+          <div className="text-right shrink-0">
+            <div className="text-6xl md:text-8xl font-extralight tabular-nums tracking-tight leading-none">
+              {clock.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}
+            </div>
+            <div className="text-neutral-400 text-lg md:text-2xl mt-2">
+              {clock.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jakarta" })}
+            </div>
           </div>
-          <div className="text-neutral-500 text-lg md:text-2xl mt-1">
-            {clock.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" })}
+        )}
+      </div>
+
+      {/* Tengah: pesan utama + status unit */}
+      <div className="flex-1 flex items-center justify-between gap-12 py-10">
+        <div className="max-w-[58%] nb-fade-in">
+          {d.headline && (
+            <h1
+              className="text-6xl md:text-8xl font-black tracking-tight leading-[0.95] bg-clip-text text-transparent"
+              style={{ backgroundImage: `linear-gradient(120deg, #ffffff 30%, ${accent} 100%)` }}
+            >
+              {d.headline}
+            </h1>
+          )}
+          {d.tagline && <div className="text-2xl md:text-4xl text-neutral-300 mt-6 tracking-wide font-light">{d.tagline}</div>}
+          {d.priceText && (
+            <div
+              className="inline-flex mt-8 text-2xl md:text-4xl font-bold px-7 py-3 rounded-2xl border"
+              style={{ borderColor: hexA(accent, 0.6), color: accent, background: hexA(accent, 0.08), boxShadow: `0 0 40px ${hexA(accent, 0.25)}` }}
+            >
+              {d.priceText}
+            </div>
+          )}
+          {!d.headline && !d.tagline && !d.priceText && <div className="text-5xl md:text-7xl font-black tracking-tight">Siap Main?</div>}
+        </div>
+
+        {d.showUnitStatus && state.unitName && (
+          <div className="shrink-0">
+            <UnitStatusBadge unitName={state.unitName} liveView={liveView} accent={accent} />
+          </div>
+        )}
+      </div>
+
+      {/* Bawah: QR booking · WiFi · teks bebas · merek */}
+      <div className="flex items-end justify-between gap-8">
+        <div className="flex items-end gap-6">
+          {d.showBookingQr && qrDataUrl && (
+            <div className={`flex items-center gap-5 rounded-3xl p-4 pr-7 ${GLASS}`}>
+              <img src={qrDataUrl} alt="QR booking" className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-white p-2" />
+              <div>
+                <div className="text-sm tracking-[0.3em] text-neutral-400">BOOKING ONLINE</div>
+                <div className="text-2xl md:text-3xl font-bold mt-1">Scan &amp; pesan unit</div>
+                <div className="text-neutral-400 text-base mt-1">Tanpa antre di kasir</div>
+              </div>
+            </div>
+          )}
+          <div className="space-y-2 pb-1">
+            {d.showWifi && d.wifiSsid && (
+              <div className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-lg md:text-xl ${GLASS}`}>
+                <span aria-hidden>📶</span> WiFi: <span className="font-semibold">{d.wifiSsid}</span>
+              </div>
+            )}
+            {d.footerText && <div className="text-neutral-300 text-lg md:text-2xl max-w-2xl">{d.footerText}</div>}
           </div>
         </div>
-      )}
-
-      {state.logoUrl && <img src={state.logoUrl} alt="" className="h-20 md:h-28 object-contain mb-4" />}
-
-      <h1 className="text-4xl md:text-6xl font-bold tracking-wide" style={{ color: accent }}>
-        {state.outletName}
-      </h1>
-
-      {d.headline && <div className="text-3xl md:text-5xl font-semibold mt-5">{d.headline}</div>}
-      {d.tagline && <div className="text-2xl md:text-4xl text-neutral-300 mt-3 tracking-wide">{d.tagline}</div>}
-      {d.priceText && (
-        <div className="text-2xl md:text-4xl font-semibold mt-4 px-6 py-2 rounded-xl border" style={{ borderColor: accent, color: accent }}>
-          {d.priceText}
+        <div className="text-right shrink-0 space-y-2">
+          <Wordmark small />
+          <div className="text-neutral-500 text-sm md:text-base">Tekan tombol apa saja di remote</div>
         </div>
-      )}
-
-      {d.showUnitStatus && state.unitName && (
-        <div className="mt-8">
-          <UnitStatusBadge unitName={state.unitName} liveView={liveView} accent={accent} />
-        </div>
-      )}
-
-      {d.showBookingQr && qrDataUrl && (
-        <div className="mt-8 flex flex-col items-center gap-2">
-          <div className="text-lg md:text-2xl text-neutral-300 tracking-wide">SCAN QR UNTUK BOOKING</div>
-          <img src={qrDataUrl} alt="QR booking" className="w-40 h-40 md:w-52 md:h-52 rounded-xl bg-white p-2" />
-        </div>
-      )}
-
-      {d.showWifi && d.wifiSsid && <div className="mt-6 text-neutral-400 text-lg md:text-xl">WiFi: {d.wifiSsid}</div>}
-
-      {d.footerText && <div className="mt-6 text-neutral-400 text-lg md:text-xl max-w-3xl">{d.footerText}</div>}
-
-      <div className="mt-10 text-neutral-600 text-sm md:text-base tracking-[0.25em]">POWERED BY NEXBILL</div>
-      <div className="mt-2 text-neutral-700 text-xs md:text-sm">Tekan tombol apa saja di remote</div>
+      </div>
     </div>
   );
 }
@@ -584,42 +806,45 @@ function Screensaver({
 function UnitStatusBadge({ unitName, liveView, accent }: { unitName: string; liveView: TvUnitView; accent: string }) {
   if (liveView.status === "maintenance") {
     return (
-      <div className="px-8 py-5 rounded-2xl border-2 border-amber-500/50 bg-amber-500/10">
-        <div className="text-2xl md:text-3xl font-bold text-amber-300">{unitName}</div>
-        <div className="text-xl md:text-2xl text-amber-200/80 mt-1">SEDANG PERBAIKAN</div>
+      <div className={`rounded-[2rem] px-10 py-8 text-center ${GLASS}`} style={{ borderColor: "rgba(251,191,36,0.45)" }}>
+        <div className="text-3xl md:text-4xl font-bold">{unitName}</div>
+        <div className="mt-3 text-2xl md:text-3xl font-bold tracking-[0.15em] text-amber-300">SEDANG PERBAIKAN</div>
       </div>
     );
   }
 
   if (liveView.status === "available" || liveView.status === "unknown") {
     return (
-      <div className="px-8 py-5 rounded-2xl border-2 bg-emerald-500/10" style={{ borderColor: accent }}>
-        <div className="text-3xl md:text-4xl font-bold">🎮 {unitName}</div>
-        <div className="text-2xl md:text-3xl font-bold text-emerald-400 mt-1 tracking-wide">TERSEDIA</div>
-        <div className="text-base md:text-lg text-neutral-400 mt-1">Hubungi kasir untuk mulai bermain</div>
+      <div className={`rounded-[2rem] px-12 py-9 text-center ${GLASS}`} style={{ borderColor: hexA(accent, 0.5), boxShadow: `0 0 70px ${hexA(accent, 0.18)}` }}>
+        <div className="text-sm tracking-[0.35em] text-neutral-400">UNIT</div>
+        <div className="text-4xl md:text-5xl font-black mt-1">{unitName}</div>
+        <div className="mt-5 inline-flex items-center gap-3 rounded-full bg-emerald-400/15 px-6 py-2.5">
+          <span className="h-3 w-3 rounded-full bg-emerald-300 nb-dot" />
+          <span className="text-2xl md:text-3xl font-bold tracking-[0.15em] text-emerald-300">TERSEDIA</span>
+        </div>
+        <div className="text-lg md:text-xl text-neutral-400 mt-4">Hubungi kasir untuk mulai bermain</div>
       </div>
     );
   }
 
   const paused = liveView.status === "paused";
+  const color = paused ? "#7dd3fc" : liveView.isOvertime ? "#fbbf24" : "#fb7185";
+  const total = liveView.remainingSeconds !== null ? (liveView.elapsedSeconds ?? 0) + liveView.remainingSeconds : null;
+  const progress = total ? (liveView.remainingSeconds ?? 0) / total : 1;
   return (
-    <div className={`px-8 py-5 rounded-2xl border-2 ${paused ? "border-sky-500/50 bg-sky-500/10" : "border-red-500/50 bg-red-500/10"}`}>
-      <div className="text-3xl md:text-4xl font-bold">
-        {paused ? "⏸" : "🔴"} {unitName}
-      </div>
-      <div className={`text-2xl md:text-3xl font-bold mt-1 tracking-wide ${paused ? "text-sky-300" : "text-red-300"}`}>
-        {paused ? "DIJEDA" : "SEDANG DIGUNAKAN"}
-      </div>
-      <div className="text-xl md:text-2xl mt-2 tabular-nums">
-        {liveView.remainingSeconds !== null ? (
-          liveView.isOvertime ? (
-            <span className="text-amber-300">Waktu habis — lewat {formatDuration(liveView.elapsedSeconds)}</span>
-          ) : (
-            <>Sisa waktu: <span className="font-bold">{formatDuration(liveView.remainingSeconds)}</span></>
-          )
-        ) : (
-          <>Berjalan: <span className="font-bold">{formatDuration(liveView.elapsedSeconds)}</span></>
-        )}
+    <div className={`rounded-[2rem] px-10 py-8 text-center flex flex-col items-center ${GLASS}`} style={{ borderColor: hexA(color, 0.4) }}>
+      <div className="text-sm tracking-[0.35em] text-neutral-400">UNIT</div>
+      <div className="text-3xl md:text-4xl font-black mt-1 mb-5">{unitName}</div>
+      <Ring progress={progress} size={230} stroke={14} color={color}>
+        <div className="text-base tracking-[0.25em]" style={{ color }}>
+          {paused ? "DIJEDA" : liveView.remainingSeconds !== null ? (liveView.isOvertime ? "LEWAT WAKTU" : "SISA") : "BERJALAN"}
+        </div>
+        <div className="text-5xl md:text-6xl font-black tabular-nums leading-none mt-1">
+          {liveView.remainingSeconds !== null && !liveView.isOvertime ? formatDuration(liveView.remainingSeconds) : formatDuration(liveView.elapsedSeconds)}
+        </div>
+      </Ring>
+      <div className="mt-5 text-xl md:text-2xl font-bold tracking-[0.15em]" style={{ color }}>
+        {paused ? "SESI DIJEDA" : "SEDANG DIGUNAKAN"}
       </div>
     </div>
   );
@@ -627,7 +852,7 @@ function UnitStatusBadge({ unitName, liveView, accent }: { unitName: string; liv
 
 /** ---------------- PIN ---------------- */
 
-function PinPrompt({ token, accent, onOk, onCancel }: { token: string; accent: string; onOk: () => void; onCancel: () => void }) {
+function PinPrompt({ token, accent, state, onOk, onCancel }: { token: string; accent: string; state: TvState; onOk: () => void; onCancel: () => void }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -680,41 +905,43 @@ function PinPrompt({ token, accent, onOk, onCancel }: { token: string; accent: s
   }, [busy, submit, onCancel]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-8 bg-black">
-      <div className="text-2xl md:text-3xl font-semibold">Masukkan PIN Staf</div>
-      <div className="flex gap-3">
-        {Array.from({ length: 6 }, (_, i) => (
-          <div
-            key={i}
-            className={`w-12 h-16 md:w-14 md:h-20 rounded-lg border-2 flex items-center justify-center text-3xl ${
-              pin.length === i ? "border-cyan-400" : "border-neutral-700"
-            }`}
-            style={pin.length === i ? { borderColor: accent } : undefined}
-          >
-            {pin[i] ? "•" : ""}
-          </div>
-        ))}
+    <div className="min-h-screen flex items-center justify-center p-10 nb-fade-in">
+      <div className={`rounded-[2rem] p-10 flex flex-col items-center gap-6 ${GLASS}`}>
+        <Wordmark small />
+        <div className="text-3xl md:text-4xl font-bold">PIN Staf</div>
+        <div className="text-neutral-400 text-lg -mt-3">{state.outletName}{state.unitName ? ` · ${state.unitName}` : ""}</div>
+        <div className="flex gap-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div
+              key={i}
+              className="w-14 h-20 md:w-16 md:h-24 rounded-2xl border flex items-center justify-center text-4xl bg-black/30 transition-all"
+              style={pin.length === i ? { borderColor: accent, boxShadow: `0 0 30px ${hexA(accent, 0.4)}` } : { borderColor: "rgba(255,255,255,0.12)" }}
+            >
+              {pin[i] ? "•" : ""}
+            </div>
+          ))}
+        </div>
+        <div className="h-7">{error && <div className="text-rose-300 text-xl">{error}</div>}</div>
+        <div className="grid grid-cols-3 gap-3">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "hapus", "0", "ok"].map((key) => (
+            <button
+              key={key}
+              disabled={busy}
+              onClick={() => {
+                if (key === "hapus") setPin((p) => p.slice(0, -1));
+                else if (key === "ok") void submit(pin);
+                else setPin((p) => (p.length >= 6 ? p : p + key));
+              }}
+              className="w-24 h-16 rounded-2xl bg-white/[0.05] border border-white/10 text-2xl font-semibold focus:outline-none focus:border-cyan-300 focus:bg-cyan-300/15 disabled:opacity-40"
+            >
+              {key === "hapus" ? "⌫" : key === "ok" ? "OK" : key}
+            </button>
+          ))}
+        </div>
+        <button onClick={onCancel} className="text-neutral-400 text-lg underline-offset-4 hover:underline focus:outline-none focus:text-white">
+          Kembali ke screensaver
+        </button>
       </div>
-      {error && <div className="text-red-400 text-xl">{error}</div>}
-      <div className="grid grid-cols-3 gap-3">
-        {["1", "2", "3", "4", "5", "6", "7", "8", "9", "hapus", "0", "ok"].map((key) => (
-          <button
-            key={key}
-            disabled={busy}
-            onClick={() => {
-              if (key === "hapus") setPin((p) => p.slice(0, -1));
-              else if (key === "ok") void submit(pin);
-              else setPin((p) => (p.length >= 6 ? p : p + key));
-            }}
-            className="w-20 h-14 rounded-lg bg-neutral-800 border border-neutral-700 text-xl font-semibold focus:bg-cyan-500/20 focus:border-cyan-400 focus:outline-none disabled:opacity-40"
-          >
-            {key === "hapus" ? "⌫" : key === "ok" ? "OK" : key}
-          </button>
-        ))}
-      </div>
-      <button onClick={onCancel} className="text-neutral-500 text-base underline">
-        Kembali ke screensaver
-      </button>
     </div>
   );
 }
@@ -726,35 +953,52 @@ function PinPrompt({ token, accent, onOk, onCancel }: { token: string; accent: s
  *
  * HANYA-BACA, dan isinya persis apa yang sudah dikirim /api/tv/state — tidak ada permintaan data
  * tambahan, tidak ada tombol yang mengubah apa pun. Membuka kunci layar di bilik BUKAN login: tidak
- * ada sesi yang dibuat dan tidak ada cookie yang dipasang. Tombol "mulai sesi" di sini akan
- * berarti perangkat yang berdiri tanpa pengawasan, di balik PIN 4 digit, bisa membuka transaksi
- * berbayar — dan itu jauh melampaui yang pantas dipercayakan kepadanya. Memulai sesi tetap di
- * kasir.
+ * ada sesi yang dibuat dan tidak ada cookie yang dipasang. Memulai sesi dari TV memakai panel kasir
+ * di aplikasi NEXBILL TV (tombol OK → PIN), bukan halaman ini.
  */
-function UnitPanel({ state, liveView, onBack }: { state: TvState; liveView: TvUnitView; onBack: () => void }) {
+function UnitPanel({ state, liveView, offline, onBack }: { state: TvState; liveView: TvUnitView; offline: boolean; onBack: () => void }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-10 bg-black text-center">
-      <div className="text-cyan-400 text-sm tracking-[0.3em]">NEXBILL TV</div>
-      <div className="text-3xl md:text-4xl font-bold">{state.unitName ?? state.screenName}</div>
-      {state.consoleType && <div className="text-neutral-400 text-xl uppercase tracking-wide">{state.consoleType.replace(/_/g, " ")}</div>}
-
-      <UnitStatusBadge unitName={state.unitName ?? state.screenName} liveView={liveView} accent={state.display.accentColor} />
-
-      {state.hourlyRate !== null && (
-        <div className="text-xl text-neutral-300">Tarif: Rp{state.hourlyRate.toLocaleString("id-ID")}/jam</div>
-      )}
-
-      <div className="text-neutral-500 text-base max-w-xl">
-        Layar ini hanya menampilkan informasi. Mulai, jeda, dan hentikan sesi tetap dilakukan dari kasir NEXBILL.
+    <div className="min-h-screen flex items-center justify-center p-10 nb-fade-in">
+      <div className={`rounded-[2rem] p-10 w-full max-w-5xl ${GLASS}`}>
+        <div className="flex items-start justify-between gap-6">
+          <OutletIdentity state={state} offline={offline} />
+          <Wordmark small />
+        </div>
+        <div className="mt-8 grid grid-cols-2 gap-8 items-center">
+          <div className="space-y-4">
+            <div>
+              <div className="text-sm tracking-[0.3em] text-neutral-400">LAYAR</div>
+              <div className="text-2xl font-semibold">{state.screenName}</div>
+            </div>
+            {state.consoleType && (
+              <div>
+                <div className="text-sm tracking-[0.3em] text-neutral-400">KONSOL</div>
+                <div className="text-2xl font-semibold uppercase">{state.consoleType.replace(/_/g, " ")}</div>
+              </div>
+            )}
+            {state.hourlyRate !== null && (
+              <div>
+                <div className="text-sm tracking-[0.3em] text-neutral-400">TARIF</div>
+                <div className="text-2xl font-semibold">Rp{state.hourlyRate.toLocaleString("id-ID")}/jam</div>
+              </div>
+            )}
+            <p className="text-neutral-400 text-base leading-relaxed">
+              Halaman ini hanya informasi. Mulai, jeda, dan hentikan sesi dari kasir NEXBILL — atau di aplikasi NEXBILL TV: tekan OK → PIN.
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <UnitStatusBadge unitName={state.unitName ?? state.screenName} liveView={liveView} accent={state.display.accentColor} />
+          </div>
+        </div>
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={onBack}
+            className="px-8 py-3 rounded-2xl bg-white/[0.06] border border-white/15 text-xl focus:outline-none focus:border-cyan-300 focus:bg-cyan-300/15"
+          >
+            Kembali ke Screensaver
+          </button>
+        </div>
       </div>
-
-      <button
-        onClick={onBack}
-        className="mt-2 px-6 py-3 rounded-lg bg-neutral-800 border border-neutral-700 text-lg focus:bg-cyan-500/20 focus:border-cyan-400 focus:outline-none"
-      >
-        Kembali ke Screensaver
-      </button>
-      <div className="text-neutral-700 text-sm">{state.outletName} &middot; {state.screenName}</div>
     </div>
   );
 }

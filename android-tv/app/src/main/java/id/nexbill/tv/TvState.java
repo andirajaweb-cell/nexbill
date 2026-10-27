@@ -25,12 +25,14 @@ final class TvState {
     /** Sesi aktif unit ini di server (untuk tambah waktu / stop dari TV); null bila tidak ada. */
     final String sessionId;
     final String outletName;
+    /** Alamat outlet ("" bila tidak ada) — tampil di layar & info supaya jelas TV terhubung ke outlet mana. */
+    final String outletAddress;
     /** Jam server saat balasan dibuat (epoch ms, 0 bila tidak ada). */
     final long serverTimeMs;
     final long receivedAt;
 
     private TvState(boolean enabled, String disabledReason, String status, Integer remainingSeconds, Integer elapsedSeconds, boolean timeUp,
-                    Integer warnMinutes, boolean requiresPin, String unitName, String sessionId, String outletName, long serverTimeMs, long receivedAt) {
+                    Integer warnMinutes, boolean requiresPin, String unitName, String sessionId, String outletName, String outletAddress, long serverTimeMs, long receivedAt) {
         this.enabled = enabled;
         this.disabledReason = disabledReason;
         this.status = status;
@@ -42,6 +44,7 @@ final class TvState {
         this.unitName = unitName;
         this.sessionId = sessionId;
         this.outletName = outletName;
+        this.outletAddress = outletAddress;
         this.serverTimeMs = serverTimeMs;
         this.receivedAt = receivedAt;
     }
@@ -62,9 +65,10 @@ final class TvState {
         String reason = o.isNull("disabledReason") ? null : o.optString("disabledReason", null);
         String sessionId = o.isNull("sessionId") ? null : o.optString("sessionId", null);
         String outletName = o.isNull("outletName") ? "" : o.optString("outletName", "");
+        String outletAddress = o.isNull("outletAddress") ? "" : o.optString("outletAddress", "");
         long serverTime = LocalStore.parseIso(o.optString("serverTime", ""));
         return new TvState(o.optBoolean("enabled", false), reason, status, remaining, elapsed, o.optBoolean("timeUp", false),
-                warn, requiresPin, unitName, sessionId, outletName, serverTime, receivedAt);
+                warn, requiresPin, unitName, sessionId, outletName, outletAddress, serverTime, receivedAt);
     }
 
     boolean inSession() {

@@ -5,7 +5,7 @@ import { computeEffectiveHourlyRate } from "@/lib/rental/pricing";
 import { DEFAULT_DEPS, processOfflineBatch, type SyncDeps } from "@/lib/offline/server-sync";
 import { isUuid, SYNC_BATCH_LIMIT, type SyncActionResult } from "@/lib/offline/protocol";
 import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
-import { getOrCreateTvSettings } from "./service";
+import { getOrCreateTvSettings, outletAddressLine } from "./service";
 import { deviceIdOf } from "./app-marker";
 import { deviceMatches, isDeviceId } from "./device-binding";
 import { checkTvAction, DEFAULT_TV_DURATIONS, packagesForConsole, parseTvEvent, TV_DEVICE_PREFIX, type TvCatalogPackage } from "./tv-session-rules";
@@ -32,6 +32,7 @@ async function pinConfigured(outletId: string) {
 
 export interface TvCatalog {
   outletName: string;
+  outletAddress: string | null;
   unit: { id: string; name: string; consoleType: string; ratePerHour: number } | null;
   packages: TvCatalogPackage[];
   durations: { minutes: number; label: string }[];
@@ -44,7 +45,7 @@ export interface TvCatalog {
 /** Daftar harga & paket untuk unit layar ini — disimpan di TV supaya bisa dipakai saat offline. */
 export async function getTvCatalog(token: string, deviceId?: string | null): Promise<TvCatalog> {
   const screen = await screenByToken(token, deviceId);
-  const [outlet] = await db.select({ name: outlets.name }).from(outlets).where(eq(outlets.id, screen.outletId)).limit(1);
+  const [outlet] = await db.select({ name: outlets.name, address: outlets.address, city: outlets.city }).from(outlets).where(eq(outlets.id, screen.outletId)).limit(1);
   const nowIso = new Date().toISOString();
   const [moduleOn, hasPin] = await Promise.all([isFeatureEnabled(screen.outletId, "TV_SCREENSAVER_ENABLED"), pinConfigured(screen.outletId)]);
   let unit: TvCatalog["unit"] = null;
@@ -69,7 +70,7 @@ export async function getTvCatalog(token: string, deviceId?: string | null): Pro
   else if (!screen.isActive) reason = "Layar ini dinonaktifkan di Pengaturan › TV Screensaver.";
   else if (!unit) reason = "Layar ini belum ditautkan ke unit PS.";
   else if (!hasPin) reason = "Atur PIN layar di Pengaturan › TV Screensaver dulu — sesi dari TV wajib lewat PIN kasir.";
-  return { outletName: outlet?.name ?? "Outlet", unit, packages, durations, canStartFromTv: reason === null, reason, serverTime: nowIso };
+  return { outletName: outlet?.name ?? "Outlet", outletAddress: outletAddressLine(outlet), unit, packages, durations, canStartFromTv: reason === null, reason, serverTime: nowIso };
 }
 
 /** Staf yang dicatat sebagai pembuat sesi dari TV: Owner outlet (atau Superuser/Manager aktif). */

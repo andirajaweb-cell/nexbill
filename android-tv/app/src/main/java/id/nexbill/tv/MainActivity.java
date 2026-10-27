@@ -74,6 +74,7 @@ public class MainActivity extends Activity {
     /** Screensaver bawaan aplikasi: tampil bila halaman /tv tidak bisa dimuat (internet putus). */
     private LinearLayout offlineView;
     private TextView offlineTitle;
+    private TextView offlineAddress;
     private TextView offlineUnit;
     private TextView offlineClock;
     private TextView offlineStatus;
@@ -257,13 +258,22 @@ public class MainActivity extends Activity {
         LinearLayout v = new LinearLayout(this);
         v.setOrientation(LinearLayout.VERTICAL);
         v.setGravity(Gravity.CENTER);
-        v.setBackgroundColor(0xFF050914);
+        // Latar premium: gradasi gelap biru → ungu (sama dengan halaman /tv).
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[] { 0xFF06222B, 0xFF04060C, 0xFF140C2A });
+        v.setBackground(bg);
+        TextView brand = label(14, 0xFF67E8F9, true);
+        brand.setText("NEXBILL TV");
+        brand.setLetterSpacing(0.35f);
+        v.addView(brand);
         offlineTitle = label(40, Color.WHITE, true);
+        offlineAddress = label(18, 0xFF94A3B8, false);
         offlineUnit = label(26, 0xFF67E8F9, true);
         offlineClock = label(72, Color.WHITE, true);
         offlineStatus = label(28, 0xFF34D399, true);
         offlineFooter = label(16, 0xFF94A3B8, false);
         v.addView(offlineTitle);
+        v.addView(offlineAddress);
         v.addView(offlineUnit);
         v.addView(offlineClock);
         v.addView(offlineStatus);
@@ -289,6 +299,9 @@ public class MainActivity extends Activity {
         JSONObject unit = cat != null ? cat.optJSONObject("unit") : null;
         String unitName = s != null && s.unitName != null && !s.unitName.isEmpty() ? s.unitName : unit != null ? unit.optString("name", "") : "";
         offlineTitle.setText(outlet);
+        String address = s != null && s.outletAddress != null && !s.outletAddress.isEmpty() ? s.outletAddress : cat != null ? cat.optString("outletAddress", "") : "";
+        offlineAddress.setText(address);
+        offlineAddress.setVisibility(address.isEmpty() ? View.GONE : View.VISIBLE);
         offlineUnit.setText(unitName);
         offlineClock.setText(DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date()));
         if (!paired) {
@@ -336,7 +349,7 @@ public class MainActivity extends Activity {
         web.setVisibility(View.INVISIBLE);
         TvState s = StateRepo.state();
         timer.setText(TvState.timerText(this, s, now, StateRepo.staffLeftMs(now)));
-        timer.setBackground(OverlayTimer.pill(s != null && s.isWarning(now) ? 0xE6B91C1C : 0xB3000000));
+        timer.setBackground(OverlayTimer.pill(s != null && s.isWarning(now) ? 0xE6B91C1C : 0xD90B1220));
         timer.setVisibility(View.VISIBLE);
         if (s != null && !s.enabled) {
             showHint(getString(R.string.disabled_hint) + (s.disabledReason == null ? "" : " " + s.disabledReason));
@@ -678,9 +691,11 @@ public class MainActivity extends Activity {
         String token = StateRepo.token(this);
         TvState s = StateRepo.state();
         String unit = s != null && s.unitName != null && !s.unitName.isEmpty() ? s.unitName : "-";
+        String outlet = s != null && s.outletName != null && !s.outletName.isEmpty() ? s.outletName : "-";
+        String address = s != null && s.outletAddress != null && !s.outletAddress.isEmpty() ? s.outletAddress : "-";
         String input = chosenInput();
         String msg = getString(R.string.info_version, Config.APP_VERSION) + "\n"
-                + (token.isEmpty() ? getString(R.string.info_unpaired) : getString(R.string.info_paired, unit)) + "\n"
+                + (token.isEmpty() ? getString(R.string.info_unpaired) : getString(R.string.info_paired, unit) + "\n" + getString(R.string.info_outlet, outlet, address)) + "\n"
                 + getString(R.string.info_input, input == null ? "-" : input) + "\n"
                 + getString(R.string.info_mode, getString(StateRepo.switchInputMode(this) ? R.string.mode_switch : R.string.mode_inapp)) + "\n"
                 + getString(R.string.info_overlay, getString(OverlayTimer.permitted(this) ? R.string.yes : R.string.no)) + "\n"
