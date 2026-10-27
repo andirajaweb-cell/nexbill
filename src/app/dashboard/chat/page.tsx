@@ -76,6 +76,60 @@ function AttachmentPreview({ url, type, name, t }: { url: string; type?: string 
   );
 }
 
+interface FaqTopic {
+  topic: string;
+  items: { key: string; question: string }[];
+}
+
+/** Pertanyaan populer (Jawaban Bot) — memilih satu membuat tiket yang langsung dijawab Tim Support NEXBILL. */
+function PopularQuestions({ onAsk, busy, t }: { onAsk: (q: string) => void; busy: boolean; t: (key: string, fallback: string) => string }) {
+  const [topics, setTopics] = useState<FaqTopic[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/api/support-chat/faq", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { topics: [] }))
+      .then((d: { topics?: FaqTopic[] }) => setTopics(d.topics ?? []))
+      .catch(() => setTopics([]));
+  }, []);
+  if (topics.length === 0) return null;
+  const current = topics.find((x) => x.topic === open);
+  return (
+    <div className="w-full space-y-3">
+      <div>
+        <div className="text-sm font-medium text-neutral-100">{t("chat.faqTitle", "Pertanyaan populer — dijawab langsung 24 jam")}</div>
+        <p className="text-xs text-neutral-500 mt-0.5">{t("chat.faqHint", "Pilih topik lalu pertanyaannya. Masih belum beres? Tekan \"Belum terselesaikan\" di jawabannya.")}</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {topics.map((x) => (
+          <button
+            key={x.topic}
+            type="button"
+            onClick={() => setOpen(open === x.topic ? null : x.topic)}
+            className={`rounded-full border px-2.5 py-1 text-xs transition ${open === x.topic ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-200" : "border-white/10 text-neutral-300 hover:bg-white/5"}`}
+          >
+            {x.topic} <span className="text-neutral-500">({x.items.length})</span>
+          </button>
+        ))}
+      </div>
+      {current && (
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          {current.items.map((q) => (
+            <button
+              key={q.key}
+              type="button"
+              disabled={busy}
+              onClick={() => onAsk(q.question)}
+              className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left text-xs text-neutral-200 transition hover:border-cyan-400/40 hover:bg-cyan-500/10 disabled:opacity-50"
+            >
+              {q.question}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SupportChatPage() {
   const { t, lang } = useDashboardLang();
   const CATEGORY_LABEL: Record<string, string> = {
@@ -182,6 +236,23 @@ export default function SupportChatPage() {
       await loadThreads();
     } finally {
       setRating(null);
+    }
+  };
+
+  const quickAsk = async (question: string) => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/support-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: question.slice(0, 120), category: "lainnya", message: question }),
+      });
+      const out = await res.json();
+      if (!res.ok) return;
+      await loadThreads();
+      setSelected(out.thread);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -411,7 +482,10 @@ export default function SupportChatPage() {
               </div>
             </>
           ) : (
-            <p className="text-sm text-neutral-500 m-auto">{t("chat.selectTicketPrompt", "Pilih tiket di sebelah kiri, atau buat tiket baru.")}</p>
+            <div className="m-auto w-full space-y-5 p-1">
+              <p className="text-sm text-neutral-500 text-center">{t("chat.selectTicketPrompt", "Pilih tiket di sebelah kiri, atau buat tiket baru.")}</p>
+              <PopularQuestions onAsk={quickAsk} busy={busy} t={t} />
+            </div>
           )}
         </Card>
       </div>

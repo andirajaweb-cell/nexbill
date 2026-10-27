@@ -7,6 +7,7 @@ import { PlanFeatureGate } from "@/components/dashboard/PlanFeatureGate";
 import { AnnouncementPopup } from "@/components/dashboard/AnnouncementPopup";
 import { GracePaymentReminderPopup } from "@/components/dashboard/GracePaymentReminderPopup";
 import { NewBookingPopup } from "@/components/dashboard/NewBookingPopup";
+import { TelegramCommunityFab } from "@/components/dashboard/TelegramCommunityFab";
 import { EmailVerificationBanner } from "@/components/dashboard/EmailVerificationBanner";
 import { DemoAccountBanner } from "@/components/dashboard/DemoAccountBanner";
 import { OfflineStatusBanner } from "@/components/offline/OfflineStatusBanner";
@@ -29,6 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <AnnouncementPopup />
           <GracePaymentReminderPopup />
           <NewBookingPopup />
+          <TelegramCommunityFab />
           <MobileNavProvider>
           <div className="flex min-h-screen min-h-[100dvh]">
             <Sidebar />

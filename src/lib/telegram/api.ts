@@ -41,16 +41,16 @@ export interface TgSentMessage {
   message_id: number;
 }
 
-export interface TgInlineButton {
-  text: string;
-  callback_data: string;
-}
+export type TgInlineButton = { text: string; callback_data: string } | { text: string; url: string };
+
+/** Tombol tetap di atas keyboard HP (reply keyboard) — teks tombol terkirim sebagai pesan biasa. */
+export type TgReplyKeyboard = string[][];
 
 /** Kirim teks (dipotong otomatis bila > 4096 karakter). Tombol (inline keyboard) dipasang di potongan terakhir. */
 export async function sendTelegramText(
   chatId: string | number,
   text: string,
-  opts: { replyTo?: number; buttons?: TgInlineButton[][] } = {}
+  opts: { replyTo?: number; buttons?: TgInlineButton[][]; keyboard?: TgReplyKeyboard } = {}
 ): Promise<number | null> {
   let last: number | null = null;
   const parts = splitTelegramText(text);
@@ -61,6 +61,9 @@ export async function sendTelegramText(
       disable_web_page_preview: true,
       ...(i === 0 && opts.replyTo ? { reply_parameters: { message_id: opts.replyTo, allow_sending_without_reply: true } } : {}),
       ...(i === parts.length - 1 && opts.buttons?.length ? { reply_markup: { inline_keyboard: opts.buttons } } : {}),
+      ...(i === parts.length - 1 && !opts.buttons?.length && opts.keyboard?.length
+        ? { reply_markup: { keyboard: opts.keyboard.map((row) => row.map((text) => ({ text }))), resize_keyboard: true, is_persistent: true } }
+        : {}),
     });
     last = msg.message_id;
   }
@@ -70,6 +73,17 @@ export async function sendTelegramText(
 /** Tutup "loading" tombol di aplikasi Telegram (wajib dijawab ≤ 10 detik), opsional dengan notifikasi singkat. */
 export async function answerCallbackQuery(id: string, text?: string) {
   await telegramCall("answerCallbackQuery", { callback_query_id: id, ...(text ? { text } : {}) }).catch(() => undefined);
+}
+
+/** Ganti isi pesan + tombolnya (navigasi menu tanpa membanjiri chat). Gagal (mis. isi sama) diabaikan. */
+export async function editTelegramText(chatId: string | number, messageId: number, text: string, buttons: TgInlineButton[][]) {
+  await telegramCall("editMessageText", {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: buttons },
+  }).catch(() => undefined);
 }
 
 /** Hapus tombol dari pesan yang sudah dinilai merchant (tidak bisa ditekan dua kali). */
@@ -117,9 +131,11 @@ export async function setWebhook(url: string, secret: string) {
   await telegramCall("setWebhook", { url, secret_token: secret, allowed_updates: ["message", "callback_query"], drop_pending_updates: false, max_connections: 20 });
   await telegramCall("setMyCommands", {
     commands: [
-      { command: "tim", description: "Bicara dengan staf Tim Support NEXBILL" },
-      { command: "status", description: "Cek status akun & perangkat outlet" },
-      { command: "bantuan", description: "Cara memakai bot ini" },
+      { command: "menu", description: "📚 Menu bantuan lengkap per topik" },
+      { command: "tim", description: "👤 Bicara dengan staf Tim Support NEXBILL" },
+      { command: "status", description: "📊 Cek status akun & perangkat outlet" },
+      { command: "grup", description: "👥 Gabung grup Telegram NEXBILL" },
+      { command: "bantuan", description: "❓ Cara memakai chat support ini" },
       { command: "putus", description: "Putuskan Telegram dari akun NEXBILL" },
     ],
   });

@@ -67,14 +67,22 @@ function deviceChunks(lang: string): KnowledgeChunk[] {
   return chunks;
 }
 
-let kbCache: { at: number; chunks: KnowledgeChunk[] } | null = null;
+let kbCache: { at: number; chunks: KnowledgeChunk[]; menu: MenuItem[] } | null = null;
+
+/** Satu tanya-jawab di menu bantuan (Telegram /menu & Customer Service "Pertanyaan populer"). */
+export interface MenuItem {
+  key: string;
+  topic: string;
+  question: string;
+  answer: string;
+}
 
 /**
  * Jawaban tim (tabel support_kb_answers) + Jawaban Bot bawaan (starter-answers.ts). Jawaban bawaan yang
  * sudah diimpor (tag "starter:<key>") memakai versi database — termasuk bila diubah atau dinonaktifkan.
  */
-async function savedAnswerChunks(): Promise<KnowledgeChunk[]> {
-  if (kbCache && Date.now() - kbCache.at < 5 * 60_000) return kbCache.chunks;
+async function loadSaved(): Promise<{ chunks: KnowledgeChunk[]; menu: MenuItem[] }> {
+  if (kbCache && Date.now() - kbCache.at < 5 * 60_000) return kbCache;
   let rows: { question: string; answer: string; tags: string | null; isActive: boolean }[] = [];
   try {
     rows = await db
@@ -85,13 +93,33 @@ async function savedAnswerChunks(): Promise<KnowledgeChunk[]> {
   } catch {
     rows = []; // tabel belum ada (migrasi 0037) — jawaban bawaan tetap dipakai
   }
-  const overridden = new Set(rows.map((r) => starterKeyOf(r.tags)).filter((k): k is string => !!k));
+  const byKey = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) {
+    const k = starterKeyOf(r.tags);
+    if (k && !byKey.has(k)) byKey.set(k, r);
+  }
   const chunks: KnowledgeChunk[] = [
     ...rows.filter((r) => r.isActive).map((r) => ({ source: "Jawaban tim NEXBILL", title: r.question, text: `${r.answer}${topicOfTags(r.tags) ? `\n(${topicOfTags(r.tags)})` : ""}` })),
-    ...STARTER_ANSWERS.filter((a) => !overridden.has(a.key)).map((a) => ({ source: "Jawaban tim NEXBILL", title: a.question, text: `${a.answer}\n(${a.topic})` })),
+    ...STARTER_ANSWERS.filter((a) => !byKey.has(a.key)).map((a) => ({ source: "Jawaban tim NEXBILL", title: a.question, text: `${a.answer}\n(${a.topic})` })),
   ];
-  kbCache = { at: Date.now(), chunks };
-  return chunks;
+  // Menu mengikuti urutan & topik jawaban bawaan; versi database dipakai bila sudah diimpor, dilewati bila dinonaktifkan.
+  const menu: MenuItem[] = [];
+  for (const a of STARTER_ANSWERS) {
+    const r = byKey.get(a.key);
+    if (r && !r.isActive) continue;
+    menu.push({ key: a.key, topic: a.topic, question: r?.question ?? a.question, answer: r?.answer ?? a.answer });
+  }
+  kbCache = { at: Date.now(), chunks, menu };
+  return kbCache;
+}
+
+async function savedAnswerChunks(): Promise<KnowledgeChunk[]> {
+  return (await loadSaved()).chunks;
+}
+
+/** Daftar menu bantuan (topik → pertanyaan) yang aktif. */
+export async function helpMenu(): Promise<MenuItem[]> {
+  return (await loadSaved()).menu;
 }
 
 export function clearSavedAnswerCache() {
@@ -114,6 +142,11 @@ export async function searchKnowledge(query: string, lang: string): Promise<stri
  */
 export async function tier1Answer(query: string, lang: string): Promise<Tier1Match | null> {
   if (lang !== "id") return null;
-  const m = tier1Match(query, await savedAnswerChunks());
+  const chunks = await savedAnswerChunks();
+  // Pertanyaan yang sama persis dengan judul Jawaban Bot (mis. dipilih dari menu) → pasti cocok.
+  const norm = (x: string) => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const exact = chunks.find((c) => norm(c.title) === norm(query));
+  if (exact) return { chunk: exact, score: 99, coverage: 1, confident: true };
+  const m = tier1Match(query, chunks);
   return m?.confident ? m : null;
 }

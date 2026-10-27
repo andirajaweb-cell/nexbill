@@ -9,9 +9,22 @@
  * Setiap jawaban tingkat 1–2 diberi tombol ✅ Sudah terbantu · ❌ Belum terselesaikan · 👤 Bicara dengan tim.
  * Balasan merchant ke pesan tim masuk langsung ke tiketnya.
  */
-import { answerCallbackQuery, removeButtons, sendTelegramText, sendTyping, type TgCallbackQuery, type TgInlineButton, type TgMessage, type TgUpdate } from "./api";
+import {
+  answerCallbackQuery,
+  editTelegramText,
+  removeButtons,
+  sendTelegramText,
+  sendTyping,
+  type TgCallbackQuery,
+  type TgInlineButton,
+  type TgMessage,
+  type TgReplyKeyboard,
+  type TgUpdate,
+} from "./api";
+import { STARTER_TOPICS } from "@/lib/support-bot/starter-answers";
+import { TELEGRAM_GROUP_URL } from "@/lib/support/community";
 import { aiAvailable, escalateWithNotify, runSupportBrain, type BrainInput, type BrainResult } from "@/lib/support-bot/brain";
-import { tier1Answer } from "@/lib/support-bot/knowledge";
+import { helpMenu, tier1Answer } from "@/lib/support-bot/knowledge";
 import {
   composeTier1Reply,
   detectIntent,
@@ -24,7 +37,7 @@ import {
   parseFeedbackData,
   type Feedback,
 } from "@/lib/support-bot/tiers";
-import { botText } from "./bot-text";
+import { BOT_LANGS, BOT_TEXT, botText, type BotTextKey } from "./bot-text";
 import {
   accountStatus,
   appendToTicket,
@@ -70,15 +83,143 @@ async function reply(
   lang: string,
   text: string,
   outletId: string | null,
-  extra: { resolution?: Resolution; priority?: SupportPriority | null; threadId?: string | null; buttons?: true | Feedback[] } = {}
+  extra: { resolution?: Resolution; priority?: SupportPriority | null; threadId?: string | null; buttons?: true | Feedback[]; keyboard?: TgReplyKeyboard } = {}
 ) {
   const logId = await logMessage({ chatId, outletId, role: "bot", body: text, resolution: extra.resolution ?? null, priority: extra.priority ?? null, supportThreadId: extra.threadId ?? null }).catch(() => null);
   const buttons = extra.buttons && logId ? feedbackButtons(lang, logId, extra.buttons === true ? undefined : extra.buttons) : undefined;
-  await sendTelegramText(chatId, text, { buttons });
+  await sendTelegramText(chatId, text, { buttons, keyboard: extra.keyboard });
+}
+
+/* -------------------------------------------------------------- menu bantuan -------------------------------------------------------------- */
+
+const TOPIC_ICON: Record<string, string> = {
+  "Akun & login": "🔐",
+  "Langganan & paket": "💳",
+  "Setup outlet baru": "🏁",
+  "Rental PS (sesi)": "🎮",
+  Booking: "📅",
+  "Kasir & pembayaran": "🧾",
+  "Shift & kas": "💰",
+  "Member, promo & voucher": "🎟️",
+  "Stok & inventori": "📦",
+  "Laporan & pembukuan": "📈",
+  "NEXBILL TV — instalasi": "📺",
+  "NEXBILL TV — pemakaian": "🕹️",
+  "NEXBILL TV — masalah": "🛠️",
+  "Kontrol perangkat (Agent & smart plug)": "🔌",
+  "Internet putus / Mode Offline": "📶",
+  "Printer & struk": "🖨️",
+  "Bantuan & Telegram": "💬",
+};
+const topicLabel = (topic: string) => `${TOPIC_ICON[topic] ?? "•"} ${topic}`;
+const short = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+/** Tombol tetap di atas keyboard HP. */
+function replyKeyboard(lang: string): TgReplyKeyboard {
+  return [
+    [botText(lang, "kbMenu"), botText(lang, "btnStatus")],
+    [botText(lang, "btnTeam"), botText(lang, "kbGroup")],
+  ];
+}
+
+/** Teks dari tombol keyboard tetap (bahasa apa pun) → aksi. */
+function keyboardAction(text: string): "menu" | "status" | "team" | "group" | null {
+  const is = (key: BotTextKey) => BOT_LANGS.some((l) => (BOT_TEXT[key] as Record<string, string>)[l] === text);
+  if (is("kbMenu")) return "menu";
+  if (is("btnStatus")) return "status";
+  if (is("btnTeam")) return "team";
+  if (is("kbGroup") || is("btnGroup")) return "group";
+  return null;
+}
+
+async function menuHome(lang: string): Promise<TgInlineButton[][]> {
+  const items = await helpMenu();
+  const topics = STARTER_TOPICS.map((topic, i) => ({ topic, i })).filter(({ topic }) => items.some((x) => x.topic === topic));
+  const rows: TgInlineButton[][] = [];
+  for (let k = 0; k < topics.length; k += 2) {
+    rows.push(topics.slice(k, k + 2).map(({ topic, i }) => ({ text: topicLabel(topic), callback_data: `mn:t:${i}` })));
+  }
+  rows.push([
+    { text: botText(lang, "btnStatus"), callback_data: "mn:st" },
+    { text: botText(lang, "btnTeam"), callback_data: "mn:tim" },
+  ]);
+  rows.push([{ text: botText(lang, "btnGroup"), url: TELEGRAM_GROUP_URL }]);
+  return rows;
+}
+
+async function sendMenu(chatId: string, lang: string) {
+  await sendTelegramText(chatId, botText(lang, "menuIntro"), { buttons: await menuHome(lang) });
+}
+
+async function sendGroupInvite(chatId: string, lang: string) {
+  await sendTelegramText(chatId, botText(lang, "groupInvite"), { buttons: [[{ text: botText(lang, "btnGroup"), url: TELEGRAM_GROUP_URL }]] });
+}
+
+/** Navigasi menu (mn:home, mn:t:<topik>, mn:q:<key>, mn:st, mn:tim). Pesan menu diedit di tempat; jawaban dikirim sebagai pesan baru. */
+async function handleMenu(cq: TgCallbackQuery, data: string) {
+  const chat = cq.message?.chat;
+  if (!chat || chat.type !== "private" || !cq.message) {
+    await answerCallbackQuery(cq.id);
+    return;
+  }
+  const chatId = String(chat.id);
+  const link = await getLinkByChat(chatId);
+  if (!link) {
+    await answerCallbackQuery(cq.id);
+    await sendTelegramText(chatId, botText("id", "notLinked", { url: `${DASHBOARD_URL}/dashboard/chat` }));
+    return;
+  }
+  const lang = await outletLang(link.outletId);
+  await answerCallbackQuery(cq.id);
+  const [, kind, arg] = data.split(":");
+
+  if (kind === "home") {
+    await editTelegramText(chatId, cq.message.message_id, botText(lang, "menuIntro"), await menuHome(lang));
+    return;
+  }
+  if (kind === "t") {
+    const topic = STARTER_TOPICS[Number(arg)];
+    const items = topic ? (await helpMenu()).filter((x) => x.topic === topic) : [];
+    if (!topic || items.length === 0) return;
+    const rows: TgInlineButton[][] = items.map((x) => [{ text: short(x.question), callback_data: `mn:q:${x.key}` }]);
+    rows.push([{ text: botText(lang, "btnBack"), callback_data: "mn:home" }]);
+    await editTelegramText(chatId, cq.message.message_id, botText(lang, "menuTopic", { topic: topicLabel(topic) }), rows);
+    return;
+  }
+  if (kind === "st") {
+    const st = await accountStatus(link.outletId);
+    await sendTelegramText(chatId, botText(lang, "status", { line: statusLine(st) }));
+    return;
+  }
+  // Pilihan yang memicu tindakan dicatat sekali saja (Telegram bisa mengirim ulang callback yang sama).
+  const fresh = await logUserMessage({
+    chatId,
+    outletId: link.outletId,
+    body: kind === "q" ? `📖 ${(await helpMenu()).find((x) => x.key === arg)?.question ?? arg}` : botText(lang, "btnTeam"),
+    updateId: `cb:${cq.id}`,
+  });
+  if (!fresh) return;
+  await touchLink(chatId);
+  if (kind === "tim") {
+    await escalateToTeam(link, lang, "", { tried: "Merchant memilih \"Bicara dengan tim\" dari menu bantuan." });
+    return;
+  }
+  if (kind === "q") {
+    const item = (await helpMenu()).find((x) => x.key === arg);
+    if (!item) return;
+    const body = composeTier1Reply(
+      { chunk: { source: "Jawaban tim NEXBILL", title: item.question, text: item.answer }, score: 99, coverage: 1, confident: true },
+      { name: link.staffName, seed: `${chatId}:${cq.id}` }
+    );
+    await reply(chatId, lang, body, link.outletId, { resolution: "faq", buttons: true });
+  }
 }
 
 export async function handleTelegramUpdate(update: TgUpdate) {
-  if (update.callback_query) return handleFeedback(update.callback_query);
+  if (update.callback_query) {
+    const data = update.callback_query.data ?? "";
+    return data.startsWith("mn:") ? handleMenu(update.callback_query, data) : handleFeedback(update.callback_query);
+  }
   const msg = update.message;
   if (!msg || msg.from?.is_bot) return;
   const chatId = String(msg.chat.id);
@@ -99,7 +240,8 @@ export async function handleTelegramUpdate(update: TgUpdate) {
       await sendTelegramText(chatId, botText(lang, "linkInvalid", { url: `${DASHBOARD_URL}/dashboard/chat` }));
       return;
     }
-    await sendTelegramText(chatId, botText(lang, "linked", { outlet: await outletName(link.outletId), name: link.staffName ?? "" }));
+    await sendTelegramText(chatId, botText(lang, "linked", { outlet: await outletName(link.outletId), name: link.staffName ?? "" }), { keyboard: replyKeyboard(lang) });
+    await sendMenu(chatId, lang);
     return;
   }
 
@@ -115,11 +257,21 @@ export async function handleTelegramUpdate(update: TgUpdate) {
     await sendTelegramText(chatId, botText(lang, "unlinked"));
     return;
   }
+  const action = text && !cmd ? keyboardAction(text) : null;
   if (cmd?.command === "bantuan" || cmd?.command === "help" || cmd?.command === "start") {
-    await sendTelegramText(chatId, botText(lang, "help", { outlet: await outletName(link.outletId) }));
+    await sendTelegramText(chatId, botText(lang, "help", { outlet: await outletName(link.outletId) }), { keyboard: replyKeyboard(lang) });
+    await sendMenu(chatId, lang);
     return;
   }
-  if (cmd?.command === "status") {
+  if (cmd?.command === "menu" || action === "menu") {
+    await sendMenu(chatId, lang);
+    return;
+  }
+  if (cmd?.command === "grup" || cmd?.command === "group" || action === "group") {
+    await sendGroupInvite(chatId, lang);
+    return;
+  }
+  if (cmd?.command === "status" || action === "status") {
     const s = await accountStatus(link.outletId);
     await sendTelegramText(chatId, botText(lang, "status", { line: statusLine(s) }));
     return;
@@ -152,8 +304,8 @@ export async function handleTelegramUpdate(update: TgUpdate) {
     return;
   }
 
-  if (cmd?.command === "tim") {
-    await escalateToTeam(link, lang, cmd.arg, { tried: "Merchant memilih /tim." });
+  if (cmd?.command === "tim" || action === "team") {
+    await escalateToTeam(link, lang, cmd?.arg ?? "", { tried: "Merchant memilih /tim." });
     return;
   }
 
@@ -171,7 +323,8 @@ export async function handleTelegramUpdate(update: TgUpdate) {
       await reply(chatId, lang, botText(lang, "isBot", { name }), link.outletId, { buttons: ["team"] });
       return;
     case "greeting":
-      await reply(chatId, lang, botText(lang, "greeting", { name, outlet }), link.outletId);
+      await reply(chatId, lang, botText(lang, "greeting", { name, outlet }), link.outletId, { keyboard: replyKeyboard(lang) });
+      await sendMenu(chatId, lang);
       return;
     case "thanks":
       await reply(chatId, lang, botText(lang, "thanks", { name }), link.outletId);
@@ -189,6 +342,7 @@ export async function handleTelegramUpdate(update: TgUpdate) {
       // Pesan pendek tanpa topik di awal percakapan → tanya balik dengan ramah (bukan tiket).
       if (!earlierUser) {
         await reply(chatId, lang, botText(lang, "clarify", { name }), link.outletId);
+        await sendMenu(chatId, lang);
         return;
       }
       break; // lanjutan percakapan ("yang di kasir") → AI membaca konteksnya

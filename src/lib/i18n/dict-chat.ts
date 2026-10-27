@@ -165,6 +165,22 @@ registerDict({
     fil: "NEXBILL Support Team",
     vi: "Đội hỗ trợ NEXBILL",
   },
+  "chat.faqTitle": {
+    id: "Pertanyaan populer — dijawab langsung 24 jam",
+    en: "Popular questions — answered instantly, 24/7",
+    ms: "Soalan popular — dijawab serta-merta 24 jam",
+    th: "คำถามยอดนิยม — ตอบทันที 24 ชม.",
+    fil: "Mga sikat na tanong — agad sinasagot, 24/7",
+    vi: "Câu hỏi phổ biến — trả lời ngay 24/7",
+  },
+  "chat.faqHint": {
+    id: "Pilih topik lalu pertanyaannya. Masih belum beres? Tekan \"Belum terselesaikan\" di jawabannya.",
+    en: "Pick a topic, then a question. Still not sorted? Tap \"Not solved yet\" on the answer.",
+    ms: "Pilih topik, kemudian soalannya. Masih belum selesai? Tekan \"Belum selesai\" pada jawapannya.",
+    th: "เลือกหัวข้อ แล้วเลือกคำถาม ยังไม่หาย? กด \"ยังไม่หาย\" ที่คำตอบ",
+    fil: "Pumili ng paksa, saka ng tanong. Hindi pa rin ayos? Pindutin ang \"Hindi pa ayos\" sa sagot.",
+    vi: "Chọn chủ đề rồi chọn câu hỏi. Vẫn chưa xong? Bấm \"Chưa giải quyết\" ở câu trả lời.",
+  },
   "chat.rateHint": {
     id: "Apakah jawaban ini menyelesaikan kendalanya?",
     en: "Did this answer solve the issue?",
