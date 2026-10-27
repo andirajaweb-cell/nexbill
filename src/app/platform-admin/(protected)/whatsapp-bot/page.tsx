@@ -291,19 +291,34 @@ function QrTroubleshooting({ open }: { open: boolean }) {
           <li>
             <b>Status &quot;Offline&quot; / tombol tidak ada</b> — proses bot mati. Di server (SSH):
             <Code>pm2 status{"\n"}pm2 restart whatsapp-bot{"\n"}pm2 logs whatsapp-bot --lines 80</Code>
-            Di log, cari &quot;QR baru siap&quot; (berhasil) atau &quot;Koneksi WhatsApp terputus&quot; beserta kodenya (lihat langkah 6).
+            Di log, cari &quot;QR baru siap&quot; (QR sudah dibuat) atau &quot;Koneksi WhatsApp terputus&quot; beserta kodenya (lihat langkah 6).
           </li>
           <li>
-            <b>Pastikan kode bot terbaru</b> (perbaikan QR ada di versi terbaru), di folder aplikasi di server:
-            <Code>git pull{"\n"}npm install{"\n"}pm2 restart whatsapp-bot</Code>
+            <b>Log &quot;QR baru siap&quot; tapi QR tidak tampil di sini</b> = bot gagal menyimpan QR ke database. Cek log error:
+            <Code>pm2 logs whatsapp-bot --err --lines 30</Code>
+            <span className="block mt-1">
+              <code className="text-neutral-200">EAI_AGAIN</code> / <code className="text-neutral-200">ENOTFOUND</code> = DNS server VPS gagal mencari alamat database
+              Supabase. Perbaiki DNS:
+            </span>
+            <Code>
+              getent hosts aws-0-ap-northeast-2.pooler.supabase.com{"\n"}sudo sed -i &apos;s/^#\?DNS=.*/DNS=1.1.1.1 8.8.8.8/&apos; /etc/systemd/resolved.conf{"\n"}sudo systemctl restart systemd-resolved{"\n"}pm2 restart all
+            </Code>
+            <span className="block mt-1">
+              <code className="text-neutral-200">statement timeout</code> = database sibuk/terkunci sesaat — bot mencoba ulang otomatis; bila terus-menerus, restart bot dan cek
+              status Supabase.
+            </span>
+          </li>
+          <li>
+            <b>Pastikan kode bot terbaru</b> (perbaikan QR ada di versi terbaru). Aplikasi di server ada di <code className="text-neutral-200">/opt/nexbill</code>:
+            <Code>cd /opt/nexbill{"\n"}git pull{"\n"}npm install{"\n"}pm2 restart whatsapp-bot</Code>
           </li>
           <li>
             <b>Mulai dari nol</b> (bila log terus &quot;Gagal mendapat QR&quot;). Nomor yang tertaut ikut logout — hanya lakukan bila belum tertaut atau mau ganti nomor:
-            <Code>pm2 stop whatsapp-bot{"\n"}rm -rf data/wa-auth{"\n"}pm2 start whatsapp-bot</Code>
+            <Code>pm2 stop whatsapp-bot{"\n"}rm -rf /opt/nexbill/data/wa-auth{"\n"}pm2 start whatsapp-bot</Code>
           </li>
           <li>
             <b>Arti kode di catatan/log:</b> 408 = QR kedaluwarsa (normal, QR baru dibuat) · 515 = perlu restart (normal setelah scan) · 401 = logout dari HP (langkah 5) ·
-            405/403 = ditolak WhatsApp, biasanya versi Baileys basi → <Code>npm i @whiskeysockets/baileys@latest{"\n"}pm2 restart whatsapp-bot</Code>
+            405/403 = ditolak WhatsApp, biasanya versi Baileys basi → <Code>cd /opt/nexbill{"\n"}npm i @whiskeysockets/baileys@latest{"\n"}pm2 restart whatsapp-bot</Code>
             440 = nomor dipakai bot lain (matikan bot ganda: <code className="text-neutral-200">pm2 status</code> hanya boleh ada satu whatsapp-bot) · 503 = gangguan WhatsApp, tunggu.
           </li>
           <li>

@@ -67,12 +67,27 @@ const DAILY_LIMIT = parseDailyLimit(process.env.WA_BOT_DAILY_LIMIT);
 const OUTBOX_POLL_MS = 10_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Status ke DB tidak boleh mematikan bot kalau database sedang bermasalah sesaat. */
+/** Pesan error singkat (tanpa stack + kode sumber yang membanjiri log pm2). */
+function shortErr(err: unknown): string {
+  const e = err as { message?: string; cause?: { message?: string; code?: string } } | null;
+  const cause = e?.cause?.message ? ` — ${e.cause.message}${e.cause.code ? ` (${e.cause.code})` : ""}` : "";
+  return `${(e?.message ?? String(err)).split("\n")[0].slice(0, 160)}${cause}`;
+}
+
+/**
+ * Status ke DB tidak boleh mematikan bot kalau database sedang bermasalah sesaat. Dicoba ulang 3x
+ * (DNS server sering EAI_AGAIN / statement timeout sesaat) — tanpa ini QR yang sudah jadi tidak pernah
+ * sampai ke halaman Platform Admin.
+ */
 async function status(patch: Parameters<typeof writeBotStatus>[0]) {
-  try {
-    await writeBotStatus(patch);
-  } catch (err) {
-    console.error("Gagal menulis status bot ke database:", err);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await writeBotStatus(patch);
+      return;
+    } catch (err) {
+      console.error(`Gagal menulis status bot ke database (percobaan ${attempt}/3): ${shortErr(err)}`);
+      if (attempt < 3) await sleep(1500 * attempt);
+    }
   }
 }
 
@@ -258,7 +273,8 @@ async function start() {
     if (qr) {
       hadQr = true;
       failuresWithoutQr = 0;
-      lastQr = await qrcode.toDataURL(qr);
+      // QR kecil & ringan (≈2–3 KB) supaya cepat tersimpan walau koneksi database lambat.
+      lastQr = await qrcode.toDataURL(qr, { errorCorrectionLevel: "L", margin: 1, width: 280 });
       lastConnected = false;
       await status({ connected: false, qrDataUrl: lastQr, number: null, lastError: "Langkah 3/3: QR siap — scan sekarang (berganti otomatis tiap ±20 dtk)." });
       console.log("QR baru siap — scan dari WhatsApp di HP (Perangkat Tertaut), atau buka Platform Admin › WhatsApp Bot.");
