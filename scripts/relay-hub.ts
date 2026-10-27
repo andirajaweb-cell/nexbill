@@ -78,6 +78,10 @@ interface ConnectedAgent {
   lastLocalConfigAt: number;
   /** Laporan TV terakhir yang belum ditulis (ditulis paling sering sekali per 2 detik, yang terbaru menang). */
   pendingTvReport: { raw: unknown; timer: ReturnType<typeof setTimeout> | null } | null;
+  /** Nama agent (untuk log yang bisa dibaca). */
+  name: string;
+  /** Sudah diproses sebagai terputus (close + error + sweep tidak boleh memproses dua kali). */
+  closed: boolean;
 }
 
 /** Agent v1.4 meminta local_config tiap 30 detik; batas bawah ini melindungi database dari agent yang rusak. */
@@ -123,12 +127,42 @@ async function markStatus(relayAgentId: string, status: "online" | "offline") {
   }
 }
 
-async function handleDisconnect(agent: ConnectedAgent) {
-  if (connectedByToken.get(agent.token) === agent) {
-    connectedByToken.delete(agent.token);
+/**
+ * Satu koneksi agent selesai. Idempoten (close, error, dan sweep bisa memanggil berkali-kali).
+ * PENTING: bila agent yang sama sudah tersambung lagi lewat koneksi BARU (agent menyambung ulang
+ * sebelum koneksi lamanya benar-benar tertutup — sering terjadi lewat Cloudflare Tunnel), status di
+ * database TIDAK diubah jadi offline. Dulu baris ini selalu menulis "offline" sehingga agent yang
+ * sebenarnya terhubung tampil offline di dashboard dan perintah TV ditolak.
+ */
+async function handleDisconnect(agent: ConnectedAgent, reason = "terputus") {
+  if (agent.closed) return;
+  agent.closed = true;
+  if (connectedByToken.get(agent.token) === agent) connectedByToken.delete(agent.token);
+  const stillConnected = [...connectedByToken.values()].some((a) => a.relayAgentId === agent.relayAgentId && !a.closed);
+  if (stillConnected) {
+    console.log(`[relay-hub] Agent "${agent.name}" (outlet ${agent.outletId}): koneksi lama ditutup, koneksi baru tetap aktif (${reason}).`);
+    return;
   }
   await markStatus(agent.relayAgentId, "offline");
-  console.log(`[relay-hub] Agent "${agent.relayAgentId}" (outlet ${agent.outletId}) terputus.`);
+  console.log(`[relay-hub] Agent "${agent.name}" (outlet ${agent.outletId}) ${reason}.`);
+}
+
+/** Cari agent berdasarkan token — dicoba ulang singkat bila DNS/database tersendat (EAI_AGAIN). */
+async function findAgentByToken(token: string) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const [row] = await db
+        .select({ id: relayAgents.id, outletId: relayAgents.outletId, name: relayAgents.name })
+        .from(relayAgents)
+        .where(eq(relayAgents.token, token))
+        .limit(1);
+      return { row: row ?? null, failed: false };
+    } catch (err) {
+      console.warn(`[relay-hub] Gagal membaca token agent (percobaan ${attempt}/3): ${describeError(err)}`);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 1000));
+    }
+  }
+  return { row: null, failed: true };
 }
 
 /**
@@ -240,6 +274,11 @@ async function sendLocalConfig(agent: ConnectedAgent) {
   }
 }
 
+// Jaring pengaman: satu error async yang lolos tidak boleh mematikan hub (semua outlet ikut terputus).
+process.on("unhandledRejection", (err) => {
+  console.error(`[relay-hub] Unhandled rejection (hub tetap jalan): ${describeError(err)}`);
+});
+
 // ---- WebSocket server: agents connect here ----
 // Bound to RELAY_WS_BIND_HOST (127.0.0.1 by default) — a Cloudflare Tunnel
 // or reverse proxy running on this same machine connects in over loopback;
@@ -254,7 +293,13 @@ console.log(
 wss.on("connection", (ws) => {
   let agent: ConnectedAgent | null = null;
 
-  ws.on("message", async (raw) => {
+  ws.on("message", (raw) => {
+    // Error di sini dulu tidak tertangkap (unhandled rejection) → proses hub mati & pm2 restart,
+    // memutus SEMUA agent di semua outlet. Sekarang hanya dicatat.
+    handleMessage(raw).catch((err) => console.error(`[relay-hub] Gagal memproses pesan agent: ${describeError(err)}`));
+  });
+
+  const handleMessage = async (raw: WebSocket.RawData) => {
     let msg: RelayAgentToHubMessage;
     try {
       msg = JSON.parse(raw.toString());
@@ -268,11 +313,13 @@ wss.on("connection", (ws) => {
       // GAGAL kalau hub ini di-restart sebelum migrasi itu jalan. Akibatnya bukan sekadar versi
       // tidak tercatat: SEMUA agent di semua outlet ditolak masuk, dan tidak ada TV yang bisa
       // dikontrol. Autentikasi hanya butuh tiga kolom lama ini.
-      const [row] = await db
-        .select({ id: relayAgents.id, outletId: relayAgents.outletId, name: relayAgents.name })
-        .from(relayAgents)
-        .where(eq(relayAgents.token, msg.token))
-        .limit(1);
+      const found = await findAgentByToken(msg.token);
+      if (found.failed) {
+        // Database tidak terjangkau sesaat — tutup dengan kode "coba lagi"; agent menyambung ulang sendiri.
+        ws.close(1013, "Database sementara tidak terjangkau");
+        return;
+      }
+      const row = found.row;
       if (!row) {
         send(ws, { type: "auth_error", message: "Token relay agent tidak dikenali. Cek ulang di halaman Devices." });
         ws.close();
@@ -290,8 +337,16 @@ wss.on("connection", (ws) => {
         capabilities: handshake.capabilities,
         lastLocalConfigAt: 0,
         pendingTvReport: null,
+        name: row.name,
+        closed: false,
       };
+      // Agent yang sama menyambung ulang sementara koneksi lamanya masih terbuka → koneksi lama diganti.
+      const previous = connectedByToken.get(msg.token);
       connectedByToken.set(msg.token, agent);
+      if (previous && previous.ws !== ws) {
+        previous.closed = true;
+        previous.ws.terminate();
+      }
       // Dibatasi 2 detik: auth_ok dulu dikirim seketika setelah token cocok. Kolom tambahannya
       // tidak boleh membuat agent menunggu lama — database yang tersendat (pernah terjadi: DNS
       // pooler Supabase gagal sesaat, lihat markStatus) cukup membuat auth_ok terkirim tanpa itu.
@@ -353,13 +408,13 @@ wss.on("connection", (ws) => {
       }
       return;
     }
-  });
+  };
 
   ws.on("close", () => {
-    if (agent) handleDisconnect(agent);
+    if (agent) void handleDisconnect(agent);
   });
-  ws.on("error", () => {
-    if (agent) handleDisconnect(agent);
+  ws.on("error", (err) => {
+    if (agent) void handleDisconnect(agent, `error koneksi: ${err.message}`);
   });
 });
 
@@ -370,7 +425,7 @@ setInterval(() => {
   for (const agent of connectedByToken.values()) {
     if (now - agent.lastPingAt > RELAY_HEARTBEAT_TIMEOUT_MS) {
       agent.ws.terminate();
-      handleDisconnect(agent);
+      void handleDisconnect(agent, "terputus (tidak ada ping)");
     }
   }
 }, RELAY_HEARTBEAT_TIMEOUT_MS);
