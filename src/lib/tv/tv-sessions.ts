@@ -8,6 +8,8 @@ import { isFeatureEnabled } from "@/lib/home-rental/feature-flags";
 import { getOrCreateTvSettings, outletAddressLine } from "./service";
 import { deviceIdOf } from "./app-marker";
 import { deviceMatches, isDeviceId } from "./device-binding";
+import { hasAnyStaffPin, validTvStaffIds } from "./staff-pins";
+import { runsByStaff } from "./staff-pin-rules";
 import { checkTvAction, DEFAULT_TV_DURATIONS, packagesForConsole, parseTvEvent, TV_DEVICE_PREFIX, type TvCatalogPackage } from "./tv-session-rules";
 
 /**
@@ -27,7 +29,7 @@ async function screenByToken(token: string, deviceId?: string | null) {
 
 async function pinConfigured(outletId: string) {
   const s = await getOrCreateTvSettings(outletId);
-  return s.unlockMode === "pin" && !!s.unlockPinHash;
+  return (s.unlockMode === "pin" && !!s.unlockPinHash) || (await hasAnyStaffPin(outletId));
 }
 
 export interface TvCatalog {
@@ -86,6 +88,12 @@ async function tvActor(outletId: string): Promise<string> {
 
 const PROTOCOL_KEYS = ["id", "kind", "at", "clockOffsetMs", "sessionId", "rentalUnitId", "plannedMinutes", "promoId", "minutes", "customerName", "gameName"];
 
+/** staffId dari TV (PIN per staf) — dipakai untuk atribusi, tidak ikut ke payload protokol. */
+function staffIdOf(r: unknown): string {
+  const v = (r as { staffId?: unknown })?.staffId;
+  return typeof v === "string" && v.length <= 64 ? v : "";
+}
+
 function cleanAction(r: Record<string, unknown>) {
   const clean: Record<string, unknown> = { recordedBy: null };
   for (const k of PROTOCOL_KEYS) if (r[k] !== undefined) clean[k] = r[k];
@@ -120,7 +128,7 @@ export async function syncTvActions(token: string, body: { actions?: unknown; cl
     });
     if (!check.ok) rejected.push({ id, status: "failed", error: check.error });
     // Hanya kolom protokol Mode Offline yang diteruskan (tidak ada token/jejak lain yang ikut tersimpan).
-    else accepted.push(cleanAction(r));
+    else accepted.push({ ...cleanAction(r), staffId: staffIdOf(r) });
   }
 
   const actor = await tvActor(screen.outletId);
@@ -183,9 +191,18 @@ export async function syncTvActions(token: string, body: { actions?: unknown; cl
   }
   const offset = typeof body.clockOffsetMs === "number" && Number.isFinite(body.clockOffsetMs) ? body.clockOffsetMs : null;
   const deps: SyncDeps = DEFAULT_DEPS;
-  const result = accepted.length
-    ? await processOfflineBatch({ outletId: screen.outletId, staffUserId: actor, currentClockOffsetMs: offset, deviceLabel }, accepted, deps)
-    : { serverTime: new Date().toISOString(), results: [], clockFlagged: false };
+  // PIN per staf: aksi diputar ulang per rangkaian staf (urutan tetap), atas nama staf yang mengetik
+  // PIN di TV. staffId yang tidak sah di outlet ini / tanpa PIN TV → jatuh ke Owner seperti sebelumnya.
+  const okStaff = await validTvStaffIds(screen.outletId, accepted.map((a) => staffIdOf(a)));
+  let result: Awaited<ReturnType<typeof processOfflineBatch>> = { serverTime: new Date().toISOString(), results: [], clockFlagged: false };
+  for (const run of runsByStaff(accepted, (a) => (okStaff.has(staffIdOf(a)) ? staffIdOf(a) : actor))) {
+    const r = await processOfflineBatch(
+      { outletId: screen.outletId, staffUserId: run.staffId, currentClockOffsetMs: offset, deviceLabel },
+      run.items.map((a) => cleanAction(a as Record<string, unknown>)),
+      deps
+    );
+    result = { ...r, results: [...result.results, ...r.results], clockFlagged: result.clockFlagged || r.clockFlagged };
+  }
   await db.update(tvScreens).set({ lastSeenAt: new Date().toISOString() }).where(eq(tvScreens.id, screen.id));
   return { ...result, results: [...rejected, ...result.results], events: eventResults };
 }

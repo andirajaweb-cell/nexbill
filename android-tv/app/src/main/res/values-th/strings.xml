@@ -4,6 +4,7 @@
     <string name="notif_text">ซิงค์ตัวจับเวลาห้องกับแคชเชียร์</string>
     <string name="timer_staff">โหมดพนักงาน</string>
     <string name="timer_paused">หยุดชั่วคราว</string>
+    <string name="timer_offline">ออฟไลน์</string>
     <string name="waiting_signal">กำลังรอสัญญาณ HDMI… ตรวจสอบว่าเครื่องเกมเปิดอยู่</string>
     <string name="no_hdmi_hint">ไม่พบอินพุต HDMI กด OK → ตั้งค่าทีวี → เลือกอินพุต HDMI</string>
     <string name="no_hdmi">ไม่พบอินพุต HDMI บนทีวีนี้</string>

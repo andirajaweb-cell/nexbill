@@ -4,6 +4,7 @@
     <string name="notif_text">Đồng bộ đồng hồ phòng với thu ngân</string>
     <string name="timer_staff">CHẾ ĐỘ NHÂN VIÊN</string>
     <string name="timer_paused">TẠM DỪNG</string>
+    <string name="timer_offline">mất mạng</string>
     <string name="waiting_signal">Đang chờ tín hiệu HDMI… hãy bật máy chơi game.</string>
     <string name="no_hdmi_hint">Không tìm thấy cổng HDMI. Bấm OK → Cài đặt TV → Chọn cổng HDMI.</string>
     <string name="no_hdmi">Không tìm thấy cổng HDMI trên TV này.</string>

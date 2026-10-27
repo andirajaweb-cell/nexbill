@@ -4,6 +4,7 @@
     <string name="notif_text">Keeping the booth timer in sync with the cashier</string>
     <string name="timer_staff">STAFF MODE</string>
     <string name="timer_paused">PAUSED</string>
+    <string name="timer_offline">offline</string>
     <string name="waiting_signal">Waiting for HDMI signal… make sure the console is on.</string>
     <string name="no_hdmi_hint">No HDMI input found. Press OK → TV settings → Choose HDMI input.</string>
     <string name="no_hdmi">No HDMI input found on this TV.</string>

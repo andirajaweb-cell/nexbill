@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pokeTvUnits } from "@/lib/tv/push";
 import { db } from "@/db/client";
 import { rentalUnits } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -62,6 +63,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { id: _ignoreId, outletId: _ignoreOutlet, createdAt: _ignoreCreated, ...rest } = body;
     const [row] = await db.update(rentalUnits).set(rest).where(eq(rentalUnits.id, id)).returning();
+    // Status maintenance / nama / konsol berubah → TV unit ini langsung menampilkan yang baru.
+    await pokeTvUnits([id]);
     return NextResponse.json(row);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 500) });

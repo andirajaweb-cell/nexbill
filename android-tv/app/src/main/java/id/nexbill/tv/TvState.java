@@ -107,8 +107,17 @@ final class TvState {
         return warnMinutes != null && r != null && r > 0 && r <= warnMinutes * 60 && "occupied".equals(status);
     }
 
-    /** Teks timer kecil di pojok layar game. */
+    /**
+     * Teks timer kecil di pojok layar game. Saat TV tidak terhubung ke dashboard, ditambah penanda
+     * "offline" — waktu tetap dihitung di TV, tapi perintah dari dashboard belum bisa diterima.
+     */
     static String timerText(Context ctx, TvState s, long now, long staffLeftMs) {
+        String base = timerTextBase(ctx, s, now, staffLeftMs);
+        if (base.isEmpty() || StateRepo.stateFresh(now)) return base;
+        return base + "  · " + ctx.getString(R.string.timer_offline);
+    }
+
+    private static String timerTextBase(Context ctx, TvState s, long now, long staffLeftMs) {
         LocalStore.Session l = StateRepo.localAuthority(ctx, now);
         if (l != null && l.active(LocalStore.serverNow(ctx))) {
             long sn = LocalStore.serverNow(ctx);

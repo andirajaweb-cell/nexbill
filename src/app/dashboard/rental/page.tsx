@@ -25,6 +25,7 @@ import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { QuickRateEditor } from "./quick-rate-editor";
 import { SaveLeftoverCredit, TimeCreditStartOption } from "./time-credit-ui";
 import { TvWatchCard } from "./tv-watch-card";
+import { TvConnectionChip, useTvConnection } from "./tv-connection";
 import "@/lib/i18n/dict-setup";
 import { describeError } from "@/lib/api/error";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
@@ -348,6 +349,8 @@ function OnlineRentalPage() {
     if (new URLSearchParams(window.location.search).get("atur") === "tarif" && canEditRates) setShowRateEditor(true);
   }, [canEditRates]);
   const [sessions, setSessions] = useState<RentalSession[]>([]);
+  /** Status sambungan NEXBILL TV per unit (chip di kartu unit + peringatan saat mulai sesi). */
+  const tvConn = useTvConnection();
   const [products, setProducts] = useState<Product[]>([]);
   const [bills, setBills] = useState<Record<string, BillBreakdown>>({});
   const [customerName, setCustomerName] = useState("");
@@ -662,6 +665,16 @@ function OnlineRentalPage() {
     if (unit && !(unit.hourlyRate > 0) && !selectedPromoId) {
       const go = await showConfirm(
         t("setup.rates.zeroStartConfirm", "Tarif {unit} masih Rp0, jadi sesi ini akan tertagih Rp0. Tetap mulai? (Atur tarif lewat tombol \"Atur Tarif Semua Unit\".)").replace("{unit}", unit.name)
+      );
+      if (!go) return;
+    }
+    // Mitigasi: TV unit ini tidak terhubung → layar game tidak akan terbuka otomatis.
+    const conn = tvConn.get(unitId);
+    if (unit && conn && conn.state === "offline") {
+      const go = await showConfirm(
+        t("tvConn.startOfflineConfirm", "TV unit {unit} sedang OFFLINE (terakhir terhubung {n} menit lalu). Sesi tetap tercatat dan tertagih, tapi layar game TIDAK akan terbuka otomatis. Pakai panel kasir di TV (OK → PIN) atau periksa WiFi/daya TV. Tetap mulai?")
+          .replace("{unit}", unit.name)
+          .replace("{n}", String(conn.minutes ?? 0))
       );
       if (!go) return;
     }
@@ -1541,6 +1554,7 @@ function OnlineRentalPage() {
                         {consoleLabel(unit.consoleType)}
                       </span>
                       <span className="text-[10px] text-neutral-500 uppercase">{unit.tvType.replace("_", " ")}</span>
+                      <TvConnectionChip conn={tvConn.get(unit.id)} />
                     </div>
                   </div>
                   <Badge status={unit.status}>{(UNIT_STATUS_KEY[unit.status] ? t(UNIT_STATUS_KEY[unit.status], unit.status) : unit.status)}</Badge>

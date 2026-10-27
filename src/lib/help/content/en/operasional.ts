@@ -505,6 +505,17 @@ export const OPERASIONAL: HelpCategory[] = [
           "Updating the app: hold OK for 3 seconds → \"Check for app update\"; if there is a new version, open Downloader and type nexbill.id/tvapk again — the pairing stays saved.",
         ],
       },
+      {
+        title: "5. When the internet / WiFi is down",
+        steps: [
+          "Someone is playing: the TV keeps counting the remaining time and locks the screen exactly when it runs out. Extend or end the session from the cashier panel on the TV (OK → PIN) — the dashboard can't send commands to the TV while offline.",
+          "No one is playing: the screen stays locked (NEXBILL screensaver). New customers are started from the cashier panel on the TV using a PIN that was used before while online.",
+          "The dashboard is offline too (cashier WiFi down): PS Rental switches to Offline Mode. For units with NEXBILL TV, start/extend/end sessions from that TV, not the dashboard, so the game screen really opens and nothing is recorded twice.",
+          "Only the TV is offline (dashboard online): the unit card in PS Rental shows \"TV offline\" and the dashboard warns you when starting a session. Check the TV's WiFi/power or start from the TV panel.",
+          "Internet back: TV and dashboard data sync automatically. TV sessions that were rejected (e.g. the unit was already in another session) show in red on the NEXBILL TV Monitoring card — bill them manually, then mark them as handled.",
+          "Power cut: the TV starts NEXBILL TV by itself; running sessions are restored and the TV clock can't be turned back to play for free.",
+        ],
+      },
     ],
     notes: [
       "One TV belongs to one outlet only: a TV still registered at another outlet is rejected when pairing. To move a TV to another outlet, the old outlet's Owner must first delete that TV's screen in Settings → TV Screensaver (links inactive for more than 30 days are released automatically).",

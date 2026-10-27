@@ -18,7 +18,7 @@ import java.util.Set;
 final class SyncEngine {
     /** Katalog disegarkan paling sering tiap 10 menit (atau segera bila belum ada). */
     private static final long CATALOG_EVERY_MS = 10 * 60_000L;
-    private static final String[] PROTOCOL_KEYS = { "id", "kind", "at", "clockOffsetMs", "sessionId", "rentalUnitId", "plannedMinutes", "promoId", "minutes" };
+    private static final String[] PROTOCOL_KEYS = { "id", "kind", "at", "clockOffsetMs", "sessionId", "rentalUnitId", "plannedMinutes", "promoId", "minutes", "staffId" };
 
     private SyncEngine() {}
 

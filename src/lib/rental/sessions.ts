@@ -1,5 +1,6 @@
 import { db } from "@/db/client";
 import { rentalSessions, rentalUnits, devices, promos, promoBundleItems, products, outlets, bookings, orders } from "@/db/schema";
+import { pokeTvUnits } from "@/lib/tv/push";
 import { eq, and, inArray, lte, gt, ne } from "drizzle-orm";
 import { turnDeviceOn, turnDeviceOff, getDeviceState } from "@/lib/devices";
 import { describeError } from "@/lib/api/error";
@@ -348,6 +349,7 @@ export async function startRentalSession(input: StartSessionInput) {
     // the QR/"Tandai Diterima" flow once the customer actually pays.
   }
 
+  await pokeTvUnits([input.rentalUnitId]);
   return { session, rate, unit, bill, prepayment, deviceWarning };
 }
 
@@ -362,6 +364,8 @@ export async function pauseRentalSession(sessionId: string, at?: string) {
     .set({ status: "paused", pausedAt: at ?? new Date().toISOString() })
     .where(eq(rentalSessions.id, sessionId))
     .returning();
+  // NEXBILL TV unit ini langsung ikut (lib/tv/push.ts) — tanpa menunggu polling 5 detik.
+  await pokeTvUnits([session.rentalUnitId]);
   return updated;
 }
 
@@ -382,6 +386,8 @@ export async function resumeRentalSession(sessionId: string, at?: string) {
     })
     .where(eq(rentalSessions.id, sessionId))
     .returning();
+  // NEXBILL TV unit ini langsung ikut (lib/tv/push.ts) — tanpa menunggu polling 5 detik.
+  await pokeTvUnits([session.rentalUnitId]);
   return updated;
 }
 
@@ -396,6 +402,8 @@ export async function extendRentalSession(sessionId: string, additionalMinutes: 
     .set({ extendedMinutes: session.extendedMinutes + additionalMinutes, tvWarningSentAt: null, pushWarningSentAt: null })
     .where(eq(rentalSessions.id, sessionId))
     .returning();
+  // NEXBILL TV unit ini langsung ikut (lib/tv/push.ts) — tanpa menunggu polling 5 detik.
+  await pokeTvUnits([session.rentalUnitId]);
   return updated;
 }
 
@@ -557,6 +565,7 @@ export async function stopRentalSession(sessionId: string, opts: { endedAt?: str
   const [settledOrder] = await db.select().from(orders).where(eq(orders.id, bill.id)).limit(1);
   order = settledOrder ?? order;
 
+  await pokeTvUnits([session.rentalUnitId]);
   return { session: updatedSession, order, elapsedMinutesRaw, billingNote, deviceWarning };
 }
 
@@ -623,6 +632,7 @@ export async function transferRentalSession(sessionId: string, newRentalUnitId: 
     deviceWarnings.push(`Unit ${newUnit.name} belum terhubung ke smart plug/TV — sesi tetap dipindah, tapi device tidak otomatis menyala. Atur di halaman Kontrol Perangkat.`);
   }
 
+  await pokeTvUnits([oldUnit?.id, newRentalUnitId]);
   return { session: updated, oldUnit, newUnit, rate, deviceWarning: deviceWarnings.length ? deviceWarnings.join(" ") : null };
 }
 

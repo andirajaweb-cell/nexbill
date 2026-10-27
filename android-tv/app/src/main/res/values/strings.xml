@@ -5,6 +5,7 @@
     <string name="notif_text">Menyelaraskan timer bilik dengan kasir</string>
     <string name="timer_staff">MODE STAF</string>
     <string name="timer_paused">DIJEDA</string>
+    <string name="timer_offline">offline</string>
     <string name="waiting_signal">Menunggu sinyal HDMI… pastikan konsol menyala.</string>
     <string name="no_hdmi_hint">Input HDMI tidak ditemukan. Tekan OK → Pengaturan TV → Pilih input HDMI.</string>
     <string name="no_hdmi">Input HDMI tidak ditemukan di TV ini.</string>

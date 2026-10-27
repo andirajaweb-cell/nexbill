@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth/client";
 import { useCurrency } from "@/lib/currency/client";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-offline";
+import "@/lib/i18n/dict-tv-connection";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
 import { useOfflineData, useSyncing } from "@/lib/offline/hooks";
 import { deriveLocalState, estimateSession, type LocalUnit, type FinishedLocal } from "@/lib/offline/engine";
@@ -139,6 +140,12 @@ export function OfflineRentalBoard({ outletId, online }: { outletId: string | nu
           ) : (
             <li>{t("offline.info.tv", "TV/konsol tidak bisa dinyalakan atau dimatikan otomatis selama offline — lakukan manual. Saat online kembali, status TV diselaraskan otomatis.")}</li>
           )}
+          <li className="text-cyan-200/90">
+            {t(
+              "tvConn.offlineBoardNote",
+              "NEXBILL TV saat internet putus: TV tetap menghitung waktu sesi yang sedang berjalan dan mengunci layar saat habis, tapi TIDAK menerima perintah dari halaman ini. Untuk mulai, tambah waktu, atau mengakhiri sesi, pakai panel kasir di TV (tekan OK → PIN). Semua data TV dan halaman ini tersinkron otomatis begitu internet kembali."
+            )}
+          </li>
           <li>{t("offline.info.estimate", "Tagihan di layar adalah perkiraan dengan tarif yang sama; total final dihitung server saat sinkron. Member & aksesori dihitung setelah online.")}</li>
           <li>{t("offline.info.snapshot", "Data terakhir dari server: {time}").replace("{time}", snapshotAge)}</li>
         </ul>

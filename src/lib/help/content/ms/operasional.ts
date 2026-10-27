@@ -505,6 +505,17 @@ export const OPERASIONAL: HelpCategory[] = [
           "Kemas kini aplikasi: tahan OK 3 saat → \"Semak kemas kini apl\"; jika ada versi baharu, buka Downloader dan taip nexbill.id/tvapk sekali lagi — pairing kekal tersimpan.",
         ],
       },
+      {
+        title: "5. Ketika internet / WiFi terputus",
+        steps: [
+          "Ada yang sedang bermain: TV tetap mengira baki masa dan mengunci skrin tepat apabila tamat. Lanjut atau tamatkan sesi melalui panel juruwang di TV (OK → PIN) — dashboard tidak boleh menghantar arahan ke TV semasa luar talian.",
+          "Tiada yang bermain: skrin kekal dikunci (screensaver NEXBILL). Pelanggan baharu dimulakan dari panel juruwang di TV dengan PIN yang pernah digunakan semasa dalam talian.",
+          "Dashboard juga luar talian (WiFi juruwang terputus): Sewa PS bertukar ke Mod Luar Talian. Untuk unit ber-NEXBILL TV, mula/lanjut/tamat sesi dari TV itu, bukan dari dashboard, supaya skrin permainan benar-benar dibuka dan tidak direkod dua kali.",
+          "Hanya TV luar talian (dashboard dalam talian): kad unit di Sewa PS memaparkan \"TV luar talian\" dan dashboard memberi amaran semasa memulakan sesi. Semak WiFi/kuasa TV atau mula dari panel di TV.",
+          "Internet kembali: data TV dan dashboard disegerakkan secara automatik. Sesi dari TV yang ditolak (cth. unit sudah dalam sesi lain) dipaparkan merah di kad Pemantauan NEXBILL TV — caj secara manual lalu tandakan sudah diuruskan.",
+          "Bekalan elektrik terputus: TV membuka NEXBILL TV sendiri; sesi yang berjalan dipulihkan dan jam TV tidak boleh diundurkan untuk bermain percuma.",
+        ],
+      },
     ],
     notes: [
       "Satu TV hanya untuk satu outlet: TV yang masih berdaftar di outlet lain ditolak semasa pairing. Untuk memindahkan TV ke outlet lain, Pemilik outlet lama mesti memadam skrin TV itu di Tetapan → TV Screensaver terlebih dahulu (pautan yang tidak aktif lebih 30 hari dilepaskan secara automatik).",

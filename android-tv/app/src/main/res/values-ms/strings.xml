@@ -4,6 +4,7 @@
     <string name="notif_text">Menyelaraskan pemasa bilik dengan juruwang</string>
     <string name="timer_staff">MOD STAF</string>
     <string name="timer_paused">DIJEDA</string>
+    <string name="timer_offline">luar talian</string>
     <string name="waiting_signal">Menunggu isyarat HDMI… pastikan konsol hidup.</string>
     <string name="no_hdmi_hint">Input HDMI tidak ditemui. Tekan OK → Tetapan TV → Pilih input HDMI.</string>
     <string name="no_hdmi">Input HDMI tidak ditemui pada TV ini.</string>

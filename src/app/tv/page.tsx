@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { computeUnitView, formatDuration, type TvUnitView } from "@/lib/tv/view";
 import { normalizePairingCode } from "@/lib/tv/pairing";
+import { tvTopicBrowser, TV_PUSH_EVENT } from "@/lib/tv/push-topic";
+import { consoleLabel } from "@/lib/tv/console-line";
 
 /**
  * NEXBILL TV — layar kiosk untuk TV Android di bilik rental.
@@ -47,6 +49,8 @@ interface TvState {
     idleMinutes: number;
     headline: string | null;
     tagline: string | null;
+    /** Baris konsol dari unit aktif outlet (server baru) — dipakai bila tagline kosong. */
+    consoleLine?: string | null;
     priceText: string | null;
     footerText: string | null;
     showClock: boolean;
@@ -299,6 +303,10 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
   const [offline, setOffline] = useState(false);
   const [mode, setMode] = useState<Mode>("screensaver");
   const [now, setNow] = useState(() => Date.now());
+  /** Naik setiap ada "colekan" dari server (Supabase Realtime) → status diambil SEKARANG. */
+  const [pokeTick, setPokeTick] = useState(0);
+  /** Waktu status server terakhir diterima — dipakai penanda "terhubung" & mitigasi offline. */
+  const [lastOkAt, setLastOkAt] = useState<number | null>(null);
   const lastActivityRef = useRef(Date.now());
 
   /**
@@ -323,6 +331,7 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
         }
         setState(data);
         setOffline(false);
+        setLastOkAt(Date.now());
       } catch {
         if (!cancelled) setOffline(true);
       }
@@ -333,7 +342,45 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
       cancelled = true;
       clearInterval(id);
     };
-  }, [token, onUnpair]);
+  }, [token, onUnpair, pokeTick]);
+
+  /**
+   * Kontrol instan (lib/tv/push.ts): dashboard "mencolek" kanal layar ini lewat Supabase Realtime
+   * setiap sesi/unit berubah. Colekan → ambil status sekarang + beri tahu aplikasi Android supaya
+   * HDMI dibuka/dikunci tanpa menunggu polling 5 detik. Gagal tersambung = tetap polling 5 detik.
+   */
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    if (!url || !key) return;
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void (async () => {
+      const topic = await tvTopicBrowser(token);
+      if (!topic || cancelled) return;
+      const { createClient } = await import("@supabase/supabase-js");
+      if (cancelled) return;
+      const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+      const channel = client
+        .channel(topic)
+        .on("broadcast", { event: TV_PUSH_EVENT }, () => {
+          setPokeTick((n) => n + 1);
+          try {
+            (window as unknown as { NexbillTvApp?: { poke?: () => void } }).NexbillTvApp?.poke?.();
+          } catch {
+            /* aplikasi versi lama tanpa poke — PollService tetap 5 detik */
+          }
+        })
+        .subscribe();
+      stop = () => {
+        void client.removeChannel(channel);
+      };
+    })();
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [token]);
 
   /** QR diambil SEKALI (dan hanya saat memang ditampilkan) — isinya tidak berubah selama slug outlet tetap. */
   useEffect(() => {
@@ -500,7 +547,7 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
         {mode === "screensaver" && alertKind && (
           <AlertScreen kind={alertKind} state={state} liveView={liveView} unitQrDataUrl={unitQrDataUrl} driftStyle={driftStyle} />
         )}
-        {mode === "screensaver" && !alertKind && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} offline={offline} />}
+        {mode === "screensaver" && !alertKind && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} offline={offline} lastOkAt={lastOkAt} />}
         {mode === "pin" && <PinPrompt token={token} accent={accent} state={state} onOk={() => setMode("panel")} onCancel={() => setMode("screensaver")} />}
         {mode === "panel" && <UnitPanel state={state} liveView={liveView} offline={offline} onBack={() => setMode("screensaver")} />}
       </div>
@@ -527,6 +574,11 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
 }
 
 /** ---------------- BAHAN TAMPILAN BERSAMA ---------------- */
+
+/** Host halaman ini (dashboard.nexbill.id) — supaya alamat di bawah QR bisa dicek dengan mata. */
+function bookingHost(): string {
+  return typeof window === "undefined" ? "" : window.location.host;
+}
 
 /** Kaca gelap: dipakai semua kartu. Sengaja TANPA backdrop-blur — WebView TV murah tersendat karenanya. */
 const GLASS = "bg-white/[0.045] border border-white/10 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]";
@@ -567,7 +619,8 @@ function Wordmark({ small }: { small?: boolean }) {
 }
 
 /** Nama & alamat outlet + status sambungan — selalu tampil supaya jelas TV ini milik outlet mana. */
-function OutletIdentity({ state, offline, centered }: { state: TvState; offline: boolean; centered?: boolean }) {
+function OutletIdentity({ state, offline, centered, lastOkAt }: { state: TvState; offline: boolean; centered?: boolean; lastOkAt?: number | null }) {
+  const agoMin = lastOkAt ? Math.max(0, Math.round((Date.now() - lastOkAt) / 60_000)) : null;
   const initial = state.outletName.trim().charAt(0).toUpperCase() || "N";
   return (
     <div className={`flex items-center gap-5 ${centered ? "flex-col text-center" : ""}`}>
@@ -590,7 +643,9 @@ function OutletIdentity({ state, offline, centered }: { state: TvState; offline:
         )}
         <div className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm md:text-base ${offline ? "bg-amber-400/10 text-amber-200" : "bg-emerald-400/10 text-emerald-200"}`}>
           <span className={`h-2 w-2 rounded-full ${offline ? "bg-amber-300" : "bg-emerald-300 nb-dot"}`} />
-          {offline ? "Menyambungkan ulang…" : `Terhubung${state.unitName ? ` · ${state.unitName}` : ""}`}
+          {offline
+            ? `Offline${agoMin !== null ? ` · terakhir terhubung ${agoMin < 1 ? "baru saja" : `${agoMin} mnt lalu`}` : ""} — waktu sesi tetap dihitung di TV`
+            : `Terhubung ke dashboard${state.unitName ? ` · ${state.unitName}` : ""}`}
         </div>
       </div>
     </div>
@@ -688,6 +743,7 @@ function AlertScreen({
             <img src={unitQrDataUrl} alt="QR unit" className="w-52 h-52 md:w-60 md:h-60 rounded-2xl bg-white p-2" />
             <div className="mt-4 text-lg md:text-xl text-neutral-300 max-w-[15rem]">
               {timeUp ? "Scan untuk lihat tagihan & panggil kasir" : "Scan untuk tambah waktu, pesan makanan, atau panggil kasir"}
+              <div className="mt-1 text-base text-neutral-500">Tanpa aplikasi — cukup kamera HP</div>
             </div>
           </div>
         )}
@@ -713,6 +769,7 @@ function Screensaver({
   now,
   driftStyle,
   offline,
+  lastOkAt,
 }: {
   state: TvState;
   liveView: TvUnitView;
@@ -720,6 +777,7 @@ function Screensaver({
   now: number;
   driftStyle: React.CSSProperties;
   offline: boolean;
+  lastOkAt?: number | null;
 }) {
   const d = state.display;
   const accent = d.accentColor;
@@ -729,7 +787,7 @@ function Screensaver({
     <div className="min-h-screen flex flex-col px-12 py-10 md:px-16 md:py-12" style={driftStyle}>
       {/* Atas: identitas outlet (nama + alamat + status sambungan) · jam */}
       <div className="flex items-start justify-between gap-8 nb-fade-in">
-        <OutletIdentity state={state} offline={offline} />
+        <OutletIdentity state={state} offline={offline} lastOkAt={lastOkAt} />
         {d.showClock && (
           <div className="text-right shrink-0">
             <div className="text-6xl md:text-8xl font-extralight tabular-nums tracking-tight leading-none">
@@ -753,7 +811,7 @@ function Screensaver({
               {d.headline}
             </h1>
           )}
-          {d.tagline && <div className="text-2xl md:text-4xl text-neutral-300 mt-6 tracking-wide font-light">{d.tagline}</div>}
+          {(d.tagline || d.consoleLine) && <div className="text-2xl md:text-4xl text-neutral-300 mt-6 tracking-wide font-light">{d.tagline || d.consoleLine}</div>}
           {d.priceText && (
             <div
               className="inline-flex mt-8 text-2xl md:text-4xl font-bold px-7 py-3 rounded-2xl border"
@@ -762,12 +820,12 @@ function Screensaver({
               {d.priceText}
             </div>
           )}
-          {!d.headline && !d.tagline && !d.priceText && <div className="text-5xl md:text-7xl font-black tracking-tight">Siap Main?</div>}
+          {!d.headline && !d.priceText && <div className="text-5xl md:text-7xl font-black tracking-tight">Siap Main?</div>}
         </div>
 
         {d.showUnitStatus && state.unitName && (
           <div className="shrink-0">
-            <UnitStatusBadge unitName={state.unitName} liveView={liveView} accent={accent} />
+            <UnitStatusBadge unitName={state.unitName} liveView={liveView} accent={accent} consoleType={state.consoleType} />
           </div>
         )}
       </div>
@@ -781,7 +839,8 @@ function Screensaver({
               <div>
                 <div className="text-sm tracking-[0.3em] text-neutral-400">BOOKING ONLINE</div>
                 <div className="text-2xl md:text-3xl font-bold mt-1">Scan &amp; pesan unit</div>
-                <div className="text-neutral-400 text-base mt-1">Tanpa antre di kasir</div>
+                <div className="text-neutral-400 text-base mt-1">Tanpa aplikasi — cukup kamera HP</div>
+                {state.bookingUrl && <div className="text-cyan-200/80 text-sm md:text-base mt-1 font-mono">{bookingHost()}{state.bookingUrl}</div>}
               </div>
             </div>
           )}
@@ -803,7 +862,8 @@ function Screensaver({
   );
 }
 
-function UnitStatusBadge({ unitName, liveView, accent }: { unitName: string; liveView: TvUnitView; accent: string }) {
+function UnitStatusBadge({ unitName, liveView, accent, consoleType }: { unitName: string; liveView: TvUnitView; accent: string; consoleType?: string | null }) {
+  const consoleText = consoleLabel(consoleType ?? null);
   if (liveView.status === "maintenance") {
     return (
       <div className={`rounded-[2rem] px-10 py-8 text-center ${GLASS}`} style={{ borderColor: "rgba(251,191,36,0.45)" }}>
@@ -816,7 +876,7 @@ function UnitStatusBadge({ unitName, liveView, accent }: { unitName: string; liv
   if (liveView.status === "available" || liveView.status === "unknown") {
     return (
       <div className={`rounded-[2rem] px-12 py-9 text-center ${GLASS}`} style={{ borderColor: hexA(accent, 0.5), boxShadow: `0 0 70px ${hexA(accent, 0.18)}` }}>
-        <div className="text-sm tracking-[0.35em] text-neutral-400">UNIT</div>
+        <div className="text-sm tracking-[0.35em] text-neutral-400">{consoleText ? consoleText.toUpperCase() : "UNIT"}</div>
         <div className="text-4xl md:text-5xl font-black mt-1">{unitName}</div>
         <div className="mt-5 inline-flex items-center gap-3 rounded-full bg-emerald-400/15 px-6 py-2.5">
           <span className="h-3 w-3 rounded-full bg-emerald-300 nb-dot" />
@@ -833,7 +893,7 @@ function UnitStatusBadge({ unitName, liveView, accent }: { unitName: string; liv
   const progress = total ? (liveView.remainingSeconds ?? 0) / total : 1;
   return (
     <div className={`rounded-[2rem] px-10 py-8 text-center flex flex-col items-center ${GLASS}`} style={{ borderColor: hexA(color, 0.4) }}>
-      <div className="text-sm tracking-[0.35em] text-neutral-400">UNIT</div>
+      <div className="text-sm tracking-[0.35em] text-neutral-400">{consoleText ? consoleText.toUpperCase() : "UNIT"}</div>
       <div className="text-3xl md:text-4xl font-black mt-1 mb-5">{unitName}</div>
       <Ring progress={progress} size={230} stroke={14} color={color}>
         <div className="text-base tracking-[0.25em]" style={{ color }}>
@@ -973,7 +1033,7 @@ function UnitPanel({ state, liveView, offline, onBack }: { state: TvState; liveV
             {state.consoleType && (
               <div>
                 <div className="text-sm tracking-[0.3em] text-neutral-400">KONSOL</div>
-                <div className="text-2xl font-semibold uppercase">{state.consoleType.replace(/_/g, " ")}</div>
+                <div className="text-2xl font-semibold">{consoleLabel(state.consoleType)}</div>
               </div>
             )}
             {state.hourlyRate !== null && (
@@ -987,7 +1047,7 @@ function UnitPanel({ state, liveView, offline, onBack }: { state: TvState; liveV
             </p>
           </div>
           <div className="flex justify-center">
-            <UnitStatusBadge unitName={state.unitName ?? state.screenName} liveView={liveView} accent={state.display.accentColor} />
+            <UnitStatusBadge unitName={state.unitName ?? state.screenName} liveView={liveView} accent={state.display.accentColor} consoleType={state.consoleType} />
           </div>
         </div>
         <div className="mt-8 flex justify-center">

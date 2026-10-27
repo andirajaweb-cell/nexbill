@@ -3388,3 +3388,16 @@ export const supportKbAnswers = pgTable("support_kb_answers", {
   createdBy: text("created_by"),
   ...timestamps,
 });
+
+/** PIN per staf untuk sesi dari NEXBILL TV (migrasi 0038) — lihat lib/tv/staff-pins.ts. */
+export const tvStaffPins = pgTable(
+  "tv_staff_pins",
+  {
+    id: id(),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    staffUserId: text("staff_user_id").notNull().references(() => staffUsers.id),
+    pinHash: text("pin_hash").notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("tv_staff_pins_outlet_staff_idx").on(t.outletId, t.staffUserId)]
+);

@@ -38,11 +38,22 @@ Belum ada uji di TV sungguhan — semua penilaian di bawah dari membaca kode. Uj
 | # | Risiko | Dampak | Status | Penanganan |
 |---|---|---|---|---|
 | A1 | TV satu outlet mengatur unit/outlet lain | Tinggi | Ditutup | Outlet & unit dari token layar; aksi untuk unit lain ditolak (tes `tv-session-rules.test.ts`). |
-| A2 | PIN layar dipakai bersama → sesi dari TV tercatat atas nama Owner, bukan kasir | Sedang | Terbuka | Perangkat tercatat "NEXBILL TV · unit". Usul: PIN per staf. |
+| A2 | PIN layar dipakai bersama → sesi dari TV tercatat atas nama Owner, bukan kasir | Sedang | Ditutup (1.2.2) | PIN per staf (Pengaturan › TV Screensaver › PIN per Staf, migrasi 0038): sesi dari TV tercatat atas nama kasir yang mengetik PIN-nya, juga saat offline (TV mengingat PIN yang pernah benar). PIN layar bersama tetap jadi cadangan Owner. |
 | A3 | PIN bocor → orang lain memulai sesi | Sedang | Dikurangi | Sesi yang dimulai tetap jadi tagihan (bukan uang keluar); PIN tidak membuka pembayaran/laporan. Ganti PIN di dashboard. |
 | A4 | PIN offline belum pernah dipakai online di TV itu → kasir tidak bisa memulai sesi saat internet putus | Sedang | Dikurangi | Panduan: masukkan PIN sekali saat online setelah pairing. |
 | A6 | TV diambil alih outlet lain (data aplikasi dihapus / dipasang ulang lalu diketik kode outlet lain) | Tinggi | Ditutup (1.2.2) | Sidik TV (hash ANDROID_ID) dikirim saat pairing & polling: pairing ke outlet lain ditolak selama TV masih terdaftar (kecuali tidak terlihat > 30 hari); token layar diganti tiap pairing sehingga satu layar = satu TV; token dari TV lain ditolak (lib/tv/device-binding.ts). |
 | A5 | Token layar tersimpan di antrean | Rendah | Ditutup | Tidak ikut dikirim/tersimpan di server (hanya kolom protokol). |
+
+## Kecepatan kontrol & internet putus
+
+| # | Skenario | Dampak | Status | Penanganan |
+|---|---|---|---|---|
+| C1 | Perintah dashboard (mulai/jeda/selesai) baru sampai ke TV setelah ≤ 5 detik | Rendah | Ditutup (1.2.2) | Colekan instan lewat Supabase Realtime (lib/tv/push.ts) → TV mengambil status < 1 detik. Polling 5 detik tetap jadi cadangan. Mode "Pindah input TV": WebView bisa dijeda Android → tetap ±5 detik. |
+| C2 | WiFi mati, TV sedang dipakai | Sedang | Dikurangi | TV terus menghitung & mengunci tepat waktu; timer menampilkan "offline". Tambah/akhiri lewat panel kasir di TV. |
+| C3 | WiFi mati, TV tidak dipakai | Rendah | Ditutup | Layar tetap terkunci; sesi baru dari panel kasir TV (PIN yang pernah dipakai online). |
+| C4 | Dashboard offline (Mode Offline) & kasir memulai sesi unit ber-TV dari dashboard → TV tidak tahu, layar tidak terbuka; atau dua sesi untuk unit yang sama | Sedang | Dikurangi | Papan Mode Offline menyuruh kasir memakai panel TV untuk unit ber-NEXBILL TV. Sesi ganda ditolak server saat sinkron dan muncul di kartu Pengawasan NEXBILL TV. |
+| C5 | Hanya TV yang offline, kasir memulai sesi dari dashboard | Sedang | Dikurangi | Chip "TV offline N mnt" di kartu unit Rental PS + konfirmasi sebelum mulai sesi. |
+| C6 | Supabase Realtime mati / env belum diisi | Rendah | Diterima | Otomatis kembali ke polling 5 detik; tidak ada fungsi yang hilang. |
 
 ## Operasional & distribusi
 
@@ -57,5 +68,4 @@ Belum ada uji di TV sungguhan — semua penilaian di bawah dari membaca kode. Uj
 ## Langkah berikutnya yang disarankan
 
 1. Uji lapangan 7 hari di XTREAM ps (O5).
-2. PIN per staf untuk sesi dari TV (A2).
 3. Notifikasi (push/WA) ke owner saat ada sesi dari TV yang ditolak — sekarang baru terlihat di halaman Rental.

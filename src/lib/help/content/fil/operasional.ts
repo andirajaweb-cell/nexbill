@@ -505,6 +505,17 @@ export const OPERASIONAL: HelpCategory[] = [
           "Pag-update ng app: pindutin nang matagal ang OK nang 3 segundo → \"Tingnan ang update ng app\"; kung may bagong bersyon, buksan ang Downloader at i-type muli ang nexbill.id/tvapk — nananatiling naka-save ang pairing.",
         ],
       },
+      {
+        title: "5. Kapag walang internet / WiFi",
+        steps: [
+          "May naglalaro: patuloy na binibilang ng TV ang natitirang oras at nila-lock ang screen pagkaubos nito. I-extend o tapusin ang session sa cashier panel ng TV (OK → PIN) — hindi makakapagpadala ng utos ang dashboard sa TV habang offline.",
+          "Walang naglalaro: nananatiling naka-lock ang screen (NEXBILL screensaver). Sinisimulan ang bagong customer sa cashier panel ng TV gamit ang PIN na nagamit na habang online.",
+          "Offline din ang dashboard (patay ang WiFi ng cashier): lilipat ang PS Rental sa Offline Mode. Para sa mga unit na may NEXBILL TV, mag-start/extend/end ng session mula sa TV na iyon, hindi sa dashboard, para talagang bumukas ang game screen at hindi madoble ang tala.",
+          "TV lang ang offline (online ang dashboard): ipinapakita ng unit card sa PS Rental ang \"Offline ang TV\" at nagbababala ang dashboard kapag nagsisimula ng session. Tingnan ang WiFi/kuryente ng TV o magsimula sa panel ng TV.",
+          "Bumalik ang internet: awtomatikong nagsi-sync ang data ng TV at dashboard. Ang mga session mula sa TV na tinanggihan (hal. may ibang session na ang unit) ay lalabas na pula sa NEXBILL TV Monitoring card — singilin nang manual at markahang naayos na.",
+          "Brownout: kusang bubuksan ng TV ang NEXBILL TV; naibabalik ang tumatakbong session at hindi maibabalik ang orasan ng TV para makapaglaro nang libre.",
+        ],
+      },
     ],
     notes: [
       "Isang outlet lang ang may-ari ng bawat TV: tinatanggihan sa pairing ang TV na nakarehistro pa sa ibang outlet. Para ilipat ang TV sa ibang outlet, kailangan munang burahin ng Owner ng dating outlet ang screen ng TV na iyon sa Settings → TV Screensaver (awtomatikong inaalis ang link na hindi aktibo nang higit 30 araw).",

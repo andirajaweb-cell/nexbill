@@ -222,6 +222,8 @@ final class LocalStore {
                     .put("sessionId", sessionId)
                     .put("token", StateRepo.token(c))
                     .put("attempts", 0);
+            // PIN per staf: aksi dicatat atas nama kasir yang mengetik PIN-nya di TV.
+            if (!StateRepo.cashierId().isEmpty()) a.put("staffId", StateRepo.cashierId());
             if (extra != null) {
                 JSONArray names = extra.names();
                 for (int i = 0; names != null && i < names.length(); i++) a.put(names.getString(i), extra.get(names.getString(i)));

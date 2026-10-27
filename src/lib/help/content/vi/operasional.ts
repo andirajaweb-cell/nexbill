@@ -505,6 +505,17 @@ export const OPERASIONAL: HelpCategory[] = [
           "Cập nhật ứng dụng: giữ OK 3 giây → \"Kiểm tra cập nhật ứng dụng\"; nếu có bản mới, mở Downloader và gõ lại nexbill.id/tvapk — ghép nối vẫn được giữ.",
         ],
       },
+      {
+        title: "5. Khi mất internet / WiFi",
+        steps: [
+          "Đang có người chơi: TV vẫn đếm thời gian còn lại và khóa màn hình đúng lúc hết giờ. Gia hạn hoặc kết thúc phiên bằng bảng thu ngân trên TV (OK → PIN) — dashboard không gửi được lệnh đến TV khi mất kết nối.",
+          "Không có người chơi: màn hình vẫn khóa (trình bảo vệ màn hình NEXBILL). Khách mới được bắt đầu từ bảng thu ngân trên TV bằng PIN đã từng dùng khi có mạng.",
+          "Dashboard cũng mất mạng (WiFi quầy thu ngân hỏng): Thuê PS chuyển sang Chế độ ngoại tuyến. Với máy có NEXBILL TV, hãy bắt đầu/gia hạn/kết thúc phiên từ chính TV đó, không từ dashboard, để màn hình game thực sự mở và không bị ghi hai lần.",
+          "Chỉ TV mất mạng (dashboard vẫn online): thẻ máy trong Thuê PS hiện \"TV mất kết nối\" và dashboard cảnh báo khi bắt đầu phiên. Kiểm tra WiFi/nguồn TV hoặc bắt đầu từ bảng trên TV.",
+          "Internet trở lại: dữ liệu TV và dashboard tự đồng bộ. Các phiên từ TV bị từ chối (vd. máy đã có phiên khác) hiện màu đỏ trên thẻ Giám sát NEXBILL TV — tính tiền thủ công rồi đánh dấu đã xử lý.",
+          "Mất điện: TV tự mở NEXBILL TV; phiên đang chạy được khôi phục và không thể chỉnh lùi đồng hồ TV để chơi miễn phí.",
+        ],
+      },
     ],
     notes: [
       "Mỗi TV chỉ thuộc một cửa hàng: TV vẫn đăng ký ở cửa hàng khác sẽ bị từ chối khi ghép nối. Muốn chuyển TV sang cửa hàng khác, Chủ cửa hàng cũ phải xóa màn hình của TV đó tại Cài đặt → TV Screensaver trước (liên kết không hoạt động quá 30 ngày được tự động gỡ).",

@@ -505,6 +505,17 @@ export const OPERASIONAL: HelpCategory[] = [
           "Memperbarui aplikasi: tahan OK 3 detik → \"Cek pembaruan aplikasi\"; bila ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi — pairing tetap tersimpan.",
         ],
       },
+      {
+        title: "5. Saat internet / WiFi mati",
+        steps: [
+          "Sedang ada yang main: TV tetap menghitung sisa waktu dan mengunci layar tepat saat habis. Tambah waktu atau akhiri sesi lewat panel kasir di TV (OK → PIN) — dashboard tidak bisa mengirim perintah ke TV selama offline.",
+          "Tidak ada yang main: layar tetap terkunci (screensaver NEXBILL). Pelanggan baru dimulai dari panel kasir di TV dengan PIN yang pernah dipakai saat online.",
+          "Dashboard ikut offline (WiFi kasir mati): Rental PS pindah ke Mode Offline. Untuk unit ber-NEXBILL TV, mulai/tambah/akhiri sesi dari TV-nya, jangan dari dashboard, supaya layar game benar-benar terbuka dan tidak tercatat dua kali.",
+          "Hanya TV yang offline (dashboard online): kartu unit di Rental PS menampilkan \"TV offline\" dan dashboard memperingatkan saat memulai sesi. Periksa WiFi/daya TV atau mulai dari panel di TV.",
+          "Internet kembali: data TV dan dashboard tersinkron otomatis. Sesi dari TV yang ditolak (mis. unit sudah dipakai sesi lain) muncul merah di kartu Pengawasan NEXBILL TV — tagih manual lalu tandai sudah ditangani.",
+          "Listrik padam: TV menyala sendiri ke NEXBILL TV; sesi yang berjalan dipulihkan dan jam TV tidak bisa dimundurkan untuk main gratis.",
+        ],
+      },
     ],
     notes: [
       "Satu TV hanya untuk satu outlet: TV yang masih terdaftar di outlet lain ditolak saat pairing. Untuk memindahkan TV ke outlet lain, Owner outlet lama harus menghapus layar TV itu di Pengaturan → TV Screensaver dulu (ikatan yang tidak aktif lebih dari 30 hari dilepas otomatis).",

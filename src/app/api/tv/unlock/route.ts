@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { describeError } from "@/lib/api/error";
-import { verifyTvPin } from "@/lib/tv/service";
+import { verifyTvPinDetailed } from "@/lib/tv/service";
 
 /**
  * PUBLIK — memeriksa PIN staf yang diketik di TV untuk keluar dari screensaver.
@@ -23,11 +23,12 @@ export async function POST(req: NextRequest) {
     const token = bearer || (typeof body.token === "string" ? body.token.trim() : "");
     if (!token) return NextResponse.json({ error: "Token layar tidak ada." }, { status: 401 });
 
-    const ok = await verifyTvPin(token, typeof body.pin === "string" ? body.pin : "");
+    const { ok, staff } = await verifyTvPinDetailed(token, typeof body.pin === "string" ? body.pin : "");
     // Selalu 200 dengan { ok: false } untuk PIN salah, bukan 401 — 401 di sini akan tercampur
     // dengan "token dicabut" yang ditangani berbeda oleh halaman /tv, dan layar akan mengira
     // dirinya perlu dipasangkan ulang hanya karena seseorang salah ketik satu angka.
-    return NextResponse.json({ ok });
+    // PIN per staf: aplikasi NEXBILL TV mencatat staffId di setiap aksi sesi (atribusi per kasir).
+    return NextResponse.json({ ok, staffId: staff?.id ?? null, staffName: staff?.name ?? null });
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });
   }

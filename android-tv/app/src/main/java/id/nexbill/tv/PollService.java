@@ -42,6 +42,22 @@ public class PollService extends Service {
         }
     };
 
+    private static volatile PollService instance;
+    private static volatile long lastPokeAt;
+
+    /**
+     * Kontrol instan: halaman /tv menerima "colekan" dashboard (Supabase Realtime) lalu memanggil
+     * NexbillTvApp.poke() → status diambil SEKARANG, tidak menunggu putaran 5 detik berikutnya.
+     */
+    static void pollNow() {
+        PollService s = instance;
+        long now = SystemClock.elapsedRealtime();
+        if (s == null || s.worker == null || now - lastPokeAt < 400) return;
+        lastPokeAt = now;
+        s.worker.removeCallbacks(s.poll);
+        s.worker.post(s.poll);
+    }
+
     static void start(Context c) {
         Intent i = new Intent(c, PollService.class);
         try {
@@ -56,6 +72,7 @@ public class PollService extends Service {
     public void onCreate() {
         super.onCreate();
         DeviceId.init(this);
+        instance = this;
         overlay = new OverlayTimer(this);
         startAsForeground();
         thread = new HandlerThread("nexbill-poll");
@@ -75,6 +92,7 @@ public class PollService extends Service {
 
     @Override
     public void onDestroy() {
+        if (instance == this) instance = null;
         main.removeCallbacks(tick);
         StateRepo.removeListener(onRepoChange);
         if (worker != null) worker.removeCallbacksAndMessages(null);

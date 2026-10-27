@@ -517,9 +517,15 @@ public class MainActivity extends Activity {
                 JSONObject body = new JSONObject().put("pin", pin);
                 Http.Result r = Http.request("POST", Config.UNLOCK_URL, token, body.toString());
                 if (r.code >= 500) throw new java.io.IOException("server " + r.code);
-                ok = r.code == 200 && new JSONObject(r.body).optBoolean("ok", false);
-                // PIN benar menurut server → diingat untuk dipakai saat internet putus.
-                if (ok) StateRepo.rememberPin(this, pin);
+                JSONObject resp = r.code == 200 ? new JSONObject(r.body) : new JSONObject();
+                ok = resp.optBoolean("ok", false);
+                // PIN benar menurut server → diingat (bersama stafnya) untuk dipakai saat internet putus.
+                if (ok) {
+                    String sid = resp.isNull("staffId") ? "" : resp.optString("staffId", "");
+                    String sname = resp.isNull("staffName") ? "" : resp.optString("staffName", "");
+                    StateRepo.rememberPin(this, pin, sid, sname);
+                    StateRepo.setCashier(sid, sname);
+                }
             } catch (Exception e) {
                 // Internet / server tidak terjangkau: cocokkan dengan PIN yang terakhir dinyatakan benar.
                 failed = true;
@@ -527,7 +533,9 @@ public class MainActivity extends Activity {
                 if (now < offlinePinLockedUntil) {
                     ok = false;
                 } else {
-                    ok = StateRepo.matchesRememberedPin(this, pin);
+                    String[] who = StateRepo.matchRememberedPin(this, pin);
+                    ok = who != null;
+                    if (ok) StateRepo.setCashier(who[0], who[1]);
                     if (ok) {
                         offlinePinFails = 0;
                     } else if (++offlinePinFails >= 5) {
@@ -743,7 +751,8 @@ public class MainActivity extends Activity {
         TvState s = StateRepo.state();
         JSONObject cat = LocalStore.catalog(this);
         JSONObject unit = cat != null ? cat.optJSONObject("unit") : null;
-        String title = getString(R.string.cashier_title) + (unit != null ? " · " + unit.optString("name") : s != null && s.unitName != null ? " · " + s.unitName : "");
+        String title = getString(R.string.cashier_title) + (unit != null ? " · " + unit.optString("name") : s != null && s.unitName != null ? " · " + s.unitName : "")
+                + (StateRepo.cashierName().isEmpty() ? "" : " · " + StateRepo.cashierName());
         new AlertDialog.Builder(this)
                 .setTitle(title)
                 .setItems(labels.toArray(new String[0]), (d, which) -> {
@@ -997,6 +1006,12 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String appVersion() {
             return Config.APP_VERSION;
+        }
+
+        /** Colekan dari dashboard (kontrol instan) → ambil status sekarang. */
+        @JavascriptInterface
+        public void poke() {
+            PollService.pollNow();
         }
 
         /** Sidik TV (hash) untuk pairing — server menolak pairing ke outlet lain selama TV ini masih terdaftar. */

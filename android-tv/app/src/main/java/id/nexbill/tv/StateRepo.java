@@ -23,6 +23,8 @@ final class StateRepo {
     private static final String K_MODE_SWITCH = "mode_switch_input";
     private static final String K_PIN_SALT = "pin_salt";
     private static final String K_PIN_HASH = "pin_hash";
+    /** PIN per staf yang pernah benar di TV ini: [{salt, hash, staffId, staffName}] — untuk dipakai saat offline. */
+    private static final String K_PINS = "pins_v2";
     private static final String K_GUARD = "screen_guard";
 
     private static volatile TvState state;
@@ -51,7 +53,8 @@ final class StateRepo {
         // Layar dipasangkan ulang / dilepas: PIN yang diingat untuk layar lama tidak berlaku lagi, begitu
         // juga sesi lokal, katalog, dan status terakhirnya (antrean yang belum terkirim tetap dikirim
         // dengan token lamanya — lihat SyncEngine).
-        prefs(c).edit().putString(K_TOKEN, t).remove(K_PIN_SALT).remove(K_PIN_HASH).apply();
+        prefs(c).edit().putString(K_TOKEN, t).remove(K_PIN_SALT).remove(K_PIN_HASH).remove(K_PINS).apply();
+        setCashier("", "");
         LocalStore.clearForNewScreen(c);
         state = null;
         stateWall = 0L;
@@ -148,28 +151,84 @@ final class StateRepo {
      * membuka menu staf satu kali di TV ini saat online. PIN yang diganti di dashboard menimpa ingatan ini
      * begitu dipakai online lagi; layar yang dipasangkan ulang menghapusnya.
      */
-    static void rememberPin(Context c, String pin) {
+    /** Kasir yang terakhir membuka panel dengan PIN-nya (PIN per staf); "" = PIN layar bersama / Owner. */
+    private static volatile String cashierId = "";
+    private static volatile String cashierName = "";
+
+    static void setCashier(String id, String name) {
+        cashierId = id == null ? "" : id;
+        cashierName = name == null ? "" : name;
+    }
+
+    static String cashierId() {
+        return cashierId;
+    }
+
+    static String cashierName() {
+        return cashierName;
+    }
+
+    /** PIN benar menurut server → diingat (hash PBKDF2 bergaram, bukan PIN-nya) bersama staf pemiliknya. */
+    static synchronized void rememberPin(Context c, String pin, String staffId, String staffName) {
         byte[] salt = new byte[16];
         new SecureRandom().nextBytes(salt);
         byte[] hash = pbkdf2(pin, salt);
         if (hash == null) return;
-        prefs(c).edit().putString(K_PIN_SALT, hex(salt)).putString(K_PIN_HASH, hex(hash)).apply();
+        String sid = staffId == null ? "" : staffId;
+        try {
+            org.json.JSONArray old = pins(c);
+            org.json.JSONArray out = new org.json.JSONArray();
+            for (int i = 0; i < old.length(); i++) {
+                org.json.JSONObject e = old.optJSONObject(i);
+                if (e == null) continue;
+                if (e.optString("staffId").equals(sid)) continue; // PIN lama staf yang sama diganti
+                if (matches(e, pin)) continue; // PIN yang sama kini milik staf lain
+                out.put(e);
+            }
+            out.put(new org.json.JSONObject().put("salt", hex(salt)).put("hash", hex(hash)).put("staffId", sid).put("staffName", staffName == null ? "" : staffName));
+            while (out.length() > 30) out.remove(0);
+            prefs(c).edit().putString(K_PINS, out.toString()).remove(K_PIN_SALT).remove(K_PIN_HASH).apply();
+        } catch (Exception ignored) {
+        }
     }
 
-    static boolean hasRememberedPin(Context c) {
-        return !prefs(c).getString(K_PIN_HASH, "").isEmpty();
+    private static org.json.JSONArray pins(Context c) {
+        try {
+            return new org.json.JSONArray(prefs(c).getString(K_PINS, "[]"));
+        } catch (Exception e) {
+            return new org.json.JSONArray();
+        }
     }
 
-    static boolean matchesRememberedPin(Context c, String pin) {
-        String salt = prefs(c).getString(K_PIN_SALT, "");
-        String want = prefs(c).getString(K_PIN_HASH, "");
+    private static boolean matches(org.json.JSONObject e, String pin) {
+        String salt = e.optString("salt");
+        String want = e.optString("hash");
         if (salt.isEmpty() || want.isEmpty()) return false;
         byte[] got = pbkdf2(pin, unhex(salt));
         return got != null && MessageDigest.isEqual(got, unhex(want));
     }
 
+    static boolean hasRememberedPin(Context c) {
+        return pins(c).length() > 0 || !prefs(c).getString(K_PIN_HASH, "").isEmpty();
+    }
+
+    /** Saat offline: { staffId, staffName } pemilik PIN ini yang pernah benar di TV ini, atau null. */
+    static String[] matchRememberedPin(Context c, String pin) {
+        org.json.JSONArray list = pins(c);
+        for (int i = 0; i < list.length(); i++) {
+            org.json.JSONObject e = list.optJSONObject(i);
+            if (e != null && matches(e, pin)) return new String[] { e.optString("staffId"), e.optString("staffName") };
+        }
+        // PIN versi lama (sebelum 1.2.2): satu PIN layar tanpa staf.
+        String salt = prefs(c).getString(K_PIN_SALT, "");
+        String want = prefs(c).getString(K_PIN_HASH, "");
+        if (salt.isEmpty() || want.isEmpty()) return null;
+        byte[] got = pbkdf2(pin, unhex(salt));
+        return got != null && MessageDigest.isEqual(got, unhex(want)) ? new String[] { "", "" } : null;
+    }
+
     static void forgetPin(Context c) {
-        prefs(c).edit().remove(K_PIN_SALT).remove(K_PIN_HASH).apply();
+        prefs(c).edit().remove(K_PIN_SALT).remove(K_PIN_HASH).remove(K_PINS).apply();
     }
 
     private static byte[] pbkdf2(String pin, byte[] salt) {

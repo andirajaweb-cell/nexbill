@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { TvStaffPinsCard } from "./tv-staff-pins";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -2103,6 +2104,8 @@ function TvScreensaverTab({ canManage }: { canManage: boolean }) {
           )}
         </div>
       </Card>
+
+      <TvStaffPinsCard canManage={canManage} />
 
       <Card className="space-y-3">
         <h2 className="font-medium">{t("settings.tv.nightTitle", "Mode Malam")}</h2>

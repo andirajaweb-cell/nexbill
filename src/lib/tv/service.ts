@@ -16,6 +16,9 @@ import { computeUnitView, nightDimOpacity, type TvUnitView } from "@/lib/tv/view
 import { assessTvEligibility, canPairScreen, type TvEligibility } from "@/lib/tv/eligibility";
 import { appVersionOf, deviceIdOf, withAppVersion, withDeviceId } from "@/lib/tv/app-marker";
 import { decidePairing, deviceMatches, isDeviceId } from "@/lib/tv/device-binding";
+import { hasAnyStaffPin, matchStaffPin } from "@/lib/tv/staff-pins";
+import { pokeTvOutlet } from "@/lib/tv/push";
+import { consoleLine } from "@/lib/tv/console-line";
 
 /**
  * Lapisan basis data TV Screensaver. Semua yang menyentuh `db` ada di sini; perhitungan murninya
@@ -127,6 +130,7 @@ export async function updateTvSettings(outletId: string, input: UpdateTvSettings
   }
 
   const [row] = await db.update(tvScreensaverSettings).set(patch).where(eq(tvScreensaverSettings.outletId, outletId)).returning();
+  await pokeTvOutlet(outletId); // tampilan baru langsung ke semua TV outlet ini
   return row;
 }
 
@@ -344,6 +348,7 @@ export async function updateTvScreen(
 
   const [row] = await db.update(tvScreens).set(set).where(and(eq(tvScreens.id, screenId), eq(tvScreens.outletId, outletId))).returning();
   if (!row) throw new Error("Layar tidak ditemukan.");
+  await pokeTvOutlet(outletId);
   return row;
 }
 
@@ -463,6 +468,8 @@ export interface TvStateResponse {
     idleMinutes: number;
     headline: string | null;
     tagline: string | null;
+    /** "PS2 • PS3 • PS4 • PS5" dari unit aktif outlet — dipakai bila tagline kosong. */
+    consoleLine: string | null;
     priceText: string | null;
     footerText: string | null;
     showClock: boolean;
@@ -528,10 +535,11 @@ export async function getTvState(token: string, opts: { appVersion?: string | nu
   const [outlet] = await db.select().from(outlets).where(eq(outlets.id, screen.outletId)).limit(1);
   const settings = await getOrCreateTvSettings(screen.outletId);
 
-  const [moduleOn, unitStatusOn, bookingQrOn] = await Promise.all([
+  const [moduleOn, unitStatusOn, bookingQrOn, anyStaffPin] = await Promise.all([
     isFeatureEnabled(screen.outletId, "TV_SCREENSAVER_ENABLED"),
     isFeatureEnabled(screen.outletId, "TV_SCREENSAVER_UNIT_STATUS"),
     isFeatureEnabled(screen.outletId, "TV_SCREENSAVER_BOOKING_QR"),
+    hasAnyStaffPin(screen.outletId),
   ]);
 
   let unit: typeof rentalUnits.$inferSelect | null = null;
@@ -564,7 +572,13 @@ export async function getTvState(token: string, opts: { appVersion?: string | nu
     now.getTime()
   );
 
-  const showBookingQr = settings.showBookingQr && bookingQrOn && !!outlet?.slug;
+  // QR booking hanya bila outlet memang menerima booking online (halaman /book/<slug> aktif).
+  const showBookingQr = settings.showBookingQr && bookingQrOn && !!outlet?.slug && outlet?.acceptOnlineBooking !== false;
+  // Baris konsol otomatis dari unit aktif outlet (PS2…PS5, Driving Simulator) bila tagline kosong.
+  const consoleTypes = await db
+    .select({ consoleType: rentalUnits.consoleType })
+    .from(rentalUnits)
+    .where(and(eq(rentalUnits.outletId, screen.outletId), eq(rentalUnits.isActive, true)));
 
   let timeUp = false;
   if (unit && !session && settings.timeUpScreenEnabled) {
@@ -603,6 +617,7 @@ export async function getTvState(token: string, opts: { appVersion?: string | nu
       idleMinutes: settings.idleMinutes,
       headline: settings.headline,
       tagline: settings.tagline,
+      consoleLine: consoleLine(consoleTypes.map((c) => c.consoleType)),
       priceText: settings.priceText,
       footerText: settings.footerText,
       showClock: settings.showClock,
@@ -611,7 +626,8 @@ export async function getTvState(token: string, opts: { appVersion?: string | nu
       showWifi: settings.showWifi && !!outlet?.wifiSsid,
       wifiSsid: settings.showWifi ? outlet?.wifiSsid ?? null : null,
       accentColor: settings.accentColor,
-      requiresPin: settings.unlockMode === "pin" && !!settings.unlockPinHash,
+      // PIN per staf (lib/tv/staff-pins.ts) juga mewajibkan PIN di TV.
+      requiresPin: (settings.unlockMode === "pin" && !!settings.unlockPinHash) || anyStaffPin,
       nightDimOpacity: nightDimOpacity(settings.nightModeEnabled, settings.nightDimPercent, settings.nightStartHour, settings.nightEndHour, now),
       timeWarningMinutes: settings.timeWarningEnabled ? settings.timeWarningMinutes : null,
     },
@@ -633,12 +649,42 @@ export async function getTvState(token: string, opts: { appVersion?: string | nu
 const DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
 export async function verifyTvPin(token: string, pin: string): Promise<boolean> {
+  return (await verifyTvPinDetailed(token, pin)).ok;
+}
+
+/**
+ * PIN per staf (lib/tv/staff-pins.ts) dicek dulu → { ok, staff }: sesi dari TV tercatat atas nama
+ * staf itu. PIN layar bersama tetap diterima sebagai PIN cadangan Owner (staff = null).
+ */
+export async function verifyTvPinDetailed(token: string, pin: string): Promise<{ ok: boolean; staff: { id: string; name: string } | null }> {
   const [screen] = await db.select().from(tvScreens).where(eq(tvScreens.token, token)).limit(1);
   if (!screen) {
     await bcrypt.compare(pin ?? "", DUMMY_HASH);
-    return false;
+    return { ok: false, staff: null };
   }
+  const staff = await matchStaffPin(screen.outletId, pin ?? "");
+  if (staff) return { ok: true, staff };
   const settings = await getOrCreateTvSettings(screen.outletId);
-  if (settings.unlockMode !== "pin" || !settings.unlockPinHash) return true; // tanpa PIN, layar memang boleh dibuka siapa saja
-  return bcrypt.compare(pin ?? "", settings.unlockPinHash);
+  const anyStaffPin = await hasAnyStaffPin(screen.outletId);
+  if ((settings.unlockMode !== "pin" || !settings.unlockPinHash) && !anyStaffPin) return { ok: true, staff: null }; // tanpa PIN apa pun, layar memang boleh dibuka siapa saja
+  if (!settings.unlockPinHash) return { ok: false, staff: null };
+  return { ok: await bcrypt.compare(pin ?? "", settings.unlockPinHash), staff: null };
+}
+
+
+/** Status sambungan layar TV per unit untuk Rental PS (semua staf yang login boleh melihat). */
+export async function listTvConnection(outletId: string) {
+  const rows = await db
+    .select({ id: tvScreens.id, name: tvScreens.name, rentalUnitId: tvScreens.rentalUnitId, pairedAt: tvScreens.pairedAt, lastSeenAt: tvScreens.lastSeenAt, isActive: tvScreens.isActive, tvInfo: tvScreens.tvInfo })
+    .from(tvScreens)
+    .where(eq(tvScreens.outletId, outletId));
+  return rows
+    .filter((r) => r.isActive && r.rentalUnitId)
+    .map((r) => ({
+      unitId: r.rentalUnitId as string,
+      screenName: r.name,
+      isPaired: !!r.pairedAt,
+      lastSeenAt: r.lastSeenAt,
+      appVersion: appVersionOf(r.tvInfo),
+    }));
 }

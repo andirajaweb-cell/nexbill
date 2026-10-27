@@ -4,6 +4,7 @@
     <string name="notif_text">Itinutugma ang timer ng booth sa cashier</string>
     <string name="timer_staff">STAFF MODE</string>
     <string name="timer_paused">NAKA-PAUSE</string>
+    <string name="timer_offline">offline</string>
     <string name="waiting_signal">Hinihintay ang HDMI signal… siguraduhing naka-on ang console.</string>
     <string name="no_hdmi_hint">Walang nakitang HDMI input. Pindutin ang OK → Settings ng TV → Piliin ang HDMI input.</string>
     <string name="no_hdmi">Walang nakitang HDMI input sa TV na ito.</string>
