@@ -1,11 +1,11 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { BOT_STATE_LABEL, type BotState } from "@/lib/leads/wa-bot-rules";
+import { BOT_STATE_LABEL, isBotCommand, type BotState } from "@/lib/leads/wa-bot-rules";
 
 interface BotData {
   state: BotState;
@@ -94,6 +94,20 @@ export default function WhatsappBotPage() {
   };
 
   const state = data?.state ?? "belum_pernah";
+  const [restarting, setRestarting] = useState(false);
+  const requestNewQr = async () => {
+    if (!(await showConfirm("Minta QR baru? Bot dimulai ulang (±15 detik). Nomor yang sudah tertaut tidak di-logout.", { confirmLabel: "Minta QR baru" }))) return;
+    setRestarting(true);
+    try {
+      const res = await fetch("/api/platform-admin/wa-bot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restart" }) });
+      const d = await res.json().catch(() => null);
+      if (!res.ok) await showAlert(d?.error ?? "Gagal mengirim perintah.");
+      await load();
+    } finally {
+      setRestarting(false);
+    }
+  };
+  const note = data?.status?.lastError ?? null;
 
   return (
     <div className="space-y-6">
@@ -121,6 +135,12 @@ export default function WhatsappBotPage() {
               {BOT_STATE_LABEL[state]}
             </span>
             <span className="text-xs text-neutral-500">Heartbeat terakhir: {ago(data?.status?.lastHeartbeatAt ?? null)}</span>
+            <span className="flex-1" />
+            {state !== "offline" && state !== "belum_pernah" && (
+              <Button variant="secondary" className="text-xs" onClick={requestNewQr} disabled={restarting || isBotCommand(note)}>
+                {restarting || isBotCommand(note) ? "Memulai ulang bot…" : state === "online" ? "Mulai ulang bot" : "Minta QR baru"}
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -130,7 +150,7 @@ export default function WhatsappBotPage() {
             </div>
             <div>
               <div className="text-xs text-neutral-500">Catatan terakhir</div>
-              <div className="text-neutral-300">{data?.status?.lastError ?? "—"}</div>
+              <div className="text-neutral-300">{isBotCommand(note) ? "Perintah terkirim — menunggu bot menerima (±5 dtk)…" : note ?? "—"}</div>
             </div>
           </div>
 
@@ -209,6 +229,8 @@ export default function WhatsappBotPage() {
         </Card>
       </div>
 
+      {state !== "online" && <QrTroubleshooting open={state === "menghubungkan" || state === "offline"} />}
+
       <Card>
         <div className="flex items-center justify-between gap-2 mb-3">
           <h2 className="gm-heading font-semibold">Pesan Terbaru</h2>
@@ -244,5 +266,62 @@ export default function WhatsappBotPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+const Code = ({ children }: { children: ReactNode }) => (
+  <code className="block whitespace-pre-wrap break-all rounded-md bg-black/40 px-2 py-1 text-[11px] text-emerald-200">{children}</code>
+);
+
+/** Panduan bila QR tidak muncul — urut dari yang paling cepat. */
+function QrTroubleshooting({ open }: { open: boolean }) {
+  return (
+    <Card>
+      <details open={open}>
+        <summary className="cursor-pointer gm-heading font-semibold">Panduan: QR tidak muncul / bot tidak stabil</summary>
+        <ol className="mt-3 list-decimal pl-5 space-y-3 text-sm text-neutral-300">
+          <li>
+            <b>Tunggu 1 menit.</b> Catatan terakhir menunjukkan langkah bot: <i>Langkah 1/3 versi WhatsApp → 2/3 membuka koneksi → 3/3 QR siap</i>. Halaman ini
+            memperbarui sendiri tiap 3 detik.
+          </li>
+          <li>
+            <b>Tekan &quot;Minta QR baru&quot;</b> (kanan atas kartu status). Bot memulai ulang dirinya dan membuang sesi yang belum tertaut; QR baru muncul ±15 detik.
+            Bot juga memulai ulang sendiri bila 4 menit tanpa QR.
+          </li>
+          <li>
+            <b>Status &quot;Offline&quot; / tombol tidak ada</b> — proses bot mati. Di server (SSH):
+            <Code>pm2 status{"\n"}pm2 restart whatsapp-bot{"\n"}pm2 logs whatsapp-bot --lines 80</Code>
+            Di log, cari &quot;QR baru siap&quot; (berhasil) atau &quot;Koneksi WhatsApp terputus&quot; beserta kodenya (lihat langkah 6).
+          </li>
+          <li>
+            <b>Pastikan kode bot terbaru</b> (perbaikan QR ada di versi terbaru), di folder aplikasi di server:
+            <Code>git pull{"\n"}npm install{"\n"}pm2 restart whatsapp-bot</Code>
+          </li>
+          <li>
+            <b>Mulai dari nol</b> (bila log terus &quot;Gagal mendapat QR&quot;). Nomor yang tertaut ikut logout — hanya lakukan bila belum tertaut atau mau ganti nomor:
+            <Code>pm2 stop whatsapp-bot{"\n"}rm -rf data/wa-auth{"\n"}pm2 start whatsapp-bot</Code>
+          </li>
+          <li>
+            <b>Arti kode di catatan/log:</b> 408 = QR kedaluwarsa (normal, QR baru dibuat) · 515 = perlu restart (normal setelah scan) · 401 = logout dari HP (langkah 5) ·
+            405/403 = ditolak WhatsApp, biasanya versi Baileys basi → <Code>npm i @whiskeysockets/baileys@latest{"\n"}pm2 restart whatsapp-bot</Code>
+            440 = nomor dipakai bot lain (matikan bot ganda: <code className="text-neutral-200">pm2 status</code> hanya boleh ada satu whatsapp-bot) · 503 = gangguan WhatsApp, tunggu.
+          </li>
+          <li>
+            <b>Koneksi & jam server.</b> Server harus bisa membuka WhatsApp dan jamnya tepat:
+            <Code>curl -sI https://web.whatsapp.com | head -1{"\n"}timedatectl</Code>
+            Bila curl gagal, cek DNS/firewall VPS. Bila jam tidak sinkron: <code className="text-neutral-200">timedatectl set-ntp true</code>.
+          </li>
+          <li>
+            <b>Saat scan di HP:</b> WhatsApp › Perangkat tertaut › Tautkan perangkat. HP harus online; maksimal 4 perangkat tertaut — hapus perangkat lama bila
+            penuh. Bila muncul &quot;Tidak dapat menautkan perangkat&quot;, tekan &quot;Minta QR baru&quot; lalu scan QR yang baru.
+          </li>
+          <li>
+            <b>Agar stabil:</b> pakai nomor khusus NEXBILL (bukan nomor pribadi yang juga dibuka di WhatsApp Web lain), jalankan lewat pm2 dengan{" "}
+            <code className="text-neutral-200">pm2 save</code> + <code className="text-neutral-200">pm2 startup</code> supaya hidup lagi setelah server reboot, dan
+            jangan kirim massal melebihi batas harian.
+          </li>
+        </ol>
+      </details>
+    </Card>
   );
 }

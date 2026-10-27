@@ -37,12 +37,16 @@ import {
   countSentSince,
   markOutboxFailed,
   markOutboxSent,
+  readBotNote,
   recordInbound,
   requeueStuckSending,
   writeBotStatus,
 } from "../src/lib/leads/wa-bot";
 import {
+  BOT_COMMAND_POLL_MS,
+  BOT_COMMAND_RESTART,
   BOT_HEARTBEAT_INTERVAL_MS,
+  HARD_RESTART_NO_QR_MS,
   NO_QR_WATCHDOG_MS,
   RESET_UNLINKED_AFTER_FAILURES,
   VERSION_FETCH_TIMEOUT_MS,
@@ -141,6 +145,32 @@ let lastNumber: string | null = null;
 let generation = 0;
 let failuresWithoutQr = 0;
 let reconnectScheduled = false;
+let linkedNow = false;
+/** Terakhir kali bot "sehat" (QR tampil atau terhubung) — dipakai penjaga keras. */
+let lastHealthyAt = Date.now();
+
+/** Mulai ulang proses dari nol (pm2 menyalakannya lagi). Sesi belum-tertaut dibuang supaya QR benar-benar baru. */
+async function restartProcess(note: string) {
+  const linked = linkedNow;
+  if (!linked) clearUnlinkedAuth();
+  await status({ connected: false, qrDataUrl: null, number: null, lastError: `${note} Bot dimulai ulang — QR baru muncul ±15 dtk lagi.` });
+  console.warn(`${note} Keluar supaya pm2 menyalakan ulang bot.`);
+  process.exit(0);
+}
+
+// Perintah dari Platform Admin ("Minta QR baru") + penjaga keras bila lama tanpa QR/koneksi.
+setInterval(async () => {
+  if (lastConnected || lastQr) lastHealthyAt = Date.now();
+  try {
+    const note = await readBotNote();
+    if (note === BOT_COMMAND_RESTART) await restartProcess("Perintah \"Minta QR baru\" dari Platform Admin diterima.");
+  } catch {
+    // database sesaat bermasalah — coba lagi di putaran berikutnya
+  }
+  if (!lastConnected && !lastQr && Date.now() - lastHealthyAt > HARD_RESTART_NO_QR_MS) {
+    await restartProcess(`Tidak ada QR/koneksi selama ${HARD_RESTART_NO_QR_MS / 60_000} menit.`);
+  }
+}, BOT_COMMAND_POLL_MS);
 
 function stopTimers() {
   if (outboxPoller) clearInterval(outboxPoller);
@@ -187,7 +217,12 @@ async function start() {
     cachedVersion = null;
   }
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  linkedNow = !!state.creds.me;
+  await status({ connected: false, qrDataUrl: null, number: null, lastError: `Langkah 1/3: mengambil versi WhatsApp Web… (${new Date().toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" })} WIB)` });
   const version = await resolveWaVersion(failuresWithoutQr >= RESET_UNLINKED_AFTER_FAILURES);
+  await status({
+    lastError: `Langkah 2/3: membuka koneksi ke WhatsApp (versi ${version.join(".")})… ${linkedNow ? "Nomor sudah tertaut — menyambung tanpa QR." : "QR muncul setelah WhatsApp menjawab (biasanya < 15 dtk)."}`,
+  });
 
   const sock = makeWASocket({
     version,
@@ -225,7 +260,7 @@ async function start() {
       failuresWithoutQr = 0;
       lastQr = await qrcode.toDataURL(qr);
       lastConnected = false;
-      await status({ connected: false, qrDataUrl: lastQr, number: null, lastError: null });
+      await status({ connected: false, qrDataUrl: lastQr, number: null, lastError: "Langkah 3/3: QR siap — scan sekarang (berganti otomatis tiap ±20 dtk)." });
       console.log("QR baru siap — scan dari WhatsApp di HP (Perangkat Tertaut), atau buka Platform Admin › WhatsApp Bot.");
     }
 
@@ -234,6 +269,7 @@ async function start() {
       lastConnected = true;
       lastQr = null;
       lastNumber = sock.user?.id ?? null;
+      linkedNow = true;
       if (watchdog) clearTimeout(watchdog);
       watchdog = null;
       await status({ connected: true, qrDataUrl: null, number: lastNumber, lastError: null });

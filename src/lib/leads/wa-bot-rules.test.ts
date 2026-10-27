@@ -103,3 +103,12 @@ describe("sambung ulang & QR", () => {
     expect(closeCodeName(undefined)).toBe("tanpa kode");
   });
 });
+
+describe("perintah Minta QR baru", () => {
+  it("catatan berawalan CMD: dianggap perintah, bukan catatan biasa", async () => {
+    const { isBotCommand, BOT_COMMAND_RESTART } = await import("./wa-bot-rules");
+    expect(isBotCommand(BOT_COMMAND_RESTART)).toBe(true);
+    expect(isBotCommand("Langkah 3/3: QR siap")).toBe(false);
+    expect(isBotCommand(null)).toBe(false);
+  });
+});

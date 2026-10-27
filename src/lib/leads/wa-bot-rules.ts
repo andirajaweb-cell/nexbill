@@ -73,6 +73,20 @@ export const NO_QR_WATCHDOG_MS = 90_000;
 /** Batas waktu ambil versi WhatsApp Web (tanpa ini fetch bisa menggantung beberapa menit → QR tidak pernah muncul). */
 export const VERSION_FETCH_TIMEOUT_MS = 10_000;
 
+/**
+ * Perintah dari Platform Admin ke proses bot (tanpa migrasi): disimpan sementara di kolom last_error,
+ * dibaca bot setiap beberapa detik. "Minta QR baru" = bot memulai ulang dirinya (pm2 menyalakannya lagi);
+ * sesi yang BELUM tertaut ikut dibuang supaya QR benar-benar baru. Nomor yang sudah tertaut tidak di-logout.
+ */
+export const BOT_COMMAND_RESTART = "CMD:restart";
+export const BOT_COMMAND_POLL_MS = 5_000;
+/** Penjaga keras: belum terhubung & tanpa QR selama ini → proses keluar, pm2 menyalakan ulang dari nol. */
+export const HARD_RESTART_NO_QR_MS = 4 * 60_000;
+
+export function isBotCommand(note: string | null | undefined): boolean {
+  return !!note && note.startsWith("CMD:");
+}
+
 /** Jeda sebelum mencoba lagi: 3 dtk, 6, 12, 24, 48, maks 60 dtk. */
 export function reconnectDelayMs(consecutiveFailures: number): number {
   const n = Math.max(0, consecutiveFailures - 1);

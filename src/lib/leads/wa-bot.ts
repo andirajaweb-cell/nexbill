@@ -17,6 +17,12 @@ export async function getBotStatus() {
   return row ?? null;
 }
 
+/** Catatan/perintah terbaru di baris status (dipakai bot untuk membaca perintah "Minta QR baru"). */
+export async function readBotNote(): Promise<string | null> {
+  const [row] = await db.select({ note: platformWaBotStatus.lastError }).from(platformWaBotStatus).where(eq(platformWaBotStatus.id, STATUS_ID)).limit(1);
+  return row?.note ?? null;
+}
+
 type StatusPatch = Partial<Omit<typeof platformWaBotStatus.$inferInsert, "id" | "updatedAt">>;
 
 export async function writeBotStatus(patch: StatusPatch) {
