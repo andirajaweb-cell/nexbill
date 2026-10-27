@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { shouldNotifyOnCall } from "@/lib/telegram/support-rules";
-import { botSenderName, escalatedPriorityOf, HUMAN_ACTIVE_MS, isBotSender, needsHuman, pendingEscalation, shouldAutoReply, threadToTurns, type ThreadMsg } from "./autoreply-rules";
+import { botSenderName, botTierOf, escalatedPriorityOf, HUMAN_ACTIVE_MS, isBotSender, needsHuman, pendingEscalation, rateableMessageId, shouldAutoReply, threadToTurns, type ThreadMsg } from "./autoreply-rules";
 
 const T0 = Date.parse("2026-10-26T10:00:00Z");
 const at = (min: number) => new Date(T0 + min * 60_000).toISOString();
@@ -75,5 +75,26 @@ describe("riwayat untuk AI & notifikasi", () => {
     expect(shouldNotifyOnCall("P3", undefined)).toBe(false);
     expect(shouldNotifyOnCall("P2", "P1")).toBe(false);
     expect(shouldNotifyOnCall("P4", "P4")).toBe(true);
+  });
+});
+
+describe("tingkat balasan bot & tombol penilaian", () => {
+  it("penanda tingkat di senderName", () => {
+    expect(botTierOf(botSenderName(null, "faq"))).toBe("faq");
+    expect(botTierOf(botSenderName(null))).toBe("ai");
+    expect(botTierOf("Bot NEXBILL")).toBe("ai"); // pesan bot lama
+    expect(botTierOf(botSenderName(null, "info"))).toBe("info");
+    expect(botTierOf(botSenderName("P2", "faq"))).toBe("team");
+    expect(botTierOf("Andi")).toBeNull();
+    expect(isBotSender(botSenderName(null, "faq"))).toBe(true);
+  });
+  it("hanya jawaban FAQ/AI terakhir di tiket terbuka yang bisa dinilai", () => {
+    const q = { id: "1", sender: "outlet" as const, senderName: "Budi" };
+    const faq = { id: "2", sender: "platform_admin" as const, senderName: botSenderName(null, "faq") };
+    expect(rateableMessageId([q, faq], "open")).toBe("2");
+    expect(rateableMessageId([q, faq], "resolved")).toBeNull();
+    expect(rateableMessageId([q, faq, { id: "3", sender: "outlet", senderName: "Budi" }], "open")).toBeNull();
+    expect(rateableMessageId([q, { id: "4", sender: "platform_admin", senderName: botSenderName(null, "info") }], "open")).toBeNull();
+    expect(rateableMessageId([q, { id: "5", sender: "platform_admin", senderName: "Andi" }], "open")).toBeNull();
   });
 });

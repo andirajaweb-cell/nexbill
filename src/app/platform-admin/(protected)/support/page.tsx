@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/Button";
 import { fetchJsonArray } from "@/lib/api/fetch-json";
 import Link from "next/link";
 import { showAlert, showPrompt } from "@/lib/ui/dialog";
-import { isBotSender, escalatedPriorityOf } from "@/lib/support-bot/autoreply-rules";
+import { isBotSender, escalatedPriorityOf, botTierOf } from "@/lib/support-bot/autoreply-rules";
+
+const TIER_LABEL = { faq: "Bot · tingkat 1 FAQ (tanpa AI)", ai: "Bot · tingkat 2 AI", info: "Bot · sapaan/info", team: "Bot · diteruskan ke staf" } as const;
 import { LANG_OPTIONS, type LangCode } from "@/lib/i18n/registry";
 import { Paperclip, Download, X, FileVideo } from "lucide-react";
 
@@ -23,6 +25,7 @@ interface Thread {
   escalatedPriority?: "P1" | "P2" | "P3" | "P4" | null;
   botReplies?: number;
   autoReply?: boolean;
+  aiOn?: boolean;
 }
 
 interface Message {
@@ -179,6 +182,7 @@ export default function PlatformSupportPage() {
   const visibleThreads = threads.filter((t) => (filter === "mine" ? !!t.needsHuman : filter === "all" || t.status === filter));
   const mineCount = threads.filter((t) => t.needsHuman).length;
   const autoReplyOn = threads[0]?.autoReply ?? true;
+  const aiOn = threads[0]?.aiOn ?? true;
 
   // Kurasi mingguan: jawaban tim yang bagus disimpan supaya bot bisa menjawab masalah yang sama sendiri.
   const saveAsBotAnswer = async (m: Message) => {
@@ -205,8 +209,8 @@ export default function PlatformSupportPage() {
           <p className="text-sm text-neutral-500 mt-1">Keluhan, saran, dan kendala teknis dari seluruh outlet/merchant — balas di sini sebagai tim pusat NEXBILL.</p>
           <p className={`text-xs mt-1 ${autoReplyOn ? "text-sky-300" : "text-rose-300"}`}>
             {autoReplyOn
-              ? "Bot NEXBILL membalas otomatis 24 jam dari Panduan, panduan perangkat, kendala NEXBILL TV, status akun, dan Jawaban Bot. Bot diam 2 jam setelah kamu membalas di tiket itu."
-              : "Balas otomatis MATI (SUPPORT_AUTOREPLY=off atau ANTHROPIC_API_KEY kosong)."}{" "}
+              ? `Support 3 tingkat aktif 24 jam, tampil ke outlet sebagai "Tim Support NEXBILL": 1) FAQ tanpa AI dari Jawaban Bot → 2) ${aiOn ? "asisten AI (Panduan, perangkat, kendala TV, status akun)" : "asisten AI MATI (ANTHROPIC_API_KEY kosong) — dilewati"} → 3) diteruskan ke kamu. Outlet menilai tiap jawaban (Sudah terbantu / Belum terselesaikan / Bicara dengan tim). Bot diam 2 jam setelah kamu membalas di tiket itu.`
+              : "Balas otomatis MATI (SUPPORT_AUTOREPLY=off)."}{" "}
             <Link href="/platform-admin/support-kb" className="underline">Jawaban Bot</Link>
           </p>
         </div>
@@ -287,7 +291,9 @@ export default function PlatformSupportPage() {
                       className={`max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${m.sender === "outlet" ? "bg-white/5" : bot ? `ml-auto ${esc ? "bg-orange-500/10 border border-orange-400/30" : "bg-sky-500/10"}` : "bg-amber-400/10 ml-auto"}`}
                     >
                       <div className="flex items-center justify-between gap-3 mb-0.5">
-                        <span className={`text-[10px] ${bot ? "text-sky-300" : "text-neutral-500"}`}>{m.senderName || (m.sender === "outlet" ? selected.outletName : "NEXBILL Support")}</span>
+                        <span className={`text-[10px] ${bot ? "text-sky-300" : "text-neutral-500"}`}>
+                          {bot ? `${TIER_LABEL[botTierOf(m.senderName) ?? "ai"]}${esc ? ` ${esc}` : ""}` : m.senderName || (m.sender === "outlet" ? selected.outletName : "NEXBILL Support")}
+                        </span>
                         <span className="text-[10px] text-neutral-600 shrink-0">{formatDateTime(m.createdAt)}</span>
                       </div>
                       {m.body}

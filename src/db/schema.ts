@@ -3358,8 +3358,12 @@ export const telegramSupportMessages = pgTable(
     role: text("role", { enum: ["user", "bot", "team"] }).notNull(),
     body: text("body").notNull(),
     priority: text("priority", { enum: ["P1", "P2", "P3", "P4"] }),
-    /** Hanya di pesan bot: answered = dijawab bot, ticket = tiket dibuat, urgent = tiket P1. */
-    resolution: text("resolution", { enum: ["answered", "ticket", "urgent"] }),
+    /**
+     * Pesan bot: faq = dijawab tingkat 1 (tanpa AI), answered = dijawab AI (tingkat 2), ticket = diteruskan ke
+     * staf (tingkat 3), urgent = tiket P1. Pesan user dari tombol penilaian: fb_ok / fb_no / fb_team
+     * (update_id = "fb:<id pesan bot>" → satu penilaian per jawaban). Kolom teks biasa: tanpa migrasi.
+     */
+    resolution: text("resolution", { enum: ["answered", "ticket", "urgent", "faq", "fb_ok", "fb_no", "fb_team"] }),
     supportThreadId: text("support_thread_id").references(() => supportThreads.id),
     /** update_id Telegram (pesan user) — mencegah pesan diproses dua kali saat Telegram mengirim ulang. */
     updateId: text("update_id"),

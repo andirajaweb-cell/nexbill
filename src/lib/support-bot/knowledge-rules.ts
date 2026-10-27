@@ -52,7 +52,7 @@ export function groupDictEntries(entries: Record<string, string>, prefixes: stri
 }
 
 const STOPWORDS = new Set(
-  "yang dan di ke dari untuk dengan ini itu ada tidak bisa saya kami kamu apa bagaimana cara kenapa mengapa atau juga sudah belum akan pada dalam karena jadi kalau jika agar the a an and or of to in is on for how why what my our can not".split(" ")
+  "yang dan di ke dari untuk dengan ini itu ada tidak bisa saya aku kami kita kamu anda apa bagaimana gimana cara kenapa mengapa atau juga sudah udah belum akan pada dalam karena jadi kalau jika agar terus lagi dong ya sih kok mau ingin tolong mohon the a an and or of to in is on for how why what my our can not".split(" ")
 );
 
 export function tokenize(s: string): string[] {
@@ -61,7 +61,35 @@ export function tokenize(s: string): string[] {
     .normalize("NFKD")
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/)
-    .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
+    .filter((w) => w.length >= 2 && !STOPWORDS.has(w))
+    .map(stemId);
+}
+
+/**
+ * Stemmer Bahasa Indonesia ringan: "menambah" → "tambah", "pembayaran" → "bayar", "dicetak" → "cetak".
+ * Diterapkan sama ke pertanyaan dan jawaban, jadi kecocokan tetap konsisten walau tidak sempurna.
+ */
+export function stemId(w: string): string {
+  if (w.length <= 5 || /\d/.test(w)) return w;
+  let r = w;
+  for (const suf of ["nya", "kan", "an", "lah"]) {
+    if (r.endsWith(suf) && r.length - suf.length >= 4) {
+      r = r.slice(0, -suf.length);
+      break;
+    }
+  }
+  const v = /^[aiueo]/;
+  if (r.startsWith("meng") && r.length > 7) r = v.test(r.slice(4)) ? "k" + r.slice(4) : r.slice(4);
+  else if (r.startsWith("meny") && r.length > 7) r = "s" + r.slice(4);
+  else if (r.startsWith("mem") && r.length > 6) r = v.test(r.slice(3)) ? "p" + r.slice(3) : r.slice(3);
+  else if (r.startsWith("men") && r.length > 6) r = v.test(r.slice(3)) ? "t" + r.slice(3) : r.slice(3);
+  else if (r.startsWith("me") && r.length > 5) r = r.slice(2);
+  else if (r.startsWith("peng") && r.length > 7) r = v.test(r.slice(4)) ? "k" + r.slice(4) : r.slice(4);
+  else if (r.startsWith("pem") && r.length > 6) r = v.test(r.slice(3)) ? "p" + r.slice(3) : r.slice(3);
+  else if (r.startsWith("pen") && r.length > 6) r = v.test(r.slice(3)) ? "t" + r.slice(3) : r.slice(3);
+  else if (/^(di|ke|se)/.test(r) && r.length > 5) r = r.slice(2);
+  else if (/^(ber|ter|per)/.test(r) && r.length > 6) r = r.slice(3);
+  return r;
 }
 
 /** Skor = jumlah kata kueri yang muncul (judul berbobot 2), dibagi akar panjang potongan supaya potongan raksasa tidak selalu menang. */

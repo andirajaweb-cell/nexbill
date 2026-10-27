@@ -1,14 +1,34 @@
 /**
  * Memproses satu update Telegram (dipanggil webhook setelah respons 200 dikirim, lewat after()).
- * Alur sesuai dokumen kerangka: tautan akun → pesan merchant → bot AI (panduan + status akun) →
- * terjawab / tiket / P1. Balasan merchant ke pesan tim masuk langsung ke tiketnya.
+ *
+ * Support 3 tingkat (lib/support-bot/tiers.ts):
+ *   1. FAQ tanpa AI  — Jawaban Bot yang cocoknya yakin (outlet berbahasa Indonesia). Gratis, instan.
+ *   2. Claude Haiku  — bila FAQ tidak yakin, atau merchant menekan "Belum terselesaikan".
+ *   3. Staf jaga     — bila AI meneruskan, merchant menekan "Bicara dengan tim" / "Belum terselesaikan"
+ *                      setelah AI, AI tidak tersedia, atau darurat.
+ * Setiap jawaban tingkat 1–2 diberi tombol ✅ Sudah terbantu · ❌ Belum terselesaikan · 👤 Bicara dengan tim.
+ * Balasan merchant ke pesan tim masuk langsung ke tiketnya.
  */
-import { sendTelegramText, sendTyping, type TgMessage, type TgUpdate } from "./api";
-import { escalateWithNotify, runSupportBrain, type BrainInput } from "@/lib/support-bot/brain";
+import { answerCallbackQuery, removeButtons, sendTelegramText, sendTyping, type TgCallbackQuery, type TgInlineButton, type TgMessage, type TgUpdate } from "./api";
+import { aiAvailable, escalateWithNotify, runSupportBrain, type BrainInput, type BrainResult } from "@/lib/support-bot/brain";
+import { tier1Answer } from "@/lib/support-bot/knowledge";
+import {
+  composeTier1Reply,
+  detectIntent,
+  feedbackData,
+  isFeedbackEcho,
+  isFrustrated,
+  MAX_MESSAGES_PER_10_MIN,
+  nameVar,
+  nextTier,
+  parseFeedbackData,
+  type Feedback,
+} from "@/lib/support-bot/tiers";
 import { botText } from "./bot-text";
 import {
   accountStatus,
   appendToTicket,
+  botLogForChat,
   createSupportTicket,
   DASHBOARD_URL,
   getLinkByChat,
@@ -22,9 +42,10 @@ import {
   threadForTelegramMessage,
   touchLink,
   unlinkChat,
+  userMessagesSince,
   type TelegramLink,
 } from "./support-service";
-import { enforcedPriority, isSupportHours, parseCommand } from "./support-rules";
+import { enforcedPriority, isSupportHours, parseCommand, type SupportPriority } from "./support-rules";
 
 function langOf(msg: TgMessage, fallback = "id"): string {
   const code = msg.from?.language_code?.slice(0, 2);
@@ -32,12 +53,32 @@ function langOf(msg: TgMessage, fallback = "id"): string {
   return code && ["id", "en", "ms", "th", "vi"].includes(code) ? code : fallback;
 }
 
-async function reply(chatId: string, text: string, outletId: string | null, extra: { resolution?: "answered" | "ticket" | "urgent"; priority?: "P1" | "P2" | "P3" | "P4" | null; threadId?: string | null } = {}) {
-  await sendTelegramText(chatId, text);
-  await logMessage({ chatId, outletId, role: "bot", body: text, resolution: extra.resolution ?? null, priority: extra.priority ?? null, supportThreadId: extra.threadId ?? null }).catch(() => undefined);
+type Resolution = "answered" | "ticket" | "urgent" | "faq";
+
+function feedbackButtons(lang: string, logId: string, only?: Feedback[]): TgInlineButton[][] {
+  const b = (kind: Feedback, key: "btnOk" | "btnNo" | "btnTeam") => ({ text: botText(lang, key), callback_data: feedbackData(kind, logId) });
+  if (only) return [only.map((k) => b(k, k === "ok" ? "btnOk" : k === "no" ? "btnNo" : "btnTeam"))];
+  return [[b("ok", "btnOk")], [b("no", "btnNo"), b("team", "btnTeam")]];
+}
+
+/**
+ * Kirim balasan bot + catat di log. `buttons` = pasang tombol penilaian (butuh id log, jadi dicatat dulu);
+ * bila pencatatan gagal, pesan tetap terkirim tanpa tombol.
+ */
+async function reply(
+  chatId: string,
+  lang: string,
+  text: string,
+  outletId: string | null,
+  extra: { resolution?: Resolution; priority?: SupportPriority | null; threadId?: string | null; buttons?: true | Feedback[] } = {}
+) {
+  const logId = await logMessage({ chatId, outletId, role: "bot", body: text, resolution: extra.resolution ?? null, priority: extra.priority ?? null, supportThreadId: extra.threadId ?? null }).catch(() => null);
+  const buttons = extra.buttons && logId ? feedbackButtons(lang, logId, extra.buttons === true ? undefined : extra.buttons) : undefined;
+  await sendTelegramText(chatId, text, { buttons });
 }
 
 export async function handleTelegramUpdate(update: TgUpdate) {
+  if (update.callback_query) return handleFeedback(update.callback_query);
   const msg = update.message;
   if (!msg || msg.from?.is_bot) return;
   const chatId = String(msg.chat.id);
@@ -99,27 +140,156 @@ export async function handleTelegramUpdate(update: TgUpdate) {
     const threadId = await threadForTelegramMessage(chatId, String(msg.reply_to_message.message_id));
     if (threadId) {
       await appendToTicket(threadId, link, text);
-      await reply(chatId, botText(lang, "appended", { ticket: threadId.slice(0, 8) }), link.outletId, { resolution: "ticket", threadId });
+      await reply(chatId, lang, botText(lang, "appended", { ticket: threadId.slice(0, 8) }), link.outletId, { resolution: "ticket", threadId });
       return;
     }
   }
 
-  if (cmd?.command === "tim") {
-    await escalateToTeam(link, lang, cmd.arg);
+  // Rem banjir pesan (melindungi kuota AI): balas sekali saat ambang terlewati, sesudahnya diam.
+  const recent = await userMessagesSince(chatId, 10).catch(() => 0);
+  if (recent > MAX_MESSAGES_PER_10_MIN) {
+    if (recent === MAX_MESSAGES_PER_10_MIN + 1) await sendTelegramText(chatId, botText(lang, "slowDown"));
     return;
   }
 
-  await sendTyping(chatId);
-  const outlet = await outletName(link.outletId);
-  try {
-    const turns = await recentConversation(chatId);
-    const result = await runSupportBrain({ ...brainBase(link, outlet, lang), turns });
-    await reply(chatId, result.reply, link.outletId, { resolution: result.resolution, priority: result.priority, threadId: result.ref ? threadIdByRef.get(result.ref) ?? null : null });
-  } catch (err) {
-    // AI gagal → pesan tidak boleh hilang: langsung jadi tiket.
-    console.error("Bot Telegram support gagal menjawab:", err);
-    await escalateToTeam(link, lang, text, true);
+  if (cmd?.command === "tim") {
+    await escalateToTeam(link, lang, cmd.arg, { tried: "Merchant memilih /tim." });
+    return;
   }
+
+  const name = nameVar(link.staffName, lang);
+  const outlet = await outletName(link.outletId);
+  const intent = detectIntent(text);
+  const turns = await recentConversation(chatId);
+  const earlierUser = turns.filter((t) => t.role === "user" && !isFeedbackEcho(t.body)).length > 1;
+
+  switch (intent) {
+    case "human":
+      await escalateToTeam(link, lang, text, { tried: "Merchant minta bicara dengan staf." });
+      return;
+    case "is_bot":
+      await reply(chatId, lang, botText(lang, "isBot", { name }), link.outletId, { buttons: ["team"] });
+      return;
+    case "greeting":
+      await reply(chatId, lang, botText(lang, "greeting", { name, outlet }), link.outletId);
+      return;
+    case "thanks":
+      await reply(chatId, lang, botText(lang, "thanks", { name }), link.outletId);
+      return;
+    case "not_resolved": {
+      // "masih belum bisa" setelah jawaban bot = sama dengan menekan "Belum terselesaikan".
+      const lastBot = [...turns].reverse().find((t) => t.role === "bot");
+      if (lastBot) {
+        await notResolved(link, lang, outlet, lastBot.resolution === "faq" ? "faq" : "ai");
+        return;
+      }
+      break;
+    }
+    case "vague":
+      // Pesan pendek tanpa topik di awal percakapan → tanya balik dengan ramah (bukan tiket).
+      if (!earlierUser) {
+        await reply(chatId, lang, botText(lang, "clarify", { name }), link.outletId);
+        return;
+      }
+      break; // lanjutan percakapan ("yang di kasir") → AI membaca konteksnya
+    default:
+      break;
+  }
+
+  // Tingkat 1: FAQ tanpa AI — hanya pertanyaan baru yang cocoknya yakin (bukan darurat, bukan lanjutan samar).
+  if (intent === "question") {
+    const m = await tier1Answer(text, lang).catch(() => null);
+    if (m) {
+      const body = composeTier1Reply(m, { name: link.staffName, frustrated: isFrustrated(text), seed: `${chatId}:${update.update_id}` });
+      await reply(chatId, lang, body, link.outletId, { resolution: "faq", buttons: true });
+      return;
+    }
+  }
+
+  // Tingkat 2: AI. Tidak tersedia → langsung ke staf (pesan tidak boleh hilang).
+  await runAi(link, lang, outlet, turns);
+}
+
+async function runAi(link: TelegramLink, lang: string, outlet: string, turns: Awaited<ReturnType<typeof recentConversation>>, tierNote?: string) {
+  const chatId = link.chatId!;
+  const latest = [...turns].reverse().find((t) => t.role === "user" && !isFeedbackEcho(t.body))?.body ?? "";
+  if (!aiAvailable()) {
+    await escalateToTeam(link, lang, latest, { tried: tierNote ? "Jawaban FAQ sudah dicoba, belum terselesaikan." : "Belum ada di Jawaban Bot (FAQ).", priority: tierNote ? "P2" : "P3" });
+    return;
+  }
+  await sendTyping(chatId);
+  let result: BrainResult;
+  try {
+    result = await runSupportBrain({ ...brainBase(link, outlet, lang), turns, tierNote });
+  } catch (err) {
+    // AI gagal → pesan tidak boleh hilang: langsung ke staf.
+    console.error("Bot Telegram support gagal menjawab:", err);
+    await escalateToTeam(link, lang, latest, { tried: "Asisten AI sedang gangguan — diteruskan otomatis.", priority: "P2" });
+    return;
+  }
+  const threadId = result.ref ? threadIdByRef.get(result.ref) ?? null : null;
+  await reply(chatId, lang, result.reply, link.outletId, {
+    resolution: result.resolution,
+    priority: result.priority,
+    threadId,
+    // Sudah diteruskan ke staf → cukup satu tombol penutup; dijawab AI → tombol lengkap.
+    buttons: result.resolution === "answered" ? true : undefined,
+  });
+}
+
+/** "Belum terselesaikan": naik satu tingkat (FAQ → AI → staf). */
+async function notResolved(link: TelegramLink, lang: string, outlet: string, from: "faq" | "ai") {
+  const chatId = link.chatId!;
+  const next = nextTier(from);
+  if (next === "ai" && aiAvailable()) {
+    await sendTelegramText(chatId, botText(lang, "fbDeeper", { name: nameVar(link.staffName, lang) }));
+    const turns = await recentConversation(chatId);
+    await runAi(
+      link,
+      lang,
+      outlet,
+      turns,
+      'Merchant menekan "Belum terselesaikan" atas jawaban FAQ sebelumnya (tingkat 1). Jangan ulangi jawaban itu: periksa status_akun, tanyakan singkat di langkah mana gagal bila belum jelas, beri pendekatan lain; bila tetap buntu teruskan_ke_tim.'
+    );
+    return;
+  }
+  await escalateToTeam(link, lang, "", { tried: from === "faq" ? "Jawaban FAQ sudah dicoba, belum terselesaikan." : "Jawaban FAQ & asisten AI sudah dicoba, merchant menekan \"Belum terselesaikan\".", priority: "P2" });
+}
+
+/** Tombol penilaian di bawah jawaban bot. Satu penilaian per jawaban (update_id "fb:<id>" unik di log). */
+async function handleFeedback(cq: TgCallbackQuery) {
+  const fb = parseFeedbackData(cq.data);
+  const chat = cq.message?.chat;
+  if (!fb || !chat || chat.type !== "private") {
+    await answerCallbackQuery(cq.id);
+    return;
+  }
+  const chatId = String(chat.id);
+  const link = await getLinkByChat(chatId);
+  const bot = link ? await botLogForChat(chatId, fb.logId) : null;
+  if (!link || !bot) {
+    await answerCallbackQuery(cq.id);
+    return;
+  }
+  const lang = await outletLang(link.outletId);
+  const label = botText(lang, fb.kind === "ok" ? "btnOk" : fb.kind === "no" ? "btnNo" : "btnTeam");
+  const fresh = await logUserMessage({ chatId, outletId: link.outletId, body: label, updateId: `fb:${fb.logId}`, resolution: `fb_${fb.kind}` as const });
+  if (cq.message) await removeButtons(chatId, cq.message.message_id);
+  if (!fresh) {
+    await answerCallbackQuery(cq.id, botText(lang, "fbDone"));
+    return;
+  }
+  await answerCallbackQuery(cq.id);
+  await touchLink(chatId);
+  if (fb.kind === "ok") {
+    await reply(chatId, lang, botText(lang, "fbThanks", { name: nameVar(link.staffName, lang) }), link.outletId);
+    return;
+  }
+  if (fb.kind === "team") {
+    await escalateToTeam(link, lang, "", { tried: `Merchant menekan "Bicara dengan tim" setelah jawaban ${bot.resolution === "faq" ? "FAQ" : "asisten"}.` });
+    return;
+  }
+  await notResolved(link, lang, await outletName(link.outletId), bot.resolution === "faq" ? "faq" : "ai");
 }
 
 /** Nomor tiket pendek (ref) → id tiket penuh, untuk log percakapan. Hanya hidup selama satu update. */
@@ -142,24 +312,24 @@ function brainBase(link: TelegramLink, outlet: string, lang: string): Omit<Brain
   };
 }
 
-/** /tim, atau AI gagal: ringkas percakapan berjalan menjadi tiket. */
-async function escalateToTeam(link: TelegramLink, lang: string, note: string, botFailed = false) {
+/** Tingkat 3 — staf: ringkas percakapan berjalan menjadi tiket (+ notifikasi petugas jaga sesuai prioritas). */
+async function escalateToTeam(link: TelegramLink, lang: string, note: string, opts: { tried: string; priority?: SupportPriority }) {
   const chatId = link.chatId!;
   const turns = await recentConversation(chatId);
-  const userLines = turns.filter((t) => t.role === "user" && !t.body.startsWith("/")).map((t) => t.body);
-  const summary = (note || userLines.slice(-3).join(" / ") || "Merchant minta bicara dengan tim lewat Telegram.").slice(0, 2000);
-  const priority = enforcedPriority(botFailed ? "P2" : "P3", { text: [note, ...userLines].join(" ") });
+  const userLines = turns.filter((t) => t.role === "user" && !t.body.startsWith("/") && !isFeedbackEcho(t.body)).map((t) => t.body);
+  const summary = (note || userLines.slice(-3).join(" / ") || "Merchant minta bicara dengan staf lewat Telegram.").slice(0, 2000);
+  const priority = enforcedPriority(opts.priority ?? "P3", { text: [note, ...userLines].join(" ") });
   const status = await accountStatus(link.outletId).catch(() => null);
   const outlet = await outletName(link.outletId);
   const { ref } = await escalateWithNotify(brainBase(link, outlet, lang), {
     priority,
     category: priority === "P1" || priority === "P2" ? "kendala_teknis" : "lainnya",
     summary,
-    tried: botFailed ? "Bot AI gagal menjawab (gangguan sementara) — diteruskan otomatis." : "Merchant memilih /tim.",
+    tried: opts.tried,
     accountStatus: status ? statusLine(status) : undefined,
   });
-  const key = isSupportHours() ? "ticketInHours" : priority === "P1" ? "ticketUrgentAfterHours" : "ticketAfterHours";
-  await reply(chatId, botText(lang, key, { ticket: ref }), link.outletId, {
+  const key = priority === "P1" && !isSupportHours() ? "ticketUrgentAfterHours" : isSupportHours() ? "ticketInHours" : "ticketAfterHours";
+  await reply(chatId, lang, botText(lang, key, { ticket: ref }), link.outletId, {
     resolution: priority === "P1" ? "urgent" : "ticket",
     priority,
     threadId: threadIdByRef.get(ref) ?? null,

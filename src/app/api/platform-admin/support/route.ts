@@ -6,6 +6,7 @@ import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
 import { isBotSender, needsHuman } from "@/lib/support-bot/autoreply-rules";
 import { autoReplyEnabled } from "@/lib/support-bot/dashboard-autoreply";
+import { aiAvailable } from "@/lib/support-bot/brain";
 
 /**
  * Cross-tenant inbox — every outlet's support tickets, joined with the outlet name, newest first. Gated by requirePlatformAdmin, a wholly separate auth system from outlet staff sessions.
@@ -45,11 +46,12 @@ export async function GET() {
       }
     }
     const autoReply = autoReplyEnabled();
+    const aiOn = aiAvailable();
     return NextResponse.json(
       rows.map((r) => {
         const msgs = byThread.get(r.id) ?? [];
         const h = needsHuman(msgs, r.status);
-        return { ...r, needsHuman: h.needs, escalatedPriority: h.priority, botReplies: msgs.filter((m) => m.sender === "platform_admin" && isBotSender(m.senderName)).length, autoReply };
+        return { ...r, needsHuman: h.needs, escalatedPriority: h.priority, botReplies: msgs.filter((m) => m.sender === "platform_admin" && isBotSender(m.senderName)).length, autoReply, aiOn };
       })
     );
   } catch (err: unknown) {

@@ -122,8 +122,30 @@ export async function logUserMessage(row: Omit<LogInsert, "role">): Promise<bool
   return inserted.length > 0;
 }
 
-export async function logMessage(row: LogInsert) {
-  await db.insert(telegramSupportMessages).values(row);
+/** Catat pesan; mengembalikan id baris (dipakai tombol penilaian di Telegram). */
+export async function logMessage(row: LogInsert): Promise<string | null> {
+  const [r] = await db.insert(telegramSupportMessages).values(row).returning({ id: telegramSupportMessages.id });
+  return r?.id ?? null;
+}
+
+/** Pesan bot milik chat ini (untuk tombol penilaian) — dibatasi chatId supaya tombol chat lain tidak bisa dipakai. */
+export async function botLogForChat(chatId: string, logId: string) {
+  const [row] = await db
+    .select()
+    .from(telegramSupportMessages)
+    .where(and(eq(telegramSupportMessages.id, logId), eq(telegramSupportMessages.chatId, chatId), eq(telegramSupportMessages.role, "bot")))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Jumlah pesan merchant di chat ini dalam N menit terakhir (rem banjir pesan). */
+export async function userMessagesSince(chatId: string, minutes: number): Promise<number> {
+  const since = new Date(Date.now() - minutes * 60_000).toISOString();
+  const [r] = await db
+    .select({ n: count() })
+    .from(telegramSupportMessages)
+    .where(and(eq(telegramSupportMessages.chatId, chatId), eq(telegramSupportMessages.role, "user"), gte(telegramSupportMessages.createdAt, since)));
+  return r?.n ?? 0;
 }
 
 export async function touchLink(chatId: string) {
@@ -135,7 +157,7 @@ export type ContextTurn = ChatTurn;
 /** Riwayat percakapan yang sedang berjalan (berhenti di jeda > 6 jam), lama → baru. */
 export async function recentConversation(chatId: string): Promise<ContextTurn[]> {
   const rows = await db
-    .select({ role: telegramSupportMessages.role, body: telegramSupportMessages.body, createdAt: telegramSupportMessages.createdAt })
+    .select({ role: telegramSupportMessages.role, body: telegramSupportMessages.body, createdAt: telegramSupportMessages.createdAt, resolution: telegramSupportMessages.resolution })
     .from(telegramSupportMessages)
     .where(eq(telegramSupportMessages.chatId, chatId))
     .orderBy(desc(telegramSupportMessages.createdAt))
@@ -189,7 +211,7 @@ export async function createSupportTicket(input: TicketInput): Promise<{ threadI
   const now = new Date().toISOString();
   const who = `${input.link.staffName ?? "Staf"} (via Telegram${input.link.telegramUsername ? ` @${input.link.telegramUsername}` : ""})`;
   const body = [
-    `Tiket dari bot Telegram — prioritas ${input.priority}.`,
+    `Diteruskan dari chat Telegram — prioritas ${input.priority}.`,
     `Masalah: ${input.summary.trim()}`,
     input.tried?.trim() ? `Sudah dicoba: ${input.tried.trim()}` : null,
     input.accountStatus?.trim() ? `Status akun saat itu: ${input.accountStatus.trim()}` : null,

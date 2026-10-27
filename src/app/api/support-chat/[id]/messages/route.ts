@@ -5,6 +5,7 @@ import { eq, asc } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/api/error";
 import { autoReplySupportThread } from "@/lib/support-bot/dashboard-autoreply";
+import { isBotSender, rateableMessageId } from "@/lib/support-bot/autoreply-rules";
 
 /** Bot support membalas otomatis setelah respons dikirim (after) — butuh waktu untuk AI. */
 export const maxDuration = 60;
@@ -32,7 +33,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!alreadyRead) {
       await db.update(supportThreads).set({ outletLastReadAt: new Date().toISOString() }).where(eq(supportThreads.id, id));
     }
-    return NextResponse.json(rows);
+    // Outlet melihat satu tim (nama tim dari kamus chat.supportName): penanda internal bot (tingkat/prioritas) tidak ikut terkirim.
+    const rateable = rateableMessageId(rows, thread.status);
+    return NextResponse.json(
+      rows.map((m) => (m.sender === "platform_admin" && isBotSender(m.senderName) ? { ...m, senderName: null, canRate: m.id === rateable } : m))
+    );
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }

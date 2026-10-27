@@ -65,8 +65,9 @@ describe("teks Telegram", () => {
     expect(parts.join("").length).toBe(9000);
     expect(splitTelegramText("pendek")).toEqual(["pendek"]);
   });
-  it("judul tiket menyebut prioritas & dipotong", () => {
-    expect(ticketSubject("TV  unit 3\nmati", "P2")).toBe("[Telegram P2] TV unit 3 mati");
+  it("judul tiket berupa kalimat biasa (darurat ditandai) & dipotong", () => {
+    expect(ticketSubject("TV  unit 3\nmati", "P2")).toBe("TV unit 3 mati");
+    expect(ticketSubject("kasir tidak bisa login", "P1")).toBe("Darurat: Kasir tidak bisa login");
     expect(ticketSubject("x".repeat(100), "P1").endsWith("…")).toBe(true);
   });
   it("setiap teks tetap punya 6 bahasa dengan placeholder yang sama", () => {
@@ -78,7 +79,7 @@ describe("teks Telegram", () => {
         expect(ph(entry[l]), `${key}.${l}`).toBe(base);
       }
     }
-    expect(botText("xx", "appended", { ticket: "ab12" })).toBe("Ditambahkan ke tiket #ab12. Tim akan membalas di sini.");
+    expect(botText("xx", "appended", { ticket: "ab12" })).toBe("Siap, sudah kami tambahkan ke tiket #ab12. Staf kami membalas di sini ya 🙏");
   });
 });
 
@@ -115,7 +116,17 @@ describe("metrik selesai di bot", () => {
       { chatId: "b", role: "user" as const, resolution: null, createdAt: "2026-10-01T03:00:00Z" },
       { chatId: "b", role: "bot" as const, resolution: "urgent" as const, createdAt: "2026-10-01T03:00:05Z" },
     ];
-    expect(conversationStats(rows)).toEqual({ conversations: 3, resolvedByBot: 1, tickets: 2, urgent: 1, deflection: 1 / 3 });
+    expect(conversationStats(rows)).toMatchObject({ conversations: 3, resolvedByBot: 1, tickets: 2, urgent: 1, deflection: 1 / 3 });
     expect(conversationStats([]).deflection).toBeNull();
+  });
+  it("menghitung jawaban per tingkat & tombol penilaian (tombol tidak membuka percakapan baru)", () => {
+    const rows = [
+      { chatId: "a", role: "user" as const, resolution: null, createdAt: "2026-10-01T01:00:00Z" },
+      { chatId: "a", role: "bot" as const, resolution: "faq", createdAt: "2026-10-01T01:00:01Z" },
+      { chatId: "a", role: "user" as const, resolution: "fb_no", createdAt: "2026-10-01T08:00:00Z" },
+      { chatId: "a", role: "bot" as const, resolution: "answered", createdAt: "2026-10-01T08:00:05Z" },
+      { chatId: "a", role: "user" as const, resolution: "fb_ok", createdAt: "2026-10-01T08:01:00Z" },
+    ];
+    expect(conversationStats(rows)).toMatchObject({ conversations: 1, resolvedByBot: 1, faqAnswers: 1, aiAnswers: 1, feedbackOk: 1, feedbackNo: 1, feedbackTeam: 0 });
   });
 });

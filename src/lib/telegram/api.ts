@@ -41,8 +41,17 @@ export interface TgSentMessage {
   message_id: number;
 }
 
-/** Kirim teks (dipotong otomatis bila > 4096 karakter). Mengembalikan message_id pesan terakhir. */
-export async function sendTelegramText(chatId: string | number, text: string, opts: { replyTo?: number } = {}): Promise<number | null> {
+export interface TgInlineButton {
+  text: string;
+  callback_data: string;
+}
+
+/** Kirim teks (dipotong otomatis bila > 4096 karakter). Tombol (inline keyboard) dipasang di potongan terakhir. */
+export async function sendTelegramText(
+  chatId: string | number,
+  text: string,
+  opts: { replyTo?: number; buttons?: TgInlineButton[][] } = {}
+): Promise<number | null> {
   let last: number | null = null;
   const parts = splitTelegramText(text);
   for (let i = 0; i < parts.length; i++) {
@@ -51,10 +60,21 @@ export async function sendTelegramText(chatId: string | number, text: string, op
       text: parts[i],
       disable_web_page_preview: true,
       ...(i === 0 && opts.replyTo ? { reply_parameters: { message_id: opts.replyTo, allow_sending_without_reply: true } } : {}),
+      ...(i === parts.length - 1 && opts.buttons?.length ? { reply_markup: { inline_keyboard: opts.buttons } } : {}),
     });
     last = msg.message_id;
   }
   return last;
+}
+
+/** Tutup "loading" tombol di aplikasi Telegram (wajib dijawab ≤ 10 detik), opsional dengan notifikasi singkat. */
+export async function answerCallbackQuery(id: string, text?: string) {
+  await telegramCall("answerCallbackQuery", { callback_query_id: id, ...(text ? { text } : {}) }).catch(() => undefined);
+}
+
+/** Hapus tombol dari pesan yang sudah dinilai merchant (tidak bisa ditekan dua kali). */
+export async function removeButtons(chatId: string | number, messageId: number) {
+  await telegramCall("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
 }
 
 export async function sendTyping(chatId: string | number) {
@@ -94,10 +114,10 @@ export async function getWebhookInfo(): Promise<TgWebhookInfo> {
 }
 
 export async function setWebhook(url: string, secret: string) {
-  await telegramCall("setWebhook", { url, secret_token: secret, allowed_updates: ["message"], drop_pending_updates: false, max_connections: 20 });
+  await telegramCall("setWebhook", { url, secret_token: secret, allowed_updates: ["message", "callback_query"], drop_pending_updates: false, max_connections: 20 });
   await telegramCall("setMyCommands", {
     commands: [
-      { command: "tim", description: "Bicara dengan tim NEXBILL (buat tiket)" },
+      { command: "tim", description: "Bicara dengan staf Tim Support NEXBILL" },
       { command: "status", description: "Cek status akun & perangkat outlet" },
       { command: "bantuan", description: "Cara memakai bot ini" },
       { command: "putus", description: "Putuskan Telegram dari akun NEXBILL" },
@@ -128,7 +148,15 @@ export interface TgMessage {
   reply_to_message?: { message_id: number };
 }
 
+export interface TgCallbackQuery {
+  id: string;
+  from: TgUser;
+  data?: string;
+  message?: { message_id: number; chat: { id: number; type: string } };
+}
+
 export interface TgUpdate {
   update_id: number;
   message?: TgMessage;
+  callback_query?: TgCallbackQuery;
 }

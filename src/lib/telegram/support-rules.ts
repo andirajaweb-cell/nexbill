@@ -111,7 +111,7 @@ export function splitTelegramText(text: string, max = TELEGRAM_MAX_CHARS): strin
 export interface LogRow {
   chatId: string;
   role: "user" | "bot" | "team";
-  resolution: "answered" | "ticket" | "urgent" | null;
+  resolution: string | null;
   createdAt: string;
 }
 
@@ -122,6 +122,13 @@ export interface ConversationStats {
   urgent: number;
   /** Tingkat selesai di bot (0–1); null bila belum ada percakapan. */
   deflection: number | null;
+  /** Jawaban per tingkat: 1 = FAQ tanpa AI, 2 = AI. */
+  faqAnswers: number;
+  aiAnswers: number;
+  /** Tombol penilaian merchant. */
+  feedbackOk: number;
+  feedbackNo: number;
+  feedbackTeam: number;
 }
 
 /**
@@ -138,6 +145,18 @@ export function conversationStats(rows: LogRow[], gapMs = CONVERSATION_GAP_MS): 
   let resolvedByBot = 0;
   let tickets = 0;
   let urgent = 0;
+  let faqAnswers = 0;
+  let aiAnswers = 0;
+  let feedbackOk = 0;
+  let feedbackNo = 0;
+  let feedbackTeam = 0;
+  for (const r of rows) {
+    if (r.role === "bot" && r.resolution === "faq") faqAnswers++;
+    if (r.role === "bot" && r.resolution === "answered") aiAnswers++;
+    if (r.resolution === "fb_ok") feedbackOk++;
+    if (r.resolution === "fb_no") feedbackNo++;
+    if (r.resolution === "fb_team") feedbackTeam++;
+  }
   for (const list of byChat.values()) {
     list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     let open = false;
@@ -153,7 +172,8 @@ export function conversationStats(rows: LogRow[], gapMs = CONVERSATION_GAP_MS): 
     };
     for (const r of list) {
       const at = new Date(r.createdAt).getTime();
-      if (r.role === "user") {
+      // Tombol penilaian bukan pesan baru: tidak membuka percakapan.
+      if (r.role === "user" && !r.resolution?.startsWith("fb_")) {
         if (!open || at - lastUserAt > gapMs) {
           close();
           open = true;
@@ -168,20 +188,35 @@ export function conversationStats(rows: LogRow[], gapMs = CONVERSATION_GAP_MS): 
     }
     close();
   }
-  return { conversations, resolvedByBot, tickets, urgent, deflection: conversations ? resolvedByBot / conversations : null };
+  return {
+    conversations,
+    resolvedByBot,
+    tickets,
+    urgent,
+    deflection: conversations ? resolvedByBot / conversations : null,
+    faqAnswers,
+    aiAnswers,
+    feedbackOk,
+    feedbackNo,
+    feedbackTeam,
+  };
 }
 
 /** Pratinjau singkat untuk judul tiket. */
 export function ticketSubject(summary: string, priority: SupportPriority): string {
   const one = summary.replace(/\s+/g, " ").trim();
   const cut = one.length > 70 ? `${one.slice(0, 70)}…` : one;
-  return `[Telegram ${priority}] ${cut}`;
+  // Judul terlihat merchant di Customer Service: kalimat biasa, bukan kode mesin. Prioritas ada di badan tiket.
+  const nice = cut ? cut.charAt(0).toUpperCase() + cut.slice(1) : "Permintaan bantuan";
+  return priority === "P1" ? `Darurat: ${nice}` : nice;
 }
 
 export interface ChatTurn {
   role: "user" | "bot" | "team";
   body: string;
   createdAt: string;
+  /** Pesan bot: tingkat yang menjawab (faq/answered/ticket/urgent); tombol penilaian: fb_*. */
+  resolution?: string | null;
 }
 
 /** Riwayat log → pesan AI yang bergantian user/assistant dan diawali user (syarat API). */

@@ -36,6 +36,8 @@ interface Message {
   attachmentType?: string | null;
   attachmentName?: string | null;
   createdAt: string;
+  /** Jawaban Tim Support terakhir yang bisa dinilai (tombol ✅/❌/👤). */
+  canRate?: boolean;
 }
 
 interface PendingAttachment {
@@ -163,6 +165,23 @@ export default function SupportChatPage() {
       setSelected(out.thread);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const [rating, setRating] = useState<string | null>(null);
+  const rate = async (messageId: string, kind: "ok" | "no" | "team") => {
+    if (!selected || rating) return;
+    setRating(messageId);
+    try {
+      await fetch(`/api/support-chat/${selected.id}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, kind }),
+      });
+      setMessages(await fetchJsonArray<Message>(`/api/support-chat/${selected.id}/messages`));
+      await loadThreads();
+    } finally {
+      setRating(null);
     }
   };
 
@@ -308,10 +327,40 @@ export default function SupportChatPage() {
                       <span className="text-[10px] text-neutral-500">{m.sender === "platform_admin" ? m.senderName || t("chat.supportName", "NEXBILL Support") : m.senderName || t("chat.youLabel", "Kamu")}</span>
                       <span className="text-[10px] text-neutral-600 shrink-0">{formatDateTime(m.createdAt, lang)}</span>
                     </div>
-                    {m.body}
+                    <div className="whitespace-pre-wrap">{m.body}</div>
                     {m.attachmentUrl && <AttachmentPreview url={m.attachmentUrl} type={m.attachmentType} name={m.attachmentName} t={t} />}
+                    {m.canRate && (
+                      <div className="mt-2 pt-2 border-t border-white/10 space-y-1.5">
+                        <div className="text-[11px] text-neutral-400">{t("chat.rateHint", "Apakah jawaban ini menyelesaikan kendalanya?")}</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(
+                            [
+                              ["ok", t("chat.rateOk", "✅ Sudah terbantu"), "border-emerald-500/40 text-emerald-200 hover:bg-emerald-500/10"],
+                              ["no", t("chat.rateNo", "❌ Belum terselesaikan"), "border-amber-500/40 text-amber-200 hover:bg-amber-500/10"],
+                              ["team", t("chat.rateTeam", "👤 Bicara dengan tim"), "border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/10"],
+                            ] as const
+                          ).map(([kind, label, cls]) => (
+                            <button
+                              key={kind}
+                              type="button"
+                              disabled={rating !== null}
+                              onClick={() => rate(m.id, kind)}
+                              className={`rounded-full border px-2.5 py-1 text-xs transition disabled:opacity-50 ${cls}`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
+                {selected.status === "open" &&
+                  messages.length > 0 &&
+                  messages[messages.length - 1].sender === "outlet" &&
+                  Date.now() - new Date(messages[messages.length - 1].createdAt).getTime() < 45_000 && (
+                    <div className="text-[11px] italic text-neutral-500 animate-pulse">{t("chat.replying", "Tim Support NEXBILL sedang membalas…")}</div>
+                  )}
                 {messages.length === 0 && <p className="text-xs text-neutral-500 m-auto">{t("chat.noMessages", "Belum ada pesan.")}</p>}
               </div>
               {replyAttachment && (

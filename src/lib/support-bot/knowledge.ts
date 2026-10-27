@@ -28,6 +28,7 @@ import "@/lib/i18n/dict-devices-tvsetup";
 import "@/lib/i18n/dict-local-control";
 import { starterKeyOf, topicOfTags } from "./starter-tags";
 import { STARTER_ANSWERS } from "./starter-answers";
+import { tier1Match, type Tier1Match } from "./tiers";
 import { formatChunks, groupDictEntries, searchChunks, splitMarkdownSections, type KnowledgeChunk } from "./knowledge-rules";
 
 const LANGS: LangCode[] = ["id", "en", "ms", "th", "fil", "vi"];
@@ -105,4 +106,14 @@ export async function searchKnowledge(query: string, lang: string): Promise<stri
   const fromSaved = searchChunks(query, saved, { limit: 3, maxChars: 3500 });
   const rest = searchChunks(query, all.filter((c) => !saved.includes(c)), { limit: 4, maxChars: 6000 });
   return formatChunks([...fromSaved, ...rest]);
+}
+
+/**
+ * Tingkat 1 (tanpa AI): cocokkan pertanyaan dengan Jawaban Bot (jawaban tim + bawaan). Hanya untuk outlet
+ * berbahasa Indonesia — jawaban bawaan berbahasa Indonesia; bahasa lain langsung ke tingkat 2.
+ */
+export async function tier1Answer(query: string, lang: string): Promise<Tier1Match | null> {
+  if (lang !== "id") return null;
+  const m = tier1Match(query, await savedAnswerChunks());
+  return m?.confident ? m : null;
 }

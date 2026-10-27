@@ -17,7 +17,18 @@ interface TgData {
   oncallChats: number;
   migration: boolean;
   linkedChats: number;
-  stats: { conversations: number; resolvedByBot: number; tickets: number; urgent: number; deflection: number | null } | null;
+  stats: {
+    conversations: number;
+    resolvedByBot: number;
+    tickets: number;
+    urgent: number;
+    deflection: number | null;
+    faqAnswers?: number;
+    aiAnswers?: number;
+    feedbackOk?: number;
+    feedbackNo?: number;
+    feedbackTeam?: number;
+  } | null;
 }
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }) : "—");
@@ -143,6 +154,20 @@ export default function TelegramBotPage() {
             <div>
               <div className="text-xs text-neutral-500">P1 darurat</div>
               <div className="text-xl text-rose-300">{s?.urgent ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500">Dijawab tingkat 1 FAQ (gratis)</div>
+              <div className="text-xl text-emerald-300">{s?.faqAnswers ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500">Dijawab tingkat 2 AI</div>
+              <div className="text-xl text-sky-300">{s?.aiAnswers ?? 0}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-xs text-neutral-500">Penilaian merchant</div>
+              <div className="text-sm text-neutral-200">
+                ✅ {s?.feedbackOk ?? 0} terbantu · ❌ {s?.feedbackNo ?? 0} belum · 👤 {s?.feedbackTeam ?? 0} minta staf
+              </div>
             </div>
             <div className="col-span-2">
               <div className="text-xs text-neutral-500">Akun Telegram tertaut</div>

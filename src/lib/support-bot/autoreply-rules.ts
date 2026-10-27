@@ -2,21 +2,51 @@
  * Aturan murni balas-otomatis tiket Customer Service (tanpa DB/AI). Diuji di autoreply-rules.test.ts.
  *
  * Penanda tanpa migrasi: pesan bot disimpan sebagai sender "platform_admin" dengan senderName yang
- * diawali BOT_SENDER. Bila bot meneruskan ke tim, senderName = "Bot NEXBILL · perlu tim P2" — dari
- * situ Platform Admin tahu tiket mana yang menunggu manusia.
+ * diawali BOT_SENDER, diikuti tingkat yang menjawab:
+ *   "Bot NEXBILL · FAQ"          tingkat 1 (tanpa AI)        → tombol penilaian di dashboard
+ *   "Bot NEXBILL"                tingkat 2 (AI; juga pesan bot lama) → tombol penilaian
+ *   "Bot NEXBILL · info"         sapaan/terima kasih/tanya balik → tanpa tombol
+ *   "Bot NEXBILL · perlu tim P2" diteruskan ke staf (tingkat 3) — Platform Admin tahu tiket mana menunggu manusia.
+ * Outlet tidak pernah melihat penanda ini: API outlet mengosongkan namanya → dashboard menampilkan "Tim Support NEXBILL".
  */
 import type { ChatTurn, SupportPriority } from "@/lib/telegram/support-rules";
 
 export const BOT_SENDER = "Bot NEXBILL";
 const NEEDS_TEAM = " · perlu tim ";
+const FAQ_TAG = " · FAQ";
+const INFO_TAG = " · info";
 
 /** Manusia (tim) membalas di tiket ini dalam rentang ini → bot diam, manusia yang menangani. */
 export const HUMAN_ACTIVE_MS = 2 * 3600_000;
 /** Rem: maksimal balasan bot per tiket per jam (mencegah putaran tanpa akhir). */
 export const MAX_BOT_REPLIES_PER_HOUR = 8;
 
-export function botSenderName(escalatedPriority: SupportPriority | null): string {
-  return escalatedPriority ? `${BOT_SENDER}${NEEDS_TEAM}${escalatedPriority}` : BOT_SENDER;
+export type DashboardBotTier = "faq" | "ai" | "info" | "team";
+
+export function botSenderName(escalatedPriority: SupportPriority | null, tier: Exclude<DashboardBotTier, "team"> = "ai"): string {
+  if (escalatedPriority) return `${BOT_SENDER}${NEEDS_TEAM}${escalatedPriority}`;
+  return tier === "faq" ? BOT_SENDER + FAQ_TAG : tier === "info" ? BOT_SENDER + INFO_TAG : BOT_SENDER;
+}
+
+/** Tingkat balasan bot dari senderName; null bila bukan pesan bot. */
+export function botTierOf(name: string | null | undefined): DashboardBotTier | null {
+  if (!isBotSender(name)) return null;
+  if (name!.startsWith(BOT_SENDER + NEEDS_TEAM)) return "team";
+  if (name === BOT_SENDER + FAQ_TAG) return "faq";
+  if (name === BOT_SENDER + INFO_TAG) return "info";
+  return "ai";
+}
+
+/**
+ * Pesan bot yang boleh dinilai outlet (tombol ✅/❌/👤): balasan FAQ/AI yang menjadi pesan terakhir tiket
+ * terbuka. Setelah outlet menilai atau menulis lagi, tombol hilang dengan sendirinya.
+ */
+export function rateableMessageId(msgs: Pick<ThreadMsg, "id" | "sender" | "senderName">[], status: "open" | "resolved"): string | null {
+  if (status !== "open") return null;
+  const last = msgs[msgs.length - 1];
+  if (!last || last.sender !== "platform_admin") return null;
+  const tier = botTierOf(last.senderName);
+  return tier === "faq" || tier === "ai" ? last.id : null;
 }
 
 export function isBotSender(name: string | null | undefined): boolean {
