@@ -107,6 +107,18 @@ export const PLAN_MATRIX: MatrixGroupDef[] = [
     key: "control",
     label: t6("Kontrol & analisis", "Control & insight", "Kawalan & analisis", "การควบคุมและวิเคราะห์", "Kiểm soát & phân tích", "Kontrol at pagsusuri"),
     rows: [
+      {
+        key: "activity_calendar",
+        feature: "activity_calendar",
+        label: t6(
+          "Kalender Bisnis: prakiraan cuaca BMKG + jadwal sepak bola + insight ramai/sepi",
+          "Business Calendar: BMKG weather forecast + football schedule + busy/quiet insights",
+          "Kalendar Perniagaan: ramalan cuaca BMKG + jadual bola sepak + insight sibuk/lengang",
+          "ปฏิทินธุรกิจ: พยากรณ์อากาศ BMKG + ตารางฟุตบอล + ข้อมูลช่วงคนเยอะ/น้อย",
+          "Lịch kinh doanh: dự báo thời tiết BMKG + lịch bóng đá + phân tích lúc đông/vắng",
+          "Business Calendar: BMKG weather forecast + iskedyul ng football + insight kung dagsa/matumal"
+        ),
+      },
       { key: "anti_fraud", feature: "anti_fraud", label: t6("Deteksi shift berisiko otomatis", "Automatic risky-shift detection", "Pengesanan syif berisiko automatik", "ตรวจจับกะที่มีความเสี่ยงอัตโนมัติ", "Tự động phát hiện ca rủi ro", "Awtomatikong pagtukoy ng delikadong shift") },
       {
         key: "telegram_support",

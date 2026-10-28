@@ -20,6 +20,7 @@
  */
 import "dotenv/config";
 import { runBookingScheduler } from "../src/lib/rental/scheduler";
+import { runActivitySync } from "../src/lib/activity-calendar/sync";
 
 // Lowered from 60s to 15s specifically so rental-session auto-stop (runSessionAutoStop) reacts
 // within ~15s of time running out instead of up to a minute — auto-release/waitlist/reminders
@@ -50,3 +51,23 @@ async function tick() {
 console.log(`[booking-scheduler] Berjalan, polling setiap ${POLL_INTERVAL_MS / 1000} detik...`);
 tick();
 setInterval(tick, POLL_INTERVAL_MS);
+
+// Kalender Bisnis: cuaca BMKG (per desa outlet) & jadwal sepak bola. Dicek tiap 30 menit; tiap sumber
+// punya jadwal & rem kuotanya sendiri (lib/activity-calendar), jadi pemanggilan yang "terlalu cepat" tidak
+// memakai kuota. Dijalankan terpisah dari tick booking supaya API luar yang lambat tidak menunda auto-stop sesi.
+const ACTIVITY_SYNC_MS = 30 * 60_000;
+let activityRunning = false;
+async function activityTick() {
+  if (activityRunning) return;
+  activityRunning = true;
+  try {
+    const r = await runActivitySync();
+    if (r.weatherRefreshed || r.football !== "skip") console.log(`[activity-sync] cuaca diperbarui ${r.weatherRefreshed} lokasi, sepak bola: ${r.football}`);
+  } catch (err) {
+    console.error("[activity-sync] Gagal:", err instanceof Error ? err.message : err);
+  } finally {
+    activityRunning = false;
+  }
+}
+setTimeout(activityTick, 20_000);
+setInterval(activityTick, ACTIVITY_SYNC_MS);

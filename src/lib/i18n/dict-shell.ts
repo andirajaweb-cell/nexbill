@@ -48,6 +48,7 @@ registerDict({
   "nav.kitchen": { id: "Kitchen Display", en: "Kitchen Display", ms: "Paparan Dapur", th: "จอแสดงครัว", fil: "Kitchen Display", vi: "Màn hình bếp" },
   "nav.chat": { id: "Customer Service", en: "Customer Service", ms: "Perkhidmatan Pelanggan", th: "บริการลูกค้า", fil: "Customer Service", vi: "Chăm sóc khách hàng" },
   "nav.reports": { id: "Laporan", en: "Reports", ms: "Laporan", th: "รายงาน", fil: "Mga Ulat", vi: "Báo cáo" },
+  "nav.activityCalendar": { id: "Kalender Bisnis", en: "Business Calendar", ms: "Kalendar Perniagaan", th: "ปฏิทินธุรกิจ", fil: "Business Calendar", vi: "Lịch kinh doanh" },
   "nav.ai": { id: "AI Business Intelligence", en: "AI Business Intelligence", ms: "AI Business Intelligence", th: "AI Business Intelligence", fil: "AI Business Intelligence", vi: "AI Business Intelligence" },
   "nav.settings": { id: "Pengaturan", en: "Settings", ms: "Tetapan", th: "การตั้งค่า", fil: "Setting", vi: "Cài đặt" },
   "nav.help": { id: "Bantuan & Panduan", en: "Help & Guide", ms: "Bantuan & Panduan", th: "ช่วยเหลือและคู่มือ", fil: "Tulong at Gabay", vi: "Trợ giúp & Hướng dẫn" },

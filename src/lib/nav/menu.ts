@@ -55,6 +55,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/devices", key: "nav.devices", group: "devices", anyOf: ["manage_devices"] },
   { href: "/dashboard/maintenance", key: "nav.maintenance", group: "devices", anyOf: ["manage_devices", "manage_assets", "approve_requests"] },
 
+  { href: "/dashboard/kalender-bisnis", key: "nav.activityCalendar", group: "growth", anyOf: ["view_reports"] },
   { href: "/dashboard/ai", key: "nav.ai", group: "growth", anyOf: ["view_dashboard_owner"] },
   { href: "/dashboard/marketplace", key: "nav.marketplace", group: "growth", anyOf: ["manage_marketplace"] },
   { href: "/dashboard/rekomendasi-produk", key: "nav.affiliateShowcase", group: "growth", anyOf: ["view_dashboard_owner"] },

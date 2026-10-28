@@ -121,6 +121,7 @@ registerDict({
   "plan.feature.ppob": { id: "PPOB", en: "Bill Payments (PPOB)", ms: "PPOB", th: "PPOB", fil: "PPOB", vi: "PPOB" },
   "plan.feature.anti_fraud": { id: "Kontrol Anti-Fraud", en: "Anti-Fraud Controls", ms: "Kawalan Anti-Penipuan", th: "ระบบป้องกันการทุจริต", fil: "Anti-Fraud na Kontrol", vi: "Kiểm soát chống gian lận" },
   "plan.feature.multi_outlet": { id: "Multi-Cabang", en: "Multi-Branch", ms: "Pelbagai Cawangan", th: "หลายสาขา", fil: "Multi-Branch", vi: "Nhiều chi nhánh" },
+  "plan.feature.activity_calendar": { id: "Kalender Bisnis", en: "Business Calendar", ms: "Kalendar Perniagaan", th: "ปฏิทินธุรกิจ", fil: "Business Calendar", vi: "Lịch kinh doanh" },
   "plan.feature.home_rental": { id: "Rental ke Rumah", en: "Home Rental", ms: "Sewa ke Rumah", th: "เช่ากลับบ้าน", fil: "Home Rental", vi: "Cho thuê tại nhà" },
   "plan.antiFraudLocked": {
     id: "Deteksi shift berisiko otomatis termasuk paket Pro — di paket Starter ambang ini disimpan tapi shift tidak ditandai.",

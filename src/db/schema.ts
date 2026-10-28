@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, doublePrecision, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, doublePrecision, boolean, uniqueIndex, index, primaryKey } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 const id = () => text("id").primaryKey().$defaultFn(() => crypto.randomUUID());
@@ -3405,3 +3405,95 @@ export const tvStaffPins = pgTable(
   },
   (t) => [uniqueIndex("tv_staff_pins_outlet_staff_idx").on(t.outletId, t.staffUserId)]
 );
+
+/** ---------------- KALENDER BISNIS (cuaca BMKG + jadwal sepak bola) — migrasi 0039 ---------------- */
+
+/**
+ * Pengaturan Kalender Bisnis per outlet (lib/activity-calendar). Baris tidak ada = belum diatur (lokasi
+ * kosong, semua liga yang tersedia di paket API, cuaca & pertandingan tampil).
+ */
+export const outletActivitySettings = pgTable("outlet_activity_settings", {
+  outletId: text("outlet_id").primaryKey().references(() => outlets.id),
+  /** Kode wilayah tingkat IV (desa/kelurahan) BMKG, mis. "31.71.03.1001". */
+  adm4Code: text("adm4_code"),
+  /** "Kemayoran, Kemayoran, Kota Adm. Jakarta Pusat, DKI Jakarta" — dari BMKG/wilayah. */
+  locationLabel: text("location_label"),
+  /** Zona waktu IANA lokasi outlet (dari BMKG): Asia/Jakarta, Asia/Makassar, Asia/Jayapura. */
+  timezone: text("timezone").notNull().default("Asia/Jakarta"),
+  /** league_id Footballdata.io dipisah koma; null = semua liga yang tersedia. */
+  leagueIds: text("league_ids"),
+  showWeather: boolean("show_weather").notNull().default(true),
+  showMatches: boolean("show_matches").notNull().default(true),
+  updatedBy: text("updated_by"),
+  ...timestamps,
+});
+
+/** Prakiraan BMKG terakhir per desa (dipakai bersama semua outlet di desa yang sama). */
+export const activityWeatherCache = pgTable("activity_weather_cache", {
+  adm4Code: text("adm4_code").primaryKey(),
+  /** JSON hasil normalisasi (lib/activity-calendar/bmkg-rules.ts → WeatherSnapshot). */
+  payload: text("payload"),
+  analysisDate: text("analysis_date"),
+  fetchedAt: text("fetched_at"),
+  lastAttemptAt: text("last_attempt_at"),
+  lastError: text("last_error"),
+  lastErrorAt: text("last_error_at"),
+  ...timestamps,
+});
+
+/**
+ * Arsip ringkasan prakiraan harian per desa — BMKG hanya memberi 3 hari ke depan tanpa riwayat, jadi
+ * arsip ini (prakiraan terakhir sebelum hari itu lewat) yang dipakai untuk analisis historis. BUKAN
+ * observasi cuaca aktual.
+ */
+export const activityWeatherDaily = pgTable(
+  "activity_weather_daily",
+  {
+    adm4Code: text("adm4_code").notNull(),
+    localDate: text("local_date").notNull(),
+    slots: integer("slots").notNull().default(0),
+    rainSlots: integer("rain_slots").notNull().default(0),
+    precipTotal: doublePrecision("precip_total"),
+    precipMax: doublePrecision("precip_max"),
+    tempMin: doublePrecision("temp_min"),
+    tempMax: doublePrecision("temp_max"),
+    mainCode: integer("main_code"),
+    rainHours: text("rain_hours"),
+    analysisDate: text("analysis_date"),
+    updatedAt: text("updated_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [primaryKey({ columns: [t.adm4Code, t.localDate] })]
+);
+
+/** Jadwal & hasil pertandingan dari Footballdata.io (satu sinkron untuk semua outlet). */
+export const activityFootballMatches = pgTable(
+  "activity_football_matches",
+  {
+    matchId: text("match_id").primaryKey(),
+    leagueId: text("league_id"),
+    leagueName: text("league_name"),
+    country: text("country"),
+    seasonId: text("season_id"),
+    kickoffUtc: text("kickoff_utc").notNull(),
+    status: text("status"),
+    homeTeam: text("home_team").notNull(),
+    awayTeam: text("away_team").notNull(),
+    homeLogo: text("home_logo"),
+    awayLogo: text("away_logo"),
+    scoreHome: integer("score_home"),
+    scoreAway: integer("score_away"),
+    updatedAt: text("updated_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("activity_football_matches_kickoff_idx").on(t.kickoffUtc)]
+);
+
+/** Status sinkron per sumber ("football", "football_leagues") — kuota, error terakhir, daftar liga. */
+export const activitySyncState = pgTable("activity_sync_state", {
+  key: text("key").primaryKey(),
+  payload: text("payload"),
+  lastSuccessAt: text("last_success_at"),
+  lastAttemptAt: text("last_attempt_at"),
+  lastError: text("last_error"),
+  lastErrorAt: text("last_error_at"),
+  updatedAt: text("updated_at").notNull().$defaultFn(nowIso),
+});

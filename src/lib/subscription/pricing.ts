@@ -26,9 +26,9 @@ export type BillingCycle = "monthly" | "annual";
  *  - accounting    : pembukuan lengkap (jurnal, neraca saldo, neraca, arus kas, piutang/hutang,
  *                    rekonsiliasi, CALK, audit, tutup periode, migrasi) + pendapatan lain-lain.
  */
-export type PlanFeature = "expenses" | "profit_report" | "home_rental" | "accounting" | "assets" | "ppob" | "anti_fraud" | "multi_outlet";
+export type PlanFeature = "expenses" | "profit_report" | "home_rental" | "accounting" | "assets" | "ppob" | "anti_fraud" | "multi_outlet" | "activity_calendar";
 
-export const ALL_PLAN_FEATURES: PlanFeature[] = ["expenses", "profit_report", "home_rental", "accounting", "assets", "ppob", "anti_fraud", "multi_outlet"];
+export const ALL_PLAN_FEATURES: PlanFeature[] = ["expenses", "profit_report", "home_rental", "accounting", "assets", "ppob", "anti_fraud", "multi_outlet", "activity_calendar"];
 
 /**
  * Pilihan isi Starter (2026-10-10) disusun terhadap pesaing di kelas Rp5.000–10.000/unit (CECO,
@@ -254,6 +254,8 @@ export function featureForApiRequest(pathname: string, method: string): PlanFeat
     return "ppob";
   }
   if (under("/api/home-rental")) return "home_rental";
+  // Kalender Bisnis (cuaca BMKG + jadwal sepak bola + insight) — Pro (2026-10-28).
+  if (under("/api/activity-calendar")) return "activity_calendar";
   if (p === "/api/outlets" && m === "POST") return "multi_outlet";
   return null;
 }
@@ -269,6 +271,7 @@ export function featureForDashboardPath(pathname: string): PlanFeature | null {
   if (under("/dashboard/ppob")) return "ppob";
   if (under("/dashboard/home-rental")) return "home_rental";
   if (under("/dashboard/semua-outlet")) return "multi_outlet";
+  if (under("/dashboard/kalender-bisnis")) return "activity_calendar";
   return null;
 }
 
@@ -281,6 +284,7 @@ export const FEATURE_LABEL_ID: Record<PlanFeature, string> = {
   anti_fraud: "Kontrol Anti-Fraud Shift",
   multi_outlet: "Multi-Cabang",
   home_rental: "Rental ke Rumah",
+  activity_calendar: "Kalender Bisnis (cuaca & jadwal bola)",
 };
 
 /** Header internal yang dipasang middleware. Selalu ditimpa/dihapus di middleware agar tidak bisa dipalsukan klien. */

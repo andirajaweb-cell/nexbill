@@ -98,6 +98,7 @@ const LABEL_KEY: Record<PlanFeature, string> = {
   ppob: "plan.feature.ppob",
   anti_fraud: "plan.feature.anti_fraud",
   multi_outlet: "plan.feature.multi_outlet",
+  activity_calendar: "plan.feature.activity_calendar",
 };
 
 function isPreviewFeature(f: PlanFeature): f is PreviewFeature {

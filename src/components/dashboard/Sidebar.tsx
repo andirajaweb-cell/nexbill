@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import {
+  CloudSun,
   Lock,
   LayoutDashboard,
   Gamepad2,
@@ -75,6 +76,7 @@ const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
   "/dashboard/kitchen": ChefHat,
   "/dashboard/chat": MessageCircle,
   "/dashboard/reports": BarChart3,
+  "/dashboard/kalender-bisnis": CloudSun,
   "/dashboard/ai": Sparkles,
   "/dashboard/settings": Settings,
   "/dashboard/help": HelpCircle,
