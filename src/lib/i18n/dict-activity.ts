@@ -474,6 +474,14 @@ registerDict({
     fil: "Match data: Footballdata.io",
     vi: "Dữ liệu trận đấu: Footballdata.io",
   },
+  "act.attrLib": {
+    id: "Jadwal liga Indonesia: situs resmi PT Liga Indonesia Baru",
+    en: "Indonesian league fixtures: official PT Liga Indonesia Baru website",
+    ms: "Jadual liga Indonesia: laman rasmi PT Liga Indonesia Baru",
+    th: "ตารางลีกอินโดนีเซีย: เว็บไซต์ทางการของ PT Liga Indonesia Baru",
+    fil: "Iskedyul ng liga ng Indonesia: opisyal na website ng PT Liga Indonesia Baru",
+    vi: "Lịch giải Indonesia: trang chính thức của PT Liga Indonesia Baru",
+  },
   "act.noLocation.title": {
     id: "Atur lokasi outlet dulu",
     en: "Set the outlet location first",

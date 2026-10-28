@@ -7,6 +7,7 @@ import { buildCalendar, MAX_RANGE_DAYS, todayIn, validDate } from "@/lib/activit
 import { addDays } from "@/lib/activity-calendar/insights-rules";
 import { refreshWeather, weatherCacheRow, weatherDue } from "@/lib/activity-calendar/bmkg";
 import { footballDue, syncLeagues, syncMatches } from "@/lib/activity-calendar/football";
+import { libDue, syncLibSchedule } from "@/lib/activity-calendar/lib";
 import { isMissingRelation } from "@/lib/activity-calendar/http";
 
 /** Refresh latar belakang (BMKG + Footballdata.io) bisa makan waktu; respons halaman tidak menunggunya. */
@@ -36,11 +37,13 @@ export async function GET(req: NextRequest) {
     // Pembaruan latar belakang bila data basi (tidak memblok respons).
     const adm4 = settings.adm4Code;
     const needWeather = adm4 ? weatherDue(await weatherCacheRow(adm4)) : false;
+    const needLib = settings.showMatches && (await libDue());
     const needFootball = settings.showMatches && (await footballDue());
-    if (needWeather || needFootball) {
+    if (needWeather || needFootball || needLib) {
       after(async () => {
         try {
           if (needWeather && adm4) await refreshWeather(adm4);
+          if (needLib) await syncLibSchedule();
           if (needFootball) {
             await syncLeagues();
             await syncMatches();
@@ -55,7 +58,7 @@ export async function GET(req: NextRequest) {
       migration: true,
       settings,
       canEdit: hasPermission(session.role as StaffRole, "manage_settings"),
-      refreshing: { weather: needWeather, football: needFootball },
+      refreshing: { weather: needWeather, football: needFootball || needLib },
       ...data,
     });
   } catch (err: unknown) {

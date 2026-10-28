@@ -4,7 +4,8 @@ import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { getActivitySettings } from "@/lib/activity-calendar/data";
 import { refreshWeather, weatherCacheRow } from "@/lib/activity-calendar/bmkg";
-import { footballStatus, syncLeagues, syncMatches } from "@/lib/activity-calendar/football";
+import { footballConfigured, footballStatus, syncLeagues, syncMatches } from "@/lib/activity-calendar/football";
+import { libEnabled, libLastSuccessAt, syncLibSchedule } from "@/lib/activity-calendar/lib";
 
 export const maxDuration = 60;
 
@@ -29,7 +30,15 @@ export async function POST() {
         result.weather = "ok";
       }
     }
-    if (settings.showMatches) {
+    if (settings.showMatches && libEnabled()) {
+      const last = await libLastSuccessAt();
+      if (last && Date.now() - new Date(last).getTime() < MIN_MANUAL_GAP_MS) result.football = "recent";
+      else {
+        const r = await syncLibSchedule();
+        result.football = r.ok ? "ok" : r.error ?? "error";
+      }
+    }
+    if (settings.showMatches && footballConfigured()) {
       const st = await footballStatus();
       const recent = st.lastSuccessAt && Date.now() - new Date(st.lastSuccessAt).getTime() < MIN_MANUAL_GAP_MS;
       if (!st.configured) result.football = "not_configured";

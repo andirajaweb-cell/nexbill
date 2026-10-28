@@ -83,3 +83,26 @@ export function isMissingRelation(err: unknown): boolean {
   const e = err as { code?: string; cause?: { code?: string } } | null;
   return e?.code === "42P01" || e?.cause?.code === "42P01";
 }
+
+/** HTML/teks dengan batas waktu & coba-ulang terbatas (5xx/jaringan saja). Untuk pengambilan jadwal dari situs resmi. */
+export async function fetchText(url: string, opts: Omit<FetchJsonOptions, "retry429">): Promise<string> {
+  const retries = opts.retries ?? 1;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "NEXBILL-Jadwal/1.0 (+https://nexbill.id; jadwal untuk kalender bisnis outlet)", ...(opts.headers ?? {}) },
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 10_000),
+        cache: "no-store",
+      });
+      if (res.ok) return await res.text();
+      const err = new HttpJsonError(`${opts.label}: HTTP ${res.status}`, res.status);
+      if (res.status < 500 || attempt === retries) throw err;
+      console.warn(`[activity-calendar] ${opts.label} ${safeUrl(url)} HTTP ${res.status}, coba lagi`);
+    } catch (err) {
+      if (err instanceof HttpJsonError) throw err;
+      if (attempt === retries) throw new HttpJsonError(`${opts.label}: gagal terhubung`, null);
+    }
+    await sleep(1000 * 2 ** attempt);
+  }
+  throw new HttpJsonError(`${opts.label}: gagal`, null);
+}

@@ -8,7 +8,12 @@ Halaman `/dashboard/kalender-bisnis` (menu **Tumbuh › Kalender Bisnis**, paket
 |---|---|---|---|
 | BMKG | `GET https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={kode desa}` | 60 permintaan/menit/IP, gratis, tanpa key | Prakiraan **3 hari**, per 3 jam, diperbarui 2×/hari. Wajib mencantumkan BMKG sebagai sumber (tampil di halaman). Field yang dipakai: `local_datetime`, `datetime`, `t`, `hu`, `tp` (curah hujan mm — ada di JSON walau tidak di dokumen), `tcc`, `ws`, `wd`, `weather`, `weather_desc(_en)`, `analysis_date`, `lokasi.timezone`. |
 | Footballdata.io | `GET /api/v1/leagues`, `GET /api/v1/matches?from&to&page&limit=100` (Bearer key) | Kuota **per bulan**: Free 2.000 (5 liga), Starter 100.000 (50 liga), Pro 300.000 (150 liga) | **Liga 1 Indonesia hanya mulai paket Pro mereka.** Paket Free: Piala Dunia, Premier League, La Liga, Liga Champions, Liga Europa; wajib atribusi (tampil di halaman). 429 = kuota bulanan habis. |
+| Situs resmi operator liga (PT Liga Indonesia Baru) | `https://www.ligaindonesiabaru.com/` (pekan berjalan) + `/fixtures/index/{KOMPETISI}/{pekan}/0` | robots.txt `User-agent: * Allow: /` (dicek 2026-10-28) | **Jadwal liga utama Indonesia (BRI Super League, dulu Liga 1)** — tanggal, jam kick-off WIB, tim, stadion. HTML dirender server; diurai `lib-rules.ts`. Tiap 12 jam, ±7 halaman, jeda 1,5 dtk. Laga selesai tidak menampilkan jam, jadi tidak dibuat baris baru dengan jam tebakan. Matikan: `LIB_SCHEDULE=off`. |
 | wilayah.id | `GET https://wilayah.id/api/{provinces,regencies,districts,villages}/{kode}.json` | publik, gratis | Pemilih lokasi Provinsi → Kab/Kota → Kecamatan → Desa. Format kode sama dengan adm4 BMKG. Bila tidak tersedia, kode bisa diketik langsung. |
+
+Sumber yang dipertimbangkan tetapi **tidak dipakai**: footy.id (membalas 403 Forbidden ke server & browser), livescore.in (Ketentuan Penggunaan pasal 2.2, 2.9, 2.10 melarang penggunaan komersial, ekstraksi database, dan scraping). Jadwal Tim Nasional Indonesia belum ada — perlu sumber resmi yang mengizinkan.
+
+Nama penyedia jadwal internasional tidak disebut di fitur; atribusi hanya tampil saat paket penyedia gratis (syarat lisensinya), bisa dimatikan `FOOTBALL_DATA_ATTRIBUTION=off` atas keputusan pemilik akun.
 
 ## Cara kerja
 
@@ -45,6 +50,9 @@ Halaman `/dashboard/kalender-bisnis` (menu **Tumbuh › Kalender Bisnis**, paket
 | `FOOTBALL_DATA_API_KEY` | Ya, untuk jadwal sepak bola | Vercel **dan** `.env` VPS (`/opt/nexbill`) | API key Footballdata.io. Tanpa ini halaman tetap jalan (cuaca saja) dengan pesan jelas. |
 | `FOOTBALL_DATA_API_BASE` | Tidak | — | Bawaan `https://footballdata.io/api/v1`. |
 | `BMKG_API_URL` | Tidak | — | Bawaan `https://api.bmkg.go.id/publik/prakiraan-cuaca`. |
+| `LIB_SCHEDULE` | Tidak | — | `off` mematikan pengambilan jadwal liga Indonesia. |
+| `LIB_SCHEDULE_URL` | Tidak | — | Bawaan `https://www.ligaindonesiabaru.com`. |
+| `FOOTBALL_DATA_ATTRIBUTION` | Tidak | — | `off` menyembunyikan atribusi penyedia jadwal internasional. |
 | `WILAYAH_API_URL` | Tidak | — | Bawaan `https://wilayah.id/api`. |
 
 ## Deployment

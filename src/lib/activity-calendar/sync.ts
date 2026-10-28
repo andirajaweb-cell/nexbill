@@ -9,6 +9,7 @@ import { db } from "@/db/client";
 import { outletActivitySettings } from "@/db/schema";
 import { refreshWeather, weatherCacheRows, weatherDue } from "./bmkg";
 import { footballDue, syncLeagues, syncMatches } from "./football";
+import { libDue, syncLibSchedule } from "./lib";
 import { isMissingRelation } from "./http";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -29,6 +30,10 @@ export async function runActivitySync(): Promise<SyncReport> {
       await refreshWeather(code);
       report.weatherRefreshed++;
       await sleep(1100);
+    }
+    if (await libDue()) {
+      const r = await syncLibSchedule();
+      report.football = r.ok ? `liga Indonesia ok ${r.count}` : `liga Indonesia: ${r.error}`;
     }
     if (await footballDue()) {
       await syncLeagues();

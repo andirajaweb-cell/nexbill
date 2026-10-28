@@ -9,6 +9,7 @@ import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db/client";
 import { activityFootballMatches, activitySyncState } from "@/db/schema";
 import { fetchJson, HttpJsonError } from "./http";
+import { libEnabled, libLeague, libStatus } from "./lib";
 import {
   extractList,
   extractMeta,
@@ -118,25 +119,31 @@ export async function syncLeagues(force = false): Promise<FootballLeague[]> {
   const st = await readState(STATE_LEAGUES);
   const cached = parseJson<{ leagues: FootballLeague[] }>(st?.payload)?.leagues ?? [];
   const fresh = st?.lastSuccessAt && Date.now() - new Date(st.lastSuccessAt).getTime() < FOOTBALL_LEAGUES_EVERY_MS;
-  if (!footballConfigured() || (fresh && !force && cached.length > 0)) return cached;
+  if (!footballConfigured() || (fresh && !force && cached.length > 0)) return withLib(cached);
   const now = new Date().toISOString();
   try {
     const { json, meta } = await fdGet("/leagues");
     const leagues = sortLeagues(extractList(json).map(normalizeLeague).filter((l): l is FootballLeague => !!l));
     await writeState(STATE_LEAGUES, { payload: JSON.stringify({ leagues, plan: meta.plan }), lastSuccessAt: now, lastAttemptAt: now, lastError: null, lastErrorAt: null });
     await mergeUsage(meta);
-    return leagues;
+    return withLib(leagues);
   } catch (err) {
     const e = friendly(err);
     console.warn(`[activity-calendar] Footballdata.io /leagues: ${e.code}`);
     await writeState(STATE_LEAGUES, { lastAttemptAt: now, lastError: e.message, lastErrorAt: now }).catch(() => undefined);
-    return cached;
+    return withLib(cached);
   }
+}
+
+/** Liga dari penyedia jadwal + liga utama Indonesia (situs resmi operator liga) di urutan teratas. */
+async function withLib(list: FootballLeague[]): Promise<FootballLeague[]> {
+  const lib = await libLeague();
+  return lib ? [lib, ...list.filter((l) => l.leagueId !== lib.leagueId)] : list;
 }
 
 export async function cachedLeagues(): Promise<FootballLeague[]> {
   const st = await readState(STATE_LEAGUES);
-  return parseJson<{ leagues: FootballLeague[] }>(st?.payload)?.leagues ?? [];
+  return withLib(parseJson<{ leagues: FootballLeague[] }>(st?.payload)?.leagues ?? []);
 }
 
 /** Simpan angka kuota terbaru dari meta respons (setiap respons membawa requests_used/limit). */
@@ -251,22 +258,28 @@ export interface FootballStatus {
    * paketnya gratis; env FOOTBALL_DATA_ATTRIBUTION=off menyembunyikannya (tanggung jawab pemilik akun).
    */
   attributionRequired: boolean;
+  /** Jadwal liga utama Indonesia diambil dari situs resmi operator liga. */
+  indonesianLeague: boolean;
 }
 
 export async function footballStatus(): Promise<FootballStatus> {
   const st = await readState(STATE_MATCHES);
   const s = parseJson<FootballState>(st?.payload) ?? { plan: null, requestsUsed: null, requestsLimit: null };
-  const errorIsLatest = !!st?.lastErrorAt && (!st.lastSuccessAt || st.lastErrorAt >= st.lastSuccessAt);
+  const errorIsLatest = footballConfigured() && !!st?.lastErrorAt && (!st.lastSuccessAt || st.lastErrorAt >= st.lastSuccessAt);
+  const lib = await libStatus();
+  const successes = [footballConfigured() ? st?.lastSuccessAt ?? null : null, lib.lastSuccessAt].filter((x): x is string => !!x).sort();
+  const errors = [errorIsLatest ? st?.lastError ?? null : null, lib.lastError].filter((x): x is string => !!x);
   return {
-    configured: footballConfigured(),
+    configured: footballConfigured() || libEnabled(),
     plan: s.plan,
-    requestsUsed: s.requestsUsed,
-    requestsLimit: s.requestsLimit,
-    lastSuccessAt: st?.lastSuccessAt ?? null,
-    lastError: errorIsLatest ? st?.lastError ?? null : null,
+    requestsUsed: footballConfigured() ? s.requestsUsed : null,
+    requestsLimit: footballConfigured() ? s.requestsLimit : null,
+    lastSuccessAt: successes.at(-1) ?? null,
+    lastError: errors.length ? errors.join(" · ") : null,
     lastErrorAt: errorIsLatest ? st?.lastErrorAt ?? null : null,
     quotaLow: quotaLow(s),
-    attributionRequired: (s.plan ?? "").toLowerCase() === "free" && (process.env.FOOTBALL_DATA_ATTRIBUTION ?? "").toLowerCase() !== "off",
+    attributionRequired: footballConfigured() && (s.plan ?? "").toLowerCase() === "free" && (process.env.FOOTBALL_DATA_ATTRIBUTION ?? "").toLowerCase() !== "off",
+    indonesianLeague: libEnabled(),
   };
 }
 

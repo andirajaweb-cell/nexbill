@@ -253,6 +253,7 @@ export default function BusinessCalendarPage() {
 
           <p className="text-[11px] text-neutral-500">
             {t("act.attrBmkg", "Sumber data cuaca: BMKG (Badan Meteorologi, Klimatologi, dan Geofisika)")}
+            {data.settings.showMatches && data.football.status.indonesianLeague && <> · {t("act.attrLib", "Jadwal liga Indonesia: situs resmi PT Liga Indonesia Baru")}</>}
             {data.football.status.attributionRequired && <> · {t("act.attrFootball", "Data pertandingan: Footballdata.io")}</>}
           </p>
         </>
