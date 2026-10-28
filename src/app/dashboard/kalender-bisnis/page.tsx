@@ -38,7 +38,7 @@ type LoadState = { kind: "loading" } | { kind: "ready"; data: CalendarResponse }
 
 /**
  * Kalender Bisnis — cuaca BMKG + jadwal sepak bola + insight transaksi untuk mengantisipasi hari sepi/ramai.
- * Angka selalu diberi label sumbernya: Aktual (transaksi), Prakiraan/Arsip (BMKG), Jadwal (Footballdata.io),
+ * Angka selalu diberi label sumbernya: Aktual (transaksi), Prakiraan/Arsip (BMKG), Jadwal (penyedia jadwal),
  * Prediksi (rata-rata hari yang sama 8 minggu). Data diambil dari /api/activity-calendar (cache server).
  */
 export default function BusinessCalendarPage() {
@@ -252,10 +252,8 @@ export default function BusinessCalendarPage() {
           <AnalysisSection data={data} t={t} />
 
           <p className="text-[11px] text-neutral-500">
-            {t("act.attrBmkg", "Sumber data cuaca: BMKG (Badan Meteorologi, Klimatologi, dan Geofisika)")} ·{" "}
-            <a href="https://footballdata.io" target="_blank" rel="noreferrer" className="hover:text-neutral-300 underline-offset-2 hover:underline">
-              {t("act.attrFootball", "Data pertandingan: Footballdata.io")}
-            </a>
+            {t("act.attrBmkg", "Sumber data cuaca: BMKG (Badan Meteorologi, Klimatologi, dan Geofisika)")}
+            {data.football.status.attributionRequired && <> · {t("act.attrFootball", "Data pertandingan: Footballdata.io")}</>}
           </p>
         </>
       )}
@@ -348,9 +346,9 @@ function StatusBar({ data, t, locale, tz, tzAbbr, onSetup }: { data: CalendarRes
           {w.fetchedAt && ` ${t("act.showingLastGood", "Menampilkan data terakhir yang berhasil diambil.")}`}
         </Alert>
       )}
-      {data.settings.showMatches && !fb.configured && <Alert tone="info">{t("act.football.notConfigured", "Jadwal sepak bola belum aktif: API key Footballdata.io belum dipasang di server NEXBILL.")}</Alert>}
+      {data.settings.showMatches && !fb.configured && <Alert tone="info">{t("act.football.notConfigured", "Jadwal sepak bola belum aktif: sumber data jadwal belum dipasang di server NEXBILL.")}</Alert>}
       {fb.configured && fb.lastError && <Alert>{fill(t("act.footballError", "Jadwal: {msg}"), { msg: fb.lastError })}</Alert>}
-      {fb.configured && fb.quotaLow && <Alert>{t("act.football.quotaLow", "Kuota bulanan Footballdata.io hampir habis — pembaruan otomatis dihentikan sementara, jadwal tersimpan tetap tampil.")}</Alert>}
+      {fb.configured && fb.quotaLow && <Alert>{t("act.football.quotaLow", "Kuota bulanan sumber data jadwal hampir habis — pembaruan otomatis dihentikan sementara, jadwal tersimpan tetap tampil.")}</Alert>}
       {w.forecastUntil && data.range.to > w.forecastUntil && (
         <p className="flex items-center gap-1.5 text-[11px] text-neutral-500">
           <Info size={12} /> {t("act.forecastLimit", "BMKG hanya memberi prakiraan 3 hari ke depan; tanggal setelahnya belum punya data cuaca.")}

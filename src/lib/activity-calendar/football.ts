@@ -51,13 +51,13 @@ function friendly(err: unknown): FootballApiError {
   if (err instanceof HttpJsonError) {
     const body = err.body as { error?: { code?: string } } | null;
     const code = body?.error?.code ?? `http_${err.status ?? "network"}`;
-    if (err.status === 401 || code === "invalid_api_key" || code === "missing_api_key") return new FootballApiError("API key Footballdata.io tidak valid.", code, err.status);
-    if (err.status === 403) return new FootballApiError("API key Footballdata.io tidak aktif atau fitur tidak termasuk paket.", code, err.status);
-    if (err.status === 429) return new FootballApiError("Kuota bulanan Footballdata.io habis — jadwal tersimpan tetap tampil sampai kuota pulih.", "rate_limit_exceeded", 429);
-    if (err.status == null) return new FootballApiError("Footballdata.io tidak dapat dihubungi (timeout/jaringan).", "network", null);
-    return new FootballApiError(`Footballdata.io bermasalah (HTTP ${err.status}).`, code, err.status);
+    if (err.status === 401 || code === "invalid_api_key" || code === "missing_api_key") return new FootballApiError("Kunci akses sumber jadwal tidak valid.", code, err.status);
+    if (err.status === 403) return new FootballApiError("Kunci akses sumber jadwal tidak aktif atau fitur tidak termasuk paket.", code, err.status);
+    if (err.status === 429) return new FootballApiError("Kuota bulanan sumber jadwal habis — jadwal tersimpan tetap tampil sampai kuota pulih.", "rate_limit_exceeded", 429);
+    if (err.status == null) return new FootballApiError("Sumber jadwal tidak dapat dihubungi (timeout/jaringan).", "network", null);
+    return new FootballApiError(`Sumber jadwal bermasalah (HTTP ${err.status}).`, code, err.status);
   }
-  return new FootballApiError("Gagal memproses data Footballdata.io.", "unknown", null);
+  return new FootballApiError("Gagal memproses data jadwal.", "unknown", null);
 }
 
 async function fdGet(path: string, params: Record<string, string | number> = {}) {
@@ -73,7 +73,7 @@ async function fdGet(path: string, params: Record<string, string | number> = {})
       retry429: false, // 429 = kuota BULANAN habis — mengulang tidak menolong
     });
     const root = json as { success?: boolean; error?: { code?: string; message?: string } };
-    if (root?.success === false) throw new FootballApiError("Footballdata.io menolak permintaan.", root.error?.code ?? "error", null);
+    if (root?.success === false) throw new FootballApiError("Sumber jadwal menolak permintaan.", root.error?.code ?? "error", null);
     return { json, meta: extractMeta(json) };
   } catch (err) {
     throw friendly(err);
@@ -246,6 +246,11 @@ export interface FootballStatus {
   lastError: string | null;
   lastErrorAt: string | null;
   quotaLow: boolean;
+  /**
+   * Paket gratis penyedia jadwal mewajibkan atribusi (syarat lisensi). Nama penyedia hanya tampil saat
+   * paketnya gratis; env FOOTBALL_DATA_ATTRIBUTION=off menyembunyikannya (tanggung jawab pemilik akun).
+   */
+  attributionRequired: boolean;
 }
 
 export async function footballStatus(): Promise<FootballStatus> {
@@ -261,6 +266,7 @@ export async function footballStatus(): Promise<FootballStatus> {
     lastError: errorIsLatest ? st?.lastError ?? null : null,
     lastErrorAt: errorIsLatest ? st?.lastErrorAt ?? null : null,
     quotaLow: quotaLow(s),
+    attributionRequired: (s.plan ?? "").toLowerCase() === "free" && (process.env.FOOTBALL_DATA_ATTRIBUTION ?? "").toLowerCase() !== "off",
   };
 }
 

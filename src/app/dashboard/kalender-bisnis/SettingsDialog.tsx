@@ -170,13 +170,13 @@ export function SettingsDialog({ t, onClose, onSaved }: { t: TFn; onClose: () =>
             <section className="space-y-3">
               <h3 className="text-sm font-medium text-neutral-200">{t("act.set.leagues", "Liga/kompetisi")}</h3>
               {!fb?.configured ? (
-                <p className="text-xs text-amber-200">{t("act.football.notConfigured", "Jadwal sepak bola belum aktif: API key Footballdata.io belum dipasang di server NEXBILL.")}</p>
+                <p className="text-xs text-amber-200">{t("act.football.notConfigured", "Jadwal sepak bola belum aktif: sumber data jadwal belum dipasang di server NEXBILL.")}</p>
               ) : (
                 <>
                   <p className="text-[11px] text-neutral-500">{t("act.set.leaguesHint", "Tidak memilih apa pun = semua liga yang tersedia. Liga Indonesia diurutkan paling atas bila tersedia.")}</p>
                   {!info.indonesianLeagueAvailable && info.leagues.length > 0 && (
                     <p className="rounded-lg border border-amber-400/25 bg-amber-500/[0.07] px-3 py-2 text-[11px] text-amber-100">
-                      {t("act.set.indonesiaMissing", "Liga Indonesia belum tersedia di paket Footballdata.io yang dipakai NEXBILL saat ini (Liga 1 tersedia mulai paket Pro mereka). Yang tampil di sini adalah liga yang tersedia.")}
+                      {t("act.set.indonesiaMissing", "Liga Indonesia belum tersedia dari sumber jadwal saat ini. Yang tampil di sini adalah liga yang tersedia.")}
                     </p>
                   )}
                   {info.leagues.length === 0 ? (
@@ -211,7 +211,7 @@ export function SettingsDialog({ t, onClose, onSaved }: { t: TFn; onClose: () =>
                   )}
                   {fb.requestsLimit != null && (
                     <p className={clsx("text-[11px]", fb.quotaLow ? "text-amber-200" : "text-neutral-500")}>
-                      {fill(t("act.set.usage", "Kuota Footballdata.io: {used}/{limit} permintaan bulan ini (paket {plan})."), {
+                      {fill(t("act.set.usage", "Kuota data jadwal: {used}/{limit} permintaan bulan ini."), {
                         used: fb.requestsUsed ?? 0,
                         limit: fb.requestsLimit,
                         plan: fb.plan ?? "—",
