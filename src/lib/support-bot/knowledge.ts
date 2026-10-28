@@ -32,9 +32,14 @@ import { tier1Match, type Tier1Match } from "./tiers";
 import { formatChunks, groupDictEntries, searchChunks, splitMarkdownSections, type KnowledgeChunk } from "./knowledge-rules";
 
 const LANGS: LangCode[] = ["id", "en", "ms", "th", "fil", "vi"];
-const DOCS = [
-  { file: "android-tv/RISIKO.md", source: "Kendala NEXBILL TV yang diketahui (RISIKO.md)" },
-  { file: "android-tv/README.md", source: "Catatan NEXBILL TV (README)" },
+/**
+ * Path ditulis sebagai string literal per file (bukan variabel): Turbopack menelusuri file yang dibaca
+ * lewat analisis statis, dan path dinamis (`path.join(cwd, d.file)`) membuat SELURUH proyek ikut
+ * ter-deploy ke fungsi server. Dengan literal, hanya dua file ini (+ latest.json) yang ikut.
+ */
+const DOCS: { read: () => Promise<string>; source: string }[] = [
+  { read: () => readFile(path.join(process.cwd(), "android-tv", "RISIKO.md"), "utf8"), source: "Kendala NEXBILL TV yang diketahui (RISIKO.md)" },
+  { read: () => readFile(path.join(process.cwd(), "android-tv", "README.md"), "utf8"), source: "Catatan NEXBILL TV (README)" },
 ];
 
 let docCache: KnowledgeChunk[] | null = null;
@@ -44,13 +49,13 @@ async function docChunks(): Promise<KnowledgeChunk[]> {
   const out: KnowledgeChunk[] = [];
   for (const d of DOCS) {
     try {
-      out.push(...splitMarkdownSections(await readFile(path.join(process.cwd(), d.file), "utf8"), d.source));
+      out.push(...splitMarkdownSections(await d.read(), d.source));
     } catch {
       // file tidak ikut ter-deploy — sumber lain tetap dipakai
     }
   }
   try {
-    const latest = JSON.parse(await readFile(path.join(process.cwd(), "public/downloads/nexbill-tv/latest.json"), "utf8")) as { versionName?: string; url?: string };
+    const latest = JSON.parse(await readFile(path.join(process.cwd(), "public", "downloads", "nexbill-tv", "latest.json"), "utf8")) as { versionName?: string; url?: string };
     if (latest.versionName) {
       out.push({ source: "Rilis NEXBILL TV", title: "Versi terbaru", text: `Versi terbaru aplikasi NEXBILL TV: ${latest.versionName}. Unduh: ${latest.url ?? "nexbill.id/downloads/nexbill-tv/nexbill-tv.apk"}. Di TV: menu staf › Cek pembaruan.` });
     }

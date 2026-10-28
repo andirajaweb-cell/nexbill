@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/telegram/**": ["./android-tv/RISIKO.md", "./android-tv/README.md", "./public/downloads/nexbill-tv/latest.json"],
     "/api/support-chat/**": ["./android-tv/RISIKO.md", "./android-tv/README.md", "./public/downloads/nexbill-tv/latest.json"],
+    "/api/platform-admin/support-kb/**": ["./android-tv/RISIKO.md", "./android-tv/README.md", "./public/downloads/nexbill-tv/latest.json"],
   },
 
   // Digital Asset Links untuk aplikasi Android (TWA) — lihat src/app/api/assetlinks/route.ts.
