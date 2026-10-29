@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, CloudRain, Info, MapPin, RefreshCw, Settings2, Trophy, TrendingUp } from "lucide-react";
+import { AlertTriangle, CalendarDays, Camera, ChevronLeft, ChevronRight, CloudRain, GraduationCap, Info, MapPin, PartyPopper, RefreshCw, Settings2, Sparkles, Trophy, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -250,6 +250,8 @@ export default function BusinessCalendarPage() {
           </div>
 
           <AnalysisSection data={data} t={t} />
+
+          <ComingSoon t={t} />
 
           <p className="text-[11px] text-neutral-500">
             {t("act.attrBmkg", "Sumber data cuaca: BMKG (Badan Meteorologi, Klimatologi, dan Geofisika)")}
@@ -508,5 +510,36 @@ function Legend({ t }: { t: (k: string, f: string) => string }) {
         <span className="rounded border border-dashed border-fuchsia-400/50 px-1 text-fuchsia-200">≈12</span> {t("act.legend.prediction", "Prediksi: rata-rata hari yang sama, 8 minggu")}
       </span>
     </div>
+  );
+}
+
+/** Fitur yang sedang disiapkan — ditampilkan jujur sebagai "Segera", tidak bisa diklik. */
+function ComingSoon({ t }: { t: (k: string, f: string) => string }) {
+  const items = [
+    { icon: <PartyPopper size={16} className="text-rose-300" />, title: t("act.soon.holiday.t", "Hari libur nasional & sekolah"), desc: t("act.soon.holiday.d", "Tanggal merah, cuti bersama, dan libur sekolah langsung tampil di Kalender Bisnis.") },
+    { icon: <GraduationCap size={16} className="text-amber-300" />, title: t("act.soon.exam.t", "Kalender akademik: UTS & UAS"), desc: t("act.soon.exam.d", "Periode ujian tengah semester dan akhir semester — waktu pelajar biasanya lebih jarang main.") },
+    { icon: <Sparkles size={16} className="text-fuchsia-300" />, title: t("act.soon.ai.t", "Rekomendasi strategi AI (Pro)"), desc: t("act.soon.ai.d", "Saran promo dan jadwal staf saat libur, hujan, atau ada pertandingan besar.") },
+    { icon: <Trophy size={16} className="text-lime-300" />, title: t("act.soon.club.t", "Klub sepak bola favorit per daerah"), desc: t("act.soon.club.d", "Jadwal klub yang paling banyak ditonton di daerah outlet Anda, otomatis.") },
+    { icon: <Camera size={16} className="text-sky-300" />, title: t("act.soon.cctv.t", "Sistem CCTV"), desc: t("act.soon.cctv.d", "Pantau kamera outlet dari dashboard yang sama.") },
+  ];
+  return (
+    <Card className="space-y-3 p-4">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <h3 className="text-sm font-semibold text-neutral-100">{t("act.soon.title", "Segera hadir di Kalender Bisnis")}</h3>
+        <span className="text-[11px] text-neutral-500">{t("act.soon.lead", "Sedang kami siapkan — belum aktif.")}</span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        {items.map((it) => (
+          <div key={it.title} aria-disabled="true" className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-3">
+            <div className="flex items-center justify-between gap-2">
+              {it.icon}
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200">{t("act.soon.badge", "Segera")}</span>
+            </div>
+            <div className="mt-2 text-xs font-medium text-neutral-100">{it.title}</div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-neutral-500">{it.desc}</p>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
