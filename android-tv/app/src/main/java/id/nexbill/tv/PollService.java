@@ -129,9 +129,11 @@ public class PollService extends Service {
         @Override
         public void run() {
             String token = StateRepo.token(PollService.this);
+            long delay = Config.POLL_MS;
             if (!token.isEmpty()) {
                 boolean online = false;
                 try {
+                    long requestedRt = SystemClock.elapsedRealtime();
                     long t0 = System.currentTimeMillis();
                     Http.Result r = Http.request("GET", Config.STATE_URL, token, null);
                     long t1 = System.currentTimeMillis();
@@ -144,16 +146,20 @@ public class PollService extends Service {
                         if (st.serverTimeMs > 0) LocalStore.setClockOffset(PollService.this, st.serverTimeMs - (t0 + t1) / 2);
                         LocalStore.saveState(PollService.this, r.body);
                         online = true;
-                        // Kirim dulu antrean sesi dari TV, baru status dipakai (supaya status sesudah sinkron yang menentukan).
-                        if (LocalStore.queue(PollService.this).length() > 0 || LocalStore.events(PollService.this).length() > 0) SyncEngine.syncQueue(PollService.this);
-                        StateRepo.setState(st);
+                        // Kirim antrean sesi dari TV. Status yang baru diambil di atas diminta SEBELUM aksi itu
+                        // sampai di server, jadi tidak dipakai untuk melepas sesi lokal (StateRepo.serverCaughtUp);
+                        // bila ada aksi yang diterima, status diambil ulang segera — tidak menunggu 5 detik.
+                        int acked = 0;
+                        if (LocalStore.queue(PollService.this).length() > 0 || LocalStore.events(PollService.this).length() > 0) acked = SyncEngine.syncQueue(PollService.this);
+                        StateRepo.setState(st, requestedRt);
+                        if (acked > 0) delay = 300;
                     }
                 } catch (Exception ignored) {
                     // Jaringan putus: status terakhir dipertahankan dan timer terus dihitung di TV.
                 }
                 if (online) SyncEngine.refreshCatalogIfDue(PollService.this, false);
             }
-            worker.postDelayed(this, Config.POLL_MS);
+            worker.postDelayed(this, delay);
         }
     };
 
@@ -212,7 +218,9 @@ public class PollService extends Service {
             LocalStore.setSession(c, l);
             LocalStore.enqueue(c, "stop", l.sessionId, l.endAt(), null);
             StateRepo.touch();
-        } else if (l.ended && !LocalStore.hasPendingFor(c, l.sessionId)) {
+        } else if (l.ended && !LocalStore.hasPendingFor(c, l.sessionId) && StateRepo.serverCaughtUp(SystemClock.elapsedRealtime())) {
+            // Dilepas hanya setelah status server SESUDAH stop diterima — sebelum itu status lama masih
+            // "sedang dipakai" dan layar game akan terbuka lagi dengan timer berjalan.
             LocalStore.setSession(c, null);
             StateRepo.touch();
         }

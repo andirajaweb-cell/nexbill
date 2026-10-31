@@ -441,14 +441,14 @@ export const STARTER_ANSWERS: StarterAnswer[] = [
     topic: "NEXBILL TV — instalasi",
     question: "Setelah pairing: pilih HDMI dan izin tampil di atas aplikasi",
     answer:
-      "Tahan OK di remote 3 detik → menu staf (PIN bila diminta) → \"Pilih input HDMI\" → pilih HDMI tempat PlayStation dicolok. Lalu \"Izin tampil di atas aplikasi lain\" → izinkan NEXBILL TV (wajib, supaya tombol Home/Input tidak bisa dipakai main tanpa sesi). Uji dengan sesi 1 menit dari dashboard.",
+      "Tekan OK atau Menu di remote → PIN kasir → \"Pengaturan TV (menu staf)\" → \"Pilih input HDMI\" → pilih HDMI tempat PlayStation dicolok. Lalu \"Izin tampil di atas aplikasi lain\" → izinkan NEXBILL TV (wajib, supaya tombol Home/Input tidak bisa dipakai main tanpa sesi). Uji dengan sesi 1 menit dari dashboard.",
   },
   {
     key: "tv-update",
     topic: "NEXBILL TV — instalasi",
     question: "Cara memperbarui aplikasi NEXBILL TV",
     answer:
-      "Tahan OK 3 detik → \"Cek pembaruan aplikasi\". Bila ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi lalu Install — pairing, PIN, dan pengaturan tetap tersimpan.",
+      "Tekan OK → PIN kasir → \"Pengaturan TV (menu staf)\" → \"Cek pembaruan aplikasi\". Bila ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi lalu Install — pairing, PIN, dan pengaturan tetap tersimpan.",
   },
   {
     key: "tv-satu-outlet",
@@ -499,7 +499,7 @@ export const STARTER_ANSWERS: StarterAnswer[] = [
     topic: "NEXBILL TV — pemakaian",
     question: "Membuka layar game tanpa sesi untuk tes",
     answer:
-      "Menu staf (tahan OK 3 detik) → \"Buka layar game 10 menit (tes, tanpa tagihan)\" membuka layar game 10 menit tanpa tagihan, maksimal 3 kali per TV per hari, dan selalu tercatat di kartu Pengawasan NEXBILL TV & Audit Log. Main sungguhan harus lewat sesi supaya tertagih.",
+      "Menu staf (OK → PIN kasir → \"Pengaturan TV (menu staf)\") → \"Buka layar game 10 menit (tes, tanpa tagihan)\" membuka layar game 10 menit tanpa tagihan, maksimal 3 kali per TV per hari, dan selalu tercatat di kartu Pengawasan NEXBILL TV & Audit Log. Main sungguhan harus lewat sesi supaya tertagih.",
   },
   {
     key: "tv-tampilan",

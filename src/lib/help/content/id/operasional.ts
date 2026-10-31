@@ -502,7 +502,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Mulai, jeda, perpanjang, pindah unit, dan selesai dari dashboard berlaku di TV dalam ±5 detik. Jeda mengunci layar (\"DIJEDA\") sampai sesi dilanjutkan.",
           "Dari TV: tekan OK → masukkan PIN → mulai, perpanjang, atau hentikan sesi. Tetap bisa saat internet putus; datanya terkirim otomatis ke dashboard begitu online.",
           "Saat waktu habis, layar terkunci sendiri dan suara game berhenti; tagihan tetap dibayar di kasir.",
-          "Memperbarui aplikasi: tahan OK 3 detik → \"Cek pembaruan aplikasi\"; bila ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi — pairing tetap tersimpan.",
+          "Memperbarui aplikasi: tekan OK → PIN kasir → \"Pengaturan TV (menu staf)\" → \"Cek pembaruan aplikasi\"; bila ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi — pairing tetap tersimpan.",
         ],
       },
       {

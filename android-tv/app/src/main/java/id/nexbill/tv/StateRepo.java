@@ -65,10 +65,34 @@ final class StateRepo {
         return state;
     }
 
-    static void setState(TvState s) {
+    /**
+     * @param requestedRt elapsedRealtime saat permintaan /api/tv/state DIKIRIM. Status yang diminta sebelum
+     *                    server menerima aksi dari TV belum memuat aksi itu (lihat serverCaughtUp).
+     */
+    static void setState(TvState s, long requestedRt) {
         state = s;
         stateWall = System.currentTimeMillis();
+        stateRequestedRt = requestedRt;
         notifyListeners();
+    }
+
+    /** elapsedRealtime saat permintaan status terakhir dikirim (0 = status hasil pemulihan). */
+    private static volatile long stateRequestedRt;
+    /** elapsedRealtime saat server terakhir MENERIMA aksi dari TV (balasan /api/tv/sync). */
+    private static volatile long actionsAckedRt;
+
+    static void markActionsAcked() {
+        actionsAckedRt = android.os.SystemClock.elapsedRealtime();
+    }
+
+    /**
+     * Status server sudah memuat semua aksi TV yang diterimanya: segar DAN diminta SESUDAH balasan sinkron
+     * terakhir. Sebelum itu sesi lokal tetap menjadi acuan — status yang diminta sebelum "stop" sampai di
+     * server masih berkata "sedang dipakai", dan memakainya membuat layar game terbuka lagi dengan timer
+     * berjalan beberapa detik setelah kasir menekan Akhiri sesi.
+     */
+    static boolean serverCaughtUp(long nowRealtime) {
+        return stateFresh(nowRealtime) && stateRequestedRt > actionsAckedRt;
     }
 
     /** Jam dinding saat status server terakhir diterima (0 bila hasil pemulihan setelah menyala ulang). */
@@ -97,6 +121,7 @@ final class StateRepo {
         try {
             state = TvState.parse(raw, android.os.SystemClock.elapsedRealtime() - age);
             stateWall = 0L;
+            stateRequestedRt = 0L;
             notifyListeners();
         } catch (Exception ignored) {
         }
@@ -110,19 +135,19 @@ final class StateRepo {
     /**
      * Sesi lokal (diatur dari TV) yang menentukan layar saat ini, atau null bila status server yang
      * menjadi acuan. Sesi lokal berlaku selama aksinya belum diterima server ATAU status server sedang
-     * tidak segar (internet putus). Begitu semua aksinya terkirim dan server sudah membalas sesudahnya,
-     * sesi lokal dilepas — mis. kasir menghentikan sesi dari dashboard, TV ikut terkunci.
+     * tidak segar (internet putus). Begitu semua aksinya diterima server DAN status yang diminta sesudahnya
+     * sudah tiba (serverCaughtUp), sesi lokal dilepas — mis. kasir menghentikan sesi dari dashboard, TV
+     * ikut terkunci.
      */
     static LocalStore.Session localAuthority(Context c, long nowRealtime) {
         LocalStore.Session l = LocalStore.session(c);
         if (l == null) return null;
-        boolean pending = LocalStore.hasPendingFor(c, l.sessionId);
-        if (pending) return l;
-        if (stateFresh(nowRealtime) && stateWall > LocalStore.lastSyncWall(c)) {
+        if (LocalStore.hasPendingFor(c, l.sessionId)) return l;
+        if (serverCaughtUp(nowRealtime)) {
             LocalStore.setSession(c, null);
             return null;
         }
-        return stateFresh(nowRealtime) ? null : l;
+        return l;
     }
 
     static String hdmiInput(Context c) {

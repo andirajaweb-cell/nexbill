@@ -11,6 +11,7 @@ import path from "path";
 import { translate, type LangCode } from "../src/lib/i18n/registry";
 import "../src/lib/i18n/dict-devices-tvapp";
 import "../src/lib/i18n/dict-devices-guide-levels";
+import "../src/lib/i18n/dict-devices-tvmenu";
 
 const LANGS: { code: LangCode; label: string }[] = [
   { code: "id", label: "Bahasa Indonesia" },
@@ -42,6 +43,10 @@ function article(lang: LangCode) {
   ${step(4, "devices.guide.tvFull.s4Title", ["devices.guide.tvFull.s4a", "devices.guide.tvFull.s4b", "devices.guide.tvFull.s4c"])}
   ${step(5, "devices.guide.tvFull.s5Title", ["devices.guide.tvFull.s5a", "devices.guide.tvFull.s5b", "devices.guide.tvFull.s5c"])}
   ${step(6, "devices.guide.tvFull.s6Title", ["devices.guide.tvFull.s6a", "devices.guide.tvFull.s6b"])}
+  <section class="need" style="margin-top:18px"><h2>${t("devices.guide.tvMenu.title")}</h2><p>${t("devices.guide.tvMenu.open")}</p>
+    <h3>${t("devices.guide.tvMenu.cashierTitle")}</h3><ul>${li(["devices.guide.tvMenu.c1", "devices.guide.tvMenu.c2", "devices.guide.tvMenu.c3", "devices.guide.tvMenu.c4"])}</ul>
+    <h3>${t("devices.guide.tvMenu.staffTitle")}</h3><ul>${li(["devices.guide.tvMenu.m1", "devices.guide.tvMenu.m2", "devices.guide.tvMenu.m3", "devices.guide.tvMenu.m4", "devices.guide.tvMenu.m5", "devices.guide.tvMenu.m6", "devices.guide.tvMenu.m7", "devices.guide.tvMenu.m8", "devices.guide.tvMenu.m9"])}</ul>
+  </section>
   <section class="trouble"><h2>⚠ ${t("devices.guide.tvFull.troubleTitle")}</h2><ul>${li(["devices.guide.tvFull.t1", "devices.guide.tvFull.t2", "devices.guide.tvFull.t3", "devices.guide.tvFull.t4"])}</ul></section>
   <p class="note" style="margin-top:14px">${t("devices.guide.tvApp.updateNote")}</p>
   <p class="footer">NEXBILL · Digitrajasa · nexbill.id</p>

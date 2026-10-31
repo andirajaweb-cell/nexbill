@@ -96,4 +96,26 @@
     <string name="sync_start_rejected_hint">⚠ Dashboard đã từ chối phiên này và CHƯA tính tiền — thu ngân: mở Trạng thái đồng bộ (bấm OK) rồi ghi phiên ở trang Rental.</string>
     <string name="staff_test_limit">Đã đạt giới hạn chế độ nhân viên hôm nay (%1$d lần). Muốn chơi, hãy bắt đầu phiên từ bảng thu ngân để tính tiền.</string>
     <string name="staff_test_started">Đã mở chế độ nhân viên 10 phút (không tính tiền, có ghi trên dashboard). Còn lại hôm nay: %1$d.</string>
+    <string name="menu_help">Hướng dẫn menu này</string>
+    <string name="menu_help_desc">Chức năng từng mục và thứ tự cài đặt TV mới</string>
+    <string name="menu_end_staff_desc">Đóng màn hình chơi thử ngay và khóa màn hình lại</string>
+    <string name="menu_show_game_desc">Thử hình, tiếng và tay cầm không cần phiên, không tính tiền. Được ghi lại trên bảng điều khiển. Còn lại hôm nay: %1$d</string>
+    <string name="menu_pick_hdmi_desc">Cổng HDMI đang cắm PlayStation. Hiện tại: %1$s</string>
+    <string name="menu_mode_desc">Bên trong ứng dụng = hình PS hiện trong NEXBILL TV (khuyên dùng). Chuyển cổng TV = chỉ khi hình PS không hiện; cần quyền hiển thị trên ứng dụng khác</string>
+    <string name="menu_overlay_desc">Bắt buộc cho Bảo vệ màn hình và chế độ Chuyển cổng TV. Chọn NEXBILL TV rồi cho phép</string>
+    <string name="status_allowed">Đã cho phép</string>
+    <string name="status_not_allowed">Chưa cho phép</string>
+    <string name="menu_home_desc">Để NEXBILL TV tự mở khi bật TV hoặc bấm Home. Chọn NEXBILL TV trong danh sách</string>
+    <string name="menu_guard_desc">Bật = không thể dùng Home, Source hoặc ứng dụng khác để chơi khi không có phiên. Chỉ tắt khi TV còn dùng việc khác</string>
+    <string name="menu_reload_desc">Khi màn hình chờ bị treo, không đổi hoặc trống</string>
+    <string name="menu_update_desc">Phiên bản đã cài %1$s — so với phiên bản mới nhất trên nexbill.id</string>
+    <string name="menu_info_desc">Phiên bản, cửa hàng và máy đã kết nối, nguồn HDMI, chế độ và quyền</string>
+    <string name="menu_help_back">Quay lại menu</string>
+    <string name="menu_help_body">CÀI ĐẶT TV MỚI (một lần)\n1. Chọn nguồn HDMI → cổng đang cắm PlayStation.\n2. Chế độ hiển thị HDMI → Bên trong ứng dụng. Nếu hình PS không hiện, đổi sang Chuyển cổng TV.\n3. Hiển thị trên ứng dụng khác → cho phép NEXBILL TV.\n4. Đặt làm ứng dụng chính của TV → chọn NEXBILL TV.\n5. Bảo vệ màn hình → Bật.\n6. Thử: Mở màn hình game 10 phút, kiểm tra hình, tiếng và tay cầm, rồi Kết thúc chế độ nhân viên.\n\nDÙNG HẰNG NGÀY (bấm OK hoặc MENU trên điều khiển → PIN thu ngân)\n• Bắt đầu phiên: chọn gói, thời lượng hoặc Tự do. Màn hình game mở và đồng hồ chạy.\n• Thêm giờ: cho phiên có thời lượng.\n• Kết thúc phiên ngay: đồng hồ dừng, màn hình khóa, hóa đơn chuyển sang Thu ngân (Đơn đang mở).\n• Trạng thái đồng bộ: thao tác từ TV chưa/không gửi được lên bảng điều khiển. Khi mất mạng mọi thứ vẫn chạy và tự gửi khi có mạng.\n\nHướng dẫn đầy đủ: %1$s</string>
+    <string name="cashier_start_desc">Chọn gói, thời lượng hoặc Tự do. Hóa đơn chuyển sang Thu ngân (Đơn đang mở)</string>
+    <string name="cashier_extend_desc">Thêm 15 phút đến 2 giờ cho phiên đang chạy</string>
+    <string name="cashier_stop_desc">Đồng hồ dừng, màn hình game khóa, khách thanh toán tại quầy</string>
+    <string name="cashier_sync_desc">Thao tác từ TV đang chờ gửi lên bảng điều khiển</string>
+    <string name="cashier_sync_desc_failed">Có thao tác bị bảng điều khiển từ chối — mở để xem</string>
+    <string name="cashier_settings_desc">HDMI, chế độ hiển thị, quyền, bảo vệ màn hình, cập nhật và hướng dẫn</string>
 </resources>

@@ -96,4 +96,26 @@
     <string name="sync_start_rejected_hint">⚠ Tinanggihan ng dashboard ang session na ito at HINDI pa nasisingil — kahera: buksan ang Status ng sync (pindutin ang OK) at itala ang session sa Rental.</string>
     <string name="staff_test_limit">Naabot na ang limit ng staff mode ngayong araw (%1$d beses). Para maglaro, magsimula ng session sa panel ng kahera para masingil.</string>
     <string name="staff_test_started">Binuksan ang staff mode nang 10 minuto (walang singil, naitala sa dashboard). Natitira ngayong araw: %1$d.</string>
+    <string name="menu_help">Gabay sa menu na ito</string>
+    <string name="menu_help_desc">Ano ang gamit ng bawat menu at ang pagkakasunod ng setup ng bagong TV</string>
+    <string name="menu_end_staff_desc">Isara ngayon ang test na game screen at i-lock muli ang screen</string>
+    <string name="menu_show_game_desc">Subukan ang larawan, tunog at controller nang walang session at walang bayad. Naitatala sa dashboard. Natitira ngayon: %1$d</string>
+    <string name="menu_pick_hdmi_desc">Ang HDMI port kung saan nakasaksak ang PlayStation. Ngayon: %1$s</string>
+    <string name="menu_mode_desc">Sa loob ng app = lumalabas ang larawan ng PS sa NEXBILL TV (inirerekomenda). Palitan ang input ng TV = kung hindi lumalabas ang larawan ng PS lang; kailangan ng pahintulot na magpakita sa ibabaw ng ibang app</string>
+    <string name="menu_overlay_desc">Kailangan para sa Bantay ng screen at mode na Palitan ang input ng TV. Piliin ang NEXBILL TV at payagan</string>
+    <string name="status_allowed">Pinayagan</string>
+    <string name="status_not_allowed">Hindi pa pinapayagan</string>
+    <string name="menu_home_desc">Para kusang bumukas ang NEXBILL TV pag-on ng TV o pagpindot ng Home. Piliin ang NEXBILL TV sa listahan</string>
+    <string name="menu_guard_desc">Naka-on = hindi magagamit ang Home, Source o ibang app para maglaro nang walang session. I-off lang kung ginagamit din ang TV sa ibang bagay</string>
+    <string name="menu_reload_desc">Kapag naka-stuck, hindi nagbabago, o blangko ang screensaver</string>
+    <string name="menu_update_desc">Naka-install na bersyon %1$s — ihambing sa pinakabagong bersyon sa nexbill.id</string>
+    <string name="menu_info_desc">Bersyon, nakakonektang outlet at unit, HDMI input, mode, at mga pahintulot</string>
+    <string name="menu_help_back">Bumalik sa menu</string>
+    <string name="menu_help_body">SETUP NG BAGONG TV (isang beses lang)\n1. Pumili ng HDMI input → ang port ng PlayStation.\n2. HDMI display mode → Sa loob ng app. Kung hindi lumalabas ang larawan ng PS, palitan ng Palitan ang input ng TV.\n3. Magpakita sa ibabaw ng ibang app → payagan para sa NEXBILL TV.\n4. Gawing pangunahing app ng TV → piliin ang NEXBILL TV.\n5. Bantay ng screen → Naka-on.\n6. Subukan: Buksan ang game screen nang 10 minuto, tingnan ang larawan, tunog at controller, saka Tapusin ang staff mode.\n\nARAW-ARAW NA PAGGAMIT (pindutin ang OK o MENU sa remote → PIN ng cashier)\n• Simulan ang session: pumili ng package, tagal, o Bukas. Bubukas ang game screen at tatakbo ang oras.\n• Magdagdag ng oras: para sa may tagal na session.\n• Tapusin ang session ngayon: hihinto ang oras, mala-lock ang screen, papasok ang bill sa Cashier (Open Orders).\n• Status ng sync: mga aksyon mula sa TV na hindi pa/nabigong maipadala sa dashboard. Kapag walang internet, tuloy pa rin ang lahat at kusang ipapadala pagka-online.\n\nBuong gabay: %1$s</string>
+    <string name="cashier_start_desc">Pumili ng package, tagal, o Bukas. Papasok ang bill sa Cashier (Open Orders)</string>
+    <string name="cashier_extend_desc">Magdagdag ng 15 minuto hanggang 2 oras sa tumatakbong session</string>
+    <string name="cashier_stop_desc">Hihinto ang oras, mala-lock ang game screen, magbabayad ang customer sa cashier</string>
+    <string name="cashier_sync_desc">Mga aksyon mula sa TV na naghihintay maipadala sa dashboard</string>
+    <string name="cashier_sync_desc_failed">May aksyong tinanggihan ng dashboard — buksan para suriin</string>
+    <string name="cashier_settings_desc">HDMI, display mode, mga pahintulot, bantay ng screen, update, at gabay</string>
 </resources>

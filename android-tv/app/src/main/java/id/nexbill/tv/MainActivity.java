@@ -561,39 +561,91 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    /**
+     * Menu staf (Pengaturan TV). Setiap baris punya keterangan singkat di bawah judulnya supaya staf tahu
+     * fungsinya tanpa membuka panduan; baris pertama membuka petunjuk lengkap + urutan setup TV baru.
+     * Item yang tidak relevan saat ini disembunyikan (mis. "Akhiri mode staf" hanya saat mode staf aktif).
+     */
     private void showStaffMenu() {
         menuOpen = true;
+        long nowRt = SystemClock.elapsedRealtime();
         boolean switchMode = StateRepo.switchInputMode(this);
-        String[] items = new String[] {
-                getString(R.string.menu_show_game),
-                getString(R.string.menu_end_staff),
-                getString(R.string.menu_pick_hdmi),
-                getString(R.string.menu_mode) + ": " + getString(switchMode ? R.string.mode_switch : R.string.mode_inapp),
-                getString(R.string.menu_overlay),
-                getString(R.string.menu_home),
-                getString(R.string.menu_guard) + ": " + getString(StateRepo.guardEnabled(this) ? R.string.guard_on : R.string.guard_off),
-                getString(R.string.menu_reload),
-                getString(R.string.menu_update),
-                getString(R.string.menu_info),
-        };
+        boolean staffActive = StateRepo.staffLeftMs(nowRt) > 0;
+        boolean overlayOk = OverlayTimer.permitted(this);
+        boolean guardOn = StateRepo.guardEnabled(this);
+        final List<CharSequence> items = new ArrayList<>();
+        final List<Runnable> actions = new ArrayList<>();
+
+        items.add(withHelp(getString(R.string.menu_help), getString(R.string.menu_help_desc)));
+        actions.add(this::showMenuHelp);
+        if (staffActive) {
+            items.add(withHelp(getString(R.string.menu_end_staff), getString(R.string.menu_end_staff_desc)));
+            actions.add(() -> StateRepo.setStaffUntil(0));
+        } else if (!StateRepo.inSession(this, nowRt)) {
+            items.add(withHelp(getString(R.string.menu_show_game), getString(R.string.menu_show_game_desc, LocalStore.staffTestsLeft(this))));
+            actions.add(() -> startStaffTest(SystemClock.elapsedRealtime()));
+        }
+        items.add(withHelp(getString(R.string.menu_pick_hdmi), getString(R.string.menu_pick_hdmi_desc, inputLabel(chosenInput()))));
+        actions.add(this::pickHdmi);
+        items.add(withHelp(getString(R.string.menu_mode) + ": " + getString(switchMode ? R.string.mode_switch : R.string.mode_inapp), getString(R.string.menu_mode_desc)));
+        actions.add(this::pickMode);
+        items.add(withHelp(getString(R.string.menu_overlay) + ": " + getString(overlayOk ? R.string.status_allowed : R.string.status_not_allowed), getString(R.string.menu_overlay_desc)));
+        actions.add(() -> openSettings(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))));
+        items.add(withHelp(getString(R.string.menu_home), getString(R.string.menu_home_desc)));
+        actions.add(() -> openSettings(new Intent(Settings.ACTION_HOME_SETTINGS)));
+        items.add(withHelp(getString(R.string.menu_guard) + ": " + getString(guardOn ? R.string.guard_on : R.string.guard_off), getString(R.string.menu_guard_desc)));
+        actions.add(this::toggleGuard);
+        items.add(withHelp(getString(R.string.menu_reload), getString(R.string.menu_reload_desc)));
+        actions.add(() -> web.loadUrl(Config.TV_PAGE));
+        items.add(withHelp(getString(R.string.menu_update), getString(R.string.menu_update_desc, Config.APP_VERSION)));
+        actions.add(this::checkUpdate);
+        items.add(withHelp(getString(R.string.menu_info), getString(R.string.menu_info_desc)));
+        actions.add(this::showInfo);
+
         new AlertDialog.Builder(this)
                 .setTitle(R.string.menu_title)
-                .setItems(items, (d, which) -> {
+                .setItems(items.toArray(new CharSequence[0]), (d, which) -> {
                     menuOpen = false;
-                    long now = SystemClock.elapsedRealtime();
-                    switch (which) {
-                        case 0: startStaffTest(now); break;
-                        case 1: StateRepo.setStaffUntil(0); break;
-                        case 2: pickHdmi(); break;
-                        case 3: pickMode(); break;
-                        case 4: openSettings(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))); break;
-                        case 5: openSettings(new Intent(Settings.ACTION_HOME_SETTINGS)); break;
-                        case 6: toggleGuard(); break;
-                        case 7: web.loadUrl(Config.TV_PAGE); break;
-                        case 8: checkUpdate(); break;
-                        default: showInfo(); break;
-                    }
+                    actions.get(which).run();
                 })
+                .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    /** Judul menu + keterangan kecil abu-abu di baris berikutnya. */
+    private CharSequence withHelp(String title, String help) {
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(title);
+        if (help == null || help.isEmpty()) return sb;
+        int start = sb.length();
+        sb.append('\n').append(help);
+        sb.setSpan(new android.text.style.RelativeSizeSpan(0.78f), start, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.setSpan(new android.text.style.ForegroundColorSpan(0xFF9CA3AF), start, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return sb;
+    }
+
+    /** Nama input HDMI yang mudah dibaca (mis. "HDMI 2"), "-" bila belum ada. */
+    private String inputLabel(String inputId) {
+        if (inputId == null) return "-";
+        for (TvInputInfo i : hdmiInputsCached()) {
+            if (i.getId().equals(inputId)) {
+                CharSequence l = i.loadLabel(this);
+                return l == null ? inputId : l.toString();
+            }
+        }
+        return inputId;
+    }
+
+    /** Petunjuk lengkap menu staf + urutan setup TV baru + pemakaian harian. */
+    private void showMenuHelp() {
+        menuOpen = true;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_help)
+                .setMessage(getString(R.string.menu_help_body, Config.GUIDE_SHORT_URL))
+                .setPositiveButton(R.string.menu_help_back, (d, w) -> {
+                    menuOpen = false;
+                    showStaffMenu();
+                })
+                .setNegativeButton(R.string.ok, (d, w) -> menuOpen = false)
                 .setOnCancelListener(d -> menuOpen = false)
                 .show();
     }
@@ -733,20 +785,20 @@ public class MainActivity extends Activity {
         boolean inSession = StateRepo.inSession(this, now);
         int pending = LocalStore.pendingCount(this);
         int failed = LocalStore.failedCount(this);
-        final List<String> labels = new ArrayList<>();
+        final List<CharSequence> labels = new ArrayList<>();
         final List<Runnable> actions = new ArrayList<>();
         if (inSession) {
-            labels.add(getString(R.string.cashier_extend));
+            labels.add(withHelp(getString(R.string.cashier_extend), getString(R.string.cashier_extend_desc)));
             actions.add(this::extendFlow);
-            labels.add(getString(R.string.cashier_stop));
+            labels.add(withHelp(getString(R.string.cashier_stop), getString(R.string.cashier_stop_desc)));
             actions.add(this::stopFlow);
         } else {
-            labels.add(getString(R.string.cashier_start));
+            labels.add(withHelp(getString(R.string.cashier_start), getString(R.string.cashier_start_desc)));
             actions.add(this::startFlow);
         }
-        labels.add(getString(R.string.cashier_sync_status, pending, failed));
+        labels.add(withHelp(getString(R.string.cashier_sync_status, pending, failed), getString(failed > 0 ? R.string.cashier_sync_desc_failed : R.string.cashier_sync_desc)));
         actions.add(this::syncStatusDialog);
-        labels.add(getString(R.string.cashier_settings));
+        labels.add(withHelp(getString(R.string.cashier_settings), getString(R.string.cashier_settings_desc)));
         actions.add(this::showStaffMenu);
         TvState s = StateRepo.state();
         JSONObject cat = LocalStore.catalog(this);
@@ -755,7 +807,7 @@ public class MainActivity extends Activity {
                 + (StateRepo.cashierName().isEmpty() ? "" : " · " + StateRepo.cashierName());
         new AlertDialog.Builder(this)
                 .setTitle(title)
-                .setItems(labels.toArray(new String[0]), (d, which) -> {
+                .setItems(labels.toArray(new CharSequence[0]), (d, which) -> {
                     menuOpen = false;
                     actions.get(which).run();
                 })
@@ -872,6 +924,8 @@ public class MainActivity extends Activity {
         m.startAt = serverNow - elapsed * 1000L;
         m.plannedMinutes = remaining == null ? 0 : (int) Math.max(1, Math.round((elapsed + remaining) / 60.0));
         m.label = "";
+        // Sesi yang dijeda dari dashboard tetap terkunci walau waktunya ditambah dari TV.
+        m.paused = "paused".equals(s.status);
         return m;
     }
 
@@ -920,9 +974,11 @@ public class MainActivity extends Activity {
                     l.ended = true;
                     LocalStore.setSession(this, l);
                     LocalStore.enqueue(this, "stop", l.sessionId, LocalStore.serverNow(this), null);
+                    StateRepo.setStaffUntil(0);
                     Toast.makeText(this, R.string.cashier_stopped, Toast.LENGTH_LONG).show();
-                    syncSoon();
                     render();
+                    refreshWeb();
+                    syncSoon();
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
@@ -976,9 +1032,21 @@ public class MainActivity extends Activity {
     /** Kirim antrean sekarang juga (tidak menunggu putaran PollService berikutnya). */
     private void syncSoon() {
         new Thread(() -> {
-            SyncEngine.syncQueue(getApplicationContext());
+            int acked = SyncEngine.syncQueue(getApplicationContext());
+            // Aksi diterima server → ambil status sekarang (melepas sesi lokal begitu server sudah sama)
+            // dan minta halaman /tv memuat ulang statusnya, supaya timer di screensaver ikut berhenti.
+            if (acked > 0) PollService.pollNow();
+            ui.post(this::refreshWeb);
             SyncEngine.refreshCatalogIfDue(getApplicationContext(), false);
         }).start();
+    }
+
+    /** Minta halaman /tv mengambil status server & status sesi lokal TV sekarang juga. */
+    private void refreshWeb() {
+        try {
+            web.evaluateJavascript("window.dispatchEvent(new Event('nexbill:refresh'))", null);
+        } catch (RuntimeException ignored) {
+        }
     }
 
     private String durationText(int minutes) {
@@ -1006,6 +1074,29 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String appVersion() {
             return Config.APP_VERSION;
+        }
+
+        /**
+         * Sesi yang diatur dari TV (untuk halaman /tv): setelah kasir menekan Akhiri sesi, halaman /tv
+         * langsung menampilkan "Sesi selesai" — tidak lagi memajang sisa waktu yang terus berjalan dari
+         * status server lama sampai stop-nya tersinkron.
+         */
+        @JavascriptInterface
+        public String localStatus() {
+            try {
+                Context c = getApplicationContext();
+                LocalStore.Session l = LocalStore.session(c);
+                JSONObject o = new JSONObject();
+                if (l == null) return o.put("session", JSONObject.NULL).toString();
+                return o.put("session", new JSONObject()
+                                .put("sessionId", l.sessionId)
+                                .put("ended", l.ended)
+                                .put("pending", LocalStore.hasPendingFor(c, l.sessionId))
+                                .put("failed", LocalStore.hasFailedFor(c, l.sessionId)))
+                        .toString();
+            } catch (Exception e) {
+                return "{}";
+            }
         }
 
         /** Colekan dari dashboard (kontrol instan) → ambil status sekarang. */

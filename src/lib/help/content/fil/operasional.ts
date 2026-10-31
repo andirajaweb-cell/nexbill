@@ -502,7 +502,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Ang start, pause, extend, paglipat ng unit, at end mula sa dashboard ay umiiral sa TV sa loob ng ±5 segundo. Ang pause ay nagla-lock ng screen (\"NAKA-PAUSE\") hanggang ituloy ang session.",
           "Mula sa TV: pindutin ang OK → ilagay ang PIN → mag-start, mag-extend, o mag-stop ng session. Gumagana kahit mawala ang internet; awtomatikong naipapadala ang data sa dashboard pagbalik online.",
           "Kapag naubos ang oras, kusang nagla-lock ang screen at humihinto ang tunog ng game; binabayaran pa rin ang bill sa cashier.",
-          "Pag-update ng app: pindutin nang matagal ang OK nang 3 segundo → \"Tingnan ang update ng app\"; kung may bagong bersyon, buksan ang Downloader at i-type muli ang nexbill.id/tvapk — nananatiling naka-save ang pairing.",
+          "Pag-update ng app: pindutin ang OK → PIN ng cashier → \"Settings ng TV (staff menu)\" → \"Tingnan ang update ng app\"; kung may bagong bersyon, buksan ang Downloader at i-type muli ang nexbill.id/tvapk — nananatiling naka-save ang pairing.",
         ],
       },
       {

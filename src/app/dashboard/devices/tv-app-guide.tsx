@@ -4,6 +4,7 @@ import { AlertTriangle, ListChecks } from "lucide-react";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-devices-tvapp";
 import "@/lib/i18n/dict-devices-guide-levels";
+import "@/lib/i18n/dict-devices-tvmenu";
 
 export type GuideLevel = "full" | "quick";
 
@@ -174,6 +175,33 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
           </li>
         ))}
       </ol>
+
+      {/* Fungsi setiap pilihan di TV — teksnya sama dengan keterangan di aplikasi (android-tv strings.xml). */}
+      <div className="rounded-lg border border-neutral-700 bg-white/[0.015] p-3 space-y-2">
+        <div className="font-medium text-neutral-200">{t("devices.guide.tvMenu.title", "Fungsi menu di TV (panel kasir & menu staf)")}</div>
+        <p className="text-neutral-400">
+          {t("devices.guide.tvMenu.open", "Setelah TV terhubung: tekan OK atau Menu di remote → isi PIN kasir → Panel kasir. Menu staf ada di Panel kasir › \"Pengaturan TV (menu staf)\".")}
+        </p>
+        <div className="text-neutral-300 font-medium">{t("devices.guide.tvMenu.cashierTitle", "Panel kasir")}</div>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>{t("devices.guide.tvMenu.c1", "Mulai sesi — pilih paket, durasi, atau Bebas.")}</li>
+          <li>{t("devices.guide.tvMenu.c2", "Tambah waktu — 15 menit sampai 2 jam untuk sesi berdurasi.")}</li>
+          <li>{t("devices.guide.tvMenu.c3", "Akhiri sesi sekarang — argo berhenti, layar game terkunci, pelanggan bayar di kasir.")}</li>
+          <li>{t("devices.guide.tvMenu.c4", "Status sinkron — aksi dari TV yang belum/gagal terkirim ke dashboard.")}</li>
+        </ul>
+        <div className="text-neutral-300 font-medium">{t("devices.guide.tvMenu.staffTitle", "Menu staf (Pengaturan TV)")}</div>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>{t("devices.guide.tvMenu.m1", "Buka layar game 10 menit — tes tanpa sesi dan tanpa tagihan.")}</li>
+          <li>{t("devices.guide.tvMenu.m2", "Pilih input HDMI — colokan HDMI tempat PlayStation terpasang.")}</li>
+          <li>{t("devices.guide.tvMenu.m3", "Mode tampilan HDMI — Di dalam aplikasi (disarankan).")}</li>
+          <li>{t("devices.guide.tvMenu.m4", "Izin tampil di atas aplikasi lain — wajib untuk penjaga layar.")}</li>
+          <li>{t("devices.guide.tvMenu.m5", "Jadikan aplikasi utama TV — NEXBILL TV terbuka sendiri saat TV menyala.")}</li>
+          <li>{t("devices.guide.tvMenu.m6", "Penjaga layar — mencegah main tanpa sesi lewat Home/Source/aplikasi lain.")}</li>
+          <li>{t("devices.guide.tvMenu.m7", "Muat ulang layar — bila screensaver macet atau kosong.")}</li>
+          <li>{t("devices.guide.tvMenu.m8", "Cek pembaruan aplikasi — membandingkan versi terpasang dengan versi terbaru.")}</li>
+          <li>{t("devices.guide.tvMenu.m9", "Info perangkat — versi, outlet & unit, input, mode, izin.")}</li>
+        </ul>
+      </div>
 
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1.5">
         <div className="flex items-center gap-1.5 font-medium text-amber-300">

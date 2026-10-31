@@ -96,4 +96,26 @@
     <string name="sync_start_rejected_hint">⚠ Sesi ini ditolak papan pemuka dan BELUM dicaj — juruwang: buka Status segerak (tekan OK) dan rekod sesi di Rental.</string>
     <string name="staff_test_limit">Had mod staf hari ini (%1$d kali) telah dicapai. Untuk bermain, mulakan sesi melalui panel juruwang supaya dicaj.</string>
     <string name="staff_test_started">Mod staf dibuka 10 minit (tidak dicaj, direkod di papan pemuka). Baki hari ini: %1$d.</string>
+    <string name="menu_help">Panduan menu ini</string>
+    <string name="menu_help_desc">Fungsi setiap menu dan urutan persediaan TV baharu</string>
+    <string name="menu_end_staff_desc">Tutup skrin permainan ujian sekarang dan kunci skrin semula</string>
+    <string name="menu_show_game_desc">Uji gambar, bunyi &amp; kawalan tanpa sesi dan tanpa bil. Direkod di papan pemuka. Baki hari ini: %1$d</string>
+    <string name="menu_pick_hdmi_desc">Port HDMI tempat PlayStation dipasang. Sekarang: %1$s</string>
+    <string name="menu_mode_desc">Di dalam aplikasi = gambar PS dipaparkan dalam NEXBILL TV (disyorkan). Tukar input TV = hanya jika gambar PS tidak muncul; perlu kebenaran papar di atas aplikasi lain</string>
+    <string name="menu_overlay_desc">Wajib untuk Pengawal skrin dan mod Tukar input TV. Pilih NEXBILL TV kemudian benarkan</string>
+    <string name="status_allowed">Dibenarkan</string>
+    <string name="status_not_allowed">Belum dibenarkan</string>
+    <string name="menu_home_desc">Supaya NEXBILL TV dibuka sendiri apabila TV dihidupkan atau butang Home ditekan. Pilih NEXBILL TV dalam senarai</string>
+    <string name="menu_guard_desc">Aktif = butang Home, Source atau aplikasi lain tidak boleh digunakan untuk bermain tanpa sesi. Matikan hanya jika TV digunakan untuk tujuan lain</string>
+    <string name="menu_reload_desc">Jika penyelamat skrin tersekat, tidak berubah atau kosong</string>
+    <string name="menu_update_desc">Versi dipasang %1$s — bandingkan dengan versi terkini di nexbill.id</string>
+    <string name="menu_info_desc">Versi, outlet &amp; unit yang disambung, input HDMI, mod dan kebenaran</string>
+    <string name="menu_help_back">Kembali ke menu</string>
+    <string name="menu_help_body">PERSEDIAAN TV BAHARU (sekali sahaja)\n1. Pilih input HDMI → port tempat PlayStation dipasang.\n2. Mod paparan HDMI → Di dalam aplikasi. Jika gambar PS tidak muncul, tukar ke Tukar input TV.\n3. Papar di atas aplikasi lain → benarkan untuk NEXBILL TV.\n4. Jadikan aplikasi utama TV → pilih NEXBILL TV.\n5. Pengawal skrin → Aktif.\n6. Uji: Buka skrin permainan 10 minit, semak gambar, bunyi &amp; kawalan, kemudian Tamatkan mod staf.\n\nPENGGUNAAN HARIAN (tekan OK atau MENU pada alat kawalan → PIN juruwang)\n• Mula sesi: pilih pakej, tempoh atau Bebas. Skrin permainan dibuka dan pemasa berjalan.\n• Tambah masa: untuk sesi bertempoh.\n• Tamatkan sesi sekarang: pemasa berhenti, skrin dikunci, bil masuk ke Juruwang (Pesanan Terbuka).\n• Status segerak: tindakan dari TV yang belum/gagal dihantar ke papan pemuka. Semasa internet terputus semuanya tetap berjalan dan dihantar automatik apabila dalam talian.\n\nPanduan penuh: %1$s</string>
+    <string name="cashier_start_desc">Pilih pakej, tempoh atau Bebas. Bil masuk ke Juruwang (Pesanan Terbuka)</string>
+    <string name="cashier_extend_desc">Tambah 15 minit hingga 2 jam pada sesi yang berjalan</string>
+    <string name="cashier_stop_desc">Pemasa berhenti, skrin permainan dikunci, pelanggan bayar di juruwang</string>
+    <string name="cashier_sync_desc">Tindakan dari TV yang menunggu dihantar ke papan pemuka</string>
+    <string name="cashier_sync_desc_failed">Ada tindakan ditolak papan pemuka — buka untuk semak</string>
+    <string name="cashier_settings_desc">HDMI, mod paparan, kebenaran, pengawal skrin, kemas kini dan panduan</string>
 </resources>

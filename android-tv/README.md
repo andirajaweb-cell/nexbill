@@ -28,15 +28,27 @@ Kalau merek TV tidak mengizinkan HDMI tampil di dalam aplikasi, aplikasi beralih
 - **PIN saat offline:** dicocokkan dengan PIN terakhir yang berhasil dipakai di TV itu saat online — masukkan PIN sekali saat online setelah pairing.
 - Harga, paket, dan durasi diambil dari `GET /api/tv/catalog` (disimpan di TV, disegarkan tiap 10 menit).
 
-**Menu staf:** tekan OK → PIN → Pengaturan TV (sebelum dipasangkan: tahan OK 3 detik atau tombol Menu). Isinya:
+**Menu staf:** tekan OK → PIN → Pengaturan TV (sebelum dipasangkan: tahan OK 3 detik atau tombol Menu). Sejak 1.2.3 setiap pilihan (juga di panel kasir) punya keterangan singkat di bawah judulnya, dan baris pertama **Petunjuk menu ini** berisi urutan setup TV baru + pemakaian harian. Isinya:
 
-- buka layar game 10 menit (tes, tidak ditagih — sesi sungguhan lewat panel kasir);
-- pilih input HDMI;
+- petunjuk menu ini;
+- buka layar game 10 menit (tes, tidak ditagih — sesi sungguhan lewat panel kasir; disembunyikan saat ada sesi) / akhiri mode staf (hanya saat mode staf aktif);
+- pilih input HDMI (menampilkan input yang dipakai sekarang);
 - ganti mode tampilan;
-- izin overlay;
+- izin overlay (menampilkan Diizinkan / Belum diizinkan);
 - jadikan aplikasi utama TV;
+- penjaga layar;
 - muat ulang layar;
+- cek pembaruan;
 - info perangkat.
+
+## Akhiri sesi dari TV (perbaikan 1.2.3)
+
+Dulu, setelah kasir menekan **Akhiri sesi**, waktu terlihat masih berjalan:
+
+1. Halaman `/tv` (screensaver) menampilkan sisa waktu dari status server terakhir sampai stop tersinkron — kini aplikasi memberi tahu halaman lewat `NexbillTvApp.localStatus()` dan event `nexbill:refresh`, sehingga layar langsung menampilkan **SESI SELESAI** (dengan catatan "Mengirim ke kasir…" / "Belum tercatat di kasir").
+2. Begitu stop diterima server, sesi lokal dilepas dan status server yang diminta SEBELUM stop sampai (masih "sedang dipakai") dipakai lagi — layar game terbuka kembali dengan timer berjalan beberapa detik. Kini sesi lokal hanya dilepas setelah status yang diminta SESUDAH sinkron tiba (`StateRepo.serverCaughtUp`), dan status diambil ulang segera setelah sinkron.
+3. Sinkron dari tombol TV dan dari `PollService` bisa berjalan bersamaan sehingga salah satunya ditolak "sedang diproses" — `SyncEngine.syncQueue` kini `synchronized`.
+4. Mode staf yang masih aktif ikut ditutup saat sesi diakhiri; tambah waktu pada sesi yang dijeda dari dashboard tidak lagi membuka layar game.
 
 ## Yang perlu disiapkan di dashboard
 

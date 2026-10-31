@@ -96,4 +96,26 @@
     <string name="sync_start_rejected_hint">⚠ The dashboard rejected this session and it is NOT billed yet — cashier: open Sync status (press OK) and record the session in Rental.</string>
     <string name="staff_test_limit">Today\'s staff-mode limit (%1$d times) has been reached. To play, start a session from the cashier panel so it\'s billed.</string>
     <string name="staff_test_started">Staff mode opened for 10 minutes (not billed, recorded in the dashboard). Remaining today: %1$d.</string>
+    <string name="menu_help">Help for this menu</string>
+    <string name="menu_help_desc">What each option does and the setup order for a new TV</string>
+    <string name="menu_end_staff_desc">Close the test game screen now and lock the screen again</string>
+    <string name="menu_show_game_desc">Test picture, sound &amp; controllers with no session and no bill. Logged in the dashboard. Left today: %1$d</string>
+    <string name="menu_pick_hdmi_desc">The HDMI port the PlayStation is plugged into. Current: %1$s</string>
+    <string name="menu_mode_desc">Inside the app = PS picture shows in NEXBILL TV (recommended). Switch TV input = only if the PS picture does not appear; needs the display-over-other-apps permission</string>
+    <string name="menu_overlay_desc">Required for Screen guard and Switch TV input mode. Choose NEXBILL TV, then allow</string>
+    <string name="status_allowed">Allowed</string>
+    <string name="status_not_allowed">Not allowed yet</string>
+    <string name="menu_home_desc">So NEXBILL TV opens by itself when the TV turns on or Home is pressed. Choose NEXBILL TV in the list</string>
+    <string name="menu_guard_desc">On = Home, Source or other apps cannot be used to play without a session. Turn off only if the TV is also used for other things</string>
+    <string name="menu_reload_desc">If the screensaver is stuck, not updating, or blank</string>
+    <string name="menu_update_desc">Installed version %1$s — compare with the latest version on nexbill.id</string>
+    <string name="menu_info_desc">Version, connected outlet &amp; unit, HDMI input, mode, and permissions</string>
+    <string name="menu_help_back">Back to menu</string>
+    <string name="menu_help_body">NEW TV SETUP (once)\n1. Choose HDMI input → the port the PlayStation is plugged into.\n2. HDMI display mode → Inside the app. If the PS picture does not appear, switch to Switch TV input.\n3. Display over other apps → allow it for NEXBILL TV.\n4. Make it the TV\'s main app → choose NEXBILL TV.\n5. Screen guard → On.\n6. Test: Open the game screen for 10 minutes, check picture, sound &amp; controllers, then End staff mode.\n\nDAILY USE (press OK or MENU on the remote → cashier PIN)\n• Start session: choose a package, duration, or Open. The game screen opens and the timer runs.\n• Add time: for timed sessions.\n• End session now: the timer stops, the screen locks, and the bill goes to the Cashier (Open Orders).\n• Sync status: actions from the TV not yet/failed to reach the dashboard. When the internet is down everything keeps working and is sent automatically once online.\n\nFull guide: %1$s</string>
+    <string name="cashier_start_desc">Choose a package, duration, or Open. The bill goes to the Cashier (Open Orders)</string>
+    <string name="cashier_extend_desc">Add 15 minutes to 2 hours to the running session</string>
+    <string name="cashier_stop_desc">Timer stops, game screen locks, customer pays at the cashier</string>
+    <string name="cashier_sync_desc">Actions from the TV waiting to be sent to the dashboard</string>
+    <string name="cashier_sync_desc_failed">Some actions were rejected by the dashboard — open to review</string>
+    <string name="cashier_settings_desc">HDMI, display mode, permissions, screen guard, updates, and help</string>
 </resources>

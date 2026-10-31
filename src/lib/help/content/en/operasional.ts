@@ -502,7 +502,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Start, pause, extend, move unit, and end from the dashboard apply on the TV within ±5 seconds. Pause locks the screen (\"PAUSED\") until the session resumes.",
           "From the TV: press OK → enter the PIN → start, extend, or stop a session. It works even when the internet drops; the data is sent to the dashboard automatically once online.",
           "When time is up, the screen locks by itself and the game sound stops; the bill is still paid at the cashier.",
-          "Updating the app: hold OK for 3 seconds → \"Check for app update\"; if there is a new version, open Downloader and type nexbill.id/tvapk again — the pairing stays saved.",
+          "Updating the app: press OK → cashier PIN → \"TV settings (staff menu)\" → \"Check for app update\"; if there is a new version, open Downloader and type nexbill.id/tvapk again — the pairing stays saved.",
         ],
       },
       {

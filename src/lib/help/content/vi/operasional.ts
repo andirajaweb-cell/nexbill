@@ -502,7 +502,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Bắt đầu, tạm dừng, gia hạn, chuyển máy và kết thúc từ dashboard có hiệu lực trên TV trong ±5 giây. Tạm dừng sẽ khóa màn hình (\"TẠM DỪNG\") cho đến khi phiên tiếp tục.",
           "Từ TV: nhấn OK → nhập PIN → bắt đầu, gia hạn hoặc dừng phiên. Vẫn dùng được khi mất internet; dữ liệu tự gửi lên dashboard khi có mạng trở lại.",
           "Khi hết giờ, màn hình tự khóa và âm thanh game dừng; hóa đơn vẫn thanh toán tại quầy.",
-          "Cập nhật ứng dụng: giữ OK 3 giây → \"Kiểm tra cập nhật ứng dụng\"; nếu có bản mới, mở Downloader và gõ lại nexbill.id/tvapk — ghép nối vẫn được giữ.",
+          "Cập nhật ứng dụng: bấm OK → PIN thu ngân → \"Cài đặt TV (menu nhân viên)\" → \"Kiểm tra cập nhật ứng dụng\"; nếu có bản mới, mở Downloader và gõ lại nexbill.id/tvapk — ghép nối vẫn được giữ.",
         ],
       },
       {

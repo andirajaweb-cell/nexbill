@@ -96,4 +96,26 @@
     <string name="sync_start_rejected_hint">⚠ แดชบอร์ดปฏิเสธเซสชันนี้และยังไม่ได้คิดเงิน — แคชเชียร์: เปิดสถานะซิงก์ (กด OK) แล้วบันทึกเซสชันในหน้า Rental</string>
     <string name="staff_test_limit">ใช้โหมดพนักงานครบ %1$d ครั้งของวันนี้แล้ว ถ้าจะเล่น ให้เริ่มเซสชันจากแผงแคชเชียร์เพื่อให้คิดเงิน</string>
     <string name="staff_test_started">เปิดโหมดพนักงาน 10 นาที (ไม่คิดเงิน บันทึกในแดชบอร์ด) เหลือวันนี้: %1$d</string>
+    <string name="menu_help">วิธีใช้เมนูนี้</string>
+    <string name="menu_help_desc">หน้าที่ของแต่ละเมนูและลำดับตั้งค่าทีวีใหม่</string>
+    <string name="menu_end_staff_desc">ปิดหน้าจอเกมทดสอบตอนนี้และล็อกหน้าจออีกครั้ง</string>
+    <string name="menu_show_game_desc">ทดสอบภาพ เสียง และจอยโดยไม่มีเซสชันและไม่คิดเงิน บันทึกในแดชบอร์ด เหลือวันนี้: %1$d</string>
+    <string name="menu_pick_hdmi_desc">ช่อง HDMI ที่เสียบ PlayStation อยู่ ตอนนี้: %1$s</string>
+    <string name="menu_mode_desc">ภายในแอป = ภาพ PS แสดงใน NEXBILL TV (แนะนำ) สลับอินพุตทีวี = ใช้เมื่อภาพ PS ไม่ขึ้นเท่านั้น ต้องอนุญาตแสดงทับแอปอื่น</string>
+    <string name="menu_overlay_desc">จำเป็นสำหรับตัวป้องกันหน้าจอและโหมดสลับอินพุตทีวี เลือก NEXBILL TV แล้วอนุญาต</string>
+    <string name="status_allowed">อนุญาตแล้ว</string>
+    <string name="status_not_allowed">ยังไม่อนุญาต</string>
+    <string name="menu_home_desc">ให้ NEXBILL TV เปิดเองเมื่อเปิดทีวีหรือกดปุ่ม Home เลือก NEXBILL TV ในรายการ</string>
+    <string name="menu_guard_desc">เปิด = ใช้ปุ่ม Home, Source หรือแอปอื่นเล่นโดยไม่มีเซสชันไม่ได้ ปิดเฉพาะเมื่อใช้ทีวีเพื่องานอื่นด้วย</string>
+    <string name="menu_reload_desc">เมื่อสกรีนเซฟเวอร์ค้าง ไม่เปลี่ยน หรือว่างเปล่า</string>
+    <string name="menu_update_desc">เวอร์ชันที่ติดตั้ง %1$s — เทียบกับเวอร์ชันล่าสุดที่ nexbill.id</string>
+    <string name="menu_info_desc">เวอร์ชัน สาขาและเครื่องที่เชื่อมต่อ อินพุต HDMI โหมด และสิทธิ์</string>
+    <string name="menu_help_back">กลับไปที่เมนู</string>
+    <string name="menu_help_body">ตั้งค่าทีวีใหม่ (ครั้งเดียว)\n1. เลือกอินพุต HDMI → ช่องที่เสียบ PlayStation\n2. โหมดแสดงผล HDMI → ภายในแอป ถ้าภาพ PS ไม่ขึ้น ให้เปลี่ยนเป็นสลับอินพุตทีวี\n3. แสดงทับแอปอื่น → อนุญาตให้ NEXBILL TV\n4. ตั้งเป็นแอปหลักของทีวี → เลือก NEXBILL TV\n5. ตัวป้องกันหน้าจอ → เปิด\n6. ทดสอบ: เปิดหน้าจอเกม 10 นาที ตรวจภาพ เสียง และจอย แล้วจบโหมดพนักงาน\n\nการใช้งานประจำวัน (กด OK หรือ MENU ที่รีโมท → PIN แคชเชียร์)\n• เริ่มเซสชัน: เลือกแพ็กเกจ ระยะเวลา หรือไม่จำกัด หน้าจอเกมเปิดและเริ่มจับเวลา\n• เพิ่มเวลา: สำหรับเซสชันที่มีระยะเวลา\n• จบเซสชันตอนนี้: หยุดจับเวลา ล็อกหน้าจอ บิลเข้าแคชเชียร์ (ออเดอร์ที่เปิดอยู่)\n• สถานะซิงค์: รายการจากทีวีที่ยังไม่ได้/ส่งไม่สำเร็จไปยังแดชบอร์ด เมื่ออินเทอร์เน็ตหลุดทุกอย่างยังทำงานและส่งอัตโนมัติเมื่อออนไลน์\n\nคู่มือฉบับเต็ม: %1$s</string>
+    <string name="cashier_start_desc">เลือกแพ็กเกจ ระยะเวลา หรือไม่จำกัด บิลเข้าแคชเชียร์ (ออเดอร์ที่เปิดอยู่)</string>
+    <string name="cashier_extend_desc">เพิ่ม 15 นาทีถึง 2 ชั่วโมงให้เซสชันที่กำลังเล่น</string>
+    <string name="cashier_stop_desc">หยุดจับเวลา ล็อกหน้าจอเกม ลูกค้าชำระที่แคชเชียร์</string>
+    <string name="cashier_sync_desc">รายการจากทีวีที่รอส่งไปยังแดชบอร์ด</string>
+    <string name="cashier_sync_desc_failed">มีรายการที่แดชบอร์ดปฏิเสธ — เปิดเพื่อตรวจสอบ</string>
+    <string name="cashier_settings_desc">HDMI โหมดแสดงผล สิทธิ์ ตัวป้องกันหน้าจอ อัปเดต และวิธีใช้</string>
 </resources>

@@ -132,6 +132,11 @@ final class LocalStore {
         long priceEstimate;
         /** true bila sesi ini sudah dihentikan (menunggu stop terkirim). */
         boolean ended;
+        /**
+         * Cerminan sesi dashboard yang sedang DIJEDA (tambah waktu/stop dari TV): layar tetap terkunci.
+         * Tanpa ini, menambah waktu pada sesi yang dijeda membuka layar game sampai server membalas.
+         */
+        boolean paused;
 
         long endAt() {
             return plannedMinutes <= 0 ? Long.MAX_VALUE : startAt + (plannedMinutes + (long) extendedMinutes) * 60_000L;
@@ -148,7 +153,7 @@ final class LocalStore {
         }
 
         boolean active(long serverNow) {
-            return !ended && serverNow < endAt();
+            return !ended && !paused && serverNow < endAt();
         }
 
         JSONObject toJson() throws Exception {
@@ -159,7 +164,8 @@ final class LocalStore {
                     .put("extendedMinutes", extendedMinutes)
                     .put("label", label == null ? "" : label)
                     .put("priceEstimate", priceEstimate)
-                    .put("ended", ended);
+                    .put("ended", ended)
+                    .put("paused", paused);
         }
 
         static Session fromJson(JSONObject o) {
@@ -171,6 +177,7 @@ final class LocalStore {
             s.label = o.optString("label", "");
             s.priceEstimate = o.optLong("priceEstimate", 0L);
             s.ended = o.optBoolean("ended", false);
+            s.paused = o.optBoolean("paused", false);
             return s;
         }
     }
@@ -274,6 +281,16 @@ final class LocalStore {
 
     static synchronized int failedCount(Context c) {
         return queue(c).length() - pendingCount(c);
+    }
+
+    /** Aksi sesi ini yang sudah ditolak server sampai batas percobaan (perlu ditinjau kasir/owner). */
+    static synchronized boolean hasFailedFor(Context c, String sessionId) {
+        JSONArray q = queue(c);
+        for (int i = 0; i < q.length(); i++) {
+            JSONObject a = q.optJSONObject(i);
+            if (a != null && sessionId.equals(a.optString("sessionId")) && a.optInt("attempts", 0) >= MAX_ATTEMPTS) return true;
+        }
+        return false;
     }
 
     /** Masih ada aksi untuk sesi ini yang belum diterima server. */

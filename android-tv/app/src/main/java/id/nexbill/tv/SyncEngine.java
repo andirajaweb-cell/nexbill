@@ -25,11 +25,18 @@ final class SyncEngine {
     /**
      * Kirim semua aksi sesi & kejadian (mode staf) yang menunggu, dikelompokkan per token — antrean dari
      * pairing lama tetap terkirim dengan token lamanya.
+     *
+     * synchronized: tombol di TV ("Kirim sekarang", setelah Akhiri sesi) dan PollService bisa memanggilnya
+     * bersamaan. Dua kiriman serentak membuat server membalas "sedang diproses perangkat lain" untuk salah
+     * satunya, yang di TV terbaca sebagai aksi ditolak.
+     *
+     * @return jumlah aksi sesi yang diterima server pada panggilan ini.
      */
-    static void syncQueue(Context c) {
+    static synchronized int syncQueue(Context c) {
         JSONArray q = LocalStore.queue(c);
         JSONArray ev = LocalStore.events(c);
-        if (q.length() == 0 && ev.length() == 0) return;
+        if (q.length() == 0 && ev.length() == 0) return 0;
+        int ackedTotal = 0;
         Map<String, JSONArray[]> byToken = new LinkedHashMap<>();
         for (int i = 0; i < q.length(); i++) {
             JSONObject a = q.optJSONObject(i);
@@ -75,6 +82,10 @@ final class SyncEngine {
                     else if (!id.isEmpty()) LocalStore.markFailed(c, id, res.optString("error", ""));
                 }
                 LocalStore.removeActions(c, done);
+                if (!done.isEmpty()) {
+                    ackedTotal += done.size();
+                    StateRepo.markActionsAcked();
+                }
                 JSONArray evResults = resp.optJSONArray("events");
                 Set<String> evDone = new HashSet<>();
                 for (int i = 0; evResults != null && i < evResults.length(); i++) {
@@ -91,6 +102,7 @@ final class SyncEngine {
         }
         LocalStore.setLastSync(c, System.currentTimeMillis(), lastError);
         StateRepo.touch();
+        return ackedTotal;
     }
 
     private static JSONArray[] group(Context c, Map<String, JSONArray[]> byToken, JSONObject a) {

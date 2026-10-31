@@ -68,7 +68,30 @@ interface TvState {
   /** Waktu habis & tagihan belum dibayar (server lama tidak mengirim → dianggap false). */
   timeUp?: boolean;
   hasUnitQr?: boolean;
+  /** Sesi aktif unit ini di server (null bila tidak ada) — server lama tidak mengirim. */
+  sessionId?: string | null;
   serverTime: string;
+}
+
+/** Status sesi yang diatur dari aplikasi NEXBILL TV (jembatan NexbillTvApp.localStatus, aplikasi ≥ 1.2.3). */
+interface AppLocalSession {
+  sessionId: string;
+  ended: boolean;
+  /** Masih ada aksi sesi ini yang belum diterima server. */
+  pending: boolean;
+  /** Ada aksi sesi ini yang ditolak server (perlu ditinjau kasir). */
+  failed: boolean;
+}
+
+function readAppLocalSession(): AppLocalSession | null {
+  try {
+    const bridge = (window as unknown as { NexbillTvApp?: { localStatus?: () => string } }).NexbillTvApp;
+    if (!bridge?.localStatus) return null;
+    const data = JSON.parse(bridge.localStatus()) as { session?: AppLocalSession | null };
+    return data.session && typeof data.session.sessionId === "string" ? data.session : null;
+  } catch {
+    return null;
+  }
 }
 
 export default function TvPage() {
@@ -267,7 +290,7 @@ function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
           {[
             ["1", "Owner / Manager", "Buka Pengaturan › TV Screensaver di dashboard NEXBILL, lalu tambah layar untuk unit ini."],
             ["2", "Kode 6 digit", "Kode muncul di dashboard dan berlaku 30 menit. Ketik di sini dengan remote."],
-            ["3", "Selesai", "TV langsung mengikuti sesi dari kasir. Tahan OK 3 detik untuk menu staf."],
+            ["3", "Selesai", "TV langsung mengikuti sesi dari kasir. Tekan OK untuk panel kasir & menu staf."],
           ].map(([n, title, body]) => (
             <li key={n} className={`rounded-2xl p-5 ${GLASS}`}>
               <div className="flex items-center gap-3">
@@ -427,9 +450,26 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
    * berikutnya. Tanpa ini angka sisa waktu akan melompat 5 detik sekali — terlihat patah, dan
    * pelanggan yang memperhatikan akan mengira waktunya dipotong.
    */
+  const [appLocal, setAppLocal] = useState<AppLocalSession | null>(null);
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => {
+      setNow(Date.now());
+      setAppLocal(readAppLocalSession());
+    }, 1000);
     return () => clearInterval(id);
+  }, []);
+
+  /**
+   * Aplikasi NEXBILL TV meminta status diambil SEKARANG (mis. kasir baru menekan Akhiri sesi di TV, atau
+   * aksinya baru diterima server) — tidak menunggu putaran polling 5 detik berikutnya.
+   */
+  useEffect(() => {
+    const onRefresh = () => {
+      setAppLocal(readAppLocalSession());
+      setPokeTick((n) => n + 1);
+    };
+    window.addEventListener("nexbill:refresh", onRefresh);
+    return () => window.removeEventListener("nexbill:refresh", onRefresh);
   }, []);
 
   /** Aktivitas apa pun dari remote membangunkan layar. */
@@ -538,14 +578,21 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
     liveView.remainingSeconds !== null &&
     liveView.remainingSeconds > 0 &&
     liveView.remainingSeconds <= warnMinutes * 60;
-  const alertKind: "warning" | "timeUp" | null = state.timeUp ? "timeUp" : warningActive ? "warning" : null;
+  // Kasir mengakhiri sesi dari aplikasi NEXBILL TV dan server belum mencatatnya: tampilkan "Sesi selesai",
+  // bukan sisa waktu dari status server lama yang terus berjalan (dulu terlihat seperti tombol Akhiri
+  // tidak berfungsi). Berlaku untuk sesi yang sama — sesi baru dari dashboard tidak tertutup.
+  const endedLocally =
+    !!appLocal?.ended &&
+    (!state.sessionId || state.sessionId === appLocal.sessionId) &&
+    (appLocal.pending || appLocal.failed || state.view.status === "occupied" || state.view.status === "paused");
+  const alertKind: "warning" | "timeUp" | "ended" | null = endedLocally ? "ended" : state.timeUp ? "timeUp" : warningActive ? "warning" : null;
 
   return (
     <div className="relative min-h-screen bg-[#04060c] text-white overflow-hidden">
-      <Backdrop accent={alertKind === "timeUp" ? "#f43f5e" : alertKind === "warning" ? "#f59e0b" : accent} />
+      <Backdrop accent={alertKind === "timeUp" || alertKind === "ended" ? "#f43f5e" : alertKind === "warning" ? "#f59e0b" : accent} />
       <div className="relative z-10">
         {mode === "screensaver" && alertKind && (
-          <AlertScreen kind={alertKind} state={state} liveView={liveView} unitQrDataUrl={unitQrDataUrl} driftStyle={driftStyle} />
+          <AlertScreen kind={alertKind} state={state} liveView={liveView} unitQrDataUrl={unitQrDataUrl} driftStyle={driftStyle} syncNote={alertKind === "ended" ? (appLocal?.failed ? "failed" : appLocal?.pending ? "pending" : null) : null} />
         )}
         {mode === "screensaver" && !alertKind && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} offline={offline} lastOkAt={lastOkAt} />}
         {mode === "pin" && <PinPrompt token={token} accent={accent} state={state} onOk={() => setMode("panel")} onCancel={() => setMode("screensaver")} />}
@@ -709,14 +756,18 @@ function AlertScreen({
   liveView,
   unitQrDataUrl,
   driftStyle,
+  syncNote = null,
 }: {
-  kind: "warning" | "timeUp";
+  kind: "warning" | "timeUp" | "ended";
   state: TvState;
   liveView: TvUnitView;
   unitQrDataUrl: string | null;
   driftStyle: React.CSSProperties;
+  /** Khusus "ended": stop dari TV masih dikirim ke kasir / ditolak server. */
+  syncNote?: "pending" | "failed" | null;
 }) {
-  const timeUp = kind === "timeUp";
+  const ended = kind === "ended";
+  const timeUp = kind === "timeUp" || ended;
   const color = timeUp ? "#fb7185" : "#fbbf24";
   const warnTotal = Math.max(1, (state.display.timeWarningMinutes ?? 5) * 60);
   const progress = timeUp ? 0 : (liveView.remainingSeconds ?? 0) / warnTotal;
@@ -727,9 +778,9 @@ function AlertScreen({
         <Ring progress={progress} size={340} stroke={18} color={color}>
           {timeUp ? (
             <div className="text-5xl md:text-6xl font-black" style={{ color }}>
-              WAKTU
+              {ended ? "SESI" : "WAKTU"}
               <br />
-              HABIS
+              {ended ? "SELESAI" : "HABIS"}
             </div>
           ) : (
             <>
@@ -752,6 +803,8 @@ function AlertScreen({
         {timeUp ? "Terima kasih sudah bermain! Silakan selesaikan pembayaran di kasir." : "Mau lanjut main? Tambah waktu sekarang sebelum habis."}
       </div>
       {!unitQrDataUrl && <div className="mt-4 text-2xl text-neutral-400">Hubungi kasir untuk {timeUp ? "pembayaran" : "tambah waktu"}.</div>}
+      {syncNote === "pending" && <div className="mt-4 text-xl text-neutral-500">Mengirim ke kasir…</div>}
+      {syncNote === "failed" && <div className="mt-4 text-xl text-amber-300">Belum tercatat di kasir — kasir: buka Status sinkron di panel TV.</div>}
       <div className="mt-12 flex flex-col items-center gap-1 text-neutral-500">
         <div className="text-lg md:text-xl tracking-[0.2em]">{state.outletName.toUpperCase()}</div>
         {state.outletAddress && <div className="text-base">{state.outletAddress}</div>}

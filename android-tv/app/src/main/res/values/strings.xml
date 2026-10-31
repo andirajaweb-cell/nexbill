@@ -97,4 +97,26 @@
     <string name="sync_start_rejected_hint">⚠ Sesi ini ditolak dashboard dan BELUM tertagih — kasir: buka Status sinkron (tekan OK) lalu catat sesinya di Rental.</string>
     <string name="staff_test_limit">Batas mode staf hari ini (%1$d kali) sudah tercapai. Untuk main, mulai sesi lewat panel kasir supaya tertagih.</string>
     <string name="staff_test_started">Mode staf dibuka 10 menit (tidak ditagih, dicatat di dashboard). Sisa jatah hari ini: %1$d.</string>
+    <string name="menu_help">Petunjuk menu ini</string>
+    <string name="menu_help_desc">Fungsi setiap menu dan urutan setup TV baru</string>
+    <string name="menu_end_staff_desc">Tutup layar game tes sekarang dan kunci layar lagi</string>
+    <string name="menu_show_game_desc">Tes gambar, suara &amp; stik tanpa sesi dan tanpa tagihan. Dicatat di dashboard. Sisa hari ini: %1$d</string>
+    <string name="menu_pick_hdmi_desc">Colokan HDMI tempat PlayStation terpasang. Sekarang: %1$s</string>
+    <string name="menu_mode_desc">Di dalam aplikasi = gambar PS tampil di NEXBILL TV (disarankan). Pindah input TV = hanya bila gambar PS tidak muncul; butuh izin tampil di atas aplikasi lain</string>
+    <string name="menu_overlay_desc">Wajib untuk Penjaga layar dan mode Pindah input TV. Pilih NEXBILL TV lalu izinkan</string>
+    <string name="status_allowed">Diizinkan</string>
+    <string name="status_not_allowed">Belum diizinkan</string>
+    <string name="menu_home_desc">Supaya NEXBILL TV terbuka sendiri saat TV menyala atau tombol Home ditekan. Pilih NEXBILL TV di daftar</string>
+    <string name="menu_guard_desc">Aktif = tombol Home, Source, atau aplikasi lain tidak bisa dipakai untuk main tanpa sesi. Matikan hanya bila TV dipakai keperluan lain</string>
+    <string name="menu_reload_desc">Bila screensaver macet, tidak berubah, atau tampil kosong</string>
+    <string name="menu_update_desc">Versi terpasang %1$s — bandingkan dengan versi terbaru di nexbill.id</string>
+    <string name="menu_info_desc">Versi, outlet &amp; unit yang terhubung, input HDMI, mode, dan izin</string>
+    <string name="menu_help_back">Kembali ke menu</string>
+    <string name="menu_help_body">SETUP TV BARU (sekali saja)\n1. Pilih input HDMI → colokan tempat PlayStation.\n2. Mode tampilan HDMI → Di dalam aplikasi. Kalau gambar PS tidak muncul, ganti ke Pindah input TV.\n3. Izin tampil di atas aplikasi lain → izinkan untuk NEXBILL TV.\n4. Jadikan aplikasi utama TV → pilih NEXBILL TV.\n5. Penjaga layar → Aktif.\n6. Tes: Buka layar game 10 menit, cek gambar, suara &amp; stik, lalu Akhiri mode staf.\n\nPEMAKAIAN HARIAN (tekan OK atau MENU di remote → PIN kasir)\n• Mulai sesi: pilih paket, durasi, atau Bebas. Layar game terbuka dan argo berjalan.\n• Tambah waktu: untuk sesi berdurasi.\n• Akhiri sesi sekarang: argo berhenti, layar terkunci, tagihan masuk ke Kasir (Order Terbuka).\n• Status sinkron: aksi dari TV yang belum/gagal terkirim ke dashboard. Saat internet putus semuanya tetap jalan dan dikirim otomatis begitu online.\n\nPanduan lengkap: %1$s</string>
+    <string name="cashier_start_desc">Pilih paket, durasi, atau Bebas. Tagihan masuk ke Kasir (Order Terbuka)</string>
+    <string name="cashier_extend_desc">Tambah 15 menit sampai 2 jam pada sesi yang berjalan</string>
+    <string name="cashier_stop_desc">Argo berhenti, layar game terkunci, pelanggan bayar di kasir</string>
+    <string name="cashier_sync_desc">Aksi dari TV yang menunggu dikirim ke dashboard</string>
+    <string name="cashier_sync_desc_failed">Ada aksi yang ditolak dashboard — buka untuk meninjau</string>
+    <string name="cashier_settings_desc">HDMI, mode tampilan, izin, penjaga layar, pembaruan, dan petunjuk</string>
 </resources>
