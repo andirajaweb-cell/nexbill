@@ -22,6 +22,7 @@ import { PageGuide } from "@/components/dashboard/PageGuide";
 import Link from "next/link";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { QuickAddProduct } from "./quick-add-product";
+import { groupProductsByCategory, matchesProductQuery, sortProductsByName } from "@/lib/pos/product-search";
 import "@/lib/i18n/dict-setup";
 
 interface Product {
@@ -35,20 +36,8 @@ interface Product {
   barcode?: string | null;
 }
 
-/**
- * Multi-keyword AND search on the product name — typing "ayam goreng pedas"
- * matches "Ayam Goreng Pedas Level 5" regardless of word order, and works
- * the same whether the cashier types 1 word or 5+. Also matches directly
- * against SKU/barcode so a partial code typed by hand still finds the item.
- */
-function matchesQuery(p: Product, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  if (p.barcode && p.barcode.toLowerCase().includes(q)) return true;
-  if (p.sku && p.sku.toLowerCase().includes(q)) return true;
-  const name = p.name.toLowerCase();
-  return q.split(/\s+/).filter(Boolean).every((word) => name.includes(word));
-}
+/** Pencarian (multi kata, SKU/barcode) & urutan abjad — lib/pos/product-search.ts, dipakai juga panel F&B Rental. */
+const matchesQuery = matchesProductQuery;
 
 interface CartLine {
   productId?: string;
@@ -328,13 +317,11 @@ export default function PosPage() {
    * api/transactions/[id]/items/[itemId]/route.ts.
    */
 
-  const filteredProducts = products.filter((p) => matchesQuery(p, search));
+  const filteredProducts = sortProductsByName(products.filter((p) => matchesQuery(p, search)));
   const isSearching = search.trim().length > 0;
 
-  const grouped = filteredProducts.reduce<Record<string, Product[]>>((acc, p) => {
-    (acc[p.category] ??= []).push(p);
-    return acc;
-  }, {});
+  // Kategori urut abjad, produk di tiap kategori urut abjad nama.
+  const grouped = groupProductsByCategory(filteredProducts);
 
   /**
    * Barcode-scanner-friendly: a scanner types the code then sends Enter.
@@ -469,9 +456,9 @@ export default function PosPage() {
             )}
           </div>
         ) : (
-          Object.entries(grouped).map(([category, items]) => (
+          grouped.map(({ category, label, items }) => (
             <div key={category}>
-              <h2 className="text-sm font-medium text-neutral-400 uppercase mb-2">{category.replace("_", " ")}</h2>
+              <h2 className="text-sm font-medium text-neutral-400 uppercase mb-2">{label}</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {items.map((p) => (
                   <button

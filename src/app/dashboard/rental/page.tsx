@@ -43,6 +43,7 @@ import { NotificationVolumeControl } from "@/components/dashboard/NotificationVo
 import { UnitRequestsPanel } from "./UnitRequestsPanel";
 import { UnitQrModal } from "./UnitQrModal";
 import { OfflineRentalBoard } from "./OfflineRentalBoard";
+import { FnbPicker } from "./FnbPicker";
 import { useConnectivity, useOfflineData } from "@/lib/offline/hooks";
 import { getLastOutletId } from "@/lib/offline/store";
 import { PageGuide } from "@/components/dashboard/PageGuide";
@@ -150,6 +151,9 @@ interface Product {
   category: string;
   price: number;
   isActive: boolean;
+  stockQty?: number | null;
+  sku?: string | null;
+  barcode?: string | null;
 }
 
 interface BillBreakdown {
@@ -1727,12 +1731,12 @@ function OnlineRentalPage() {
                     </Button>
 
                     {fnbSessionId === session.id && (
-                      <div className="rounded-lg border border-white/10 p-2 space-y-2 max-h-56 overflow-y-auto">
+                      <div className="rounded-lg border border-white/10 p-2 space-y-2">
                         {/* Jejak pembelian: semua F&B yang sudah masuk bill sesi ini sejauh ini —
                             tetap tampil di sini walau steppernya sudah balik ke 0 sesudah "Tambah
                             ke Bill", supaya tidak hilang jejak sudah pesan apa saja. */}
                         {(bill?.items ?? []).filter((i) => i.itemType === "product").length > 0 && (
-                          <div className="rounded-lg bg-white/5 border border-white/5 px-2 py-1.5 space-y-1">
+                          <div className="rounded-lg bg-white/5 border border-white/5 px-2 py-1.5 space-y-1 max-h-28 overflow-y-auto">
                             <div className="text-[10px] uppercase tracking-wide text-neutral-500">{t("rental.fnbOrderedSoFar", "Sudah Dipesan Sesi Ini")}</div>
                             {(bill?.items ?? []).filter((i) => i.itemType === "product").map((i) => (
                               <div key={i.id} className="flex justify-between text-xs">
@@ -1742,21 +1746,7 @@ function OnlineRentalPage() {
                             ))}
                           </div>
                         )}
-                        {products.map((p) => (
-                          <div key={p.id} className="flex items-center justify-between text-xs">
-                            <span className="flex-1">{p.name} <span className="text-neutral-500">({rupiah(p.price)})</span></span>
-                            <div className="flex items-center gap-1">
-                              <button className="w-5 h-5 rounded bg-white/10 flex items-center justify-center" onClick={() => setFnbCart((c) => ({ ...c, [p.id]: Math.max(0, (c[p.id] ?? 0) - 1) }))}>
-                                <Minus size={10} />
-                              </button>
-                              <span className="w-4 text-center">{fnbCart[p.id] ?? 0}</span>
-                              <button className="w-5 h-5 rounded bg-white/10 flex items-center justify-center" onClick={() => setFnbCart((c) => ({ ...c, [p.id]: (c[p.id] ?? 0) + 1 }))}>
-                                <Plus size={10} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        <Button className="w-full text-xs" onClick={() => addFnbToBill(session)}>{t("rental.addToBill", "Tambah ke Bill")}</Button>
+                        <FnbPicker products={products} cart={fnbCart} setCart={setFnbCart} onSubmit={() => addFnbToBill(session)} formatMoney={rupiah} />
                       </div>
                     )}
 
