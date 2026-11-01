@@ -98,3 +98,33 @@ export async function markTvActionReviewed(outletId: string, id: string, staffUs
   await db.insert(auditLogs).values({ outletId, staffUserId, action: "tv_sync_reviewed", entityType: "offline_sync_action", entityId: id, afterData: JSON.stringify({ kind: row.kind, occurredAt: row.occurredAt, error: row.error }) });
   return row;
 }
+
+/**
+ * Owner membersihkan daftar mode staf (tes) di kartu Pengawasan: catatan TIDAK dihapus dari database —
+ * statusnya menjadi "reviewed" sehingga tidak tampil lagi, dan pembersihannya dicatat di Audit Log.
+ * ids null = semua catatan mode staf outlet ini yang masih tampil.
+ */
+export async function dismissStaffTests(outletId: string, ids: string[] | null, staffUserId: string): Promise<number> {
+  const conds = [eq(offlineSyncActions.outletId, outletId), eq(offlineSyncActions.kind, TV_STAFF_TEST_KIND), eq(offlineSyncActions.status, "done")];
+  if (ids) {
+    const clean = ids.filter((x) => typeof x === "string" && x.length > 0 && x.length <= 64).slice(0, 300);
+    if (clean.length === 0) return 0;
+    conds.push(inArray(offlineSyncActions.id, clean));
+  }
+  const rows = await db
+    .update(offlineSyncActions)
+    .set({ status: "reviewed", updatedAt: new Date().toISOString() })
+    .where(and(...conds))
+    .returning({ id: offlineSyncActions.id, occurredAt: offlineSyncActions.occurredAt, deviceLabel: offlineSyncActions.deviceLabel });
+  if (rows.length > 0) {
+    await db.insert(auditLogs).values({
+      outletId,
+      staffUserId,
+      action: "tv_staff_test_dismissed",
+      entityType: "offline_sync_action",
+      entityId: rows.length === 1 ? rows[0].id : null,
+      afterData: JSON.stringify({ count: rows.length, items: rows.slice(0, 50).map((r) => ({ at: r.occurredAt, device: deviceName(r.deviceLabel) })) }),
+    });
+  }
+  return rows.length;
+}
