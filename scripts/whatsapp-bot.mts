@@ -1,15 +1,21 @@
 /**
- * Bot WhatsApp NEXBILL — KHUSUS CRM platform-admin (/platform-admin/leads).
- * (Tidak lagi mengirim notifikasi booking outlet atau membalas chat pelanggan outlet dengan AI —
- *  keputusan 2026-09-29, lihat src/lib/notifications/outlet-whatsapp.ts.)
+ * Bot WhatsApp NEXBILL — dua tugas:
+ *  A. CRM platform-admin (/platform-admin/leads): antrean pesan ke lead + mencatat balasan lead.
+ *  B. Support 24 jam untuk owner & kasir outlet NEXBILL (sejak 2026-11-01), sama dengan bot Telegram:
+ *     FAQ → asisten AI → staf (tiket Customer Service), balasan tim diteruskan ke WhatsApp. Nomor dikenali
+ *     dari tautan kode (dashboard › Customer Service › "Support 24 jam di WhatsApp") atau nomor HP di
+ *     Profil Outlet. Logika di src/lib/whatsapp-support/.
+ * (Tetap TIDAK membalas chat pelanggan outlet / mengirim notifikasi booking — keputusan 2026-09-29,
+ *  lihat src/lib/notifications/outlet-whatsapp.ts. Lead CRM tidak pernah dibalas otomatis.)
  *
  * Tugas:
  *  1. Login via QR (seperti WhatsApp Web). Status, QR, dan heartbeat ditulis ke tabel
  *     platform_wa_bot_status supaya halaman /platform-admin/whatsapp-bot (di Vercel) bisa membacanya.
  *  2. Mengirim antrean platform_wa_outbox (pesan admin ke lead) dengan jeda acak antarpesan dan
  *     batas harian (env WA_BOT_DAILY_LIMIT, default 150), lalu mencatat aktivitas di lead.
- *  3. Balasan masuk dari nomor lead dicatat ke riwayat lead + tanda "balasan baru". TIDAK dibalas
- *     otomatis. Chat grup dan nomor yang bukan lead diabaikan.
+ *  3. Pesan masuk: nomor staf outlet → support 24 jam (B). Nomor lead → dicatat ke riwayat lead + tanda
+ *     "balasan baru", TIDAK dibalas otomatis. Nomor asing → sekali per 24 jam diberi tahu cara menautkan.
+ *     Chat grup diabaikan.
  *
  * Jalankan di server yang menyala 24 jam (BUKAN Vercel):  npm run bot:whatsapp
  * Butuh DATABASE_URL yang sama dengan web app (.env).
@@ -59,7 +65,11 @@ import {
   sendDelayMs,
   startOfTodayWibIso,
 } from "../src/lib/leads/wa-bot-rules";
+import { handleWaSupportMessage, pollTeamReplies, replyNotLinkedIfDue, type WaSender } from "../src/lib/whatsapp-support/handler";
 
+/** Support 24 jam lewat WhatsApp aktif? Matikan dengan env WA_SUPPORT=off (bot kembali khusus CRM). */
+const SUPPORT_ON = (process.env.WA_SUPPORT ?? "on").toLowerCase() !== "off";
+const TEAM_REPLY_POLL_MS = 8_000;
 const AUTH_DIR = path.join(process.cwd(), "data", "wa-auth");
 fs.mkdirSync(AUTH_DIR, { recursive: true });
 
@@ -152,6 +162,8 @@ async function resolveWaVersion(force = false): Promise<WaVersion> {
 
 let heartbeat: NodeJS.Timeout | null = null;
 let outboxPoller: NodeJS.Timeout | null = null;
+let teamReplyPoller: NodeJS.Timeout | null = null;
+let pollingTeam = false;
 let watchdog: NodeJS.Timeout | null = null;
 let lastConnected = false;
 let lastQr: string | null = null;
@@ -190,6 +202,8 @@ setInterval(async () => {
 function stopTimers() {
   if (outboxPoller) clearInterval(outboxPoller);
   outboxPoller = null;
+  if (teamReplyPoller) clearInterval(teamReplyPoller);
+  teamReplyPoller = null;
   if (watchdog) clearTimeout(watchdog);
   watchdog = null;
 }
@@ -289,10 +303,28 @@ async function start() {
       if (watchdog) clearTimeout(watchdog);
       watchdog = null;
       await status({ connected: true, qrDataUrl: null, number: lastNumber, lastError: null });
-      console.log(`Bot WhatsApp CRM terhubung sebagai ${lastNumber}. Batas harian: ${DAILY_LIMIT} pesan.`);
+      console.log(`Bot WhatsApp terhubung sebagai ${lastNumber}. CRM: batas harian ${DAILY_LIMIT} pesan. Support 24 jam: ${SUPPORT_ON ? "aktif" : "mati (WA_SUPPORT=off)"}.`);
       if (!outboxPoller) {
         outboxPoller = setInterval(() => void drainOutbox(sock), OUTBOX_POLL_MS);
         void drainOutbox(sock);
+      }
+      // Balasan tim Customer Service untuk tiket asal WhatsApp → kirim ke merchant.
+      if (SUPPORT_ON && !teamReplyPoller) {
+        teamReplyPoller = setInterval(async () => {
+          if (pollingTeam) return;
+          pollingTeam = true;
+          try {
+            const n = await pollTeamReplies(async (phone, text) => {
+              const sent = await sock.sendMessage(jidFromPhone(phone), { text });
+              return sent?.key?.id ?? null;
+            });
+            if (n > 0) console.log(`Balasan tim support diteruskan ke WhatsApp: ${n}.`);
+          } catch (err) {
+            console.error("Gagal memproses balasan tim support:", shortErr(err));
+          } finally {
+            pollingTeam = false;
+          }
+        }, TEAM_REPLY_POLL_MS);
       }
     }
 
@@ -316,7 +348,7 @@ async function start() {
     }
   });
 
-  // Balasan masuk: hanya dicatat ke lead yang nomornya cocok, tidak dibalas otomatis.
+  // Pesan masuk: staf outlet → support 24 jam; lead → dicatat (tidak dibalas); nomor asing → info tautan.
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
     for (const msg of messages) {
@@ -331,10 +363,41 @@ async function start() {
         msg.message.imageMessage?.caption ||
         msg.message.videoMessage?.caption ||
         (msg.message.imageMessage ? "[gambar]" : msg.message.audioMessage ? "[pesan suara]" : msg.message.documentMessage ? "[dokumen]" : "");
+      const mediaOnly = !!(msg.message.imageMessage || msg.message.audioMessage || msg.message.documentMessage || msg.message.videoMessage) && !(msg.message.imageMessage?.caption || msg.message.videoMessage?.caption);
+      const replyJid = key.remoteJid ?? jidFromPhone(phone);
+
+      if (SUPPORT_ON) {
+        const out: WaSender = {
+          send: async (body) => {
+            const sent = await sock.sendMessage(replyJid, { text: body });
+            return sent?.key?.id ?? null;
+          },
+          typing: async () => {
+            await sock.sendPresenceUpdate("composing", replyJid).catch(() => undefined);
+          },
+        };
+        try {
+          const quotedId = msg.message.extendedTextMessage?.contextInfo?.stanzaId ?? null;
+          const res = await handleWaSupportMessage({ phone, text: mediaOnly ? "" : text, msgId: msg.key.id ?? `${phone}:${Date.now()}`, quotedId, mediaOnly }, out);
+          if (res === "handled") continue;
+        } catch (err) {
+          console.error(`Gagal memproses pesan support dari ${phone}:`, shortErr(err));
+          continue;
+        }
+      }
+
       if (!text.trim()) continue;
       try {
         const n = await recordInbound(phone, text);
         if (n > 0) console.log(`Balasan dari ${phone} dicatat ke ${n} lead.`);
+        else if (SUPPORT_ON) {
+          await replyNotLinkedIfDue(phone, {
+            send: async (body) => {
+              const sent = await sock.sendMessage(replyJid, { text: body });
+              return sent?.key?.id ?? null;
+            },
+          });
+        }
       } catch (err) {
         console.error("Gagal mencatat balasan WhatsApp:", err);
       }

@@ -17,6 +17,19 @@ interface TgData {
   oncallChats: number;
   migration: boolean;
   linkedChats: number;
+  waLinked?: number;
+  waStats?: {
+    conversations: number;
+    resolvedByBot: number;
+    tickets: number;
+    urgent: number;
+    deflection: number | null;
+    faqAnswers?: number;
+    aiAnswers?: number;
+    feedbackOk?: number;
+    feedbackNo?: number;
+    feedbackTeam?: number;
+  } | null;
   errors?: { body: string; createdAt: string }[];
   stats: {
     conversations: number;
@@ -209,6 +222,43 @@ export default function TelegramBotPage() {
           <p className="text-xs text-neutral-500">
             Percakapan = pesan satu chat tanpa jeda lebih dari 6 jam. Selesai di bot = tidak ada tiket di percakapan itu.
           </p>
+        </Card>
+        <Card className="space-y-3 p-4">
+          <h2 className="font-medium text-neutral-100">Support WhatsApp (30 hari)</h2>
+          <p className="text-xs text-neutral-500">
+            Bot WhatsApp (Platform Admin › WhatsApp Bot, berjalan di VPS) juga menjawab owner & kasir outlet dengan alur yang sama: FAQ → asisten AI → tiket staf. Nomor dikenali dari kartu &quot;Support 24 jam di WhatsApp&quot; di Customer Service outlet atau nomor HP di Profil Outlet. Matikan dengan env WA_SUPPORT=off di VPS.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-neutral-500">Percakapan</div>
+              <div className="text-xl text-neutral-100">{data?.waStats?.conversations ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500">Selesai di bot</div>
+              <div className="text-xl text-emerald-300">
+                {data?.waStats?.resolvedByBot ?? 0}
+                {data?.waStats?.deflection != null && <span className="ml-1 text-sm text-neutral-400">({Math.round(data.waStats.deflection * 100)}%)</span>}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500">Jadi tiket</div>
+              <div className="text-xl text-neutral-100">{data?.waStats?.tickets ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500">P1 darurat</div>
+              <div className="text-xl text-rose-300">{data?.waStats?.urgent ?? 0}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-xs text-neutral-500">Penilaian merchant</div>
+              <div className="text-sm text-neutral-200">
+                ✅ {data?.waStats?.feedbackOk ?? 0} terbantu · ❌ {data?.waStats?.feedbackNo ?? 0} belum · 👤 {data?.waStats?.feedbackTeam ?? 0} minta staf
+              </div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-xs text-neutral-500">Nomor WhatsApp tertaut (kode)</div>
+              <div className="text-xl text-neutral-100">{data?.waLinked ?? 0}</div>
+            </div>
+          </div>
         </Card>
       </div>
     </div>

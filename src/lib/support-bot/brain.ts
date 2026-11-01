@@ -1,7 +1,8 @@
 /**
- * Otak bot support 24 jam NEXBILL — dipakai dua kanal:
+ * Otak bot support 24 jam NEXBILL — dipakai tiga kanal:
  *  - Customer Service dashboard (lib/support-bot/dashboard-autoreply.ts): membalas tiket otomatis.
  *  - Telegram (lib/telegram/handler.ts).
+ *  - WhatsApp (lib/whatsapp-support/handler.ts, dijalankan proses bot WhatsApp di VPS).
  * Claude menjawab HANYA dari basis pengetahuan (lib/support-bot/knowledge.ts) dan status akun outlet
  * itu sendiri (hanya baca). Yang tidak bisa dijawab diteruskan ke tim lewat callback `escalate` milik
  * kanal. Bot tidak pernah mengubah uang, tagihan, langganan, atau akun (tidak ada tool untuk itu).
@@ -36,7 +37,7 @@ async function helpCategories(lang: string): Promise<HelpCategory[]> {
   return mergeWithSource(await loadHelpBook(l)).categories;
 }
 
-export type SupportChannel = "dashboard" | "telegram";
+export type SupportChannel = "dashboard" | "telegram" | "whatsapp";
 
 export interface EscalateInput {
   priority: SupportPriority;
@@ -117,7 +118,9 @@ function systemPrompt(index: string, input: BrainInput, inHours: boolean) {
   const where =
     input.channel === "telegram"
       ? "di Telegram. Format: teks biasa (tanpa Markdown/tabel/heading), kalimat pendek, langkah bernomor bila perlu, maks. ±12 baris."
-      : "di menu Customer Service dashboard NEXBILL (membalas tiket ini). Format: teks biasa (tanpa Markdown/tabel/heading), kalimat pendek, langkah bernomor bila perlu, maks. ±15 baris. Merchant tidak perlu membuat tiket baru.";
+      : input.channel === "whatsapp"
+        ? "di WhatsApp. Format: teks biasa khas WhatsApp (tanpa Markdown/tabel/heading; *tebal* boleh untuk nama menu), kalimat pendek, langkah bernomor bila perlu, maks. ±12 baris. Jangan menyebut tombol — merchant membalas dengan angka atau kata (MENU, STATUS, TIM)."
+        : "di menu Customer Service dashboard NEXBILL (membalas tiket ini). Format: teks biasa (tanpa Markdown/tabel/heading), kalimat pendek, langkah bernomor bila perlu, maks. ±15 baris. Merchant tidak perlu membuat tiket baru.";
   const staff = input.staffName && input.staffName !== "Staf" ? input.staffName.split(" ")[0] : null;
   return [
     {
@@ -204,7 +207,13 @@ export async function runSupportBrain(input: BrainInput): Promise<BrainResult> {
 
   const e = escalated as { ref: string; priority: SupportPriority } | null;
   return {
-    reply: finalText || (e ? "Pesan Kakak sudah kami teruskan ke tim NEXBILL, nanti dibalas di sini ya." : "Maaf Kak, untuk yang ini kami perlu cek lebih lanjut. Tekan \"Bicara dengan tim\" supaya staf kami yang menangani."),
+    reply:
+      finalText ||
+      (e
+        ? "Pesan Kakak sudah kami teruskan ke tim NEXBILL, nanti dibalas di sini ya."
+        : input.channel === "whatsapp"
+          ? "Maaf Kak, untuk yang ini kami perlu cek lebih lanjut. Ketik TIM supaya staf kami yang menangani."
+          : "Maaf Kak, untuk yang ini kami perlu cek lebih lanjut. Tekan \"Bicara dengan tim\" supaya staf kami yang menangani."),
     resolution: e ? (e.priority === "P1" ? "urgent" : "ticket") : "answered",
     priority: e?.priority ?? null,
     ref: e?.ref ?? null,
@@ -224,7 +233,7 @@ export async function escalateWithNotify(input: Pick<BrainInput, "channel" | "ou
   const { ref } = await input.escalate(e);
   let notified = 0;
   if (shouldNotifyOnCall(e.priority)) {
-    const kanal = input.channel === "telegram" ? "Telegram" : "Customer Service";
+    const kanal = input.channel === "telegram" ? "Telegram" : input.channel === "whatsapp" ? "WhatsApp" : "Customer Service";
     notified = await notifyOnCall(
       `${e.priority === "P1" ? "P1 DARURAT" : `${e.priority} perlu tim`} — ${input.outletName} (${kanal})\n${input.staffName}: ${e.summary}\nTiket #${ref} · ${DASHBOARD_URL}/platform-admin/support`
     );
@@ -272,7 +281,9 @@ async function runTool(use: Anthropic.ToolUseBlock, input: BrainInput, st: ToolS
       catatan:
         input.channel === "telegram"
           ? "Balasan tim otomatis muncul di chat Telegram ini dan di menu Customer Service dashboard."
-          : "Balasan tim akan muncul di tiket ini (menu Customer Service).",
+          : input.channel === "whatsapp"
+            ? "Balasan tim otomatis muncul di chat WhatsApp ini dan di menu Customer Service dashboard."
+            : "Balasan tim akan muncul di tiket ini (menu Customer Service).",
     });
   }
   return "Tool tidak dikenal.";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { count, gte, isNotNull } from "drizzle-orm";
+import { count, gte, isNotNull, like } from "drizzle-orm";
 import { db } from "@/db/client";
 import { telegramSupportLinks, telegramSupportMessages } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
     const oncall = (process.env.TELEGRAM_ONCALL_CHAT_IDS ?? "").split(",").filter((s) => s.trim()).length;
 
     let stats = null;
+    let waStats = null;
+    let waLinked = 0;
     let linkedChats = 0;
     let errors: { body: string; createdAt: string }[] = [];
     let migration = true;
@@ -35,7 +37,14 @@ export async function GET(req: NextRequest) {
         .select({ chatId: telegramSupportMessages.chatId, role: telegramSupportMessages.role, resolution: telegramSupportMessages.resolution, createdAt: telegramSupportMessages.createdAt })
         .from(telegramSupportMessages)
         .where(gte(telegramSupportMessages.createdAt, since));
-      stats = conversationStats(rows.filter((r) => r.chatId !== SYSTEM_CHAT));
+      // WhatsApp (chat_id "wa:…") dihitung terpisah; baris tautan/kode WhatsApp ("wa-link:", "wa-code:") bukan percakapan.
+      stats = conversationStats(rows.filter((r) => r.chatId !== SYSTEM_CHAT && !r.chatId.startsWith("wa")));
+      waStats = conversationStats(rows.filter((r) => r.chatId.startsWith("wa:")));
+      const [w] = await db
+        .select({ n: count() })
+        .from(telegramSupportMessages)
+        .where(like(telegramSupportMessages.chatId, "wa-link:%"));
+      waLinked = w?.n ?? 0;
       errors = await recentBotErrors(5);
       const [l] = await db.select({ n: count() }).from(telegramSupportLinks).where(isNotNull(telegramSupportLinks.chatId));
       linkedChats = l?.n ?? 0;
@@ -60,6 +69,8 @@ export async function GET(req: NextRequest) {
       oncallChats: oncall,
       migration,
       linkedChats,
+      waStats,
+      waLinked,
       stats,
       errors,
     });

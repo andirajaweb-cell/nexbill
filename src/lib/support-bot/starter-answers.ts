@@ -694,6 +694,13 @@ export const STARTER_ANSWERS: StarterAnswer[] = [
       "Customer Service → kartu \"Support 24 jam di Telegram\" → Hubungkan Telegram → tekan Start di bot. Tulis pertanyaan kapan saja; /tim untuk langsung diteruskan ke tim, /status untuk cek langganan & perangkat, /putus untuk memutuskan. Bot hanya membaca teks — foto kirim lewat tiket di dashboard.",
   },
   {
+    key: "whatsapp-support",
+    topic: "Bantuan & Telegram",
+    question: "Support lewat WhatsApp",
+    answer:
+      "Customer Service → kartu \"Support 24 jam di WhatsApp\" → Hubungkan WhatsApp → kirim pesan \"NEXBILL KODE …\" yang sudah terisi (sekali saja; Owner yang nomornya sama dengan nomor di Profil Outlet bisa langsung chat). Tulis pertanyaan kapan saja; ketik MENU untuk topik bantuan, STATUS untuk cek akun, TIM untuk staf. Setelah jawaban, balas 1 = sudah terbantu, 2 = belum, 3 = bicara dengan tim. Balasan tim ikut masuk ke WhatsApp.",
+  },
+  {
     key: "darurat-p1",
     topic: "Bantuan & Telegram",
     question: "Darurat: outlet tidak bisa menagih / semua TV terkunci",

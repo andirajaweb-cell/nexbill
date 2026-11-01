@@ -124,12 +124,12 @@ export const PLAN_MATRIX: MatrixGroupDef[] = [
         key: "telegram_support",
         all: true,
         label: t6(
-          "Support 24 jam lewat bot Telegram, diteruskan ke tim bila perlu",
-          "24-hour support via Telegram bot, handed to the team when needed",
-          "Sokongan 24 jam melalui bot Telegram, dihantar kepada pasukan bila perlu",
-          "ซัพพอร์ต 24 ชม. ผ่านบอท Telegram ส่งต่อทีมเมื่อจำเป็น",
-          "Hỗ trợ 24 giờ qua bot Telegram, chuyển cho đội ngũ khi cần",
-          "24-oras na support sa Telegram bot, ipapasa sa team kung kailangan"
+          "Support 24 jam lewat bot Telegram & WhatsApp, diteruskan ke tim bila perlu",
+          "24-hour support via Telegram & WhatsApp bots, handed to the team when needed",
+          "Sokongan 24 jam melalui bot Telegram & WhatsApp, dihantar kepada pasukan bila perlu",
+          "ซัพพอร์ต 24 ชม. ผ่านบอท Telegram และ WhatsApp ส่งต่อทีมเมื่อจำเป็น",
+          "Hỗ trợ 24 giờ qua bot Telegram & WhatsApp, chuyển cho đội ngũ khi cần",
+          "24-oras na support sa Telegram at WhatsApp bot, ipapasa sa team kung kailangan"
         ),
       },
       {

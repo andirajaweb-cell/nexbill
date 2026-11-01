@@ -9,6 +9,7 @@ import { showAlert } from "@/lib/ui/dialog";
 import { Paperclip, Download, X, FileVideo } from "lucide-react";
 import "@/lib/i18n/dict-chat";
 import { TelegramSupportCard } from "./telegram-support-card";
+import { WhatsAppSupportCard } from "./whatsapp-support-card";
 import { DATE_LOCALE, useDashboardLang, type LangCode } from "@/lib/i18n/dashboard-lang";
 
 interface Thread {
@@ -283,6 +284,7 @@ export default function SupportChatPage() {
       </div>
 
       <TelegramSupportCard />
+      <WhatsAppSupportCard />
 
       {showNew && (
         <Card className="p-4 space-y-3">

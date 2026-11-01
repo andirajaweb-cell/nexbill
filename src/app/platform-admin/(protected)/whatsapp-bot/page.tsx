@@ -112,11 +112,14 @@ export default function WhatsappBotPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="gm-display text-2xl font-bold text-amber-300">WhatsApp Bot (CRM)</h1>
+        <h1 className="gm-display text-2xl font-bold text-amber-300">WhatsApp Bot (CRM &amp; Support 24 jam)</h1>
         <p className="text-sm text-neutral-500 mt-1 max-w-3xl">
-          Nomor WhatsApp NEXBILL untuk menghubungi prospek dari{" "}
-          <Link href="/platform-admin/leads" className="text-amber-300 hover:underline">Leads &amp; CRM</Link>. Pesan dikirim dengan jeda acak dan batas harian;
-          balasan dari nomor lead otomatis tercatat di riwayat lead. Bot ini tidak mengirim apa pun ke pelanggan outlet.
+          Nomor WhatsApp NEXBILL dengan dua tugas. <b className="text-neutral-300">CRM</b>: menghubungi prospek dari{" "}
+          <Link href="/platform-admin/leads" className="text-amber-300 hover:underline">Leads &amp; CRM</Link> (jeda acak, batas harian); balasan lead
+          tercatat di riwayat lead dan tidak dibalas otomatis. <b className="text-neutral-300">Support 24 jam</b>: owner &amp; kasir outlet NEXBILL dijawab
+          seperti bot Telegram (FAQ → asisten AI → tiket staf, balasan tim ikut terkirim ke WhatsApp) — statistiknya di{" "}
+          <Link href="/platform-admin/telegram-bot" className="text-amber-300 hover:underline">Telegram Bot</Link>. Matikan support dengan env{" "}
+          <code className="text-neutral-300">WA_SUPPORT=off</code> di VPS. Bot ini tidak mengirim apa pun ke pelanggan outlet.
         </p>
       </div>
 
