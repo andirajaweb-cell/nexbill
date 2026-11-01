@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { clsx } from "clsx";
-import { MapPin, X } from "lucide-react";
+import { GraduationCap, MapPin, PartyPopper, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { fill, TZ_ABBR, type TFn } from "./shared";
+import { countryName, fill, TZ_ABBR, type TFn } from "./shared";
 
 interface League {
   leagueId: string;
@@ -17,6 +17,8 @@ interface SettingsInfo {
   leagues: League[];
   indonesianLeagueAvailable: boolean;
   football: { configured: boolean; plan: string | null; requestsUsed: number | null; requestsLimit: number | null; lastError: string | null; quotaLow: boolean };
+  prefs?: { holidayCountry: string | null; effectiveCountry: string; outletCountry: string | null; showHolidays: boolean; showAcademic: boolean; province: string | null; ready: boolean };
+  holidayCountries?: string[];
 }
 interface Item {
   code: string;
@@ -42,6 +44,9 @@ export function SettingsDialog({ t, onClose, onSaved }: { t: TFn; onClose: () =>
   const [leagues, setLeagues] = useState<string[]>([]);
   const [showWeather, setShowWeather] = useState(true);
   const [showMatches, setShowMatches] = useState(true);
+  const [holidayCountry, setHolidayCountry] = useState("");
+  const [showHolidays, setShowHolidays] = useState(true);
+  const [showAcademic, setShowAcademic] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -52,6 +57,9 @@ export function SettingsDialog({ t, onClose, onSaved }: { t: TFn; onClose: () =>
         setLeagues(d.settings.leagueIds ?? []);
         setShowWeather(d.settings.showWeather);
         setShowMatches(d.settings.showMatches);
+        setHolidayCountry(d.prefs?.holidayCountry ?? "");
+        setShowHolidays(d.prefs?.showHolidays ?? true);
+        setShowAcademic(d.prefs?.showAcademic ?? true);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     getJson<{ items: Item[] }>("/api/activity-calendar/wilayah?level=provinces")
@@ -85,7 +93,7 @@ export function SettingsDialog({ t, onClose, onSaved }: { t: TFn; onClose: () =>
       const res = await fetch("/api/activity-calendar/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adm4Code: code.trim() || null, leagueIds: leagues, showWeather, showMatches }),
+        body: JSON.stringify({ adm4Code: code.trim() || null, leagueIds: leagues, showWeather, showMatches, holidayCountry: holidayCountry || null, showHolidays, showAcademic }),
       });
       const d = await res.json().catch(() => null);
       if (!res.ok) throw new Error(d?.error ?? `HTTP ${res.status}`);
@@ -225,6 +233,44 @@ export function SettingsDialog({ t, onClose, onSaved }: { t: TFn; onClose: () =>
                 {t("act.set.showMatches", "Tampilkan pertandingan")}
               </label>
             </section>
+
+            {info.prefs?.ready && (
+              <section className="space-y-3">
+                <h3 className="flex items-center gap-1.5 text-sm font-medium text-neutral-200">
+                  <PartyPopper size={15} className="text-rose-300" /> {t("act.set.holidays", "Libur nasional")}
+                </h3>
+                <label className="block space-y-1 text-xs text-neutral-400">
+                  <span>{t("act.set.holidayCountry", "Negara")}</span>
+                  <select value={holidayCountry} disabled={!editable} onChange={(e) => setHolidayCountry(e.target.value)} className="w-full rounded-lg border border-white/10 bg-neutral-900 px-2.5 py-2 text-sm text-neutral-100">
+                    <option value="">
+                      {fill(t("act.set.holidayCountryAuto", "Ikuti negara outlet ({country})"), { country: countryName(info.prefs.outletCountry && (info.holidayCountries ?? []).includes(info.prefs.outletCountry) ? info.prefs.outletCountry : "ID", t) })}
+                    </option>
+                    {(info.holidayCountries ?? []).map((c) => (
+                      <option key={c} value={c}>
+                        {countryName(c, t)}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="block text-[11px] text-neutral-500">{t("act.set.holidayHint", "Libur nasional, cuti bersama, dan hari peringatan dari Google Calendar — diperbarui otomatis setiap hari untuk semua outlet.")}</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm text-neutral-200">
+                  <input type="checkbox" checked={showHolidays} disabled={!editable} onChange={(e) => setShowHolidays(e.target.checked)} />
+                  {t("act.set.showHolidays", "Tampilkan libur nasional")}
+                </label>
+                <h3 className="flex items-center gap-1.5 pt-2 text-sm font-medium text-neutral-200">
+                  <GraduationCap size={15} className="text-amber-300" /> {t("act.set.academic", "Kalender akademik")}
+                </h3>
+                <p className="text-[11px] text-neutral-500">
+                  {info.prefs.province
+                    ? fill(t("act.set.academicHintProvince", "Libur sekolah/kuliah, UTS, dan UAS diisi outlet sesuai kalender pendidikan {province} — lewat tombol Tambah jadwal akademik di halaman ini."), { province: info.prefs.province })
+                    : t("act.set.academicHint", "Libur sekolah/kuliah, UTS, dan UAS diisi outlet sesuai kalender pendidikan provinsinya — lewat tombol Tambah jadwal akademik di halaman ini.")}
+                </p>
+                <label className="flex items-center gap-2 text-sm text-neutral-200">
+                  <input type="checkbox" checked={showAcademic} disabled={!editable} onChange={(e) => setShowAcademic(e.target.checked)} />
+                  {t("act.set.showAcademic", "Tampilkan kalender akademik")}
+                </label>
+              </section>
+            )}
 
             <div className="flex justify-end gap-2 border-t border-white/10 pt-4">
               <Button variant="secondary" onClick={onClose}>

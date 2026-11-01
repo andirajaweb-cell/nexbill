@@ -10,6 +10,7 @@ import { outletActivitySettings } from "@/db/schema";
 import { refreshWeather, weatherCacheRows, weatherDue } from "./bmkg";
 import { footballDue, syncLeagues, syncMatches } from "./football";
 import { libDue, syncLibSchedule } from "./lib";
+import { holidayCountriesInUse, holidaysDue, syncHolidays } from "./holidays";
 import { isMissingRelation } from "./http";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -17,10 +18,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export interface SyncReport {
   weatherRefreshed: number;
   football: string;
+  holidays: string[];
 }
 
 export async function runActivitySync(): Promise<SyncReport> {
-  const report: SyncReport = { weatherRefreshed: 0, football: "skip" };
+  const report: SyncReport = { weatherRefreshed: 0, football: "skip", holidays: [] };
   try {
     const rows = await db.selectDistinct({ adm4: outletActivitySettings.adm4Code }).from(outletActivitySettings).where(isNotNull(outletActivitySettings.adm4Code));
     const codes = rows.map((r) => r.adm4).filter((c): c is string => !!c);
@@ -42,6 +44,18 @@ export async function runActivitySync(): Promise<SyncReport> {
     }
   } catch (err) {
     if (isMissingRelation(err)) report.football = "migrasi 0039 belum dijalankan";
+    else throw err;
+  }
+  // Libur nasional (Google Calendar) — satu sinkron per negara untuk semua outlet, tiap 24 jam.
+  try {
+    for (const country of await holidayCountriesInUse()) {
+      if (!(await holidaysDue(country))) continue;
+      const r = await syncHolidays(country);
+      report.holidays.push(r.ok ? `${country} ok ${r.count}` : `${country}: ${r.error}`);
+      await sleep(1100);
+    }
+  } catch (err) {
+    if (isMissingRelation(err)) report.holidays.push("migrasi 0040 belum dijalankan");
     else throw err;
   }
   return report;

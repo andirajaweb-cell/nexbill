@@ -9,6 +9,8 @@ import { refreshWeather, weatherCacheRow, weatherDue } from "@/lib/activity-cale
 import { footballDue, syncLeagues, syncMatches } from "@/lib/activity-calendar/football";
 import { libDue, syncLibSchedule } from "@/lib/activity-calendar/lib";
 import { isMissingRelation } from "@/lib/activity-calendar/http";
+import { getCalendarPrefs } from "@/lib/activity-calendar/academic";
+import { holidaysDue, syncHolidays } from "@/lib/activity-calendar/holidays";
 
 /** Refresh latar belakang (BMKG + Footballdata.io) bisa makan waktu; respons halaman tidak menunggunya. */
 export const maxDuration = 60;
@@ -32,17 +34,20 @@ export async function GET(req: NextRequest) {
     if (to < from) [from, to] = [to, from];
     if (Date.parse(to) - Date.parse(from) > MAX_RANGE_DAYS * 86400_000) to = addDays(from, MAX_RANGE_DAYS);
 
-    const data = await buildCalendar(session.outletId, settings, from, to, { day: sp.get("day") });
+    const prefs = await getCalendarPrefs(session.outletId);
+    const data = await buildCalendar(session.outletId, settings, from, to, { day: sp.get("day"), prefs });
 
     // Pembaruan latar belakang bila data basi (tidak memblok respons).
     const adm4 = settings.adm4Code;
     const needWeather = adm4 ? weatherDue(await weatherCacheRow(adm4)) : false;
     const needLib = settings.showMatches && (await libDue());
     const needFootball = settings.showMatches && (await footballDue());
-    if (needWeather || needFootball || needLib) {
+    const needHolidays = prefs.ready && prefs.showHolidays && (await holidaysDue(prefs.effectiveCountry));
+    if (needWeather || needFootball || needLib || needHolidays) {
       after(async () => {
         try {
           if (needWeather && adm4) await refreshWeather(adm4);
+          if (needHolidays) await syncHolidays(prefs.effectiveCountry);
           if (needLib) await syncLibSchedule();
           if (needFootball) {
             await syncLeagues();
@@ -58,7 +63,8 @@ export async function GET(req: NextRequest) {
       migration: true,
       settings,
       canEdit: hasPermission(session.role as StaffRole, "manage_settings"),
-      refreshing: { weather: needWeather, football: needFootball || needLib },
+      prefs,
+      refreshing: { weather: needWeather, football: needFootball || needLib, holidays: needHolidays },
       ...data,
     });
   } catch (err: unknown) {

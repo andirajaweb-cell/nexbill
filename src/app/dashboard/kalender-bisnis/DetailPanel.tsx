@@ -1,7 +1,12 @@
 "use client";
 import { clsx } from "clsx";
-import { Clock, X } from "lucide-react";
+import { Clock, GraduationCap, PartyPopper, Pencil, Plus, X } from "lucide-react";
 import {
+  ACADEMIC_STYLE,
+  HOLIDAY_STYLE,
+  academicKindLabel,
+  academicLevelLabel,
+  holidayKindLabel,
   RAIN_STYLE,
   STATUS_STYLE,
   SourceTag,
@@ -14,6 +19,7 @@ import {
   skyLabel,
   slotLabel,
   statusLabel,
+  type CalendarAcademic,
   type TFn,
 } from "./shared";
 import type { ViewData } from "./views";
@@ -27,6 +33,10 @@ export function DetailPanel({
   tzAbbr,
   money,
   onClose,
+  canEditAcademic = false,
+  showExtras = true,
+  onAddAcademic,
+  onEditAcademic,
 }: {
   date: string | null;
   data: ViewData;
@@ -36,6 +46,11 @@ export function DetailPanel({
   tzAbbr: string;
   money: (n: number) => string;
   onClose: () => void;
+  canEditAcademic?: boolean;
+  /** false = migrasi 0040 belum dijalankan (bagian libur/akademik disembunyikan). */
+  showExtras?: boolean;
+  onAddAcademic?: (date: string) => void;
+  onEditAcademic?: (a: CalendarAcademic) => void;
 }) {
   if (!date) return <p className="py-10 text-center text-sm text-neutral-500">{t("act.detail.select", "Pilih tanggal untuk melihat detail.")}</p>;
   const w = data.weatherByDate.get(date);
@@ -43,6 +58,8 @@ export function DetailPanel({
   const matches = data.matchesByDate.get(date) ?? [];
   const actual = date <= data.today ? data.actualByDate.get(date) : undefined;
   const pred = data.predictionByDate.get(date)?.baseline ?? null;
+  const holidays = data.holidaysByDate.get(date) ?? [];
+  const academic = data.academicByDate.get(date) ?? [];
 
   return (
     <div className="space-y-4">
@@ -55,6 +72,61 @@ export function DetailPanel({
           <X size={16} />
         </button>
       </div>
+
+      {/* ---------------- libur nasional & kalender akademik ---------------- */}
+      {showExtras && (
+        <section className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-medium text-neutral-200">
+              <PartyPopper size={14} className="text-rose-300" /> {t("act.detail.holidays", "Libur & kalender akademik")}
+            </h3>
+            {canEditAcademic && onAddAcademic && (
+              <button type="button" onClick={() => onAddAcademic(date)} className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 px-1.5 py-0.5 text-[11px] text-amber-200 hover:bg-amber-500/10">
+                <Plus size={11} /> {t("act.acad.add", "Tambah jadwal akademik")}
+              </button>
+            )}
+          </div>
+          {holidays.length === 0 && academic.length === 0 ? (
+            <p className="text-xs text-neutral-500">{t("act.detail.noHoliday", "Bukan hari libur dan tidak ada jadwal akademik.")}</p>
+          ) : (
+            <div className="space-y-1.5">
+              {holidays.map((h) => (
+                <div key={h.id} className={clsx("rounded-xl border p-2.5", HOLIDAY_STYLE[h.kind] ?? HOLIDAY_STYLE.other)}>
+                  <div className="text-[10px] uppercase tracking-wide opacity-80">{holidayKindLabel(h.kind, t)}</div>
+                  <div className="text-sm font-medium">{h.name}</div>
+                  {h.nameEn && h.nameEn !== h.name && <div className="text-[11px] opacity-70">{h.nameEn}</div>}
+                  {h.endDate !== h.date && (
+                    <div className="text-[11px] opacity-80">
+                      {fmtDate(h.date, locale, { day: "numeric", month: "short" })} – {fmtDate(h.endDate, locale, { day: "numeric", month: "short", year: "numeric" })}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {academic.map((a) => (
+                <div key={a.id} className={clsx("flex items-start justify-between gap-2 rounded-xl border p-2.5", ACADEMIC_STYLE[a.kind] ?? ACADEMIC_STYLE.other)}>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide opacity-80">
+                      <GraduationCap size={11} /> {academicKindLabel(a.kind, t)} · {academicLevelLabel(a.level, t)}
+                    </div>
+                    <div className="text-sm font-medium">{a.title}</div>
+                    <div className="text-[11px] opacity-80">
+                      {fmtDate(a.startDate, locale, { day: "numeric", month: "short" })} – {fmtDate(a.endDate, locale, { day: "numeric", month: "short", year: "numeric" })}
+                      {a.province ? ` · ${a.province}` : ""}
+                    </div>
+                    {a.note && <div className="mt-0.5 text-[11px] opacity-80">{a.note}</div>}
+                  </div>
+                  {canEditAcademic && onEditAcademic && (
+                    <button type="button" onClick={() => onEditAcademic(a)} aria-label={t("act.acad.edit", "Ubah")} className="shrink-0 rounded-md p-1 opacity-80 hover:bg-white/10 hover:opacity-100">
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-neutral-500">{t("act.detail.academicSource", "Libur nasional: Google Calendar. Jadwal akademik: diisi outlet.")}</p>
+        </section>
+      )}
 
       {/* ---------------- cuaca ---------------- */}
       <section className="space-y-2">

@@ -284,7 +284,7 @@ export const FEATURE_LABEL_ID: Record<PlanFeature, string> = {
   anti_fraud: "Kontrol Anti-Fraud Shift",
   multi_outlet: "Multi-Cabang",
   home_rental: "Rental ke Rumah",
-  activity_calendar: "Kalender Bisnis (cuaca & jadwal bola)",
+  activity_calendar: "Kalender Bisnis (cuaca, jadwal bola, libur & kalender akademik)",
 };
 
 /** Header internal yang dipasang middleware. Selalu ditimpa/dihapus di middleware agar tidak bisa dipalsukan klien. */

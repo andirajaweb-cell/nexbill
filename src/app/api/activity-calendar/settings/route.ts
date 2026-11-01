@@ -8,6 +8,9 @@ import { isValidAdm4, locationLabel } from "@/lib/activity-calendar/bmkg-rules";
 import { cachedLeagues, footballConfigured, footballStatus, syncLeagues } from "@/lib/activity-calendar/football";
 import { hasIndonesianLeague, sortLeagues } from "@/lib/activity-calendar/football-rules";
 import { isMissingRelation } from "@/lib/activity-calendar/http";
+import { getCalendarPrefs, saveCalendarPrefs } from "@/lib/activity-calendar/academic";
+import { holidayCountry, HOLIDAY_COUNTRY_CODES } from "@/lib/activity-calendar/holiday-rules";
+import { holidayStatus } from "@/lib/activity-calendar/holidays";
 
 export const maxDuration = 30;
 
@@ -18,6 +21,7 @@ export async function GET() {
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
     if (!hasPermission(session.role as StaffRole, "view_reports")) return NextResponse.json({ error: "Tidak punya izin." }, { status: 403 });
     const settings = await getActivitySettings(session.outletId);
+    const prefs = await getCalendarPrefs(session.outletId);
     let leagues = await cachedLeagues();
     if (leagues.length === 0 && footballConfigured()) leagues = await syncLeagues();
     leagues = sortLeagues(leagues);
@@ -27,6 +31,9 @@ export async function GET() {
       leagues,
       indonesianLeagueAvailable: hasIndonesianLeague(leagues),
       football: await footballStatus(),
+      prefs,
+      holidayCountries: HOLIDAY_COUNTRY_CODES,
+      holidayStatus: prefs.ready ? await holidayStatus(prefs.effectiveCountry) : null,
     });
   } catch (err: unknown) {
     if (isMissingRelation(err)) return NextResponse.json({ migration: false, error: "Jalankan migrasi 0039_activity_calendar.sql di Supabase." }, { status: 503 });
@@ -35,7 +42,8 @@ export async function GET() {
 }
 
 /**
- * PUT { adm4Code, leagueIds[], showWeather, showMatches } — hanya peran dengan izin Pengaturan.
+ * PUT { adm4Code, leagueIds[], showWeather, showMatches, holidayCountry, showHolidays, showAcademic } — hanya
+ * peran dengan izin Pengaturan. Preferensi libur/akademik disimpan terpisah (migrasi 0040).
  * Lokasi baru langsung dicek ke BMKG: kode yang tidak dikenal BMKG ditolak (tidak disimpan diam-diam).
  */
 export async function PUT(req: NextRequest) {
@@ -79,7 +87,20 @@ export async function PUT(req: NextRequest) {
       },
       session.name
     );
-    return NextResponse.json({ settings: await getActivitySettings(session.outletId) });
+    const prefs = await getCalendarPrefs(session.outletId);
+    if (prefs.ready && ("holidayCountry" in body || "showHolidays" in body || "showAcademic" in body)) {
+      const hc = body.holidayCountry === null || body.holidayCountry === "" ? null : holidayCountry(typeof body.holidayCountry === "string" ? body.holidayCountry : prefs.holidayCountry)?.code ?? prefs.holidayCountry;
+      await saveCalendarPrefs(
+        session.outletId,
+        {
+          holidayCountry: hc,
+          showHolidays: typeof body.showHolidays === "boolean" ? body.showHolidays : prefs.showHolidays,
+          showAcademic: typeof body.showAcademic === "boolean" ? body.showAcademic : prefs.showAcademic,
+        },
+        session.name
+      );
+    }
+    return NextResponse.json({ settings: await getActivitySettings(session.outletId), prefs: await getCalendarPrefs(session.outletId) });
   } catch (err: unknown) {
     if (isMissingRelation(err)) return NextResponse.json({ error: "Jalankan migrasi 0039_activity_calendar.sql di Supabase." }, { status: 503 });
     return NextResponse.json({ error: describeError(err) }, { status: 500 });

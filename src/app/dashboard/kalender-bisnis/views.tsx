@@ -4,6 +4,12 @@ import { Trophy } from "lucide-react";
 import type { DailyActual } from "@/lib/activity-calendar/insights-rules";
 import type { Next7Day } from "@/lib/activity-calendar/calendar";
 import {
+  ACADEMIC_STYLE,
+  HOLIDAY_STYLE,
+  academicLevelLabel,
+  academicShort,
+  holidayKindLabel,
+  isDayOffKind,
   RAIN_STYLE,
   STATUS_STYLE,
   WeatherIcon,
@@ -16,6 +22,8 @@ import {
   startOfWeek,
   statusLabel,
   addDays,
+  type CalendarAcademic,
+  type CalendarHoliday,
   type CalendarMatch,
   type CalendarWeatherDay,
   type Filters,
@@ -30,6 +38,8 @@ export interface ViewData {
   matchesByDate: Map<string, CalendarMatch[]>;
   actualByDate: Map<string, DailyActual>;
   predictionByDate: Map<string, Next7Day>;
+  holidaysByDate: Map<string, CalendarHoliday[]>;
+  academicByDate: Map<string, CalendarAcademic[]>;
   hourly: number[] | null;
 }
 
@@ -46,6 +56,34 @@ interface ViewProps {
 }
 
 const isRainy = (w: CalendarWeatherDay | undefined) => !!w && w.rainSlots > 0;
+
+/** Libur & kegiatan akademik satu tanggal sesuai filter. */
+function extrasOf(data: ViewData, filters: Filters, d: string) {
+  const holidays = filters.holidays ? data.holidaysByDate.get(d) ?? [] : [];
+  const academic = filters.academic ? data.academicByDate.get(d) ?? [] : [];
+  return { holidays, academic, dayOff: holidays.some((h) => isDayOffKind(h.kind)) };
+}
+
+/** Chip kegiatan akademik ringkas: "UTS SMP", "Libur SD". */
+export function AcademicChip({ a, t, compact = false }: { a: CalendarAcademic; t: TFn; compact?: boolean }) {
+  return (
+    <span title={a.title} className={clsx("inline-flex max-w-full items-center truncate rounded-md border px-1 py-px text-[10px]", ACADEMIC_STYLE[a.kind] ?? ACADEMIC_STYLE.other)}>
+      <span className="truncate">
+        {academicShort(a.kind, t)}
+        {a.level !== "all" ? ` ${academicLevelLabel(a.level, t)}` : ""}
+        {!compact && a.title ? ` · ${a.title}` : ""}
+      </span>
+    </span>
+  );
+}
+
+export function HolidayLine({ h, t }: { h: CalendarHoliday; t: TFn }) {
+  return (
+    <div title={`${h.name} — ${holidayKindLabel(h.kind, t)}`} className={clsx("truncate rounded-md border px-1 py-px text-[10px]", HOLIDAY_STYLE[h.kind] ?? HOLIDAY_STYLE.other)}>
+      {h.name}
+    </div>
+  );
+}
 
 /* ================================================================ BULAN ================================================================ */
 
@@ -72,6 +110,7 @@ export function MonthView({ data, filters, selected, onSelect, anchor, t, locale
             const actual = filters.actual && d <= data.today ? data.actualByDate.get(d) : undefined;
             const pred = d >= data.today ? data.predictionByDate.get(d)?.baseline : null;
             const dim = filters.rainOnly && !isRainy(w);
+            const ex = extrasOf(data, filters, d);
             return (
               <button
                 key={d}
@@ -79,7 +118,7 @@ export function MonthView({ data, filters, selected, onSelect, anchor, t, locale
                 onClick={() => onSelect(d)}
                 className={clsx(
                   "group relative flex min-h-[104px] flex-col rounded-xl border p-2 text-left transition",
-                  w && w.rainSlots > 0 ? RAIN_STYLE[w.worstRain]?.cell : "bg-white/[0.02]",
+                  w && w.rainSlots > 0 ? RAIN_STYLE[w.worstRain]?.cell : ex.dayOff ? "bg-rose-500/[0.07]" : "bg-white/[0.02]",
                   selected === d ? "border-cyan-400/70 shadow-[0_0_0_1px_rgba(34,211,238,0.5),0_0_24px_-6px_rgba(34,211,238,0.5)]" : "border-white/[0.07] hover:border-cyan-400/30 hover:bg-white/[0.04]",
                   !inMonth && "opacity-45",
                   dim && "opacity-25"
@@ -89,7 +128,7 @@ export function MonthView({ data, filters, selected, onSelect, anchor, t, locale
                   <span
                     className={clsx(
                       "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-semibold",
-                      d === data.today ? "bg-gradient-to-br from-cyan-400 to-blue-500 text-neutral-950" : "text-neutral-200"
+                      d === data.today ? "bg-gradient-to-br from-cyan-400 to-blue-500 text-neutral-950" : ex.dayOff ? "text-rose-300" : "text-neutral-200"
                     )}
                   >
                     {Number(d.slice(8, 10))}
@@ -101,6 +140,23 @@ export function MonthView({ data, filters, selected, onSelect, anchor, t, locale
                     </span>
                   )}
                 </div>
+                {(ex.holidays.length > 0 || ex.academic.length > 0) && (
+                  <div className="mt-1 space-y-0.5">
+                    {ex.holidays.slice(0, 1).map((h) => (
+                      <HolidayLine key={h.id} h={h} t={t} />
+                    ))}
+                    {ex.academic.length > 0 && (
+                      <div className="flex flex-wrap gap-0.5">
+                        {ex.academic.slice(0, 2).map((a) => (
+                          <AcademicChip key={a.id} a={a} t={t} compact />
+                        ))}
+                      </div>
+                    )}
+                    {ex.holidays.length + ex.academic.length > 3 && (
+                      <div className="text-[10px] text-neutral-500">{fill(t("act.day.more", "+{n} lagi"), { n: ex.holidays.length + ex.academic.length - 3 })}</div>
+                    )}
+                  </div>
+                )}
                 {w && w.rainSlots > 0 && (
                   <span className={clsx("mt-1 w-fit rounded-md border px-1.5 py-px text-[10px]", RAIN_STYLE[w.worstRain]?.chip, w.source === "archive" && "opacity-60")}>
                     {rainLabel(w.worstRain, t)}
@@ -155,6 +211,7 @@ export function WeekView({ data, filters, selected, onSelect, anchor, t, locale,
           const w = filters.weather ? data.weatherByDate.get(d) : undefined;
           const actual = filters.actual && d <= data.today ? data.actualByDate.get(d) : undefined;
           const pred = d >= data.today ? data.predictionByDate.get(d)?.baseline : null;
+          const ex = extrasOf(data, filters, d);
           return (
             <button
               key={d}
@@ -162,13 +219,14 @@ export function WeekView({ data, filters, selected, onSelect, anchor, t, locale,
               onClick={() => onSelect(d)}
               className={clsx(
                 "rounded-xl border px-2 py-2 text-left transition",
+                ex.dayOff && selected !== d && "bg-rose-500/[0.07]",
                 selected === d ? "border-cyan-400/70 bg-cyan-500/10" : "border-white/[0.07] bg-white/[0.02] hover:border-cyan-400/30",
                 filters.rainOnly && !isRainy(w) && "opacity-30"
               )}
             >
               <div className="text-[11px] uppercase tracking-wide text-neutral-500">{fmtDate(d, locale, { weekday: "short" })}</div>
               <div className="flex items-center justify-between">
-                <span className={clsx("text-lg font-semibold", d === data.today ? "text-cyan-300" : "text-neutral-100")}>{Number(d.slice(8, 10))}</span>
+                <span className={clsx("text-lg font-semibold", d === data.today ? "text-cyan-300" : ex.dayOff ? "text-rose-300" : "text-neutral-100")}>{Number(d.slice(8, 10))}</span>
                 {w && <WeatherIcon sky={w.sky} rain={w.worstRain} size={18} className={w.source === "archive" ? "opacity-60" : ""} />}
               </div>
               <div className="mt-0.5 h-4 text-[10px]">
@@ -180,6 +238,16 @@ export function WeekView({ data, filters, selected, onSelect, anchor, t, locale,
                   <span className="text-fuchsia-200">≈{pred.sessions}</span>
                 ) : null}
               </div>
+              {(ex.holidays.length > 0 || ex.academic.length > 0) && (
+                <div className="mt-1 space-y-0.5">
+                  {ex.holidays.slice(0, 2).map((h) => (
+                    <HolidayLine key={h.id} h={h} t={t} />
+                  ))}
+                  {ex.academic.slice(0, 3).map((a) => (
+                    <AcademicChip key={a.id} a={a} t={t} compact />
+                  ))}
+                </div>
+              )}
             </button>
           );
         })}
@@ -234,8 +302,26 @@ export function DayView({ data, filters, anchor, t, lang }: ViewProps) {
   const matches = filters.matches ? data.matchesByDate.get(anchor) ?? [] : [];
   const hourly = filters.actual && anchor <= data.today ? data.hourly : null;
   const maxHourly = hourly ? Math.max(1, ...hourly) : 1;
+  const ex = extrasOf(data, filters, anchor);
   return (
     <div className="space-y-1">
+      {(ex.holidays.length > 0 || ex.academic.length > 0) && (
+        <div className={clsx("mb-2 space-y-1 rounded-xl border p-2", ex.dayOff ? "border-rose-400/30 bg-rose-500/[0.07]" : "border-white/[0.07] bg-white/[0.02]")}>
+          {ex.holidays.map((h) => (
+            <div key={h.id} className="flex flex-wrap items-center gap-2 text-xs">
+              <span className={clsx("rounded-md border px-1.5 py-px text-[10px]", HOLIDAY_STYLE[h.kind] ?? HOLIDAY_STYLE.other)}>{holidayKindLabel(h.kind, t)}</span>
+              <span className="text-neutral-100">{h.name}</span>
+            </div>
+          ))}
+          {ex.academic.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {ex.academic.map((a) => (
+                <AcademicChip key={a.id} a={a} t={t} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-[52px_1fr_1.4fr_1fr] gap-2 px-1 text-[10px] uppercase tracking-wide text-neutral-500">
         <span>{t("act.hourCol", "Jam")}</span>
         <span>{t("act.filter.weather", "Cuaca")}</span>

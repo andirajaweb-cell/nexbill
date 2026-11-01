@@ -6,6 +6,8 @@ import { getActivitySettings } from "@/lib/activity-calendar/data";
 import { refreshWeather, weatherCacheRow } from "@/lib/activity-calendar/bmkg";
 import { footballConfigured, footballStatus, syncLeagues, syncMatches } from "@/lib/activity-calendar/football";
 import { libEnabled, libLastSuccessAt, syncLibSchedule } from "@/lib/activity-calendar/lib";
+import { getCalendarPrefs } from "@/lib/activity-calendar/academic";
+import { holidayStatus, syncHolidays } from "@/lib/activity-calendar/holidays";
 
 export const maxDuration = 60;
 
@@ -19,7 +21,7 @@ export async function POST() {
     if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
     if (!hasPermission(session.role as StaffRole, "manage_settings")) return NextResponse.json({ error: "Tidak punya izin." }, { status: 403 });
     const settings = await getActivitySettings(session.outletId);
-    const result: { weather: string; football: string } = { weather: "skip", football: "skip" };
+    const result: { weather: string; football: string; holidays: string } = { weather: "skip", football: "skip", holidays: "skip" };
 
     if (settings.adm4Code) {
       const row = await weatherCacheRow(settings.adm4Code);
@@ -47,6 +49,16 @@ export async function POST() {
         await syncLeagues(true);
         const r = await syncMatches({ force: true });
         result.football = r.ok ? "ok" : r.error ?? r.skipped ?? "error";
+      }
+    }
+    const prefs = await getCalendarPrefs(session.outletId);
+    if (prefs.ready && prefs.showHolidays) {
+      const st = await holidayStatus(prefs.effectiveCountry);
+      const last = st.lastAttemptAt ?? st.lastSuccessAt;
+      if (last && Date.now() - new Date(last).getTime() < MIN_MANUAL_GAP_MS) result.holidays = "recent";
+      else {
+        const r = await syncHolidays(prefs.effectiveCountry);
+        result.holidays = r.ok ? "ok" : r.error ?? "error";
       }
     }
     return NextResponse.json(result);

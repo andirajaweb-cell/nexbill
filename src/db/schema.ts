@@ -3487,6 +3487,66 @@ export const activityFootballMatches = pgTable(
   (t) => [index("activity_football_matches_kickoff_idx").on(t.kickoffUtc)]
 );
 
+/** ---------------- KALENDER BISNIS: libur nasional & kalender akademik — migrasi 0040 ---------------- */
+
+/**
+ * Libur nasional / cuti bersama / peringatan per negara ASEAN dari Google Calendar (lib/activity-calendar/
+ * holidays.ts). Satu sinkron untuk semua outlet; id = "<negara>:<uid event Google>".
+ */
+export const activityHolidays = pgTable(
+  "activity_holidays",
+  {
+    id: text("id").primaryKey(),
+    /** ISO 3166 alpha-2: ID, MY, SG, TH, PH, VN, BN, KH, LA, MM, TL. */
+    country: text("country").notNull(),
+    /** Tanggal lokal YYYY-MM-DD (mulai) dan akhir INKLUSIF. */
+    date: text("date").notNull(),
+    endDate: text("end_date").notNull(),
+    /** Nama dalam bahasa negara bila tersedia, selain itu Inggris. */
+    name: text("name").notNull(),
+    nameEn: text("name_en"),
+    /** public | joint_leave | observance | other (lib/activity-calendar/holiday-rules.ts). */
+    kind: text("kind").notNull().default("public"),
+    updatedAt: text("updated_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("activity_holidays_country_date_idx").on(t.country, t.date)]
+);
+
+/**
+ * Kalender akademik per outlet (sementara diisi outlet sesuai kalender pendidikan provinsinya): libur
+ * sekolah/kuliah, UTS (tengah semester), UAS (akhir semester).
+ */
+export const activityAcademicEvents = pgTable(
+  "activity_academic_events",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    outletId: text("outlet_id").notNull().references(() => outlets.id),
+    /** all | sd | smp | sma | kuliah */
+    level: text("level").notNull(),
+    /** school_holiday | midterm | final_exam | other */
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    startDate: text("start_date").notNull(),
+    endDate: text("end_date").notNull(),
+    province: text("province"),
+    note: text("note"),
+    createdBy: text("created_by"),
+    ...timestamps,
+  },
+  (t) => [index("activity_academic_events_outlet_idx").on(t.outletId, t.startDate)]
+);
+
+/** Preferensi libur & kalender akademik per outlet (terpisah dari outlet_activity_settings). */
+export const outletCalendarPrefs = pgTable("outlet_calendar_prefs", {
+  outletId: text("outlet_id").primaryKey().references(() => outlets.id),
+  /** null = negara outlet (Pengaturan › Profil Outlet), lalu ID. */
+  holidayCountry: text("holiday_country"),
+  showHolidays: boolean("show_holidays").notNull().default(true),
+  showAcademic: boolean("show_academic").notNull().default(true),
+  updatedBy: text("updated_by"),
+  ...timestamps,
+});
+
 /** Status sinkron per sumber ("football", "football_leagues") — kuota, error terakhir, daftar liga. */
 export const activitySyncState = pgTable("activity_sync_state", {
   key: text("key").primaryKey(),

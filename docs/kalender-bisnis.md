@@ -1,4 +1,4 @@
-# Kalender Bisnis NEXBILL (cuaca BMKG + jadwal sepak bola)
+# Kalender Bisnis NEXBILL (cuaca BMKG + jadwal sepak bola + libur nasional + kalender akademik)
 
 Halaman `/dashboard/kalender-bisnis` (menu **Tumbuh › Kalender Bisnis**, paket **Pro**). Satu kalender (bulan/minggu/hari) yang menggabungkan prakiraan cuaca BMKG, jadwal pertandingan Footballdata.io, transaksi aktual outlet, dan prediksi baseline, untuk mengantisipasi hari sepi/ramai.
 
@@ -14,6 +14,37 @@ Halaman `/dashboard/kalender-bisnis` (menu **Tumbuh › Kalender Bisnis**, paket
 Sumber yang dipertimbangkan tetapi **tidak dipakai**: footy.id (membalas 403 Forbidden ke server & browser), livescore.in (Ketentuan Penggunaan pasal 2.2, 2.9, 2.10 melarang penggunaan komersial, ekstraksi database, dan scraping). Jadwal Tim Nasional Indonesia belum ada — perlu sumber resmi yang mengizinkan.
 
 Nama penyedia jadwal internasional tidak disebut di fitur; atribusi hanya tampil saat paket penyedia gratis (syarat lisensinya), bisa dimatikan `FOOTBALL_DATA_ATTRIBUTION=off` atas keputusan pemilik akun.
+
+## Libur nasional ASEAN & kalender akademik (migrasi 0040, 2026-11-01)
+
+Target pasar rental PS adalah pelajar dan mahasiswa, jadi tanggal merah, libur sekolah, dan masa ujian ikut tampil di kalender (bulan/minggu/hari, panel detail, ringkasan 7 hari) dan dianalisis terhadap transaksi outlet. Tetap paket **Pro** (bagian dari `activity_calendar`).
+
+**Libur nasional — Google Calendar, untuk semua outlet**
+
+| | |
+|---|---|
+| Sumber | Kalender publik Google "Holidays in <negara>": `{lang}.{nama}#holiday@group.v.calendar.google.com` |
+| Negara | ID (`indonesian`), MY (`malaysia`), SG (`singapore`), TH (`th`), PH (`philippines`), VN (`vietnamese`), BN, KH, LA, MM, TL — `holiday-rules.ts` |
+| Dengan `GOOGLE_CALENDAR_API_KEY` | Google Calendar API v3 `events.list` (JSON) |
+| Tanpa key | feed iCal publik `https://calendar.google.com/calendar/ical/{id}/public/basic.ics` |
+| Jenis | `public` (deskripsi Google "Public holiday"), `joint_leave` (nama "Cuti Bersama"/"joint leave"), `observance` ("Observance" — bukan hari libur), `other` |
+| Nama | kalender bahasa Inggris untuk klasifikasi; nama dari kalender bahasa lokal (id/th/vi) bila ada, dicocokkan lewat UID |
+| Jadwal | 1 sinkron per negara untuk semua outlet, tiap 24 jam (gagal → coba lagi 1 jam), jendela 1 Jan tahun lalu s.d. 31 Des tahun depan. Libur yang dihapus/dipindah Google ikut terhapus. Negara yang disinkron: ID + negara pilihan outlet + negara profil outlet |
+| Tabel | `activity_holidays` (dibagi semua outlet), status di `activity_sync_state` key `holidays_<negara>` |
+
+Negara per outlet: Kalender Bisnis › Pengaturan › Libur nasional (bawaan: negara di Profil Outlet, lalu Indonesia). Bisa disembunyikan per outlet.
+
+Nama kalender Google untuk Malaysia/Vietnam/Brunei/Kamboja/Laos/Myanmar/Timor Leste diambil dari daftar komunitas (belum dicek langsung karena server pengembang tidak bisa mengakses calendar.google.com); bila satu negara gagal, statusnya tampil di halaman ("belum bisa diambil: …") tanpa mengganggu negara lain.
+
+**Kalender akademik — diisi outlet**
+
+Kalender pendidikan Indonesia berbeda per provinsi (dinas pendidikan) dan per kampus, jadi untuk sementara setiap outlet mengisi sendiri: libur sekolah/kuliah, UTS, UAS, atau kegiatan lain, untuk **semua jenjang / SD / SMP / SMA/SMK / kuliah** (`activity_academic_events`, maks. 120 hari per kegiatan). Provinsi diambil dari Profil Outlet dan dicatat di tiap kegiatan. Tambah/ubah/hapus lewat tombol **Tambah jadwal akademik** (izin Pengaturan) di kartu "Kalender akademik outlet" atau panel detail tanggal. API: `GET/POST /api/activity-calendar/academic`, `PATCH/DELETE /api/activity-calendar/academic/[id]` — selalu outlet sesi.
+
+**Insight**: ringkasan 7 hari menampilkan jumlah hari libur, libur sekolah, dan hari ujian; analisis 90 hari menambah blok "Libur nasional & cuti bersama" (bila sinkron libur pernah berhasil), "Libur sekolah/kuliah", dan "Masa UTS/UAS" (bila outlet pernah mengisinya) — tetap korelasi, dinormalkan per hari dalam seminggu, minimal 5 hari per kelompok.
+
+**Segera**: kalender akademik otomatis per provinsi (menggantikan pengisian manual).
+
+Migrasi `0040_activity_holidays_academic.sql` (3 tabel baru, aman dijalankan ulang). Sebelum dijalankan, Kalender Bisnis tetap jalan tanpa libur & jadwal akademik dan menampilkan pesan migrasi.
 
 ## Cara kerja
 
@@ -54,10 +85,13 @@ Nama penyedia jadwal internasional tidak disebut di fitur; atribusi hanya tampil
 | `LIB_SCHEDULE_URL` | Tidak | — | Bawaan `https://www.ligaindonesiabaru.com`. |
 | `FOOTBALL_DATA_ATTRIBUTION` | Tidak | — | `off` menyembunyikan atribusi penyedia jadwal internasional. |
 | `WILAYAH_API_URL` | Tidak | — | Bawaan `https://wilayah.id/api`. |
+| `GOOGLE_CALENDAR_API_KEY` | Tidak | Vercel **dan** `.env` VPS | API key Google Calendar API (Google Cloud Console › API & Services › Credentials, aktifkan *Google Calendar API*, batasi key ke API itu). Tanpa key dipakai feed iCal publik. |
+| `HOLIDAYS` | Tidak | — | `off` mematikan sinkron libur nasional. |
 
 ## Deployment
 
 1. Jalankan `0039_activity_calendar.sql` di Supabase SQL Editor.
+   Lalu `0040_activity_holidays_academic.sql` (libur nasional & kalender akademik).
 2. Daftar di footballdata.io (paket Free cukup untuk mulai), isi `FOOTBALL_DATA_API_KEY` di Vercel lalu redeploy.
 3. Di VPS: `cd /opt/nexbill && git pull && npm install`, tambahkan `FOOTBALL_DATA_API_KEY` ke `.env`, lalu `pm2 restart scheduler --update-env`.
 4. Buka Kalender Bisnis › Pengaturan, pilih lokasi outlet dan liga.

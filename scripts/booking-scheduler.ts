@@ -63,6 +63,7 @@ async function activityTick() {
   try {
     const r = await runActivitySync();
     if (r.weatherRefreshed || r.football !== "skip") console.log(`[activity-sync] cuaca diperbarui ${r.weatherRefreshed} lokasi, sepak bola: ${r.football}`);
+    if (r.holidays.length) console.log(`[activity-sync] libur nasional: ${r.holidays.join(", ")}`);
   } catch (err) {
     console.error("[activity-sync] Gagal:", err instanceof Error ? err.message : err);
   } finally {

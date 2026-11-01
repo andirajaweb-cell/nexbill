@@ -9,6 +9,11 @@ import { dailyActuals, hourlySessions, type ActivitySettings } from "./data";
 import { cachedLeagues, footballStatus, storedMatches } from "./football";
 import { isPrimeTime, kickoffBucket, localDateOf, localHourOf, localTimeOf, mapStatus, sortLeagues, type KickoffBucket, type MatchStatus } from "./football-rules";
 import { addDays, baselineFor, compareGroups, directionOf, METRICS, type Baseline, type DailyActual, type Direction, type GroupComparison } from "./insights-rules";
+import { holidaysBetween, holidayStatus, type StoredHoliday } from "./holidays";
+import { academicBetween, type AcademicEvent, type CalendarPrefs } from "./academic";
+import { datesInRange, isDayOff } from "./holiday-rules";
+import { isExam } from "./academic-rules";
+import { isMissingRelation } from "./http";
 
 export const MAX_RANGE_DAYS = 62;
 export const ANALYSIS_DAYS = 90;
@@ -45,8 +50,15 @@ export interface CalendarWeatherDay {
   sky: string | null;
 }
 
+export type CalendarHoliday = StoredHoliday;
+export type CalendarAcademic = AcademicEvent;
+
 export interface Next7Day {
   date: string;
+  /** Libur nasional/cuti bersama/peringatan pada tanggal ini. */
+  holidays: { name: string; kind: string }[];
+  /** Kegiatan akademik outlet pada tanggal ini (libur sekolah, UTS, UAS). */
+  academic: { kind: string; level: string; title: string }[];
   weather: CalendarWeatherDay | null;
   matches: number;
   primeTimeMatches: number;
@@ -94,9 +106,45 @@ function utcRange(fromDate: string, toDate: string) {
   return { fromUtc: `${addDays(fromDate, -1)}T00:00:00.000Z`, toUtc: `${addDays(toDate, 2)}T00:00:00.000Z` };
 }
 
-export async function buildCalendar(outletId: string, settings: ActivitySettings, fromDate: string, toDate: string, opts: { day?: string | null } = {}) {
+/** Peta tanggal → item untuk event bertanggal mulai–akhir (inklusif) dalam [from, to]. */
+function byDay<T extends { startDate?: string; date?: string; endDate: string }>(items: T[], from: string, to: string): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const it of items) {
+    const start = it.startDate ?? it.date ?? it.endDate;
+    for (const d of datesInRange(start, it.endDate, from, to)) map.set(d, [...(map.get(d) ?? []), it]);
+  }
+  return map;
+}
+
+export async function buildCalendar(
+  outletId: string,
+  settings: ActivitySettings,
+  fromDate: string,
+  toDate: string,
+  opts: { day?: string | null; prefs?: CalendarPrefs | null } = {}
+) {
   const tz = settings.timezone;
   const today = todayIn(tz);
+  const prefs = opts.prefs ?? null;
+
+  /* ---------------- libur nasional & kalender akademik (migrasi 0040) ---------------- */
+  const spanFrom = [fromDate, addDays(today, -ANALYSIS_DAYS)].sort()[0];
+  const spanTo = [toDate, addDays(today, 7)].sort()[1];
+  let extrasReady = !!prefs?.ready;
+  let holidayRows: StoredHoliday[] = [];
+  let academicRows: AcademicEvent[] = [];
+  if (prefs?.ready) {
+    try {
+      [holidayRows, academicRows] = await Promise.all([holidaysBetween(prefs.effectiveCountry, spanFrom, spanTo), academicBetween(outletId, spanFrom, spanTo)]);
+    } catch (err) {
+      if (!isMissingRelation(err)) throw err;
+      extrasReady = false;
+    }
+  }
+  const showHolidays = extrasReady && (prefs?.showHolidays ?? true);
+  const showAcademic = extrasReady && (prefs?.showAcademic ?? true);
+  const holidayByDay = byDay(holidayRows, spanFrom, spanTo);
+  const academicByDay = byDay(academicRows, spanFrom, spanTo);
 
   /* ---------------- cuaca ---------------- */
   const weather = settings.adm4Code ? await getWeather(settings.adm4Code) : null;
@@ -173,6 +221,8 @@ export async function buildCalendar(outletId: string, settings: ActivitySettings
     const prime = dayMatches.filter((m) => isPrimeTime(Number(m.localTime.slice(0, 2)))).sort((a, b) => a.localTime.localeCompare(b.localTime));
     next7.push({
       date: d,
+      holidays: showHolidays ? (holidayByDay.get(d) ?? []).map((h) => ({ name: h.name, kind: h.kind })) : [],
+      academic: showAcademic ? (academicByDay.get(d) ?? []).map((a) => ({ kind: a.kind, level: a.level, title: a.title })) : [],
       weather: f ? { date: d, source: "forecast", rainSlots: f.rainSlots, worstRain: f.worstRain, rainHours: f.rainHours, precipTotal: f.precipTotal, tempMin: f.tempMin, tempMax: f.tempMax, sky: f.sky } : null,
       matches: dayMatches.length,
       primeTimeMatches: prime.length,
@@ -182,6 +232,20 @@ export async function buildCalendar(outletId: string, settings: ActivitySettings
   }
 
   const [fStatus, leagues] = await Promise.all([footballStatus(), cachedLeagues()]);
+  const hStatus = prefs && extrasReady ? await holidayStatus(prefs.effectiveCountry) : null;
+
+  // Analisis 90 hari: libur nasional (bila sinkron libur pernah berhasil), libur sekolah & masa ujian
+  // (hanya bila outlet pernah mengisi kegiatan jenis itu di jendela analisis).
+  const flagsFrom = (pred: (d: string) => boolean): Map<string, boolean> => {
+    const m = new Map<string, boolean>();
+    for (let d = analysisFrom; d < today; d = addDays(d, 1)) m.set(d, pred(d));
+    return m;
+  };
+  const holidayFlags = hStatus?.lastSuccessAt ? flagsFrom((d) => (holidayByDay.get(d) ?? []).some((h) => isDayOff(h.kind))) : new Map<string, boolean>();
+  const hasSchoolHoliday = academicRows.some((a) => a.kind === "school_holiday" && a.endDate >= analysisFrom && a.startDate < today);
+  const hasExam = academicRows.some((a) => isExam(a.kind) && a.endDate >= analysisFrom && a.startDate < today);
+  const schoolHolidayFlags = hasSchoolHoliday ? flagsFrom((d) => (academicByDay.get(d) ?? []).some((a) => a.kind === "school_holiday")) : new Map<string, boolean>();
+  const examFlags = hasExam ? flagsFrom((d) => (academicByDay.get(d) ?? []).some((a) => isExam(a.kind))) : new Map<string, boolean>();
 
   return {
     today,
@@ -205,6 +269,19 @@ export async function buildCalendar(outletId: string, settings: ActivitySettings
       leagues: sortLeagues(leagues),
       matches,
     },
+    holidays: {
+      ready: extrasReady,
+      show: showHolidays,
+      country: prefs?.effectiveCountry ?? "ID",
+      status: hStatus,
+      items: showHolidays ? holidayRows.filter((h) => h.date <= toDate && h.endDate >= fromDate) : [],
+    },
+    academic: {
+      ready: extrasReady,
+      show: showAcademic,
+      province: prefs?.province ?? null,
+      items: showAcademic ? academicRows.filter((a) => a.startDate <= toDate && a.endDate >= fromDate) : [],
+    },
     actuals,
     hourly: opts.day && validDate(opts.day) ? { date: opts.day, sessions: await hourlySessions(outletId, opts.day, tz) } : null,
     insights: {
@@ -214,8 +291,14 @@ export async function buildCalendar(outletId: string, settings: ActivitySettings
       matches: next7.reduce((s, d) => s + d.matches, 0),
       primeTimeMatches: next7.reduce((s, d) => s + d.primeTimeMatches, 0),
       historyDays: history.filter((a) => a.sessions > 0 || a.revenue > 0).length,
+      holidayDays: next7.filter((d) => d.holidays.some((h) => isDayOff(h.kind))).length,
+      schoolHolidayDays: next7.filter((d) => d.academic.some((a) => a.kind === "school_holiday")).length,
+      examDays: next7.filter((d) => d.academic.some((a) => isExam(a.kind))).length,
       rain: analyse(rainFlags),
       match: analyse(matchFlags),
+      holiday: analyse(holidayFlags),
+      schoolHoliday: analyse(schoolHolidayFlags),
+      exam: analyse(examFlags),
     },
   };
 }

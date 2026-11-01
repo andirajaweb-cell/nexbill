@@ -9,8 +9,14 @@ import { useDashboardLang, DATE_LOCALE } from "@/lib/i18n/dashboard-lang";
 import { useCurrency } from "@/lib/currency/client";
 import type { DailyActual } from "@/lib/activity-calendar/insights-rules";
 import "@/lib/i18n/dict-activity";
+import "@/lib/i18n/dict-activity-holiday";
 import {
+  ACADEMIC_STYLE,
+  HOLIDAY_STYLE,
   SourceTag,
+  addDays,
+  countryName,
+  isDayOffKind,
   TZ_ABBR,
   WeatherIcon,
   fill,
@@ -19,6 +25,8 @@ import {
   rainLabel,
   rangeFor,
   shiftAnchor,
+  type CalendarAcademic,
+  type CalendarHoliday,
   type CalendarMatch,
   type CalendarResponse,
   type CalendarWeatherDay,
@@ -29,6 +37,19 @@ import {
 import { DayView, MonthView, WeekView, type ViewData } from "./views";
 import { DetailPanel } from "./DetailPanel";
 import { SettingsDialog } from "./SettingsDialog";
+import { AcademicDialog, AcademicSection, draftFrom, emptyDraft, type AcademicDraft } from "./Academic";
+import { AcademicChip } from "./views";
+
+/** Peta tanggal → event untuk event bertanggal mulai–akhir (inklusif), dibatasi [from, to]. */
+function expandByDay<T>(items: T[], startOf: (x: T) => string, endOf: (x: T) => string, from: string, to: string): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const it of items) {
+    let d = startOf(it) < from ? from : startOf(it);
+    const end = endOf(it) > to ? to : endOf(it);
+    for (let i = 0; d <= end && i < 400; i++, d = addDays(d, 1)) map.set(d, [...(map.get(d) ?? []), it]);
+  }
+  return map;
+}
 
 function localToday(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -48,7 +69,8 @@ export default function BusinessCalendarPage() {
   const [view, setView] = useState<View>("month");
   const [anchor, setAnchor] = useState<string>(localToday);
   const [selected, setSelected] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>({ weather: true, matches: true, actual: true, rainOnly: false, leagues: [] });
+  const [filters, setFilters] = useState<Filters>({ weather: true, matches: true, actual: true, rainOnly: false, holidays: true, academic: true, leagues: [] });
+  const [academicDraft, setAcademicDraft] = useState<AcademicDraft | null>(null);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -80,10 +102,10 @@ export default function BusinessCalendarPage() {
   // Server memperbarui data basi di latar belakang — muat ulang sekali setelah ±12 detik.
   const data = state.kind === "ready" ? state.data : null;
   useEffect(() => {
-    if (!data?.refreshing?.weather && !data?.refreshing?.football) return;
+    if (!data?.refreshing?.weather && !data?.refreshing?.football && !data?.refreshing?.holidays) return;
     const h = window.setTimeout(() => setReloadKey((k) => k + 1), 12_000);
     return () => window.clearTimeout(h);
-  }, [data?.refreshing?.weather, data?.refreshing?.football]);
+  }, [data?.refreshing?.weather, data?.refreshing?.football, data?.refreshing?.holidays]);
 
   const viewData: ViewData | null = useMemo(() => {
     if (!data) return null;
@@ -106,6 +128,8 @@ export default function BusinessCalendarPage() {
       matchesByDate,
       actualByDate: new Map<string, DailyActual>(data.actuals.map((a) => [a.date, a])),
       predictionByDate: new Map(data.insights.next7.map((d) => [d.date, d])),
+      holidaysByDate: expandByDay<CalendarHoliday>(data.holidays?.items ?? [], (h) => h.date, (h) => h.endDate, data.range.from, data.range.to),
+      academicByDate: expandByDay<CalendarAcademic>(data.academic?.items ?? [], (a) => a.startDate, (a) => a.endDate, data.range.from, data.range.to),
       hourly: data.hourly?.date === (view === "day" ? anchor : selected) ? data.hourly.sessions : null,
     };
   }, [data, filters.leagues, view, anchor, selected]);
@@ -117,7 +141,7 @@ export default function BusinessCalendarPage() {
       const res = await fetch("/api/activity-calendar/refresh", { method: "POST" });
       const d = await res.json().catch(() => null);
       if (!res.ok) setNotice(d?.error ?? t("act.loadError", "Gagal memuat kalender."));
-      else if (d?.weather === "recent" || d?.football === "recent") setNotice(t("act.refreshRecent", "Baru saja diperbarui — coba lagi dalam 15 menit."));
+      else if (d?.weather === "recent" || d?.football === "recent" || d?.holidays === "recent") setNotice(t("act.refreshRecent", "Baru saja diperbarui — coba lagi dalam 15 menit."));
       else setNotice(t("act.refreshDone", "Data diperbarui."));
       setReloadKey((k) => k + 1);
     } finally {
@@ -144,7 +168,7 @@ export default function BusinessCalendarPage() {
     <div className="space-y-5">
       <PageHeader
         title={t("act.title", "Kalender Bisnis")}
-        subtitle={t("act.subtitle", "Prakiraan cuaca BMKG dan jadwal sepak bola dalam satu kalender — untuk mengantisipasi hari sepi dan ramai.")}
+        subtitle={t("act.subtitle2", "Prakiraan cuaca BMKG, jadwal sepak bola, libur nasional, dan kalender akademik dalam satu kalender — untuk mengantisipasi hari sepi dan ramai.")}
         actions={
           <>
             {data?.canEdit && (
@@ -220,6 +244,8 @@ export default function BusinessCalendarPage() {
                 <Toggle on={filters.matches} onClick={() => setFilters((f) => ({ ...f, matches: !f.matches }))} label={t("act.filter.matches", "Pertandingan")} />
                 <Toggle on={filters.actual} onClick={() => setFilters((f) => ({ ...f, actual: !f.actual }))} label={t("act.filter.actual", "Transaksi aktual")} />
                 <Toggle on={filters.rainOnly} onClick={() => setFilters((f) => ({ ...f, rainOnly: !f.rainOnly }))} label={t("act.filter.rainOnly", "Hanya hari hujan")} />
+                {data.holidays?.show && <Toggle on={filters.holidays} onClick={() => setFilters((f) => ({ ...f, holidays: !f.holidays }))} label={t("act.filter.holidays", "Libur nasional")} tone="rose" />}
+                {data.academic?.show && <Toggle on={filters.academic} onClick={() => setFilters((f) => ({ ...f, academic: !f.academic }))} label={t("act.filter.academic", "Kalender akademik")} tone="amber" />}
                 {filters.matches && leagueChips.length > 1 && (
                   <>
                     <span className="mx-1 h-4 w-px bg-white/10" />
@@ -245,9 +271,24 @@ export default function BusinessCalendarPage() {
             </Card>
 
             <Card className="h-fit p-4 xl:sticky xl:top-4">
-              <DetailPanel date={view === "day" ? anchor : selected} data={viewData} t={t} locale={locale} lang={lang} tzAbbr={tzAbbr} money={formatMoney} onClose={() => setSelected(null)} />
+              <DetailPanel
+                date={view === "day" ? anchor : selected}
+                data={viewData}
+                t={t}
+                locale={locale}
+                lang={lang}
+                tzAbbr={tzAbbr}
+                money={formatMoney}
+                onClose={() => setSelected(null)}
+                showExtras={!!data.holidays?.ready}
+                canEditAcademic={!!data.academic?.ready && data.canEdit}
+                onAddAcademic={(d) => setAcademicDraft(emptyDraft(d))}
+                onEditAcademic={(a) => setAcademicDraft(draftFrom(a))}
+              />
             </Card>
           </div>
+
+          {data.academic?.ready && <AcademicSection t={t} locale={locale} reloadKey={reloadKey} onAdd={() => setAcademicDraft(emptyDraft(selected ?? data.today))} onEdit={(a) => setAcademicDraft(draftFrom(a))} />}
 
           <AnalysisSection data={data} t={t} />
 
@@ -257,8 +298,22 @@ export default function BusinessCalendarPage() {
             {t("act.attrBmkg", "Sumber data cuaca: BMKG (Badan Meteorologi, Klimatologi, dan Geofisika)")}
             {data.settings.showMatches && data.football.status.indonesianLeague && <> · {t("act.attrLib", "Jadwal liga Indonesia: situs resmi PT Liga Indonesia Baru")}</>}
             {data.football.status.attributionRequired && <> · {t("act.attrFootball", "Data pertandingan: Footballdata.io")}</>}
+            {data.holidays?.show && <> · {t("act.attrHolidays", "Libur nasional: Google Calendar")}</>}
           </p>
         </>
+      )}
+
+      {academicDraft && (
+        <AcademicDialog
+          draft={academicDraft}
+          t={t}
+          onClose={() => setAcademicDraft(null)}
+          onSaved={() => {
+            setAcademicDraft(null);
+            setNotice(t("act.acad.saved", "Kalender akademik disimpan."));
+            setReloadKey((k) => k + 1);
+          }}
+        />
       )}
 
       {settingsOpen && (
@@ -278,7 +333,14 @@ export default function BusinessCalendarPage() {
 
 /* ================================================================ bagian kecil ================================================================ */
 
-function Toggle({ on, onClick, label, tone = "cyan" }: { on: boolean; onClick: () => void; label: string; tone?: "cyan" | "lime" }) {
+const TOGGLE_ON: Record<string, string> = {
+  cyan: "border-cyan-400/50 bg-cyan-500/15 text-cyan-100",
+  lime: "border-lime-400/50 bg-lime-400/15 text-lime-100",
+  rose: "border-rose-400/50 bg-rose-500/15 text-rose-100",
+  amber: "border-amber-400/50 bg-amber-500/15 text-amber-100",
+};
+
+function Toggle({ on, onClick, label, tone = "cyan" }: { on: boolean; onClick: () => void; label: string; tone?: "cyan" | "lime" | "rose" | "amber" }) {
   return (
     <button
       type="button"
@@ -286,7 +348,7 @@ function Toggle({ on, onClick, label, tone = "cyan" }: { on: boolean; onClick: (
       aria-pressed={on}
       className={clsx(
         "rounded-full border px-2.5 py-1 text-xs transition",
-        on ? (tone === "lime" ? "border-lime-400/50 bg-lime-400/15 text-lime-100" : "border-cyan-400/50 bg-cyan-500/15 text-cyan-100") : "border-white/10 text-neutral-400 hover:bg-white/5"
+        on ? TOGGLE_ON[tone] : "border-white/10 text-neutral-400 hover:bg-white/5"
       )}
     >
       {label}
@@ -343,6 +405,7 @@ function StatusBar({ data, t, locale, tz, tzAbbr, onSetup }: { data: CalendarRes
         )}
         {fb.lastSuccessAt && <span>{fill(t("act.matchesSynced", "Jadwal diperbarui {time}"), { time: fmtDateTime(fb.lastSuccessAt, locale, tz) })}</span>}
       </div>
+      <HolidayStatus data={data} t={t} locale={locale} tz={tz} />
       {(w.error || w.stale) && (
         <Alert>
           {w.error ? fill(t("act.weatherError", "Cuaca: {msg}"), { msg: w.error }) : t("act.staleWarn", "Data cuaca lebih dari 12 jam — sedang dicoba diperbarui otomatis.")}
@@ -361,6 +424,26 @@ function StatusBar({ data, t, locale, tz, tzAbbr, onSetup }: { data: CalendarRes
   );
 }
 
+function HolidayStatus({ data, t, locale, tz }: { data: CalendarResponse; t: (k: string, f: string) => string; locale: string; tz: string }) {
+  const h = data.holidays;
+  if (!h) return null;
+  if (!h.ready) return <Alert tone="info">{t("act.hol.migration", "Libur nasional & kalender akademik aktif setelah pembaruan database (migrasi 0040). Hubungi tim NEXBILL.")}</Alert>;
+  if (!h.show) return null;
+  const st = h.status;
+  const name = countryName(h.country, t);
+  if (st?.lastSuccessAt) {
+    return (
+      <p className="flex flex-wrap items-center gap-1.5 text-xs text-neutral-400">
+        <PartyPopper size={13} className="text-rose-300" />
+        {fill(t("act.hol.synced", "Libur nasional {country} diperbarui {time}"), { country: name, time: fmtDateTime(st.lastSuccessAt, locale, tz) })}
+        {st.lastError && <span className="text-amber-200">· {t("act.hol.lastFailed", "pembaruan terakhir gagal, data lama tetap dipakai")}</span>}
+      </p>
+    );
+  }
+  if (st?.lastError) return <Alert>{fill(t("act.hol.error", "Libur nasional {country} belum bisa diambil: {msg}"), { country: name, msg: st.lastError })}</Alert>;
+  return <Alert tone="info">{fill(t("act.hol.pending", "Libur nasional {country} sedang diambil dari Google Calendar…"), { country: name })}</Alert>;
+}
+
 function Alert({ children, tone = "warn" }: { children: React.ReactNode; tone?: "warn" | "info" }) {
   return (
     <div className={clsx("flex items-start gap-2 rounded-xl border px-3 py-2 text-xs", tone === "warn" ? "border-amber-400/30 bg-amber-500/[0.08] text-amber-100" : "border-white/10 bg-white/[0.03] text-neutral-300")}>
@@ -374,9 +457,17 @@ function InsightsSection({ data, t, locale, money, onSelect }: { data: CalendarR
   const ins = data.insights;
   return (
     <section className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={<CloudRain size={18} className="text-sky-300" />} label={t("act.ins.rainyDays", "Hari berpotensi hujan")} value={ins.forecastDays ? fill(t("act.ins.rainyValue", "{n} dari {m} hari berprakiraan"), { n: ins.rainyDays, m: ins.forecastDays }) : t("act.ins.noForecast", "Belum ada prakiraan")} tag={<SourceTag kind="forecast" t={t} />} />
         <Stat icon={<Trophy size={18} className="text-lime-300" />} label={t("act.ins.matches", "Pertandingan liga pilihan")} value={fill(t("act.ins.matchesValue", "{n} laga · {p} di jam 15.00–23.59"), { n: ins.matches, p: ins.primeTimeMatches })} tag={<SourceTag kind="schedule" t={t} />} />
+        {(data.holidays?.show || data.academic?.show) && (
+          <Stat
+            icon={<PartyPopper size={18} className="text-rose-300" />}
+            label={t("act.ins.holidays", "Libur & ujian 7 hari ke depan")}
+            value={fill(t("act.ins.holidaysValue", "{h} hari libur · {s} libur sekolah · {e} hari ujian"), { h: ins.holidayDays ?? 0, s: ins.schoolHolidayDays ?? 0, e: ins.examDays ?? 0 })}
+            tag={<SourceTag kind="schedule" t={t} />}
+          />
+        )}
         <Stat icon={<TrendingUp size={18} className="text-emerald-300" />} label={t("act.ins.history", "Riwayat transaksi untuk prediksi")} value={fill(t("act.ins.historyValue", "{n} hari buka dalam 90 hari"), { n: ins.historyDays })} tag={<SourceTag kind="actual" t={t} />} />
       </div>
 
@@ -393,7 +484,11 @@ function InsightsSection({ data, t, locale, money, onSelect }: { data: CalendarR
               onClick={() => onSelect(d.date)}
               className={clsx(
                 "min-w-[150px] flex-1 snap-start rounded-xl border p-3 text-left transition hover:border-cyan-400/40",
-                d.weather && d.weather.rainSlots > 0 ? "border-sky-400/25 bg-sky-500/[0.06]" : "border-white/[0.07] bg-white/[0.02]"
+                (d.holidays ?? []).some((h) => isDayOffKind(h.kind))
+                  ? "border-rose-400/30 bg-rose-500/[0.07]"
+                  : d.weather && d.weather.rainSlots > 0
+                    ? "border-sky-400/25 bg-sky-500/[0.06]"
+                    : "border-white/[0.07] bg-white/[0.02]"
               )}
             >
               <div className="flex items-center justify-between">
@@ -401,6 +496,18 @@ function InsightsSection({ data, t, locale, money, onSelect }: { data: CalendarR
                 {d.weather && <WeatherIcon sky={d.weather.sky} rain={d.weather.worstRain} size={18} />}
               </div>
               <div className="mt-1 text-[11px] text-neutral-400">{d.weather ? rainLabel(d.weather.worstRain, t) : t("act.ins.noForecast", "Belum ada prakiraan")}</div>
+              {(d.holidays ?? []).map((h, i) => (
+                <div key={i} className={clsx("mt-1 truncate rounded-md border px-1 py-px text-[10px]", HOLIDAY_STYLE[h.kind] ?? HOLIDAY_STYLE.other)} title={h.name}>
+                  {h.name}
+                </div>
+              ))}
+              {(d.academic ?? []).length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-0.5">
+                  {(d.academic ?? []).slice(0, 3).map((a, i) => (
+                    <AcademicChip key={i} a={{ id: String(i), level: a.level, kind: a.kind, title: a.title, startDate: d.date, endDate: d.date, province: null, note: null, createdBy: null, updatedAt: "" }} t={t} compact />
+                  ))}
+                </div>
+              )}
               <div className="mt-1 text-[11px] text-lime-200">
                 {d.matches > 0 ? `${fill(t("act.day.matches", "{n} laga"), { n: d.matches })}${d.firstPrimeKickoff ? ` · ${fill(t("act.ins.kickoff", "Kick-off {time}"), { time: d.firstPrimeKickoff })}` : ""}` : <span className="text-neutral-500">{t("act.ins.noMatch", "Tanpa laga")}</span>}
               </div>
@@ -435,6 +542,15 @@ function AnalysisSection({ data, t }: { data: CalendarResponse; t: (k: string, f
   const blocks = [
     { key: "rain", title: t("act.an.rain", "Hari dengan prakiraan hujan di jam buka (09.00–23.59)"), block: data.insights.rain, icon: <CloudRain size={15} className="text-sky-300" /> },
     { key: "match", title: t("act.an.match", "Hari dengan pertandingan jam 15.00–23.59"), block: data.insights.match, icon: <Trophy size={15} className="text-lime-300" /> },
+    ...(data.insights.holiday && data.insights.holiday.coveredDays > 0
+      ? [{ key: "holiday", title: t("act.an.holiday", "Libur nasional & cuti bersama"), block: data.insights.holiday, icon: <PartyPopper size={15} className="text-rose-300" /> }]
+      : []),
+    ...(data.insights.schoolHoliday && data.insights.schoolHoliday.coveredDays > 0
+      ? [{ key: "schoolHoliday", title: t("act.an.schoolHoliday", "Libur sekolah/kuliah (diisi outlet)"), block: data.insights.schoolHoliday, icon: <GraduationCap size={15} className="text-emerald-300" /> }]
+      : []),
+    ...(data.insights.exam && data.insights.exam.coveredDays > 0
+      ? [{ key: "exam", title: t("act.an.exam", "Masa UTS/UAS (diisi outlet)"), block: data.insights.exam, icon: <GraduationCap size={15} className="text-amber-300" /> }]
+      : []),
   ];
   return (
     <Card className="space-y-4 p-4">
@@ -504,6 +620,13 @@ function Legend({ t }: { t: (k: string, f: string) => string }) {
         <Trophy size={12} className="text-lime-300" /> {t("act.legend.prime", "Laga jam 15.00–23.59")}
       </span>
       <span className="flex items-center gap-1.5">
+        <span className={clsx("rounded border px-1 text-[10px]", HOLIDAY_STYLE.public)}>{t("act.legend.holidayChip", "Libur")}</span> {t("act.legend.holiday", "Libur nasional / cuti bersama")}
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className={clsx("rounded border px-1 text-[10px]", ACADEMIC_STYLE.midterm)}>{t("act.acad.short.midterm", "UTS")}</span>
+        <span className={clsx("rounded border px-1 text-[10px]", ACADEMIC_STYLE.school_holiday)}>{t("act.acad.short.holiday", "Libur")}</span> {t("act.legend.academic", "Kalender akademik (diisi outlet)")}
+      </span>
+      <span className="flex items-center gap-1.5">
         <span className="rounded bg-emerald-500/20 px-1 text-emerald-200">12</span> {t("act.legend.actual", "Aktual (transaksi)")}
       </span>
       <span className="flex items-center gap-1.5">
@@ -516,8 +639,7 @@ function Legend({ t }: { t: (k: string, f: string) => string }) {
 /** Fitur yang sedang disiapkan — ditampilkan jujur sebagai "Segera", tidak bisa diklik. */
 function ComingSoon({ t }: { t: (k: string, f: string) => string }) {
   const items = [
-    { icon: <PartyPopper size={16} className="text-rose-300" />, title: t("act.soon.holiday.t", "Hari libur nasional & sekolah"), desc: t("act.soon.holiday.d", "Tanggal merah, cuti bersama, dan libur sekolah langsung tampil di Kalender Bisnis.") },
-    { icon: <GraduationCap size={16} className="text-amber-300" />, title: t("act.soon.exam.t", "Kalender akademik: UTS & UAS"), desc: t("act.soon.exam.d", "Periode ujian tengah semester dan akhir semester — waktu pelajar biasanya lebih jarang main.") },
+    { icon: <GraduationCap size={16} className="text-amber-300" />, title: t("act.soon.academicAuto.t", "Kalender akademik otomatis per provinsi"), desc: t("act.soon.academicAuto.d", "Libur sekolah, UTS, dan UAS terisi otomatis dari kalender pendidikan provinsi — tidak perlu diisi manual.") },
     { icon: <Sparkles size={16} className="text-fuchsia-300" />, title: t("act.soon.ai.t", "Rekomendasi strategi AI (Pro)"), desc: t("act.soon.ai.d", "Saran promo dan jadwal staf saat libur, hujan, atau ada pertandingan besar.") },
     { icon: <Trophy size={16} className="text-lime-300" />, title: t("act.soon.club.t", "Klub sepak bola favorit per daerah"), desc: t("act.soon.club.d", "Jadwal klub yang paling banyak ditonton di daerah outlet Anda, otomatis.") },
     { icon: <Camera size={16} className="text-sky-300" />, title: t("act.soon.cctv.t", "Sistem CCTV"), desc: t("act.soon.cctv.d", "Pantau kamera outlet dari dashboard yang sama.") },
@@ -528,7 +650,7 @@ function ComingSoon({ t }: { t: (k: string, f: string) => string }) {
         <h3 className="text-sm font-semibold text-neutral-100">{t("act.soon.title", "Segera hadir di Kalender Bisnis")}</h3>
         <span className="text-[11px] text-neutral-500">{t("act.soon.lead", "Sedang kami siapkan — belum aktif.")}</span>
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {items.map((it) => (
           <div key={it.title} aria-disabled="true" className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-3">
             <div className="flex items-center justify-between gap-2">

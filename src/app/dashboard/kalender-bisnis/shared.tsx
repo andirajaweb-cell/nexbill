@@ -1,6 +1,7 @@
 "use client";
 import { Cloud, CloudFog, CloudLightning, CloudRain, CloudSun, Haze, Sun } from "lucide-react";
-import type { CalendarPayload, CalendarMatch, CalendarWeatherDay } from "@/lib/activity-calendar/calendar";
+import type { CalendarAcademic, CalendarHoliday, CalendarPayload, CalendarMatch, CalendarWeatherDay } from "@/lib/activity-calendar/calendar";
+import type { CalendarPrefs } from "@/lib/activity-calendar/academic";
 import type { WeatherSlot } from "@/lib/activity-calendar/bmkg-rules";
 import type { ActivitySettings } from "@/lib/activity-calendar/data";
 
@@ -11,16 +12,19 @@ export type CalendarResponse = CalendarPayload & {
   migration: boolean;
   settings: ActivitySettings;
   canEdit: boolean;
-  refreshing: { weather: boolean; football: boolean };
+  refreshing: { weather: boolean; football: boolean; holidays?: boolean };
+  prefs?: CalendarPrefs;
 };
 
-export type { CalendarMatch, CalendarWeatherDay, WeatherSlot };
+export type { CalendarAcademic, CalendarHoliday, CalendarMatch, CalendarWeatherDay, WeatherSlot };
 
 export interface Filters {
   weather: boolean;
   matches: boolean;
   actual: boolean;
   rainOnly: boolean;
+  holidays: boolean;
+  academic: boolean;
   leagues: string[];
 }
 
@@ -204,4 +208,97 @@ export function SourceTag({ kind, t }: { kind: "forecast" | "archive" | "actual"
   } as const;
   const [k, fb, cls] = map[kind];
   return <span className={`inline-flex shrink-0 rounded-full border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide ${cls}`}>{t(k, fb)}</span>;
+}
+
+/* ---------------------------------------------- libur nasional & kalender akademik ---------------------------------------------- */
+
+/** Libur yang benar-benar meliburkan (sama dengan holiday-rules.isDayOff — tanpa impor modul server). */
+export const isDayOffKind = (kind: string) => kind === "public" || kind === "joint_leave";
+export const isExamKind = (kind: string) => kind === "midterm" || kind === "final_exam";
+
+export function holidayKindLabel(kind: string, t: TFn): string {
+  switch (kind) {
+    case "public":
+      return t("act.hol.kind.public", "Libur nasional");
+    case "joint_leave":
+      return t("act.hol.kind.joint", "Cuti bersama");
+    case "observance":
+      return t("act.hol.kind.observance", "Hari peringatan (bukan libur)");
+    default:
+      return t("act.hol.kind.other", "Hari khusus");
+  }
+}
+
+export const HOLIDAY_STYLE: Record<string, string> = {
+  public: "border-rose-400/40 bg-rose-500/15 text-rose-100",
+  joint_leave: "border-orange-400/40 bg-orange-500/15 text-orange-100",
+  observance: "border-white/15 bg-white/[0.04] text-neutral-300",
+  other: "border-white/15 bg-white/[0.04] text-neutral-300",
+};
+
+export const ACADEMIC_STYLE: Record<string, string> = {
+  school_holiday: "border-emerald-400/40 bg-emerald-500/15 text-emerald-100",
+  midterm: "border-amber-400/40 bg-amber-500/15 text-amber-100",
+  final_exam: "border-amber-400/50 bg-amber-500/20 text-amber-50",
+  other: "border-indigo-400/40 bg-indigo-500/15 text-indigo-100",
+};
+
+export function academicKindLabel(kind: string, t: TFn): string {
+  switch (kind) {
+    case "school_holiday":
+      return t("act.acad.kind.holiday", "Libur sekolah/kuliah");
+    case "midterm":
+      return t("act.acad.kind.midterm", "UTS (tengah semester)");
+    case "final_exam":
+      return t("act.acad.kind.final", "UAS (akhir semester)");
+    default:
+      return t("act.acad.kind.other", "Kegiatan akademik lain");
+  }
+}
+
+/** Label pendek untuk sel kalender: "UTS", "UAS", "Libur". */
+export function academicShort(kind: string, t: TFn): string {
+  switch (kind) {
+    case "school_holiday":
+      return t("act.acad.short.holiday", "Libur");
+    case "midterm":
+      return t("act.acad.short.midterm", "UTS");
+    case "final_exam":
+      return t("act.acad.short.final", "UAS");
+    default:
+      return t("act.acad.short.other", "Akademik");
+  }
+}
+
+export function academicLevelLabel(level: string, t: TFn): string {
+  switch (level) {
+    case "sd":
+      return t("act.acad.level.sd", "SD");
+    case "smp":
+      return t("act.acad.level.smp", "SMP");
+    case "sma":
+      return t("act.acad.level.sma", "SMA/SMK");
+    case "kuliah":
+      return t("act.acad.level.kuliah", "Kuliah");
+    default:
+      return t("act.acad.level.all", "Semua jenjang");
+  }
+}
+
+export function countryName(code: string, t: TFn): string {
+  const names: Record<string, [string, string]> = {
+    ID: ["act.country.ID", "Indonesia"],
+    MY: ["act.country.MY", "Malaysia"],
+    SG: ["act.country.SG", "Singapura"],
+    TH: ["act.country.TH", "Thailand"],
+    PH: ["act.country.PH", "Filipina"],
+    VN: ["act.country.VN", "Vietnam"],
+    BN: ["act.country.BN", "Brunei"],
+    KH: ["act.country.KH", "Kamboja"],
+    LA: ["act.country.LA", "Laos"],
+    MM: ["act.country.MM", "Myanmar"],
+    TL: ["act.country.TL", "Timor Leste"],
+  };
+  const n = names[code];
+  return n ? t(n[0], n[1]) : code;
 }
