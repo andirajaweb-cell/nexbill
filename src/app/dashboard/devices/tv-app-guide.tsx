@@ -188,6 +188,7 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
           <li>{t("devices.guide.tvMenu.c2", "Tambah waktu — 15 menit sampai 2 jam untuk sesi berdurasi.")}</li>
           <li>{t("devices.guide.tvMenu.c3", "Akhiri sesi sekarang — argo berhenti, layar game terkunci, pelanggan bayar di kasir.")}</li>
           <li>{t("devices.guide.tvMenu.c4", "Status sinkron — aksi dari TV yang belum/gagal terkirim ke dashboard.")}</li>
+          <li>{t("devices.guide.tvMenu.c5", "Riwayat sesi — sesi per hari, minggu, bulan dan status terkirim ke dashboard.")}</li>
         </ul>
         <div className="text-neutral-300 font-medium">{t("devices.guide.tvMenu.staffTitle", "Menu staf (Pengaturan TV)")}</div>
         <ul className="list-disc pl-4 space-y-1">

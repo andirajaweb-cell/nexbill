@@ -73,6 +73,11 @@ final class SyncEngine {
                 JSONObject resp = new JSONObject(r.body);
                 JSONArray results = resp.optJSONArray("results");
                 Set<String> done = new HashSet<>();
+                Map<String, String> sessionOf = new java.util.HashMap<>();
+                for (int i = 0; i < q.length(); i++) {
+                    JSONObject a = q.optJSONObject(i);
+                    if (a != null) sessionOf.put(a.optString("id"), a.optString("sessionId"));
+                }
                 for (int i = 0; results != null && i < results.length(); i++) {
                     JSONObject res = results.optJSONObject(i);
                     if (res == null) continue;
@@ -85,6 +90,13 @@ final class SyncEngine {
                 if (!done.isEmpty()) {
                     ackedTotal += done.size();
                     StateRepo.markActionsAcked();
+                    // Riwayat sesi: tandai "terkirim" untuk sesi yang semua aksinya sudah diterima dashboard.
+                    Set<String> sessions = new HashSet<>();
+                    for (String id : done) {
+                        String sid = sessionOf.get(id);
+                        if (sid != null && !sid.isEmpty()) sessions.add(sid);
+                    }
+                    LocalStore.historyMarkSent(c, sessions);
                 }
                 JSONArray evResults = resp.optJSONArray("events");
                 Set<String> evDone = new HashSet<>();

@@ -317,11 +317,15 @@ final class LocalStore {
     static synchronized void dropFailed(Context c) {
         JSONArray q = queue(c);
         JSONArray out = new JSONArray();
+        java.util.Set<String> droppedSessions = new java.util.HashSet<>();
         for (int i = 0; i < q.length(); i++) {
             JSONObject a = q.optJSONObject(i);
-            if (a != null && a.optInt("attempts", 0) < MAX_ATTEMPTS) out.put(a);
+            if (a == null) continue;
+            if (a.optInt("attempts", 0) < MAX_ATTEMPTS) out.put(a);
+            else droppedSessions.add(a.optString("sessionId", ""));
         }
         saveQueue(c, out);
+        historyMarkDropped(c, droppedSessions);
     }
 
     /** Coba lagi aksi yang sudah melewati batas (mis. setelah owner memperbaiki di dashboard). */
@@ -361,6 +365,240 @@ final class LocalStore {
 
     static String lastSyncError(Context c) {
         return p(c).getString(K_LAST_SYNC_ERROR, "");
+    }
+
+    /* ---------------- riwayat sesi (ditampilkan di panel kasir) ---------------- */
+
+    private static final String K_HISTORY = "session_history";
+    /** Riwayat disimpan sekian hari (cukup untuk "Bulan lalu") dan paling banyak sekian baris. */
+    static final int HISTORY_DAYS = 62;
+    private static final int HISTORY_MAX = 1000;
+
+    /**
+     * Satu baris riwayat sesi unit layar ini. source "tv" = dimulai dari TV; "dashboard" = dimulai dari
+     * dashboard dan terlihat oleh TV (status server). tvActions = ada aksi dari TV (mulai/tambah/akhiri)
+     * yang harus dikirim ke dashboard — status kirimnya dihitung dari antrean (lihat historyState).
+     */
+    static final class HistoryEntry {
+        String sessionId;
+        String source;
+        long startAt;
+        /** 0 = masih berjalan. */
+        long endAt;
+        int plannedMinutes;
+        int extendedMinutes;
+        String label;
+        long priceEstimate;
+        long ratePerHour;
+        boolean tvActions;
+        /** Jam (server) saat aksi terakhir sesi ini diterima dashboard; 0 = belum/tidak perlu. */
+        long sentAt;
+        /** Aksi yang ditolak lalu dihapus dari TV — sesi ini tidak pernah sampai ke dashboard. */
+        boolean dropped;
+        String outletName;
+        String unitName;
+
+        JSONObject toJson() throws Exception {
+            return new JSONObject().put("sessionId", sessionId).put("source", source).put("startAt", startAt).put("endAt", endAt)
+                    .put("plannedMinutes", plannedMinutes).put("extendedMinutes", extendedMinutes).put("label", label == null ? "" : label)
+                    .put("priceEstimate", priceEstimate).put("ratePerHour", ratePerHour).put("tvActions", tvActions).put("sentAt", sentAt)
+                    .put("dropped", dropped).put("outletName", outletName == null ? "" : outletName).put("unitName", unitName == null ? "" : unitName);
+        }
+
+        static HistoryEntry fromJson(JSONObject o) {
+            HistoryEntry e = new HistoryEntry();
+            e.sessionId = o.optString("sessionId", "");
+            e.source = o.optString("source", "tv");
+            e.startAt = o.optLong("startAt", 0L);
+            e.endAt = o.optLong("endAt", 0L);
+            e.plannedMinutes = o.optInt("plannedMinutes", 0);
+            e.extendedMinutes = o.optInt("extendedMinutes", 0);
+            e.label = o.optString("label", "");
+            e.priceEstimate = o.optLong("priceEstimate", 0L);
+            e.ratePerHour = o.optLong("ratePerHour", 0L);
+            e.tvActions = o.optBoolean("tvActions", false);
+            e.sentAt = o.optLong("sentAt", 0L);
+            e.dropped = o.optBoolean("dropped", false);
+            e.outletName = o.optString("outletName", "");
+            e.unitName = o.optString("unitName", "");
+            return e;
+        }
+
+        /** Lama main (menit) sampai endAt, atau sampai "now" bila masih berjalan. */
+        long minutes(long now) {
+            long end = endAt > 0 ? endAt : now;
+            return Math.max(0, (end - startAt) / 60_000L);
+        }
+
+        /** Perkiraan tagihan (bukan nilai final kasir): harga paket/durasi + tambahan waktu, atau tarif × lama main. */
+        long estimate(long now) {
+            if (priceEstimate > 0) return priceEstimate + Math.round(ratePerHour * extendedMinutes / 60.0);
+            return Math.round(ratePerHour * minutes(now) / 60.0);
+        }
+    }
+
+    static synchronized java.util.List<HistoryEntry> history(Context c) {
+        java.util.List<HistoryEntry> out = new java.util.ArrayList<>();
+        try {
+            JSONArray a = new JSONArray(p(c).getString(K_HISTORY, "[]"));
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.optJSONObject(i);
+                if (o != null) out.add(HistoryEntry.fromJson(o));
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    private static void saveHistory(Context c, java.util.List<HistoryEntry> list) {
+        long cutoff = serverNow(c) - HISTORY_DAYS * 86_400_000L;
+        JSONArray a = new JSONArray();
+        int skip = Math.max(0, list.size() - HISTORY_MAX);
+        for (int i = skip; i < list.size(); i++) {
+            HistoryEntry e = list.get(i);
+            if (e.startAt < cutoff && (e.endAt > 0 || e.startAt <= 0)) continue;
+            try {
+                a.put(e.toJson());
+            } catch (Exception ignored) {
+            }
+        }
+        p(c).edit().putString(K_HISTORY, a.toString()).apply();
+    }
+
+    private static HistoryEntry find(java.util.List<HistoryEntry> list, String sessionId) {
+        for (HistoryEntry e : list) if (e.sessionId.equals(sessionId)) return e;
+        return null;
+    }
+
+    private static void stampPlace(Context c, HistoryEntry e) {
+        JSONObject cat = catalog(c);
+        TvState s = StateRepo.state();
+        if (e.outletName == null || e.outletName.isEmpty()) {
+            e.outletName = s != null && s.outletName != null && !s.outletName.isEmpty() ? s.outletName : cat != null ? cat.optString("outletName", "") : "";
+        }
+        if (e.unitName == null || e.unitName.isEmpty()) {
+            JSONObject unit = cat != null ? cat.optJSONObject("unit") : null;
+            e.unitName = s != null && s.unitName != null && !s.unitName.isEmpty() ? s.unitName : unit != null ? unit.optString("name", "") : "";
+        }
+        if (e.ratePerHour <= 0) {
+            JSONObject unit = cat != null ? cat.optJSONObject("unit") : null;
+            e.ratePerHour = unit != null ? unit.optLong("ratePerHour", 0L) : 0L;
+        }
+    }
+
+    /**
+     * Mencatat/memperbarui riwayat dari sesi yang diatur di TV (mulai, tambah waktu, akhiri, habis).
+     * endAt 0 = sesi masih berjalan.
+     */
+    static synchronized void historyFromSession(Context c, Session l, String sourceIfNew, long endAt) {
+        if (l == null || l.sessionId == null || l.sessionId.isEmpty()) return;
+        java.util.List<HistoryEntry> list = history(c);
+        HistoryEntry e = find(list, l.sessionId);
+        if (e == null) {
+            e = new HistoryEntry();
+            e.sessionId = l.sessionId;
+            e.source = sourceIfNew;
+            e.startAt = l.startAt;
+            list.add(e);
+        }
+        if (e.startAt <= 0) e.startAt = l.startAt;
+        e.plannedMinutes = Math.max(e.plannedMinutes, l.plannedMinutes);
+        e.extendedMinutes = Math.max(e.extendedMinutes, l.extendedMinutes);
+        if (l.label != null && !l.label.isEmpty()) e.label = l.label;
+        if (l.priceEstimate > 0) e.priceEstimate = l.priceEstimate;
+        if (endAt > 0) e.endAt = endAt;
+        e.tvActions = true;
+        stampPlace(c, e);
+        saveHistory(c, list);
+    }
+
+    /**
+     * Sesi yang terlihat di status server (termasuk yang dimulai dari dashboard). Sesi berjalan yang tidak
+     * lagi dilaporkan server — dan bukan sesi lokal yang sedang berjalan di TV — dicatat selesai.
+     */
+    static synchronized void observeServerState(Context c, TvState st) {
+        if (st == null) return;
+        long now = serverNow(c);
+        java.util.List<HistoryEntry> list = history(c);
+        boolean changed = false;
+        String current = st.sessionId != null && !st.sessionId.isEmpty() && st.inSession() ? st.sessionId : null;
+        if (current != null) {
+            HistoryEntry e = find(list, current);
+            long elapsed = st.elapsedSeconds == null ? 0 : st.elapsedSeconds;
+            if (e == null) {
+                e = new HistoryEntry();
+                e.sessionId = current;
+                e.source = "dashboard";
+                e.startAt = now - elapsed * 1000L;
+                list.add(e);
+                stampPlace(c, e);
+                changed = true;
+            }
+            if ("dashboard".equals(e.source) && st.remainingSeconds != null) {
+                int planned = (int) Math.round((elapsed + st.remainingSeconds) / 60.0);
+                if (planned != e.plannedMinutes + e.extendedMinutes && planned > 0) {
+                    e.plannedMinutes = planned - e.extendedMinutes;
+                    changed = true;
+                }
+            }
+            if (e.endAt > 0 && e.endAt < now - 60_000L) {
+                // Dibuka kembali di dashboard (mis. sinkron offline) → berjalan lagi.
+                e.endAt = 0;
+                changed = true;
+            }
+        }
+        Session local = session(c);
+        String localRunning = local != null && !local.ended ? local.sessionId : null;
+        for (HistoryEntry e : list) {
+            if (e.endAt > 0 || e.sessionId.equals(current) || e.sessionId.equals(localRunning)) continue;
+            if (hasPendingFor(c, e.sessionId)) continue;
+            e.endAt = now;
+            changed = true;
+        }
+        if (changed) saveHistory(c, list);
+    }
+
+    /** Dipanggil SyncEngine: semua aksi sesi ini sudah diterima dashboard. */
+    static synchronized void historyMarkSent(Context c, java.util.Set<String> sessionIds) {
+        if (sessionIds.isEmpty()) return;
+        java.util.List<HistoryEntry> list = history(c);
+        long now = serverNow(c);
+        boolean changed = false;
+        for (String id : sessionIds) {
+            if (hasPendingFor(c, id)) continue;
+            HistoryEntry e = find(list, id);
+            if (e == null) continue;
+            e.sentAt = now;
+            e.dropped = false;
+            changed = true;
+        }
+        if (changed) saveHistory(c, list);
+    }
+
+    private static synchronized void historyMarkDropped(Context c, java.util.Set<String> sessionIds) {
+        if (sessionIds.isEmpty()) return;
+        java.util.List<HistoryEntry> list = history(c);
+        boolean changed = false;
+        for (String id : sessionIds) {
+            if (hasPendingFor(c, id)) continue;
+            HistoryEntry e = find(list, id);
+            if (e != null) {
+                e.dropped = true;
+                changed = true;
+            }
+        }
+        if (changed) saveHistory(c, list);
+    }
+
+    /** Status kirim ke dashboard untuk satu baris riwayat. */
+    enum SyncState { SENT, PENDING, FAILED, DROPPED, DASHBOARD }
+
+    static synchronized SyncState historyState(Context c, HistoryEntry e) {
+        if (hasFailedFor(c, e.sessionId)) return SyncState.FAILED;
+        if (hasPendingFor(c, e.sessionId)) return SyncState.PENDING;
+        if (e.dropped) return SyncState.DROPPED;
+        if (!e.tvActions && "dashboard".equals(e.source)) return SyncState.DASHBOARD;
+        return SyncState.SENT;
     }
 
     /* ---------------- kejadian non-tagihan (mode staf / tes) ---------------- */

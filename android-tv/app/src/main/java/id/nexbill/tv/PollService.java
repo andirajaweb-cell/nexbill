@@ -43,6 +43,8 @@ public class PollService extends Service {
     };
 
     private static volatile PollService instance;
+    private String lastObservedSession = "?init";
+    private long lastObservedAt;
     private static volatile long lastPokeAt;
 
     /**
@@ -152,6 +154,15 @@ public class PollService extends Service {
                         int acked = 0;
                         if (LocalStore.queue(PollService.this).length() > 0 || LocalStore.events(PollService.this).length() > 0) acked = SyncEngine.syncQueue(PollService.this);
                         StateRepo.setState(st, requestedRt);
+                        // Riwayat sesi di TV (termasuk sesi yang dimulai dari dashboard).
+                        // Dibaca ulang hanya saat sesi server berganti atau tiap 60 detik (riwayat bisa ratusan baris).
+                        long nowRt = SystemClock.elapsedRealtime();
+                        String sid = st.sessionId == null ? "" : st.sessionId;
+                        if (acked == 0 && (!sid.equals(lastObservedSession) || nowRt - lastObservedAt > 60_000L)) {
+                            lastObservedSession = sid;
+                            lastObservedAt = nowRt;
+                            LocalStore.observeServerState(PollService.this, st);
+                        }
                         if (acked > 0) delay = 300;
                     }
                 } catch (Exception ignored) {
@@ -217,6 +228,7 @@ public class PollService extends Service {
             l.ended = true;
             LocalStore.setSession(c, l);
             LocalStore.enqueue(c, "stop", l.sessionId, l.endAt(), null);
+            LocalStore.historyFromSession(c, l, "tv", l.endAt());
             StateRepo.touch();
         } else if (l.ended && !LocalStore.hasPendingFor(c, l.sessionId) && StateRepo.serverCaughtUp(SystemClock.elapsedRealtime())) {
             // Dilepas hanya setelah status server SESUDAH stop diterima — sebelum itu status lama masih

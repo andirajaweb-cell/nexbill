@@ -796,6 +796,8 @@ public class MainActivity extends Activity {
             labels.add(withHelp(getString(R.string.cashier_start), getString(R.string.cashier_start_desc)));
             actions.add(this::startFlow);
         }
+        labels.add(withHelp(getString(R.string.cashier_history), getString(R.string.cashier_history_desc)));
+        actions.add(this::historyPeriodDialog);
         labels.add(withHelp(getString(R.string.cashier_sync_status, pending, failed), getString(failed > 0 ? R.string.cashier_sync_desc_failed : R.string.cashier_sync_desc)));
         actions.add(this::syncStatusDialog);
         labels.add(withHelp(getString(R.string.cashier_settings), getString(R.string.cashier_settings_desc)));
@@ -900,6 +902,7 @@ public class MainActivity extends Activity {
             LocalStore.enqueue(this, "start", l.sessionId, now, extra);
         } catch (Exception ignored) {
         }
+        LocalStore.historyFromSession(this, l, "tv", 0L);
         StateRepo.setStaffUntil(0);
         Toast.makeText(this, R.string.cashier_started, Toast.LENGTH_LONG).show();
         syncSoon();
@@ -953,6 +956,7 @@ public class MainActivity extends Activity {
                         LocalStore.enqueue(this, "extend", l.sessionId, LocalStore.serverNow(this), new JSONObject().put("minutes", mins[which]));
                     } catch (Exception ignored) {
                     }
+                    LocalStore.historyFromSession(this, l, "dashboard", 0L);
                     Toast.makeText(this, getString(R.string.cashier_extended, durationText(mins[which])), Toast.LENGTH_LONG).show();
                     syncSoon();
                     render();
@@ -973,7 +977,9 @@ public class MainActivity extends Activity {
                 .setPositiveButton(R.string.cashier_stop_button, (d, w) -> {
                     l.ended = true;
                     LocalStore.setSession(this, l);
-                    LocalStore.enqueue(this, "stop", l.sessionId, LocalStore.serverNow(this), null);
+                    long stoppedAt = LocalStore.serverNow(this);
+                    LocalStore.enqueue(this, "stop", l.sessionId, stoppedAt, null);
+                    LocalStore.historyFromSession(this, l, "dashboard", stoppedAt);
                     StateRepo.setStaffUntil(0);
                     Toast.makeText(this, R.string.cashier_stopped, Toast.LENGTH_LONG).show();
                     render();
@@ -1058,6 +1064,180 @@ public class MainActivity extends Activity {
 
     private void message(String text) {
         new AlertDialog.Builder(this).setMessage(text).setPositiveButton(R.string.ok, null).show();
+    }
+
+    /** ---------------- Riwayat sesi ---------------- */
+
+    /** Pilih periode riwayat: hari ini, kemarin, 7 hari, minggu ini, bulan ini, bulan lalu. */
+    private void historyPeriodDialog() {
+        menuOpen = true;
+        final String[] labels = {
+                getString(R.string.history_today), getString(R.string.history_yesterday), getString(R.string.history_this_week),
+                getString(R.string.history_7days), getString(R.string.history_this_month), getString(R.string.history_last_month),
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.cashier_history)
+                .setItems(labels, (d, which) -> {
+                    menuOpen = false;
+                    long[] range = historyRange(which);
+                    showHistory(labels[which], range[0], range[1]);
+                })
+                .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    /** [mulai, akhir) dalam epoch ms menurut zona waktu TV, untuk pilihan periode. */
+    private long[] historyRange(int which) {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.setTimeInMillis(LocalStore.serverNow(this));
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        long today = cal.getTimeInMillis();
+        long day = 86_400_000L;
+        switch (which) {
+            case 0: return new long[] { today, Long.MAX_VALUE };
+            case 1: {
+                cal.add(java.util.Calendar.DAY_OF_MONTH, -1);
+                return new long[] { cal.getTimeInMillis(), today };
+            }
+            case 2: {
+                // Minggu ini mulai Senin.
+                int dow = cal.get(java.util.Calendar.DAY_OF_WEEK);
+                int back = (dow + 5) % 7;
+                cal.add(java.util.Calendar.DAY_OF_MONTH, -back);
+                return new long[] { cal.getTimeInMillis(), Long.MAX_VALUE };
+            }
+            case 3: return new long[] { today - 6 * day, Long.MAX_VALUE };
+            case 4: {
+                cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
+                return new long[] { cal.getTimeInMillis(), Long.MAX_VALUE };
+            }
+            default: {
+                cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
+                long thisMonth = cal.getTimeInMillis();
+                cal.add(java.util.Calendar.MONTH, -1);
+                return new long[] { cal.getTimeInMillis(), thisMonth };
+            }
+        }
+    }
+
+    private String historyStateText(LocalStore.SyncState st, LocalStore.HistoryEntry e, DateFormat time) {
+        switch (st) {
+            case PENDING: return getString(R.string.history_state_pending);
+            case FAILED: return getString(R.string.history_state_failed);
+            case DROPPED: return getString(R.string.history_state_dropped);
+            case DASHBOARD: return getString(R.string.history_state_dashboard);
+            default: return e.sentAt > 0 ? getString(R.string.history_state_sent_at, time.format(new Date(e.sentAt))) : getString(R.string.history_state_sent);
+        }
+    }
+
+    /** Judul dialog dua baris: judul tebal + ringkasan kecil (judul bawaan AlertDialog hanya satu baris di banyak TV). */
+    private TextView dialogTitle(String title, String sub) {
+        TextView v = new TextView(this);
+        v.setPadding(48, 36, 48, 12);
+        v.setTextColor(Color.WHITE);
+        v.setTextSize(18);
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(title);
+        sb.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), 0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (sub != null && !sub.isEmpty()) {
+            int start = sb.length();
+            sb.append('\n').append(sub);
+            sb.setSpan(new android.text.style.RelativeSizeSpan(0.78f), start, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(0xFFCBD5E1), start, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        v.setText(sb);
+        return v;
+    }
+
+    /** Daftar sesi pada periode + ringkasan (jumlah, lama main, perkiraan tagihan, status kirim ke dashboard). */
+    private void showHistory(final String periodLabel, long from, long to) {
+        final long now = LocalStore.serverNow(this);
+        JSONObject cat = LocalStore.catalog(this);
+        TvState s = StateRepo.state();
+        String outlet = s != null && s.outletName != null && !s.outletName.isEmpty() ? s.outletName : cat != null ? cat.optString("outletName", "") : "";
+        final List<LocalStore.HistoryEntry> rows = new ArrayList<>();
+        for (LocalStore.HistoryEntry e : LocalStore.history(this)) {
+            if (e.startAt < from || e.startAt >= to) continue;
+            // Riwayat outlet lain (TV pernah dipasangkan ke outlet lain) tidak ditampilkan.
+            if (!outlet.isEmpty() && e.outletName != null && !e.outletName.isEmpty() && !outlet.equals(e.outletName)) continue;
+            rows.add(e);
+        }
+        java.util.Collections.sort(rows, (a, b) -> Long.compare(b.startAt, a.startAt));
+        if (rows.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle(getString(R.string.history_title_fmt, periodLabel)).setMessage(R.string.history_empty)
+                    .setPositiveButton(R.string.history_other_period, (d, w) -> historyPeriodDialog()).setNegativeButton(R.string.ok, null).show();
+            return;
+        }
+        final DateFormat time = DateFormat.getTimeInstance(DateFormat.SHORT);
+        final java.text.SimpleDateFormat dayFmt = new java.text.SimpleDateFormat("EEE dd/MM", Locale.getDefault());
+        long totalMin = 0, totalRp = 0;
+        int sent = 0, pendingN = 0, failedN = 0;
+        final List<CharSequence> items = new ArrayList<>();
+        for (LocalStore.HistoryEntry e : rows) {
+            LocalStore.SyncState st = LocalStore.historyState(this, e);
+            if (st == LocalStore.SyncState.PENDING) pendingN++;
+            else if (st == LocalStore.SyncState.FAILED || st == LocalStore.SyncState.DROPPED) failedN++;
+            else sent++;
+            long mins = e.minutes(now);
+            long rp = e.estimate(now);
+            totalMin += mins;
+            totalRp += rp;
+            String range = time.format(new Date(e.startAt)) + "–" + (e.endAt > 0 ? time.format(new Date(e.endAt)) : getString(R.string.history_running));
+            String what = e.label != null && !e.label.isEmpty() ? e.label : getString("tv".equals(e.source) ? R.string.history_source_tv : R.string.history_source_dashboard);
+            String title = dayFmt.format(new Date(e.startAt)) + " · " + range + " · " + durationText((int) Math.max(1, mins)) + (rp > 0 ? " · ≈" + rupiah(rp) : "");
+            items.add(withHelp(title, what + " · " + historyStateText(st, e, time)));
+        }
+        String summary = getString(R.string.history_summary, rows.size(), durationText((int) Math.max(1, totalMin)), rupiah(totalRp), sent, pendingN, failedN);
+        menuOpen = true;
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setCustomTitle(dialogTitle(getString(R.string.history_title_fmt, periodLabel), summary))
+                .setItems(items.toArray(new CharSequence[0]), (d, which) -> {
+                    menuOpen = false;
+                    showHistoryDetail(rows.get(which), periodLabel, from, to);
+                })
+                .setNeutralButton(R.string.history_other_period, (d, w) -> {
+                    menuOpen = false;
+                    historyPeriodDialog();
+                })
+                .setNegativeButton(R.string.ok, (d, w) -> menuOpen = false)
+                .setOnCancelListener(d -> menuOpen = false);
+        if (pendingN > 0 || failedN > 0) {
+            b.setPositiveButton(R.string.sync_title, (d, w) -> {
+                menuOpen = false;
+                syncStatusDialog();
+            });
+        }
+        b.show();
+    }
+
+    private void showHistoryDetail(LocalStore.HistoryEntry e, final String periodLabel, final long from, final long to) {
+        long now = LocalStore.serverNow(this);
+        DateFormat dt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT);
+        DateFormat time = DateFormat.getTimeInstance(DateFormat.SHORT);
+        LocalStore.SyncState st = LocalStore.historyState(this, e);
+        StringBuilder m = new StringBuilder();
+        m.append(getString(R.string.history_d_unit, e.unitName == null || e.unitName.isEmpty() ? "-" : e.unitName)).append('\n');
+        m.append(getString(R.string.history_d_start, dt.format(new Date(e.startAt)))).append('\n');
+        m.append(getString(R.string.history_d_end, e.endAt > 0 ? dt.format(new Date(e.endAt)) : getString(R.string.history_running))).append('\n');
+        m.append(getString(R.string.history_d_duration, durationText((int) Math.max(1, e.minutes(now))))).append('\n');
+        if (e.plannedMinutes > 0) m.append(getString(R.string.history_d_planned, durationText(e.plannedMinutes + e.extendedMinutes))).append('\n');
+        if (e.label != null && !e.label.isEmpty()) m.append(getString(R.string.history_d_package, e.label)).append('\n');
+        m.append(getString(R.string.history_d_source, getString("tv".equals(e.source) ? R.string.history_source_tv : R.string.history_source_dashboard))).append('\n');
+        long rp = e.estimate(now);
+        if (rp > 0) m.append(getString(R.string.history_d_estimate, rupiah(rp))).append('\n');
+        m.append('\n').append(getString(R.string.history_d_sync, historyStateText(st, e, time))).append('\n');
+        m.append(getString(R.string.history_d_id, e.sessionId.length() > 8 ? e.sessionId.substring(0, 8) : e.sessionId)).append("\n\n");
+        m.append(getString(R.string.history_note));
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle(R.string.history_detail_title)
+                .setMessage(m.toString())
+                .setNegativeButton(R.string.history_back, (d, w) -> showHistory(periodLabel, from, to));
+        if (st == LocalStore.SyncState.PENDING || st == LocalStore.SyncState.FAILED) {
+            b.setPositiveButton(R.string.sync_title, (d, w) -> syncStatusDialog());
+        }
+        b.show();
     }
 
     /** ---------------- Jembatan dari halaman /tv ---------------- */

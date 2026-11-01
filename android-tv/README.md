@@ -41,6 +41,16 @@ Kalau merek TV tidak mengizinkan HDMI tampil di dalam aplikasi, aplikasi beralih
 - cek pembaruan;
 - info perangkat.
 
+## Riwayat sesi di TV (1.2.4)
+
+Panel kasir › **Riwayat sesi** → pilih periode (Hari ini, Kemarin, Minggu ini mulai Senin, 7 hari terakhir, Bulan ini, Bulan lalu). Isinya:
+
+- ringkasan: jumlah sesi, total lama main, perkiraan tagihan, dan jumlah **terkirim/tercatat · menunggu · ditolak**;
+- per sesi: tanggal, jam mulai–selesai, lama main, perkiraan tagihan, paket/asal (dari TV / dari dashboard), dan status kirim ke dashboard: **✓ Terkirim (jam)**, **⏳ Belum terkirim**, **✗ Ditolak** (buka Status sinkron), **✗ Dihapus dari TV**, atau **✓ Tercatat di dashboard** (sesi dashboard tanpa aksi dari TV);
+- pilih satu sesi → rincian (unit, mulai, selesai, durasi dipesan, ID sesi) dan tombol ke Status sinkron bila belum terkirim.
+
+Data di `LocalStore` (`session_history`): dicatat saat mulai/tambah waktu/akhiri/habis di TV, dari status server untuk sesi dashboard (`observeServerState`, dibaca saat sesi berganti atau tiap 60 detik), "terkirim" ditandai `SyncEngine` begitu semua aksi sesi diterima dashboard. Disimpan 62 hari / maks. 1000 baris; riwayat outlet lain tidak ditampilkan. Tagihan di riwayat adalah perkiraan — nilai final ada di Kasir.
+
 ## Akhiri sesi dari TV (perbaikan 1.2.3)
 
 Dulu, setelah kasir menekan **Akhiri sesi**, waktu terlihat masih berjalan:
