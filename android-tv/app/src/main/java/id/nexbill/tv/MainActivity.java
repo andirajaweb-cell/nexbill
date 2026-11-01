@@ -88,6 +88,10 @@ public class MainActivity extends Activity {
     private boolean externalLaunched;
     private long okDownAt;
     private boolean menuOpen;
+    /** Layar PIN "di dalam aplikasi" (pilihan kedua selain pop-up). */
+    private PinPad pinPad;
+    /** Lama penjaga layar dijeda setelah staf menutup aplikasi lewat menu staf. */
+    private static final long CLOSE_GUARD_PAUSE_MS = 30 * 60_000L;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -98,6 +102,17 @@ public class MainActivity extends Activity {
         }
     };
     private final Runnable onRepoChange = this::render;
+
+    /** Bahasa pilihan staf (menu staf › Bahasa) berlaku untuk seluruh teks aplikasi. */
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Lang.wrap(base));
+    }
+
+    /** Halaman /tv dengan bahasa yang sama dengan aplikasi. */
+    private String tvPageUrl() {
+        return Config.TV_PAGE + "&lang=" + Lang.effective(this);
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -147,7 +162,7 @@ public class MainActivity extends Activity {
                 loadError = true;
                 webFailed = true;
                 render();
-                ui.postDelayed(() -> web.loadUrl(Config.TV_PAGE), 10_000);
+                ui.postDelayed(() -> web.loadUrl(tvPageUrl()), 10_000);
             }
         });
         root.addView(web, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
@@ -175,6 +190,8 @@ public class MainActivity extends Activity {
         offlineView = buildOfflineView();
         offlineView.setVisibility(View.GONE);
         root.addView(offlineView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        pinPad = new PinPad(this, root);
 
         setContentView(root);
         StateRepo.restore(this);
@@ -208,7 +225,7 @@ public class MainActivity extends Activity {
         });
 
         PollService.start(this);
-        web.loadUrl(Config.TV_PAGE);
+        web.loadUrl(tvPageUrl());
     }
 
     @Override
@@ -447,6 +464,11 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int k = e.getKeyCode();
+        // Layar PIN di dalam aplikasi: angka/hapus/back ditangani PinPad; tombol arah & OK menekan tombol di layar.
+        if (pinPad != null && pinPad.isShowing()) {
+            if (pinPad.handleKey(e)) return true;
+            return super.dispatchKeyEvent(e);
+        }
         boolean paired = !StateRepo.token(this).isEmpty();
         if (k == KeyEvent.KEYCODE_MENU) {
             if (e.getAction() == KeyEvent.ACTION_UP) {
@@ -491,24 +513,59 @@ public class MainActivity extends Activity {
         else showStaffMenu();
     }
 
+    /**
+     * Minta PIN staf. Dua tampilan (menu staf › Tampilan PIN staf): layar penuh di aplikasi (papan angka
+     * besar, bawaan) atau pop-up kecil dengan keyboard TV.
+     */
     private void askPin(final Runnable onSuccess) {
         menuOpen = true;
+        if (StateRepo.pinInApp(this)) {
+            TvState s = StateRepo.state();
+            String sub = s == null ? "" : (s.outletName == null ? "" : s.outletName) + (s.unitName != null && !s.unitName.isEmpty() ? " · " + s.unitName : "");
+            pinPad.show(sub, new PinPad.Listener() {
+                @Override
+                public void onSubmit(String pin) {
+                    checkPin(pin, () -> {
+                        pinPad.hide();
+                        menuOpen = false;
+                        onSuccess.run();
+                    }, (msg) -> pinPad.fail(msg));
+                }
+
+                @Override
+                public void onCancel() {
+                    pinPad.hide();
+                    menuOpen = false;
+                }
+            });
+            return;
+        }
         final EditText pin = new EditText(this);
         pin.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.pin_title)
                 .setView(pin)
-                .setPositiveButton(R.string.ok, (d, w) -> checkPin(pin.getText().toString(), onSuccess))
+                .setPositiveButton(R.string.ok, (d, w) -> checkPin(pin.getText().toString(), () -> {
+                    menuOpen = false;
+                    onSuccess.run();
+                }, (msg) -> {
+                    menuOpen = false;
+                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                }))
                 .setNegativeButton(R.string.cancel, (d, w) -> menuOpen = false)
                 .setOnCancelListener(d -> menuOpen = false)
                 .show();
+    }
+
+    private interface PinFail {
+        void run(String message);
     }
 
     /** Percobaan PIN offline yang salah berturut-turut; dikunci 5 menit setelah 5 kali. */
     private int offlinePinFails;
     private long offlinePinLockedUntil;
 
-    private void checkPin(final String pin, final Runnable onSuccess) {
+    private void checkPin(final String pin, final Runnable onSuccess, final PinFail onFail) {
         final String token = StateRepo.token(this);
         new Thread(() -> {
             boolean ok;
@@ -548,14 +605,11 @@ public class MainActivity extends Activity {
             final boolean offline = failed;
             final boolean noMemory = failed && !StateRepo.hasRememberedPin(this);
             ui.post(() -> {
-                menuOpen = false;
                 if (pass) {
                     if (offline) Toast.makeText(this, R.string.pin_offline_ok, Toast.LENGTH_SHORT).show();
                     onSuccess.run();
-                } else if (noMemory) {
-                    Toast.makeText(this, R.string.pin_error, Toast.LENGTH_LONG).show();
                 } else {
-                    Toast.makeText(this, R.string.pin_wrong, Toast.LENGTH_SHORT).show();
+                    onFail.run(getString(noMemory ? R.string.pin_error : R.string.pin_wrong));
                 }
             });
         }).start();
@@ -596,11 +650,17 @@ public class MainActivity extends Activity {
         items.add(withHelp(getString(R.string.menu_guard) + ": " + getString(guardOn ? R.string.guard_on : R.string.guard_off), getString(R.string.menu_guard_desc)));
         actions.add(this::toggleGuard);
         items.add(withHelp(getString(R.string.menu_reload), getString(R.string.menu_reload_desc)));
-        actions.add(() -> web.loadUrl(Config.TV_PAGE));
+        actions.add(() -> web.loadUrl(tvPageUrl()));
         items.add(withHelp(getString(R.string.menu_update), getString(R.string.menu_update_desc, Config.APP_VERSION)));
         actions.add(this::checkUpdate);
+        items.add(withHelp(getString(R.string.menu_lang) + ": " + (Lang.chosen(this).isEmpty() ? getString(R.string.lang_system) + " (" + Lang.displayName(Lang.effective(this)) + ")" : Lang.displayName(Lang.chosen(this))), getString(R.string.menu_lang_desc)));
+        actions.add(this::pickLanguage);
+        items.add(withHelp(getString(R.string.menu_pin_style) + ": " + getString(StateRepo.pinInApp(this) ? R.string.pin_style_inapp : R.string.pin_style_popup), getString(R.string.menu_pin_style_desc)));
+        actions.add(this::pickPinStyle);
         items.add(withHelp(getString(R.string.menu_info), getString(R.string.menu_info_desc)));
         actions.add(this::showInfo);
+        items.add(withHelp(getString(R.string.menu_close), getString(R.string.menu_close_desc)));
+        actions.add(this::closeAppFlow);
 
         new AlertDialog.Builder(this)
                 .setTitle(R.string.menu_title)
@@ -608,8 +668,69 @@ public class MainActivity extends Activity {
                     menuOpen = false;
                     actions.get(which).run();
                 })
+                .setNegativeButton(R.string.back_to_screensaver, (d, w) -> menuOpen = false)
                 .setOnCancelListener(d -> menuOpen = false)
                 .show();
+    }
+
+    /** Bahasa aplikasi & halaman /tv (6 bahasa atau ikut TV). Aktivitas dimuat ulang supaya semua teks ikut berganti. */
+    private void pickLanguage() {
+        final String[] labels = new String[Lang.CODES.length + 1];
+        labels[0] = getString(R.string.lang_system);
+        System.arraycopy(Lang.NAMES, 0, labels, 1, Lang.NAMES.length);
+        menuOpen = true;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_lang)
+                .setItems(labels, (d, which) -> {
+                    menuOpen = false;
+                    Lang.setChosen(this, which == 0 ? "" : Lang.CODES[which - 1]);
+                    recreate();
+                })
+                .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    private void pickPinStyle() {
+        String[] labels = { getString(R.string.pin_style_inapp), getString(R.string.pin_style_popup) };
+        menuOpen = true;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_pin_style)
+                .setItems(labels, (d, which) -> {
+                    menuOpen = false;
+                    StateRepo.setPinInApp(this, which == 0);
+                    Toast.makeText(this, labels[which], Toast.LENGTH_SHORT).show();
+                })
+                .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    /**
+     * Tutup aplikasi (menu staf): konfirmasi → PIN staf (bila outlet memakai PIN) → keluar. Penjaga layar
+     * dijeda 30 menit supaya tidak langsung menarik aplikasi kembali; setelah itu NEXBILL TV kembali ke
+     * depan sendiri (bilik tidak tertinggal tanpa kunci).
+     */
+    private void closeAppFlow() {
+        menuOpen = true;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_close)
+                .setMessage(R.string.close_confirm)
+                .setPositiveButton(R.string.close_button, (d, w) -> {
+                    menuOpen = false;
+                    TvState s = StateRepo.state();
+                    boolean pinNeeded = (s != null && s.requiresPin) || StateRepo.hasRememberedPin(this);
+                    if (pinNeeded) askPin(this::closeAppNow);
+                    else closeAppNow();
+                })
+                .setNegativeButton(R.string.cancel, (d, w) -> menuOpen = false)
+                .setOnCancelListener(d -> menuOpen = false)
+                .show();
+    }
+
+    private void closeAppNow() {
+        StateRepo.pauseGuard(SystemClock.elapsedRealtime() + CLOSE_GUARD_PAUSE_MS);
+        releaseHdmi();
+        Toast.makeText(this, R.string.closing_toast, Toast.LENGTH_LONG).show();
+        finishAndRemoveTask();
     }
 
     /** Judul menu + keterangan kecil abu-abu di baris berikutnya. */
@@ -813,6 +934,7 @@ public class MainActivity extends Activity {
                     menuOpen = false;
                     actions.get(which).run();
                 })
+                .setNegativeButton(R.string.back_to_screensaver, (d, w) -> menuOpen = false)
                 .setOnCancelListener(d -> menuOpen = false)
                 .show();
     }
@@ -1254,6 +1376,19 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String appVersion() {
             return Config.APP_VERSION;
+        }
+
+        /** Bahasa dipilih di layar "Hubungkan TV" → berlaku untuk aplikasi juga (dimuat ulang). */
+        @JavascriptInterface
+        public void setLanguage(String code) {
+            if (code == null || !Lang.isSupported(code) || code.equals(Lang.chosen(getApplicationContext()))) return;
+            Lang.setChosen(getApplicationContext(), code);
+            ui.post(MainActivity.this::recreate);
+        }
+
+        @JavascriptInterface
+        public String language() {
+            return Lang.effective(getApplicationContext());
         }
 
         /**

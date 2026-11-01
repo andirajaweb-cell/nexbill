@@ -60,6 +60,12 @@ public class PollService extends Service {
         s.worker.post(s.poll);
     }
 
+    /** Teks timer/notifikasi mengikuti bahasa pilihan staf (Lang). */
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Lang.wrap(base));
+    }
+
     static void start(Context c) {
         Intent i = new Intent(c, PollService.class);
         try {

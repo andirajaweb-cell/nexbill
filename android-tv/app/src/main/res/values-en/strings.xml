@@ -152,4 +152,19 @@
     <string name="history_d_sync">Dashboard: %1$s</string>
     <string name="history_d_id">Session ID: %1$s</string>
     <string name="history_note">Estimated bill only — the final amount is at the Cashier (Open Orders). History is kept on this TV for 62 days; full data stays in the dashboard.</string>
+    <string name="pin_cancel_back">Cancel — back to screensaver</string>
+    <string name="pin_too_short">PIN must be at least 4 digits.</string>
+    <string name="menu_lang">Language</string>
+    <string name="menu_lang_desc">Language of this app and TV screen (6 languages)</string>
+    <string name="lang_system">Follow TV language</string>
+    <string name="menu_pin_style">Staff PIN display</string>
+    <string name="menu_pin_style_desc">Full screen = big number pad, easy with the remote. Pop-up = small box with the TV keyboard.</string>
+    <string name="pin_style_inapp">Full screen in the app</string>
+    <string name="pin_style_popup">Pop-up (dialog box)</string>
+    <string name="menu_close">Close app</string>
+    <string name="menu_close_desc">Exit NEXBILL TV — needs a staff PIN. Screen guard pauses for 30 minutes.</string>
+    <string name="close_confirm">Close NEXBILL TV? While the app is closed, the timer and screen lock don\'t run. The screen guard pauses for 30 minutes, then NEXBILL TV opens again by itself.</string>
+    <string name="close_button">Close app</string>
+    <string name="closing_toast">NEXBILL TV closed. Open it again from the app list — it reopens by itself in 30 minutes.</string>
+    <string name="back_to_screensaver">Back to screensaver</string>
 </resources>

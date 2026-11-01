@@ -201,7 +201,11 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
           <li>{t("devices.guide.tvMenu.m7", "Muat ulang layar — bila screensaver macet atau kosong.")}</li>
           <li>{t("devices.guide.tvMenu.m8", "Cek pembaruan aplikasi — membandingkan versi terpasang dengan versi terbaru.")}</li>
           <li>{t("devices.guide.tvMenu.m9", "Info perangkat — versi, outlet & unit, input, mode, izin.")}</li>
+          <li>{t("devices.guide.tvMenu.m10", "Bahasa — 6 bahasa untuk aplikasi dan layar TV.")}</li>
+          <li>{t("devices.guide.tvMenu.m11", "Tampilan PIN staf — layar penuh atau pop-up.")}</li>
+          <li>{t("devices.guide.tvMenu.m12", "Tutup aplikasi — keluar dari NEXBILL TV setelah PIN staf.")}</li>
         </ul>
+        <p className="text-neutral-400">{t("devices.guide.tvMenu.back", "Setiap panel punya tombol Kembali ke screensaver.")}</p>
       </div>
 
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-1.5">

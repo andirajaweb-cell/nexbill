@@ -152,4 +152,19 @@
     <string name="history_d_sync">Papan pemuka: %1$s</string>
     <string name="history_d_id">ID sesi: %1$s</string>
     <string name="history_note">Anggaran bil sahaja — jumlah akhir di Juruwang (Pesanan Terbuka). Sejarah disimpan di TV ini 62 hari; data penuh kekal di papan pemuka.</string>
+    <string name="pin_cancel_back">Batal — kembali ke penyelamat skrin</string>
+    <string name="pin_too_short">PIN sekurang-kurangnya 4 digit.</string>
+    <string name="menu_lang">Bahasa</string>
+    <string name="menu_lang_desc">Bahasa aplikasi dan skrin TV ini (6 bahasa)</string>
+    <string name="lang_system">Ikut bahasa TV</string>
+    <string name="menu_pin_style">Paparan PIN staf</string>
+    <string name="menu_pin_style_desc">Skrin penuh = pad nombor besar, mudah dengan alat kawalan. Pop-up = kotak kecil dengan papan kekunci TV.</string>
+    <string name="pin_style_inapp">Skrin penuh dalam aplikasi</string>
+    <string name="pin_style_popup">Pop-up (kotak dialog)</string>
+    <string name="menu_close">Tutup aplikasi</string>
+    <string name="menu_close_desc">Keluar daripada NEXBILL TV — perlu PIN staf. Pengawal skrin dijeda 30 minit.</string>
+    <string name="close_confirm">Tutup NEXBILL TV? Semasa aplikasi ditutup, pemasa dan kunci skrin tidak berjalan. Pengawal skrin dijeda 30 minit, kemudian NEXBILL TV dibuka semula secara automatik.</string>
+    <string name="close_button">Tutup aplikasi</string>
+    <string name="closing_toast">NEXBILL TV ditutup. Buka semula dari senarai aplikasi — dibuka sendiri dalam 30 minit.</string>
+    <string name="back_to_screensaver">Kembali ke penyelamat skrin</string>
 </resources>

@@ -41,6 +41,14 @@ Kalau merek TV tidak mengizinkan HDMI tampil di dalam aplikasi, aplikasi beralih
 - cek pembaruan;
 - info perangkat.
 
+## Bahasa, PIN, tutup aplikasi, alur kembali (1.2.5)
+
+- **6 bahasa** (Indonesia, English, Melayu, ไทย, Filipino, Tiếng Việt): menu staf › **Bahasa** atau tombol bahasa di layar **Hubungkan TV**. Disimpan di TV (`Lang.java`), berlaku untuk seluruh teks aplikasi (activity & PollService lewat `attachBaseContext`) dan halaman `/tv` (dikirim sebagai `?lang=`; teks halaman di `src/app/tv/tv-i18n.ts`). "Ikuti bahasa TV" = bahasa sistem.
+- **Tampilan PIN staf** (menu staf): **Layar penuh di aplikasi** (bawaan — `PinPad.java`: 6 titik, papan angka 3×4 yang dipilih tombol arah, tombol angka remote langsung mengisi, Back = batal) atau **Pop-up** (kotak dialog + keyboard TV, perilaku lama).
+- **Tutup aplikasi** (menu staf): konfirmasi → PIN staf (bila outlet memakai PIN) → keluar. Penjaga layar dijeda 30 menit, lalu NEXBILL TV kembali ke depan sendiri.
+- **Perbaikan "Kembali ke screensaver" membuka panel kasir**: di aplikasi, halaman `/tv` dulu ikut pindah ke PIN/panel web saat tombol arah ditekan, lalu OK pada "Kembali ke screensaver" diambil aplikasi → panel kasir. Kini di aplikasi halaman `/tv` selalu screensaver (PIN & panel hanya dari aplikasi), dan panel kasir serta menu staf punya tombol **Kembali ke screensaver**.
+- **Layar Hubungkan TV 2 kolom**: kiri = judul, kolom kode 6 digit, status, 3 langkah; kanan = tombol angka (fokus awal di "1") + pilihan bahasa.
+
 ## Riwayat sesi di TV (1.2.4)
 
 Panel kasir › **Riwayat sesi** → pilih periode (Hari ini, Kemarin, Minggu ini mulai Senin, 7 hari terakhir, Bulan ini, Bulan lalu). Isinya:

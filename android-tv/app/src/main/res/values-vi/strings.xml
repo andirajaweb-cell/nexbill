@@ -152,4 +152,19 @@
     <string name="history_d_sync">Bảng điều khiển: %1$s</string>
     <string name="history_d_id">Mã phiên: %1$s</string>
     <string name="history_note">Chỉ là hóa đơn ước tính — số tiền cuối cùng ở Thu ngân (Đơn đang mở). Lịch sử lưu trên TV này 62 ngày; dữ liệu đầy đủ vẫn ở bảng điều khiển.</string>
+    <string name="pin_cancel_back">Hủy — quay lại màn hình chờ</string>
+    <string name="pin_too_short">PIN phải có ít nhất 4 chữ số.</string>
+    <string name="menu_lang">Ngôn ngữ</string>
+    <string name="menu_lang_desc">Ngôn ngữ của ứng dụng và màn hình TV này (6 ngôn ngữ)</string>
+    <string name="lang_system">Theo ngôn ngữ TV</string>
+    <string name="menu_pin_style">Kiểu nhập PIN nhân viên</string>
+    <string name="menu_pin_style_desc">Toàn màn hình = bàn phím số lớn, dễ dùng điều khiển. Pop-up = hộp nhỏ với bàn phím TV.</string>
+    <string name="pin_style_inapp">Toàn màn hình trong ứng dụng</string>
+    <string name="pin_style_popup">Pop-up (hộp thoại)</string>
+    <string name="menu_close">Đóng ứng dụng</string>
+    <string name="menu_close_desc">Thoát NEXBILL TV — cần PIN nhân viên. Bảo vệ màn hình tạm dừng 30 phút.</string>
+    <string name="close_confirm">Đóng NEXBILL TV? Khi ứng dụng đóng, đồng hồ và khóa màn hình không chạy. Bảo vệ màn hình tạm dừng 30 phút, sau đó NEXBILL TV tự mở lại.</string>
+    <string name="close_button">Đóng ứng dụng</string>
+    <string name="closing_toast">Đã đóng NEXBILL TV. Mở lại từ danh sách ứng dụng — tự mở lại sau 30 phút.</string>
+    <string name="back_to_screensaver">Quay lại màn hình chờ</string>
 </resources>

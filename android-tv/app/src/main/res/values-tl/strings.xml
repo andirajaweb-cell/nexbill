@@ -152,4 +152,19 @@
     <string name="history_d_sync">Dashboard: %1$s</string>
     <string name="history_d_id">ID ng session: %1$s</string>
     <string name="history_note">Tantiya lang ang bill — nasa Cashier (Open Orders) ang final na halaga. 62 araw na naka-save ang history sa TV na ito; kumpletong data nasa dashboard.</string>
+    <string name="pin_cancel_back">Kanselahin — bumalik sa screensaver</string>
+    <string name="pin_too_short">Dapat hindi bababa sa 4 na digit ang PIN.</string>
+    <string name="menu_lang">Wika</string>
+    <string name="menu_lang_desc">Wika ng app at screen ng TV na ito (6 na wika)</string>
+    <string name="lang_system">Sundin ang wika ng TV</string>
+    <string name="menu_pin_style">Display ng PIN ng staff</string>
+    <string name="menu_pin_style_desc">Full screen = malaking number pad, madali gamit ang remote. Pop-up = maliit na kahon na may keyboard ng TV.</string>
+    <string name="pin_style_inapp">Full screen sa app</string>
+    <string name="pin_style_popup">Pop-up (dialog box)</string>
+    <string name="menu_close">Isara ang app</string>
+    <string name="menu_close_desc">Lumabas sa NEXBILL TV — kailangan ng PIN ng staff. Hihinto ang bantay ng screen nang 30 minuto.</string>
+    <string name="close_confirm">Isara ang NEXBILL TV? Habang sarado ang app, hindi tumatakbo ang timer at screen lock. Hihinto ang bantay ng screen nang 30 minuto, saka kusang bubukas muli ang NEXBILL TV.</string>
+    <string name="close_button">Isara ang app</string>
+    <string name="closing_toast">Naisara ang NEXBILL TV. Buksan muli mula sa listahan ng app — kusang bubukas sa loob ng 30 minuto.</string>
+    <string name="back_to_screensaver">Bumalik sa screensaver</string>
 </resources>

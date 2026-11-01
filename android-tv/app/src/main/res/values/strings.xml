@@ -153,4 +153,19 @@
     <string name="history_d_sync">Dashboard: %1$s</string>
     <string name="history_d_id">ID sesi: %1$s</string>
     <string name="history_note">Perkiraan tagihan saja — nilai final ada di Kasir (Order Terbuka). Riwayat disimpan di TV ini 62 hari; data lengkap tetap di dashboard.</string>
+    <string name="pin_cancel_back">Batal — kembali ke screensaver</string>
+    <string name="pin_too_short">PIN minimal 4 digit.</string>
+    <string name="menu_lang">Bahasa</string>
+    <string name="menu_lang_desc">Bahasa aplikasi dan layar TV ini (6 bahasa)</string>
+    <string name="lang_system">Ikuti bahasa TV</string>
+    <string name="menu_pin_style">Tampilan PIN staf</string>
+    <string name="menu_pin_style_desc">Layar penuh = papan angka besar, mudah dengan remote. Pop-up = kotak kecil dengan keyboard TV.</string>
+    <string name="pin_style_inapp">Layar penuh di aplikasi</string>
+    <string name="pin_style_popup">Pop-up (kotak dialog)</string>
+    <string name="menu_close">Tutup aplikasi</string>
+    <string name="menu_close_desc">Keluar dari NEXBILL TV — butuh PIN staf. Penjaga layar dijeda 30 menit.</string>
+    <string name="close_confirm">Tutup NEXBILL TV? Selama aplikasi tertutup, timer dan kunci layar tidak berjalan. Penjaga layar dijeda 30 menit, setelah itu NEXBILL TV terbuka lagi otomatis.</string>
+    <string name="close_button">Tutup aplikasi</string>
+    <string name="closing_toast">NEXBILL TV ditutup. Buka lagi dari daftar aplikasi — terbuka sendiri dalam 30 menit.</string>
+    <string name="back_to_screensaver">Kembali ke screensaver</string>
 </resources>

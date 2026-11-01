@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { isTvLang, tvText, TV_LANG_NAMES, TV_LANGS, TV_LOCALE, type TvLang, type TvT } from "./tv-i18n";
 import { computeUnitView, formatDuration, type TvUnitView } from "@/lib/tv/view";
 import { normalizePairingCode } from "@/lib/tv/pairing";
 import { tvTopicBrowser, TV_PUSH_EVENT } from "@/lib/tv/push-topic";
@@ -94,8 +95,39 @@ function readAppLocalSession(): AppLocalSession | null {
   }
 }
 
+const TvTCtx = createContext<TvT>((k, v) => tvText("id", k, v));
+const TvLangCtx = createContext<TvLang>("id");
+const useT = () => useContext(TvTCtx);
+const useTvLocale = () => TV_LOCALE[useContext(TvLangCtx)];
+const LANG_STORAGE_KEY = "nexbill_tv_lang";
+
+type Bridge = { language?: () => string; setLanguage?: (code: string) => void };
+function bridgeOf(): Bridge | undefined {
+  return (window as unknown as { NexbillTvApp?: Bridge }).NexbillTvApp;
+}
+
+/** Bahasa layar: ?lang= dari aplikasi NEXBILL TV → pilihan tersimpan → bahasa aplikasi → bahasa browser → Indonesia. */
+function initialLang(): TvLang {
+  try {
+    const q = new URLSearchParams(window.location.search).get("lang");
+    if (isTvLang(q)) return q;
+    const saved = localStorage.getItem(LANG_STORAGE_KEY);
+    if (isTvLang(saved)) return saved;
+    const app = bridgeOf()?.language?.();
+    if (isTvLang(app)) return app;
+    const nav = (navigator.language || "id").slice(0, 2).toLowerCase();
+    const mapped = nav === "tl" ? "fil" : nav === "in" ? "id" : nav;
+    return isTvLang(mapped) ? mapped : "id";
+  } catch {
+    return "id";
+  }
+}
+
 export default function TvPage() {
   const [token, setToken] = useState<string | null>(null);
+  const [lang, setLangState] = useState<TvLang>("id");
+  /** Dimuat di aplikasi NEXBILL TV (Android): panel kasir & PIN diurus aplikasi, bukan halaman ini. */
+  const [appMode, setAppMode] = useState(false);
   const [booted, setBooted] = useState(false);
   /** Baru saja dipasangkan → tampilkan konfirmasi "Terhubung ke <outlet>" sebentar. */
   const [justPaired, setJustPaired] = useState(false);
@@ -108,8 +140,29 @@ export default function TvPage() {
     } catch {
       // Mode penyamaran / penyimpanan diblokir: biarkan token null, layar akan meminta pairing.
     }
+    setLangState(initialLang());
+    try {
+      setAppMode(new URLSearchParams(window.location.search).get("app") === "1" || !!bridgeOf());
+    } catch {
+      setAppMode(false);
+    }
     setBooted(true);
   }, []);
+
+  const changeLang = useCallback((code: TvLang) => {
+    setLangState(code);
+    try {
+      localStorage.setItem(LANG_STORAGE_KEY, code);
+    } catch {
+      /* tetap berlaku sampai halaman dimuat ulang */
+    }
+    try {
+      bridgeOf()?.setLanguage?.(code); // aplikasi NEXBILL TV ikut berganti bahasa (dimuat ulang)
+    } catch {
+      /* aplikasi versi lama */
+    }
+  }, []);
+  const t = useCallback<TvT>((k, v) => tvText(lang, k, v), [lang]);
 
   const handlePaired = useCallback((newToken: string) => {
     try {
@@ -144,8 +197,13 @@ export default function TvPage() {
   }, [booted, token]);
 
   if (!booted) return <div className="min-h-screen bg-black" />;
-  if (!token) return <PairingScreen onPaired={handlePaired} />;
-  return <ScreenDisplay token={token} onUnpair={handleUnpair} justPaired={justPaired} />;
+  return (
+    <TvLangCtx.Provider value={lang}>
+      <TvTCtx.Provider value={t}>
+        {!token ? <PairingScreen onPaired={handlePaired} lang={lang} onLang={changeLang} /> : <ScreenDisplay token={token} onUnpair={handleUnpair} justPaired={justPaired} appMode={appMode} />}
+      </TvTCtx.Provider>
+    </TvLangCtx.Provider>
+  );
 }
 
 /** ---------------- PAIRING ---------------- */
@@ -161,7 +219,8 @@ function appDeviceId(): string | undefined {
   }
 }
 
-function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
+function PairingScreen({ onPaired, lang, onLang }: { onPaired: (token: string) => void; lang: TvLang; onLang: (l: TvLang) => void }) {
+  const t = useT();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -170,7 +229,7 @@ function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
     async (value: string) => {
       const clean = normalizePairingCode(value);
       if (!clean) {
-        setError("Kode harus 6 digit angka.");
+        setError(t("pair.badCode"));
         return;
       }
       setBusy(true);
@@ -184,18 +243,18 @@ function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
         });
         const data = await res.json();
         if (!res.ok) {
-          setError(data.error ?? "Gagal memasangkan layar.");
+          setError(data.error ?? t("pair.failed"));
           setCode("");
           return;
         }
         onPaired(data.token);
       } catch {
-        setError("Tidak bisa menghubungi server. Periksa koneksi internet TV ini.");
+        setError(t("pair.network"));
       } finally {
         setBusy(false);
       }
     },
-    [onPaired]
+    [onPaired, t]
   );
 
   // Nilai kode terbaru disimpan juga di ref, dan penangan Enter membaca dari ref ini — BUKAN dari
@@ -235,72 +294,100 @@ function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
     if (code.length === 6 && !busy) void submit(code);
   }, [code, busy, submit]);
 
+  // Dua kolom: kiri = judul, kolom isian kode, status, langkah; kanan = tombol angka & pilihan bahasa.
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#04060c] text-white">
       <Backdrop accent="#22d3ee" />
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center gap-10 p-10 nb-fade-in">
-        <Wordmark />
-        <div className="text-center space-y-3">
-          <h1 className="text-5xl md:text-6xl font-black tracking-tight">Hubungkan TV ini</h1>
-          <p className="text-neutral-300/80 text-xl md:text-2xl max-w-3xl leading-relaxed">
-            Ketik 6 digit kode pairing dengan tombol angka di remote. TV ini akan terhubung ke <span className="text-white font-semibold">satu outlet</span> dan satu unit saja.
-          </p>
-        </div>
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-8 md:p-12 nb-fade-in">
+        <div className="grid w-full max-w-7xl grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-10 items-center">
+          {/* ---------------- kolom kiri: isian ---------------- */}
+          <div className="space-y-8">
+            <Wordmark />
+            <div className="space-y-3">
+              <h1 className="text-5xl md:text-6xl font-black tracking-tight">{t("pair.title")}</h1>
+              <p className="text-neutral-300/80 text-xl md:text-2xl max-w-2xl leading-relaxed">{t("pair.lead")}</p>
+            </div>
 
-        <div className={`flex gap-4 p-6 rounded-3xl ${GLASS}`}>
-          {Array.from({ length: 6 }, (_, i) => {
-            const active = code.length === i && !busy;
-            const filled = !!code[i];
-            return (
-              <div
-                key={i}
-                className={`w-16 h-24 md:w-24 md:h-32 rounded-2xl flex items-center justify-center text-5xl md:text-6xl font-bold tabular-nums transition-all duration-300 ${
-                  active ? "border-2 border-cyan-300 bg-cyan-300/10 shadow-[0_0_40px_rgba(34,211,238,0.45)] scale-105" : filled ? "border border-white/25 bg-white/[0.07]" : "border border-white/10 bg-black/30"
-                }`}
-              >
-                {code[i] ?? ""}
+            <div>
+              <div className="mb-3 text-sm tracking-[0.3em] text-neutral-400 uppercase">{t("pair.codeLabel")}</div>
+              <div className={`inline-flex gap-3 p-5 rounded-3xl ${GLASS}`}>
+                {Array.from({ length: 6 }, (_, i) => {
+                  const active = code.length === i && !busy;
+                  const filled = !!code[i];
+                  return (
+                    <div
+                      key={i}
+                      className={`w-14 h-20 md:w-20 md:h-28 rounded-2xl flex items-center justify-center text-4xl md:text-6xl font-bold tabular-nums transition-all duration-300 ${
+                        active ? "border-2 border-cyan-300 bg-cyan-300/10 shadow-[0_0_40px_rgba(34,211,238,0.45)] scale-105" : filled ? "border border-white/25 bg-white/[0.07]" : "border border-white/10 bg-black/30"
+                      }`}
+                    >
+                      {code[i] ?? ""}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-
-        <div className="h-8 text-center">
-          {busy && <div className="text-cyan-300 text-2xl animate-pulse">Menghubungkan ke outlet…</div>}
-          {error && !busy && <div className="text-rose-300 text-xl md:text-2xl max-w-3xl">{error}</div>}
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "hapus", "0", "ok"].map((key) => (
-            <button
-              key={key}
-              disabled={busy}
-              onClick={() => {
-                if (key === "hapus") setCode((p) => p.slice(0, -1));
-                else if (key === "ok") void submit(code);
-                else setCode((p) => (p.length >= 6 ? p : p + key));
-              }}
-              className="w-24 h-16 md:w-28 md:h-[4.5rem] rounded-2xl bg-white/[0.05] border border-white/10 text-2xl font-semibold transition hover:bg-white/10 focus:outline-none focus:border-cyan-300 focus:bg-cyan-300/15 focus:shadow-[0_0_30px_rgba(34,211,238,0.35)] disabled:opacity-40"
-            >
-              {key === "hapus" ? "⌫" : key === "ok" ? "OK" : key}
-            </button>
-          ))}
-        </div>
-
-        <ol className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl w-full text-left">
-          {[
-            ["1", "Owner / Manager", "Buka Pengaturan › TV Screensaver di dashboard NEXBILL, lalu tambah layar untuk unit ini."],
-            ["2", "Kode 6 digit", "Kode muncul di dashboard dan berlaku 30 menit. Ketik di sini dengan remote."],
-            ["3", "Selesai", "TV langsung mengikuti sesi dari kasir. Tekan OK untuk panel kasir & menu staf."],
-          ].map(([n, title, body]) => (
-            <li key={n} className={`rounded-2xl p-5 ${GLASS}`}>
-              <div className="flex items-center gap-3">
-                <span className="h-9 w-9 rounded-full bg-cyan-300/15 text-cyan-200 flex items-center justify-center font-bold">{n}</span>
-                <span className="text-lg font-semibold">{title}</span>
+              <div className="mt-4 min-h-8">
+                {busy && <div className="text-cyan-300 text-2xl animate-pulse">{t("pair.connecting")}</div>}
+                {error && !busy && <div className="text-rose-300 text-xl md:text-2xl max-w-2xl">{error}</div>}
               </div>
-              <p className="mt-2 text-neutral-400 text-base leading-relaxed">{body}</p>
-            </li>
-          ))}
-        </ol>
+            </div>
+
+            <ol className="grid grid-cols-1 md:grid-cols-3 gap-3 text-left">
+              {[
+                ["1", t("pair.s1t"), t("pair.s1")],
+                ["2", t("pair.s2t"), t("pair.s2")],
+                ["3", t("pair.s3t"), t("pair.s3")],
+              ].map(([n, title, body]) => (
+                <li key={n} className={`rounded-2xl p-4 ${GLASS}`}>
+                  <div className="flex items-center gap-3">
+                    <span className="h-8 w-8 rounded-full bg-cyan-300/15 text-cyan-200 flex items-center justify-center font-bold">{n}</span>
+                    <span className="text-base font-semibold">{title}</span>
+                  </div>
+                  <p className="mt-2 text-neutral-400 text-sm leading-relaxed">{body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          {/* ---------------- kolom kanan: tombol angka & bahasa ---------------- */}
+          <div className={`rounded-[2rem] p-6 md:p-8 flex flex-col items-center gap-5 ${GLASS}`}>
+            <div className="grid grid-cols-3 gap-3">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "hapus", "0", "ok"].map((key) => (
+                <button
+                  key={key}
+                  disabled={busy}
+                  autoFocus={key === "1"}
+                  aria-label={key === "hapus" ? t("pair.delete") : key === "ok" ? "OK" : key}
+                  onClick={() => {
+                    if (key === "hapus") setCode((p) => p.slice(0, -1));
+                    else if (key === "ok") void submit(code);
+                    else setCode((p) => (p.length >= 6 ? p : p + key));
+                  }}
+                  className={`w-24 h-20 md:w-28 md:h-24 rounded-2xl border text-3xl font-semibold transition focus:outline-none focus:border-cyan-300 focus:bg-cyan-300/15 focus:shadow-[0_0_30px_rgba(34,211,238,0.35)] disabled:opacity-40 ${
+                    key === "ok" ? "bg-cyan-400/15 border-cyan-300/40 text-cyan-100" : "bg-white/[0.05] border-white/10 hover:bg-white/10"
+                  }`}
+                >
+                  {key === "hapus" ? "⌫" : key === "ok" ? "OK" : key}
+                </button>
+              ))}
+            </div>
+            <p className="text-neutral-400 text-base text-center max-w-sm leading-relaxed">{t("pair.keypadHint")}</p>
+            <div className="w-full border-t border-white/10 pt-4">
+              <div className="mb-2 text-center text-xs tracking-[0.3em] text-neutral-500 uppercase">{t("pair.language")}</div>
+              <div className="flex flex-wrap justify-center gap-2">
+                {TV_LANGS.map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => onLang(l)}
+                    className={`rounded-full border px-3.5 py-1.5 text-base transition focus:outline-none focus:border-cyan-300 focus:bg-cyan-300/15 ${l === lang ? "border-cyan-300/60 bg-cyan-400/15 text-cyan-100" : "border-white/10 text-neutral-300 hover:bg-white/10"}`}
+                  >
+                    {TV_LANG_NAMES[l]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <GlobalTvStyles />
     </div>
@@ -311,7 +398,8 @@ function PairingScreen({ onPaired }: { onPaired: (token: string) => void }) {
 
 type Mode = "screensaver" | "pin" | "panel";
 
-function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string; onUnpair: () => void; justPaired?: boolean }) {
+function ScreenDisplay({ token, onUnpair, justPaired = false, appMode = false }: { token: string; onUnpair: () => void; justPaired?: boolean; appMode?: boolean }) {
+  const t = useT();
   const [state, setState] = useState<TvState | null>(null);
   const [showConnected, setShowConnected] = useState(false);
   const hasState = !!state;
@@ -472,8 +560,17 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
     return () => window.removeEventListener("nexbill:refresh", onRefresh);
   }, []);
 
-  /** Aktivitas apa pun dari remote membangunkan layar. */
+  /**
+   * Aktivitas apa pun dari remote membangunkan layar — HANYA di browser biasa. Di aplikasi NEXBILL TV,
+   * tombol OK/Menu dipakai aplikasi untuk panel kasir & PIN; dulu halaman ini ikut pindah ke PIN/panel
+   * web saat tombol arah ditekan, lalu "Kembali ke screensaver" tidak bisa dipilih karena OK diambil
+   * aplikasi (membuka panel kasir). Di aplikasi, halaman ini selalu screensaver.
+   */
   useEffect(() => {
+    if (appMode) {
+      setMode("screensaver");
+      return;
+    }
     const wake = () => {
       lastActivityRef.current = Date.now();
       setMode((prev) => {
@@ -487,7 +584,7 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
       window.removeEventListener("keydown", wake);
       window.removeEventListener("click", wake);
     };
-  }, [state?.display.requiresPin]);
+  }, [state?.display.requiresPin, appMode]);
 
   /** Kembali ke screensaver setelah idleMinutes tanpa aktivitas. */
   useEffect(() => {
@@ -519,7 +616,7 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
           <div className="h-1 w-56 rounded-full bg-white/10 overflow-hidden">
             <div className="h-full w-1/3 rounded-full bg-cyan-300 nb-loading" />
           </div>
-          <div className="text-neutral-400 text-2xl">{offline ? "Menyambungkan ulang…" : "Memuat…"}</div>
+          <div className="text-neutral-400 text-2xl">{offline ? t("reconnecting") : t("loading")}</div>
         </div>
         <GlobalTvStyles />
       </div>
@@ -533,11 +630,9 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
         <div className="relative z-10 min-h-screen flex flex-col items-center justify-center gap-5 text-center p-10">
           <OutletIdentity state={state} offline={offline} centered />
           <div className={`mt-6 rounded-3xl p-8 max-w-3xl ${GLASS}`}>
-            <div className="text-neutral-200 text-3xl font-semibold">Screensaver tidak aktif</div>
+            <div className="text-neutral-200 text-3xl font-semibold">{t("disabled.title")}</div>
             <p className="text-neutral-400 text-xl mt-3">{state.disabledReason}</p>
-            <p className="text-neutral-500 text-lg mt-3">
-              Layar <span className="text-neutral-200">{state.screenName}</span> tetap terhubung dan menyala sendiri begitu masalah di atas dibereskan di dashboard.
-            </p>
+            <p className="text-neutral-500 text-lg mt-3">{t("disabled.body", { screen: state.screenName })}</p>
           </div>
         </div>
         <GlobalTvStyles />
@@ -594,7 +689,7 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
         {mode === "screensaver" && alertKind && (
           <AlertScreen kind={alertKind} state={state} liveView={liveView} unitQrDataUrl={unitQrDataUrl} driftStyle={driftStyle} syncNote={alertKind === "ended" ? (appLocal?.failed ? "failed" : appLocal?.pending ? "pending" : null) : null} />
         )}
-        {mode === "screensaver" && !alertKind && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} offline={offline} lastOkAt={lastOkAt} />}
+        {mode === "screensaver" && !alertKind && <Screensaver state={state} liveView={liveView} qrDataUrl={qrDataUrl} now={now} driftStyle={driftStyle} offline={offline} lastOkAt={lastOkAt} appMode={appMode} />}
         {mode === "pin" && <PinPrompt token={token} accent={accent} state={state} onOk={() => setMode("panel")} onCancel={() => setMode("screensaver")} />}
         {mode === "panel" && <UnitPanel state={state} liveView={liveView} offline={offline} onBack={() => setMode("screensaver")} />}
       </div>
@@ -603,10 +698,10 @@ function ScreenDisplay({ token, onUnpair, justPaired = false }: { token: string;
       {showConnected && (
         <div className="fixed inset-x-0 top-10 z-30 flex justify-center pointer-events-none nb-fade-in">
           <div className="rounded-3xl px-10 py-6 bg-emerald-500/15 border border-emerald-300/40 shadow-[0_0_60px_rgba(16,185,129,0.35)] text-center">
-            <div className="text-emerald-200 text-xl tracking-[0.2em] font-semibold">✓ TERHUBUNG</div>
+            <div className="text-emerald-200 text-xl tracking-[0.2em] font-semibold">{t("connected")}</div>
             <div className="text-3xl md:text-4xl font-bold mt-1">{state.outletName}</div>
             {state.outletAddress && <div className="text-lg md:text-xl text-neutral-300 mt-1">{state.outletAddress}</div>}
-            {state.unitName && <div className="text-base text-neutral-400 mt-2">Unit: {state.unitName}</div>}
+            {state.unitName && <div className="text-base text-neutral-400 mt-2">{t("unit")}: {state.unitName}</div>}
           </div>
         </div>
       )}
@@ -667,6 +762,7 @@ function Wordmark({ small }: { small?: boolean }) {
 
 /** Nama & alamat outlet + status sambungan — selalu tampil supaya jelas TV ini milik outlet mana. */
 function OutletIdentity({ state, offline, centered, lastOkAt }: { state: TvState; offline: boolean; centered?: boolean; lastOkAt?: number | null }) {
+  const t = useT();
   const agoMin = lastOkAt ? Math.max(0, Math.round((Date.now() - lastOkAt) / 60_000)) : null;
   const initial = state.outletName.trim().charAt(0).toUpperCase() || "N";
   return (
@@ -691,8 +787,8 @@ function OutletIdentity({ state, offline, centered, lastOkAt }: { state: TvState
         <div className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm md:text-base ${offline ? "bg-amber-400/10 text-amber-200" : "bg-emerald-400/10 text-emerald-200"}`}>
           <span className={`h-2 w-2 rounded-full ${offline ? "bg-amber-300" : "bg-emerald-300 nb-dot"}`} />
           {offline
-            ? `Offline${agoMin !== null ? ` · terakhir terhubung ${agoMin < 1 ? "baru saja" : `${agoMin} mnt lalu`}` : ""} — waktu sesi tetap dihitung di TV`
-            : `Terhubung ke dashboard${state.unitName ? ` · ${state.unitName}` : ""}`}
+            ? `${t("offline")}${agoMin !== null ? ` · ${t("offlineSince", { ago: agoMin < 1 ? t("justNow") : t("minAgo", { n: agoMin }) })}` : ""} — ${t("offlineNote")}`
+            : `${t("online")}${state.unitName ? ` · ${state.unitName}` : ""}`}
         </div>
       </div>
     </div>
@@ -766,6 +862,7 @@ function AlertScreen({
   /** Khusus "ended": stop dari TV masih dikirim ke kasir / ditolak server. */
   syncNote?: "pending" | "failed" | null;
 }) {
+  const t = useT();
   const ended = kind === "ended";
   const timeUp = kind === "timeUp" || ended;
   const color = timeUp ? "#fb7185" : "#fbbf24";
@@ -778,13 +875,13 @@ function AlertScreen({
         <Ring progress={progress} size={340} stroke={18} color={color}>
           {timeUp ? (
             <div className="text-5xl md:text-6xl font-black" style={{ color }}>
-              {ended ? "SESI" : "WAKTU"}
+              {ended ? t("ended1") : t("timeUp1")}
               <br />
-              {ended ? "SELESAI" : "HABIS"}
+              {ended ? t("ended2") : t("timeUp2")}
             </div>
           ) : (
             <>
-              <div className="text-lg tracking-[0.3em] text-amber-200/80">SISA WAKTU</div>
+              <div className="text-lg tracking-[0.3em] text-amber-200/80">{t("timeLeft")}</div>
               <div className="text-7xl md:text-8xl font-black tabular-nums leading-none mt-2">{formatDuration(liveView.remainingSeconds)}</div>
             </>
           )}
@@ -793,18 +890,18 @@ function AlertScreen({
           <div className={`rounded-3xl p-6 ${GLASS}`}>
             <img src={unitQrDataUrl} alt="QR unit" className="w-52 h-52 md:w-60 md:h-60 rounded-2xl bg-white p-2" />
             <div className="mt-4 text-lg md:text-xl text-neutral-300 max-w-[15rem]">
-              {timeUp ? "Scan untuk lihat tagihan & panggil kasir" : "Scan untuk tambah waktu, pesan makanan, atau panggil kasir"}
-              <div className="mt-1 text-base text-neutral-500">Tanpa aplikasi — cukup kamera HP</div>
+              {timeUp ? t("scanBill") : t("scanExtend")}
+              <div className="mt-1 text-base text-neutral-500">{t("noApp")}</div>
             </div>
           </div>
         )}
       </div>
       <div className="mt-10 text-3xl md:text-4xl text-neutral-100 max-w-4xl font-medium">
-        {timeUp ? "Terima kasih sudah bermain! Silakan selesaikan pembayaran di kasir." : "Mau lanjut main? Tambah waktu sekarang sebelum habis."}
+        {timeUp ? t("thanks") : t("extendAsk")}
       </div>
-      {!unitQrDataUrl && <div className="mt-4 text-2xl text-neutral-400">Hubungi kasir untuk {timeUp ? "pembayaran" : "tambah waktu"}.</div>}
-      {syncNote === "pending" && <div className="mt-4 text-xl text-neutral-500">Mengirim ke kasir…</div>}
-      {syncNote === "failed" && <div className="mt-4 text-xl text-amber-300">Belum tercatat di kasir — kasir: buka Status sinkron di panel TV.</div>}
+      {!unitQrDataUrl && <div className="mt-4 text-2xl text-neutral-400">{timeUp ? t("callPay") : t("callExtend")}</div>}
+      {syncNote === "pending" && <div className="mt-4 text-xl text-neutral-500">{t("syncPending")}</div>}
+      {syncNote === "failed" && <div className="mt-4 text-xl text-amber-300">{t("syncFailed")}</div>}
       <div className="mt-12 flex flex-col items-center gap-1 text-neutral-500">
         <div className="text-lg md:text-xl tracking-[0.2em]">{state.outletName.toUpperCase()}</div>
         {state.outletAddress && <div className="text-base">{state.outletAddress}</div>}
@@ -823,6 +920,7 @@ function Screensaver({
   driftStyle,
   offline,
   lastOkAt,
+  appMode = false,
 }: {
   state: TvState;
   liveView: TvUnitView;
@@ -831,7 +929,10 @@ function Screensaver({
   driftStyle: React.CSSProperties;
   offline: boolean;
   lastOkAt?: number | null;
+  appMode?: boolean;
 }) {
+  const t = useT();
+  const locale = useTvLocale();
   const d = state.display;
   const accent = d.accentColor;
   const clock = new Date(now);
@@ -844,10 +945,10 @@ function Screensaver({
         {d.showClock && (
           <div className="text-right shrink-0">
             <div className="text-6xl md:text-8xl font-extralight tabular-nums tracking-tight leading-none">
-              {clock.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}
+              {clock.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}
             </div>
             <div className="text-neutral-400 text-lg md:text-2xl mt-2">
-              {clock.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jakarta" })}
+              {clock.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jakarta" })}
             </div>
           </div>
         )}
@@ -873,7 +974,7 @@ function Screensaver({
               {d.priceText}
             </div>
           )}
-          {!d.headline && !d.priceText && <div className="text-5xl md:text-7xl font-black tracking-tight">Siap Main?</div>}
+          {!d.headline && !d.priceText && <div className="text-5xl md:text-7xl font-black tracking-tight">{t("ready")}</div>}
         </div>
 
         {d.showUnitStatus && state.unitName && (
@@ -890,9 +991,9 @@ function Screensaver({
             <div className={`flex items-center gap-5 rounded-3xl p-4 pr-7 ${GLASS}`}>
               <img src={qrDataUrl} alt="QR booking" className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-white p-2" />
               <div>
-                <div className="text-sm tracking-[0.3em] text-neutral-400">BOOKING ONLINE</div>
-                <div className="text-2xl md:text-3xl font-bold mt-1">Scan &amp; pesan unit</div>
-                <div className="text-neutral-400 text-base mt-1">Tanpa aplikasi — cukup kamera HP</div>
+                <div className="text-sm tracking-[0.3em] text-neutral-400">{t("bookingOnline")}</div>
+                <div className="text-2xl md:text-3xl font-bold mt-1">{t("scanBook")}</div>
+                <div className="text-neutral-400 text-base mt-1">{t("noApp")}</div>
                 {state.bookingUrl && <div className="text-cyan-200/80 text-sm md:text-base mt-1 font-mono">{bookingHost()}{state.bookingUrl}</div>}
               </div>
             </div>
@@ -908,7 +1009,7 @@ function Screensaver({
         </div>
         <div className="text-right shrink-0 space-y-2">
           <Wordmark small />
-          <div className="text-neutral-500 text-sm md:text-base">Tekan tombol apa saja di remote</div>
+          <div className="text-neutral-500 text-sm md:text-base">{appMode ? t("pressAny") : t("pressAnyWeb")}</div>
         </div>
       </div>
     </div>
@@ -916,12 +1017,13 @@ function Screensaver({
 }
 
 function UnitStatusBadge({ unitName, liveView, accent, consoleType }: { unitName: string; liveView: TvUnitView; accent: string; consoleType?: string | null }) {
+  const t = useT();
   const consoleText = consoleLabel(consoleType ?? null);
   if (liveView.status === "maintenance") {
     return (
       <div className={`rounded-[2rem] px-10 py-8 text-center ${GLASS}`} style={{ borderColor: "rgba(251,191,36,0.45)" }}>
         <div className="text-3xl md:text-4xl font-bold">{unitName}</div>
-        <div className="mt-3 text-2xl md:text-3xl font-bold tracking-[0.15em] text-amber-300">SEDANG PERBAIKAN</div>
+        <div className="mt-3 text-2xl md:text-3xl font-bold tracking-[0.15em] text-amber-300">{t("maintenance")}</div>
       </div>
     );
   }
@@ -929,13 +1031,13 @@ function UnitStatusBadge({ unitName, liveView, accent, consoleType }: { unitName
   if (liveView.status === "available" || liveView.status === "unknown") {
     return (
       <div className={`rounded-[2rem] px-12 py-9 text-center ${GLASS}`} style={{ borderColor: hexA(accent, 0.5), boxShadow: `0 0 70px ${hexA(accent, 0.18)}` }}>
-        <div className="text-sm tracking-[0.35em] text-neutral-400">{consoleText ? consoleText.toUpperCase() : "UNIT"}</div>
+        <div className="text-sm tracking-[0.35em] text-neutral-400">{consoleText ? consoleText.toUpperCase() : t("unit").toUpperCase()}</div>
         <div className="text-4xl md:text-5xl font-black mt-1">{unitName}</div>
         <div className="mt-5 inline-flex items-center gap-3 rounded-full bg-emerald-400/15 px-6 py-2.5">
           <span className="h-3 w-3 rounded-full bg-emerald-300 nb-dot" />
-          <span className="text-2xl md:text-3xl font-bold tracking-[0.15em] text-emerald-300">TERSEDIA</span>
+          <span className="text-2xl md:text-3xl font-bold tracking-[0.15em] text-emerald-300">{t("available")}</span>
         </div>
-        <div className="text-lg md:text-xl text-neutral-400 mt-4">Hubungi kasir untuk mulai bermain</div>
+        <div className="text-lg md:text-xl text-neutral-400 mt-4">{t("callStart")}</div>
       </div>
     );
   }
@@ -946,18 +1048,18 @@ function UnitStatusBadge({ unitName, liveView, accent, consoleType }: { unitName
   const progress = total ? (liveView.remainingSeconds ?? 0) / total : 1;
   return (
     <div className={`rounded-[2rem] px-10 py-8 text-center flex flex-col items-center ${GLASS}`} style={{ borderColor: hexA(color, 0.4) }}>
-      <div className="text-sm tracking-[0.35em] text-neutral-400">{consoleText ? consoleText.toUpperCase() : "UNIT"}</div>
+      <div className="text-sm tracking-[0.35em] text-neutral-400">{consoleText ? consoleText.toUpperCase() : t("unit").toUpperCase()}</div>
       <div className="text-3xl md:text-4xl font-black mt-1 mb-5">{unitName}</div>
       <Ring progress={progress} size={230} stroke={14} color={color}>
         <div className="text-base tracking-[0.25em]" style={{ color }}>
-          {paused ? "DIJEDA" : liveView.remainingSeconds !== null ? (liveView.isOvertime ? "LEWAT WAKTU" : "SISA") : "BERJALAN"}
+          {paused ? t("paused") : liveView.remainingSeconds !== null ? (liveView.isOvertime ? t("overtime") : t("left")) : t("running")}
         </div>
         <div className="text-5xl md:text-6xl font-black tabular-nums leading-none mt-1">
           {liveView.remainingSeconds !== null && !liveView.isOvertime ? formatDuration(liveView.remainingSeconds) : formatDuration(liveView.elapsedSeconds)}
         </div>
       </Ring>
       <div className="mt-5 text-xl md:text-2xl font-bold tracking-[0.15em]" style={{ color }}>
-        {paused ? "SESI DIJEDA" : "SEDANG DIGUNAKAN"}
+        {paused ? t("sessionPaused") : t("inUse")}
       </div>
     </div>
   );
@@ -966,6 +1068,7 @@ function UnitStatusBadge({ unitName, liveView, accent, consoleType }: { unitName
 /** ---------------- PIN ---------------- */
 
 function PinPrompt({ token, accent, state, onOk, onCancel }: { token: string; accent: string; state: TvState; onOk: () => void; onCancel: () => void }) {
+  const t = useT();
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -984,16 +1087,16 @@ function PinPrompt({ token, accent, state, onOk, onCancel }: { token: string; ac
         const data = await res.json();
         if (data.ok) onOk();
         else {
-          setError("PIN salah.");
+          setError(t("pinWrong"));
           setPin("");
         }
       } catch {
-        setError("Tidak bisa menghubungi server.");
+        setError(t("serverDown"));
       } finally {
         setBusy(false);
       }
     },
-    [token, onOk]
+    [token, onOk, t]
   );
 
   // Ref, dengan alasan yang sama seperti di PairingScreen: submit tidak boleh dipanggil dari dalam
@@ -1021,7 +1124,7 @@ function PinPrompt({ token, accent, state, onOk, onCancel }: { token: string; ac
     <div className="min-h-screen flex items-center justify-center p-10 nb-fade-in">
       <div className={`rounded-[2rem] p-10 flex flex-col items-center gap-6 ${GLASS}`}>
         <Wordmark small />
-        <div className="text-3xl md:text-4xl font-bold">PIN Staf</div>
+        <div className="text-3xl md:text-4xl font-bold">{t("pinTitle")}</div>
         <div className="text-neutral-400 text-lg -mt-3">{state.outletName}{state.unitName ? ` · ${state.unitName}` : ""}</div>
         <div className="flex gap-3">
           {Array.from({ length: 6 }, (_, i) => (
@@ -1052,7 +1155,7 @@ function PinPrompt({ token, accent, state, onOk, onCancel }: { token: string; ac
           ))}
         </div>
         <button onClick={onCancel} className="text-neutral-400 text-lg underline-offset-4 hover:underline focus:outline-none focus:text-white">
-          Kembali ke screensaver
+          {t("backToSaver")}
         </button>
       </div>
     </div>
@@ -1070,6 +1173,7 @@ function PinPrompt({ token, accent, state, onOk, onCancel }: { token: string; ac
  * di aplikasi NEXBILL TV (tombol OK → PIN), bukan halaman ini.
  */
 function UnitPanel({ state, liveView, offline, onBack }: { state: TvState; liveView: TvUnitView; offline: boolean; onBack: () => void }) {
+  const t = useT();
   return (
     <div className="min-h-screen flex items-center justify-center p-10 nb-fade-in">
       <div className={`rounded-[2rem] p-10 w-full max-w-5xl ${GLASS}`}>
@@ -1080,24 +1184,22 @@ function UnitPanel({ state, liveView, offline, onBack }: { state: TvState; liveV
         <div className="mt-8 grid grid-cols-2 gap-8 items-center">
           <div className="space-y-4">
             <div>
-              <div className="text-sm tracking-[0.3em] text-neutral-400">LAYAR</div>
+              <div className="text-sm tracking-[0.3em] text-neutral-400">{t("screen")}</div>
               <div className="text-2xl font-semibold">{state.screenName}</div>
             </div>
             {state.consoleType && (
               <div>
-                <div className="text-sm tracking-[0.3em] text-neutral-400">KONSOL</div>
+                <div className="text-sm tracking-[0.3em] text-neutral-400">{t("console")}</div>
                 <div className="text-2xl font-semibold">{consoleLabel(state.consoleType)}</div>
               </div>
             )}
             {state.hourlyRate !== null && (
               <div>
-                <div className="text-sm tracking-[0.3em] text-neutral-400">TARIF</div>
-                <div className="text-2xl font-semibold">Rp{state.hourlyRate.toLocaleString("id-ID")}/jam</div>
+                <div className="text-sm tracking-[0.3em] text-neutral-400">{t("rate")}</div>
+                <div className="text-2xl font-semibold">Rp{state.hourlyRate.toLocaleString("id-ID")}{t("perHour")}</div>
               </div>
             )}
-            <p className="text-neutral-400 text-base leading-relaxed">
-              Halaman ini hanya informasi. Mulai, jeda, dan hentikan sesi dari kasir NEXBILL — atau di aplikasi NEXBILL TV: tekan OK → PIN.
-            </p>
+            <p className="text-neutral-400 text-base leading-relaxed">{t("panelInfo")}</p>
           </div>
           <div className="flex justify-center">
             <UnitStatusBadge unitName={state.unitName ?? state.screenName} liveView={liveView} accent={state.display.accentColor} consoleType={state.consoleType} />
@@ -1108,7 +1210,7 @@ function UnitPanel({ state, liveView, offline, onBack }: { state: TvState; liveV
             onClick={onBack}
             className="px-8 py-3 rounded-2xl bg-white/[0.06] border border-white/15 text-xl focus:outline-none focus:border-cyan-300 focus:bg-cyan-300/15"
           >
-            Kembali ke Screensaver
+            {t("backToSaver")}
           </button>
         </div>
       </div>

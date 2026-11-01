@@ -152,4 +152,19 @@
     <string name="history_d_sync">แดชบอร์ด: %1$s</string>
     <string name="history_d_id">รหัสเซสชัน: %1$s</string>
     <string name="history_note">เป็นเพียงบิลโดยประมาณ — ยอดจริงอยู่ที่แคชเชียร์ (ออเดอร์ที่เปิดอยู่) ประวัติเก็บในทีวีนี้ 62 วัน ข้อมูลครบอยู่ในแดชบอร์ด</string>
+    <string name="pin_cancel_back">ยกเลิก — กลับไปที่สกรีนเซฟเวอร์</string>
+    <string name="pin_too_short">PIN ต้องมีอย่างน้อย 4 หลัก</string>
+    <string name="menu_lang">ภาษา</string>
+    <string name="menu_lang_desc">ภาษาของแอปและหน้าจอทีวีนี้ (6 ภาษา)</string>
+    <string name="lang_system">ตามภาษาของทีวี</string>
+    <string name="menu_pin_style">รูปแบบการใส่ PIN พนักงาน</string>
+    <string name="menu_pin_style_desc">เต็มจอ = แป้นตัวเลขใหญ่ ใช้รีโมทง่าย ป๊อปอัป = กล่องเล็กพร้อมคีย์บอร์ดทีวี</string>
+    <string name="pin_style_inapp">เต็มจอในแอป</string>
+    <string name="pin_style_popup">ป๊อปอัป (กล่องโต้ตอบ)</string>
+    <string name="menu_close">ปิดแอป</string>
+    <string name="menu_close_desc">ออกจาก NEXBILL TV — ต้องใช้ PIN พนักงาน ตัวป้องกันหน้าจอหยุดชั่วคราว 30 นาที</string>
+    <string name="close_confirm">ปิด NEXBILL TV หรือไม่? ระหว่างปิดแอป ตัวจับเวลาและการล็อกหน้าจอจะไม่ทำงาน ตัวป้องกันหน้าจอหยุดชั่วคราว 30 นาที จากนั้น NEXBILL TV จะเปิดเองอีกครั้ง</string>
+    <string name="close_button">ปิดแอป</string>
+    <string name="closing_toast">ปิด NEXBILL TV แล้ว เปิดอีกครั้งได้จากรายการแอป — จะเปิดเองใน 30 นาที</string>
+    <string name="back_to_screensaver">กลับไปที่สกรีนเซฟเวอร์</string>
 </resources>

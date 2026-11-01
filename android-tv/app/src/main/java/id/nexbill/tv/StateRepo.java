@@ -26,6 +26,7 @@ final class StateRepo {
     /** PIN per staf yang pernah benar di TV ini: [{salt, hash, staffId, staffName}] — untuk dipakai saat offline. */
     private static final String K_PINS = "pins_v2";
     private static final String K_GUARD = "screen_guard";
+    private static final String K_PIN_INAPP = "pin_in_app";
 
     private static volatile TvState state;
     private static volatile long staffUntil;
@@ -283,6 +284,15 @@ final class StateRepo {
      * lain tidak bisa dipakai untuk main tanpa sesi atau melewati waktu habis. Owner bisa mematikannya
      * dari menu staf (ber-PIN) bila TV juga dipakai untuk keperluan lain.
      */
+    /** Tampilan PIN staf: true = layar penuh di aplikasi (bawaan), false = pop-up dengan keyboard TV. */
+    static boolean pinInApp(Context c) {
+        return prefs(c).getBoolean(K_PIN_INAPP, true);
+    }
+
+    static void setPinInApp(Context c, boolean on) {
+        prefs(c).edit().putBoolean(K_PIN_INAPP, on).apply();
+    }
+
     static boolean guardEnabled(Context c) {
         return prefs(c).getBoolean(K_GUARD, true);
     }
