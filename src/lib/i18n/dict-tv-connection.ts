@@ -4,6 +4,12 @@ import { registerDict } from "./registry";
 registerDict({
   "tvConn.online": { id: "TV terhubung", en: "TV connected", ms: "TV disambungkan", th: "ทีวีเชื่อมต่อแล้ว", fil: "Nakakonekta ang TV", vi: "TV đã kết nối" },
   "tvConn.offline": { id: "TV offline {n} mnt", en: "TV offline {n} min", ms: "TV luar talian {n} min", th: "ทีวีออฟไลน์ {n} นาที", fil: "Offline ang TV {n} min", vi: "TV mất kết nối {n} phút" },
+  "tvConn.offlineFor": { id: "TV offline {d}", en: "TV offline {d}", ms: "TV luar talian {d}", th: "ทีวีออฟไลน์ {d}", fil: "Offline ang TV {d}", vi: "TV mất kết nối {d}" },
+  "tvConn.durMin": { id: "{m} mnt", en: "{m} min", ms: "{m} min", th: "{m} นาที", fil: "{m} min", vi: "{m} phút" },
+  "tvConn.durHour": { id: "{h} jam", en: "{h} h", ms: "{h} jam", th: "{h} ชม.", fil: "{h} oras", vi: "{h} giờ" },
+  "tvConn.durHourMin": { id: "{h} jam {m} mnt", en: "{h} h {m} min", ms: "{h} jam {m} min", th: "{h} ชม. {m} นาที", fil: "{h} oras {m} min", vi: "{h} giờ {m} phút" },
+  "tvConn.durDay": { id: "{d} hari", en: "{d} d", ms: "{d} hari", th: "{d} วัน", fil: "{d} araw", vi: "{d} ngày" },
+  "tvConn.durDayHour": { id: "{d} hari {h} jam", en: "{d} d {h} h", ms: "{d} hari {h} jam", th: "{d} วัน {h} ชม.", fil: "{d} araw {h} oras", vi: "{d} ngày {h} giờ" },
   "tvConn.never": { id: "TV belum dipasangkan", en: "TV not paired yet", ms: "TV belum dipasangkan", th: "ทีวียังไม่จับคู่", fil: "Hindi pa naka-pair ang TV", vi: "TV chưa ghép nối" },
   "tvConn.startOfflineConfirm": {
     id: "TV unit {unit} sedang OFFLINE (terakhir terhubung {n} menit lalu). Sesi tetap tercatat dan tertagih, tapi layar game TIDAK akan terbuka otomatis. Pakai panel kasir di TV (OK → PIN) atau periksa WiFi/daya TV. Tetap mulai?",

@@ -1558,7 +1558,6 @@ function OnlineRentalPage() {
                         {consoleLabel(unit.consoleType)}
                       </span>
                       <span className="text-[10px] text-neutral-500 uppercase">{unit.tvType.replace("_", " ")}</span>
-                      <TvConnectionChip conn={tvConn.get(unit.id)} />
                     </div>
                   </div>
                   <Badge status={unit.status}>{(UNIT_STATUS_KEY[unit.status] ? t(UNIT_STATUS_KEY[unit.status], unit.status) : unit.status)}</Badge>
@@ -1775,6 +1774,9 @@ function OnlineRentalPage() {
                       : (UNIT_STATUS_KEY[unit.status] ? t(UNIT_STATUS_KEY[unit.status], unit.status) : unit.status)}
                   </Button>
                 )}
+
+                {/* Status NEXBILL TV di bawah tombol utama (Pilih Stasiun Ini / End Session). */}
+                <TvConnectionChip conn={tvConn.get(unit.id)} />
 
                 <div className="flex gap-2 pt-1 border-t border-white/10">
                   <Button variant="ghost" className="flex-1 flex items-center justify-center gap-1 text-xs" onClick={() => toggleDevice(unit, true)}>
