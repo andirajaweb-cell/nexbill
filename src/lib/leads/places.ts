@@ -125,7 +125,11 @@ export async function searchPlaces(textQuery: string, pageToken?: string): Promi
   });
 
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(describePlacesError(res.status, data));
+  if (!res.ok) {
+    // Detail lengkap ke log server (Vercel › Logs) — kunci TIDAK ikut dicatat.
+    console.warn("[places] ditolak", res.status, JSON.stringify(data)?.slice(0, 2000));
+    throw new Error(`${describePlacesError(res.status, data)} (key yang dipakai server berakhiran …${apiKey.slice(-4)})`);
+  }
 
   const results = ((data?.places ?? []) as RawPlace[]).map(normalizePlace).filter((p): p is PlaceResult => p !== null);
   return { results, nextPageToken: data?.nextPageToken ?? null };
@@ -155,7 +159,7 @@ export function describePlacesError(status: number, data: unknown): string {
   const hint =
     (reason && PLACES_ERROR_HINTS[reason]) ||
     (status === 403
-      ? "Cek di Google Cloud Console: \"Places API (New)\" aktif, billing aktif, dan API key ini tidak dibatasi ke API lain atau ke website/IP tertentu."
+      ? "Pastikan GOOGLE_MAPS_API_KEY di Vercel (Production) sama dengan key di Google Cloud — cocokkan 4 karakter terakhirnya — lalu redeploy. Bila sama: \"Places API (New)\" aktif di project key itu, project terhubung ke akun billing, dan key tidak dibatasi ke API lain atau website/IP tertentu."
       : null);
   return `Google Places API menolak permintaan: ${message}${reason ? ` [${reason}]` : ""}${hint ? ` — ${hint}` : ""}`;
 }
