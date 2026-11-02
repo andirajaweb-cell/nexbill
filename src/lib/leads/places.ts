@@ -125,11 +125,37 @@ export async function searchPlaces(textQuery: string, pageToken?: string): Promi
   });
 
   const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    const message = data?.error?.message ?? `HTTP ${res.status}`;
-    throw new Error(`Google Places API menolak permintaan: ${message}`);
-  }
+  if (!res.ok) throw new Error(describePlacesError(res.status, data));
 
   const results = ((data?.places ?? []) as RawPlace[]).map(normalizePlace).filter((p): p is PlaceResult => p !== null);
   return { results, nextPageToken: data?.nextPageToken ?? null };
+}
+
+/** Petunjuk perbaikan per alasan penolakan Google (error.details[].reason pada respons 4xx). */
+const PLACES_ERROR_HINTS: Record<string, string> = {
+  API_KEY_SERVICE_BLOCKED:
+    "API key ini dibatasi ke API lain. Google Cloud Console › APIs & Services › Credentials › key ini › API restrictions: tambahkan \"Places API (New)\" (atau pilih Don't restrict key).",
+  API_KEY_HTTP_REFERRER_BLOCKED:
+    "API key ini dibatasi ke website (HTTP referrer), padahal pencarian dipanggil dari server. Ubah Application restrictions key ini menjadi None, atau buat key khusus server.",
+  API_KEY_IP_ADDRESS_BLOCKED:
+    "API key ini dibatasi ke alamat IP tertentu, sedangkan server Vercel memakai IP yang berubah-ubah. Ubah Application restrictions key ini menjadi None.",
+  API_KEY_ANDROID_APP_BLOCKED: "API key ini dibatasi ke aplikasi Android. Pakai key terpisah untuk server dengan Application restrictions = None.",
+  API_KEY_IOS_APP_BLOCKED: "API key ini dibatasi ke aplikasi iOS. Pakai key terpisah untuk server dengan Application restrictions = None.",
+  SERVICE_DISABLED: "\"Places API (New)\" belum diaktifkan di project Google Cloud pemilik key ini. Aktifkan di APIs & Services › Library.",
+  BILLING_DISABLED: "Billing belum aktif di project Google Cloud pemilik key ini. Hubungkan akun billing.",
+  API_KEY_INVALID: "GOOGLE_MAPS_API_KEY tidak valid (salah salin atau sudah dihapus). Perbarui env lalu redeploy.",
+  API_KEY_EXPIRED: "GOOGLE_MAPS_API_KEY sudah kedaluwarsa. Buat key baru, perbarui env, lalu redeploy.",
+};
+
+/** Pesan error Places yang bisa langsung ditindaklanjuti admin (alasan Google + langkah perbaikan). */
+export function describePlacesError(status: number, data: unknown): string {
+  const err = (data as { error?: { message?: string; status?: string; details?: { reason?: string }[] } } | null)?.error;
+  const message = err?.message ?? `HTTP ${status}`;
+  const reason = err?.details?.map((d) => d?.reason).find((r): r is string => typeof r === "string" && r.length > 0) ?? null;
+  const hint =
+    (reason && PLACES_ERROR_HINTS[reason]) ||
+    (status === 403
+      ? "Cek di Google Cloud Console: \"Places API (New)\" aktif, billing aktif, dan API key ini tidak dibatasi ke API lain atau ke website/IP tertentu."
+      : null);
+  return `Google Places API menolak permintaan: ${message}${reason ? ` [${reason}]` : ""}${hint ? ` — ${hint}` : ""}`;
 }
