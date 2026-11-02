@@ -3,12 +3,12 @@ import { SITE_URL } from "@/app/layout";
 import { PillarPage, pillarFaqJsonLd } from "@/components/pillar/PillarPage";
 
 // SEO pillar page #3 of 4 — primary keyword "software rental PS". Content angle: comprehensive,
-// integrated software stack (9 modules) — for owners evaluating this as a "system" purchase, not
+// integrated software stack (12 modules) — for owners evaluating this as a "system" purchase, not
 // just a POS.
 export const metadata: Metadata = {
   title: "Software Rental PS All-in-One — NEXBILL",
   description:
-    "Software rental PS dengan 9 modul terintegrasi: kontrol TV/konsol otomatis, booking online, member, sampai laporan laba rugi. Bukan sekadar software kasir.",
+    "Software rental PS dengan 12 modul terintegrasi: kontrol TV/konsol otomatis, booking online, member, sampai laporan laba rugi. Bukan sekadar software kasir.",
   alternates: {
     canonical: `${SITE_URL}/software-rental-ps`,
     languages: {
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 const FAQ = [
   {
     q: "Apa yang membedakan NEXBILL dari aplikasi kasir biasa?",
-    a: "Kasir cuma satu dari sembilan modul — NEXBILL juga mengurus kontrol TV/konsol otomatis, booking online, manajemen member, hak akses staf, sampai laporan keuangan, semuanya saling terhubung dalam satu software.",
+    a: "Kasir cuma satu dari dua belas modul — NEXBILL juga mengurus kontrol TV/konsol otomatis (termasuk aplikasi NEXBILL TV di Android TV), booking online, manajemen member, hak akses staf, sampai laporan keuangan, semuanya saling terhubung dalam satu software.",
   },
   {
     q: "Apakah software ini bisa mengontrol TV dan konsol secara otomatis?",
@@ -47,7 +47,7 @@ export default function SoftwareRentalPsPage() {
         breadcrumbCurrent="Software Rental PS"
         kicker="Software Rental PS"
         h1="Software Rental PS All-in-One — Bukan Sekadar Kasir"
-        lede="NEXBILL bukan aplikasi kasir tempelan — sembilan modul terintegrasi menutup seluruh alur bisnis rental PlayStation, dari kontrol TV/konsol otomatis, booking online, sampai laporan laba rugi, dalam satu software yang tumbuh bareng outlet Anda."
+        lede="NEXBILL bukan aplikasi kasir tempelan — dua belas modul terintegrasi menutup seluruh alur bisnis rental PlayStation, dari kontrol TV/konsol otomatis, booking online, sampai laporan laba rugi, dalam satu software yang tumbuh bareng outlet Anda."
         ctaLabel="Coba Gratis 30 Hari"
         ctaSecondaryLabel="Lihat Harga"
         painSection={{
@@ -62,7 +62,7 @@ export default function SoftwareRentalPsPage() {
           { word: "UNIT KACAU", title: "Manajemen Unit PS/TV Berantakan", desc: "Tiap unit (PS4, PS5) punya kondisi berbeda. Tanpa pencatatan per unit, pelanggan gampang komplain karena salah dikasih unit." },
         ]}
         featureSection={{
-          kicker: "Satu Software, Sembilan Modul",
+          kicker: "Satu Software, Dua Belas Modul",
           title: "Cakupan software yang menutup seluruh operasional",
           sub: "Dari lantai kasir sampai laporan keuangan owner — tanpa software tambahan.",
         }}

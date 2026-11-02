@@ -3,11 +3,11 @@ import { SITE_URL } from "@/app/layout";
 import { PillarPage, pillarFaqJsonLd } from "@/components/pillar/PillarPage";
 
 // EN counterpart of /software-rental-ps — primary keyword "PlayStation rental management
-// software". Angle: comprehensive, integrated software stack (9 modules).
+// software". Angle: comprehensive, integrated software stack (12 modules).
 export const metadata: Metadata = {
   title: "PlayStation Rental Management Software — NEXBILL",
   description:
-    "PlayStation rental management software with 9 integrated modules: automatic TV/console control, online booking, membership, and P&L reports. Not just a POS.",
+    "PlayStation rental management software with 12 integrated modules: automatic TV/console control, online booking, membership, and P&L reports. Not just a POS.",
   alternates: {
     canonical: `${SITE_URL}/en/playstation-rental-management-software`,
     languages: {
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 const FAQ = [
   {
     q: "What sets NEXBILL apart from a basic POS app?",
-    a: "POS is just one of nine modules — NEXBILL also handles automatic TV/console control, online booking, membership management, staff access rights, and financial reporting, all connected within one software.",
+    a: "POS is just one of twelve modules — NEXBILL also handles automatic TV/console control (including the NEXBILL TV app on Android TV), online booking, membership management, staff access rights, and financial reporting, all connected within one software.",
   },
   {
     q: "Can this software control TVs and consoles automatically?",
@@ -46,7 +46,7 @@ export default function PlaystationRentalManagementSoftwarePage() {
         breadcrumbCurrent="PlayStation Rental Management Software"
         kicker="PlayStation Rental Management Software"
         h1="PlayStation Rental Management Software — Not Just a POS"
-        lede="NEXBILL isn't a bolted-on cashier app — nine integrated modules cover the entire PlayStation rental operation, from automatic TV/console control and online booking to profit & loss reporting, in one software that scales with your outlet."
+        lede="NEXBILL isn't a bolted-on cashier app — twelve integrated modules cover the entire PlayStation rental operation, from automatic TV/console control and online booking to profit & loss reporting, in one software that scales with your outlet."
         ctaLabel="Start Free for 30 Days"
         ctaSecondaryLabel="See Pricing"
         painSection={{
@@ -61,7 +61,7 @@ export default function PlaystationRentalManagementSoftwarePage() {
           { word: "UNIT CHAOS", title: "Messy PS/TV unit management", desc: "Every unit (PS4, PS5) is in different condition. Without per-unit tracking, customers easily complain about being handed the wrong unit." },
         ]}
         featureSection={{
-          kicker: "One Software, Nine Modules",
+          kicker: "One Software, Twelve Modules",
           title: "Coverage that spans the entire operation",
           sub: "From the front counter to the owner's P&L report — no extra software needed.",
         }}

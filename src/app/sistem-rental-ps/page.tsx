@@ -84,7 +84,7 @@ export default function SistemRentalPsPage() {
         related={[
           { label: "Detail perhitungan billing per detiknya →", href: "/billing-rental-ps" },
           { label: "Versi ringkas sebagai aplikasi harian →", href: "/aplikasi-rental-ps" },
-          { label: "Cakupan penuh sembilan modul software →", href: "/software-rental-ps" },
+          { label: "Cakupan penuh dua belas modul software →", href: "/software-rental-ps" },
         ]}
       />
     </>

@@ -1181,7 +1181,8 @@ function LandingPageInner() {
         </div>
       </section>
 
-      {/* SECTION: GAP KOMPETITIF — "Hanya di NEXBILL" (diperbarui 2026-10-11).
+      {/* SECTION: GAP KOMPETITIF — "Hanya di NEXBILL" (diperbarui 2026-10-11; baris Kalender Bisnis
+          ditambah 2026-11-02 dari tabel katalog yang dicek ulang 29 Okt 2026).
           Berisi HANYA fitur yang tidak tercantum di situs resmi 9 aplikasi billing rental PS lain yang
           dibandingkan pada 10 Okt 2026 (dokumen SWOT). Tidak menyebut nama produk mana pun dan memakai
           "Tidak disebut", bukan "tidak ada" — catatan dasar perbandingannya (t.gap.note) WAJIB tampil.
@@ -1226,8 +1227,9 @@ function LandingPageInner() {
       <AppShowcase copy={t.appShowcase} />
 
       {/* SECTION: KASIR TANPA PC — HP Android + printer Bluetooth + notifikasi push + scan kamera.
-          Klaim dijaga akurat: kontrol TV tanpa PC hanya lewat smart plug WiFi; Android TV tetap
-          memakai Relay Agent di perangkat outlet (disebut di kartu ketiga). */}
+          Klaim dijaga akurat: kontrol TV tanpa PC lewat smart plug WiFi atau aplikasi NEXBILL TV di
+          Android TV (kode pairing 6 digit, tanpa ADB); Relay Agent tetap disebut sebagai pilihan
+          (kartu ketiga, diperbarui 2026-11-02). */}
       <section id="kasir-tanpa-pc" style={{ backgroundColor: 'transparent' }}>
         <div className="wrap">
           <div className="section-head">

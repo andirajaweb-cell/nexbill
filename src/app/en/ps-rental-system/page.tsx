@@ -84,7 +84,7 @@ export default function PsRentalSystemPage() {
         related={[
           { label: "See the per-second billing details →", href: "/en/playstation-rental-billing-software" },
           { label: "The everyday app version →", href: "/en/playstation-rental-app" },
-          { label: "Full coverage across nine software modules →", href: "/en/playstation-rental-management-software" },
+          { label: "Full coverage across twelve software modules →", href: "/en/playstation-rental-management-software" },
         ]}
       />
     </>
