@@ -74,10 +74,19 @@ export const toolDefinitions: Anthropic.Tool[] = [
   },
 ];
 
-export async function executeTool(name: string, input: any, threadId: string): Promise<string> {
+interface AgentToolInput {
+  consoleType?: string;
+  category?: string;
+  items?: { productName: string; qty: number }[];
+  customerName?: string;
+  reason?: string;
+}
+
+export async function executeTool(name: string, rawInput: unknown, threadId: string, outletId: string): Promise<string> {
+  const input = (rawInput && typeof rawInput === "object" ? rawInput : {}) as AgentToolInput;
   switch (name) {
     case "check_rental_availability": {
-      const rows = await db.select().from(rentalUnits);
+      const rows = await db.select().from(rentalUnits).where(and(eq(rentalUnits.outletId, outletId), eq(rentalUnits.isActive, true)));
       const filtered =
         input.consoleType && input.consoleType !== "any"
           ? rows.filter((r) => r.consoleType === input.consoleType)
@@ -94,7 +103,7 @@ export async function executeTool(name: string, input: any, threadId: string): P
     }
 
     case "get_menu": {
-      const rows = await db.select().from(products).where(eq(products.isActive, true));
+      const rows = await db.select().from(products).where(and(eq(products.outletId, outletId), eq(products.isActive, true)));
       const filtered = input.category ? rows.filter((r) => r.category === input.category) : rows;
       return JSON.stringify(
         filtered.map((r) => ({ name: r.name, category: r.category, price: r.price, stock: r.stockQty }))
@@ -102,18 +111,18 @@ export async function executeTool(name: string, input: any, threadId: string): P
     }
 
     case "get_active_promos": {
-      const rows = await db.select().from(promos).where(eq(promos.isActive, true));
-      return JSON.stringify(rows);
+      const rows = await db.select().from(promos).where(and(eq(promos.outletId, outletId), eq(promos.isActive, true)));
+      return JSON.stringify(rows.map((p) => ({ name: p.name, type: p.type, description: p.description, consoleType: p.consoleType, durationMinutes: p.durationMinutes, packagePrice: p.packagePrice, discountPercent: p.discountPercent, discountAmount: p.discountAmount, validUntil: p.validUntil })));
     }
 
     case "create_preorder": {
       const [thread] = await db.select().from(chatThreads).where(eq(chatThreads.id, threadId)).limit(1);
-      const allProducts = await db.select().from(products);
+      const allProducts = await db.select().from(products).where(and(eq(products.outletId, outletId), eq(products.isActive, true)));
 
       let subtotal = 0;
       const lineItems: { productId?: string; description: string; qty: number; unitPrice: number; lineTotal: number }[] = [];
 
-      for (const item of input.items as { productName: string; qty: number }[]) {
+      for (const item of input.items ?? []) {
         const product = allProducts.find((p) => p.name.toLowerCase().includes(item.productName.toLowerCase()));
         const unitPrice = product?.price ?? 0;
         const lineTotal = unitPrice * item.qty;
@@ -130,7 +139,7 @@ export async function executeTool(name: string, input: any, threadId: string): P
       const [order] = await db
         .insert(orders)
         .values({
-          outletId: (await getDefaultOutletId()) ?? "",
+          outletId,
           customerId: thread?.customerId ?? null,
           status: "open",
           subtotal,
@@ -156,8 +165,10 @@ export async function executeTool(name: string, input: any, threadId: string): P
   }
 }
 
-async function getDefaultOutletId() {
+/** Outlet bot Instagram: env IG_AGENT_OUTLET_ID, cadangan outlet pertama (perilaku lama). */
+export async function agentOutletId(): Promise<string | null> {
+  if (process.env.IG_AGENT_OUTLET_ID) return process.env.IG_AGENT_OUTLET_ID;
   const { outlets } = await import("@/db/schema");
-  const [row] = await db.select().from(outlets).limit(1);
-  return row?.id;
+  const [row] = await db.select({ id: outlets.id }).from(outlets).limit(1);
+  return row?.id ?? null;
 }

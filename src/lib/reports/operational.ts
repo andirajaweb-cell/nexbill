@@ -36,6 +36,23 @@ async function recognizedOrders(outletId: string, from?: string, to?: string, ex
     .where(and(eq(orders.outletId, outletId), inArray(orders.status, [...RECOGNIZED_STATUSES]), ...rangeConditions(businessDate, from, to), ...extra));
 }
 
+/**
+ * Pendapatan diakui per hari (kalender WIB atas Business Date) — aturan yang sama dengan Laporan
+ * Penjualan. Dipakai AI Insights (tren/forecast/anomali) supaya angkanya cocok dengan Laporan.
+ */
+export async function dailyRecognizedRevenue(outletId: string, from?: string, to?: string): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ total: orders.total, businessDate: orders.businessDate, createdAt: orders.createdAt })
+    .from(orders)
+    .where(and(eq(orders.outletId, outletId), inArray(orders.status, [...RECOGNIZED_STATUSES]), ...rangeConditions(businessDate, from, to)));
+  const map = new Map<string, number>();
+  for (const o of rows) {
+    const day = outletDateYmd(new Date(o.businessDate ?? o.createdAt));
+    map.set(day, (map.get(day) ?? 0) + (o.total ?? 0));
+  }
+  return map;
+}
+
 const REVENUE_GROUP_LABEL: Record<string, string> = {
   "41": "Rental PS",
   "42": "F&B",

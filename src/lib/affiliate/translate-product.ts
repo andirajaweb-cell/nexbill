@@ -1,12 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
+import { AI_TRANSLATE_MODEL, createMessage } from "@/lib/ai/models";
 import type { LangCode } from "@/lib/i18n/registry";
 // Tipe dan pemilih bahasa tinggal di file MURNI terpisah supaya halaman "use client" bisa
 // memakainya tanpa ikut menarik SDK Anthropic di bawah ini ke bundel browser.
 import type { ProductTranslatableFields, ProductTranslations } from "./product-lang";
 export type { ProductTranslatableFields, ProductTranslations } from "./product-lang";
 export { pickProductLang } from "./product-lang";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 /** Bahasa tujuan — Indonesia tidak termasuk karena kolom aslinya di tabel SUDAH berbahasa Indonesia. */
 const TARGET_LANGS: { code: Exclude<LangCode, "id">; label: string }[] = [
@@ -51,8 +50,8 @@ export async function translateProductFields(input: ProductTranslatableFields): 
   const langList = TARGET_LANGS.map((l) => `"${l.code}" (${l.label})`).join(", ");
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-5",
+    const response = await createMessage({
+      model: AI_TRANSLATE_MODEL,
       max_tokens: 2048,
       system: [
         "Kamu penerjemah katalog produk untuk NEXBILL, SaaS POS/rental PlayStation di Asia Tenggara.",

@@ -17,12 +17,12 @@ registerDict({
   // --- Payment-gated notice (role allowed, but no active AI Add-on/trial/unlimited plan) ---
   "ai.paywallTitle": { id: "AI Add-on Belum Aktif", en: "AI Add-on Not Active Yet", ms: "AI Add-on Belum Aktif", th: "AI Add-on ยังไม่เปิดใช้งาน", fil: "Hindi Pa Aktibo ang AI Add-on", vi: "AI Add-on chưa được kích hoạt" },
   "ai.paywallBody": {
-    id: "AI Business Intelligence adalah produk berbayar terpisah — gratis selama masa percobaan, setelah itu perlu AI Add-on aktif (atau paket unlimited) di halaman Langganan.",
-    en: "AI Business Intelligence is a separate paid product — free during the trial period, after which it needs an active AI Add-on (or an unlimited plan) on the Subscription page.",
-    ms: "AI Business Intelligence ialah produk berbayar berasingan — percuma semasa tempoh percubaan, selepas itu perlukan AI Add-on aktif (atau pelan tanpa had) di halaman Langganan.",
-    th: "AI Business Intelligence เป็นผลิตภัณฑ์แบบชำระเงินแยกต่างหาก — ใช้ฟรีในช่วงทดลองใช้ หลังจากนั้นต้องมี AI Add-on ที่ใช้งานอยู่ (หรือแพ็กเกจไม่จำกัด) ที่หน้าการสมัครสมาชิก",
-    fil: "Ang AI Business Intelligence ay hiwalay na bayad na produkto — libre habang trial period, pagkatapos noon kailangan ng aktibong AI Add-on (o unlimited plan) sa Subscription page.",
-    vi: "AI Business Intelligence là sản phẩm trả phí riêng — miễn phí trong thời gian dùng thử, sau đó cần AI Add-on đang hoạt động (hoặc gói không giới hạn) tại trang Đăng ký gói.",
+    id: "AI Business Intelligence gratis selama masa percobaan, termasuk di paket Pro dan Akses Gratis Selamanya. Untuk paket Starter, aktifkan AI Add-on di halaman Langganan.",
+    en: "AI Business Intelligence is free during the trial and included in the Pro plan and Free Forever Access. On the Starter plan, activate the AI Add-on on the Subscription page.",
+    ms: "AI Business Intelligence percuma semasa tempoh percubaan, termasuk dalam pelan Pro dan Akses Percuma Selamanya. Untuk pelan Starter, aktifkan AI Add-on di halaman Langganan.",
+    th: "AI Business Intelligence ใช้ฟรีในช่วงทดลองใช้ และรวมอยู่ในแพ็กเกจ Pro และสิทธิ์ใช้ฟรีตลอดไป สำหรับแพ็กเกจ Starter ให้เปิดใช้งาน AI Add-on ที่หน้าการสมัครสมาชิก",
+    fil: "Libre ang AI Business Intelligence habang trial, at kasama sa Pro plan at Libreng Access Habambuhay. Sa Starter plan, i-activate ang AI Add-on sa Subscription page.",
+    vi: "AI Business Intelligence miễn phí trong thời gian dùng thử, đã bao gồm trong gói Pro và Quyền truy cập miễn phí vĩnh viễn. Với gói Starter, hãy kích hoạt AI Add-on tại trang Đăng ký gói.",
   },
   "ai.paywallCta": { id: "Aktifkan AI Add-on", en: "Activate AI Add-on", ms: "Aktifkan AI Add-on", th: "เปิดใช้งาน AI Add-on", fil: "I-activate ang AI Add-on", vi: "Kích hoạt AI Add-on" },
 

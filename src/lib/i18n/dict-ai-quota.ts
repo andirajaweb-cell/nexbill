@@ -1,0 +1,168 @@
+import { registerDict } from "./registry";
+
+/**
+ * Halaman /dashboard/ai (2026-11-02): kuota AI per outlet, pesan error AI, label sumber data (tool
+ * terintegrasi), saran pertanyaan lintas fitur, dan teks Insight yang diperbarui.
+ */
+registerDict({
+  "aiq.pageSubtitle": {
+    id: "Tanya jawab data bisnis secara natural — terhubung ke Rental PS, booking, kasir & shift, F&B & stok, NEXBILL TV, Kalender Bisnis, keuangan, PPOB, dan Rental ke Rumah — plus tren, forecast, anomali, dan rekomendasi.",
+    en: "Ask about your business in plain language — connected to PS Rental, bookings, cashier & shifts, F&B & stock, NEXBILL TV, Business Calendar, finance, PPOB, and Home Rental — plus trends, forecasts, anomalies, and recommendations.",
+    ms: "Tanya jawab data perniagaan secara semula jadi — bersambung ke Rental PS, tempahan, juruwang & syif, F&B & stok, NEXBILL TV, Kalendar Perniagaan, kewangan, PPOB, dan Sewa ke Rumah — serta tren, ramalan, anomali, dan cadangan.",
+    th: "ถาม-ตอบข้อมูลธุรกิจแบบภาษาธรรมชาติ — เชื่อมกับเช่า PS, การจอง, แคชเชียร์และกะ, F&B และสต็อก, NEXBILL TV, ปฏิทินธุรกิจ, การเงิน, PPOB และเช่ากลับบ้าน — พร้อมแนวโน้ม พยากรณ์ ความผิดปกติ และคำแนะนำ",
+    fil: "Magtanong tungkol sa negosyo nang natural — konektado sa PS Rental, booking, cashier at shift, F&B at stock, NEXBILL TV, Business Calendar, finance, PPOB, at Home Rental — kasama ang trends, forecast, anomalya, at rekomendasyon.",
+    vi: "Hỏi đáp dữ liệu kinh doanh tự nhiên — kết nối với Cho thuê PS, đặt chỗ, thu ngân & ca, F&B & tồn kho, NEXBILL TV, Lịch kinh doanh, tài chính, PPOB và Cho thuê tại nhà — kèm xu hướng, dự báo, bất thường và đề xuất.",
+  },
+
+  // --- Kuota ---
+  "aiq.title": { id: "Kuota AI outlet", en: "Outlet AI quota", ms: "Kuota AI outlet", th: "โควตา AI ของสาขา", fil: "AI quota ng outlet", vi: "Hạn mức AI của cửa hàng" },
+  "aiq.tier.paid": { id: "Paket berbayar", en: "Paid plan", ms: "Pelan berbayar", th: "แพ็กเกจแบบชำระเงิน", fil: "Bayad na plan", vi: "Gói trả phí" },
+  "aiq.tier.trial": { id: "Masa percobaan", en: "Trial", ms: "Tempoh percubaan", th: "ช่วงทดลองใช้", fil: "Trial", vi: "Dùng thử" },
+  "aiq.tier.freeForever": { id: "Akses Gratis Selamanya", en: "Free Forever Access", ms: "Akses Percuma Selamanya", th: "สิทธิ์ใช้ฟรีตลอดไป", fil: "Libreng Access Habambuhay", vi: "Miễn phí vĩnh viễn" },
+  "aiq.tier.internal": { id: "Akun internal", en: "Internal account", ms: "Akaun dalaman", th: "บัญชีภายใน", fil: "Internal account", vi: "Tài khoản nội bộ" },
+  "aiq.questions": {
+    id: "Pertanyaan: {d}/{dl} hari ini · {m}/{ml} bulan ini",
+    en: "Questions: {d}/{dl} today · {m}/{ml} this month",
+    ms: "Soalan: {d}/{dl} hari ini · {m}/{ml} bulan ini",
+    th: "คำถาม: {d}/{dl} วันนี้ · {m}/{ml} เดือนนี้",
+    fil: "Tanong: {d}/{dl} ngayon · {m}/{ml} ngayong buwan",
+    vi: "Câu hỏi: {d}/{dl} hôm nay · {m}/{ml} tháng này",
+  },
+  "aiq.recos": { id: "Rekomendasi: {d}/{dl} hari ini", en: "Recommendations: {d}/{dl} today", ms: "Cadangan: {d}/{dl} hari ini", th: "คำแนะนำ: {d}/{dl} วันนี้", fil: "Rekomendasyon: {d}/{dl} ngayon", vi: "Đề xuất: {d}/{dl} hôm nay" },
+  "aiq.budget": { id: "Anggaran AI bulan ini terpakai {pct}%", en: "This month's AI budget used: {pct}%", ms: "Bajet AI bulan ini digunakan {pct}%", th: "ใช้งบ AI เดือนนี้ไปแล้ว {pct}%", fil: "Nagamit na ang {pct}% ng AI budget ngayong buwan", vi: "Đã dùng {pct}% ngân sách AI tháng này" },
+  "aiq.fairUse": {
+    id: "batas wajar per outlet supaya layanan AI tetap cepat untuk semua merchant; terisi lagi tiap hari/awal bulan.",
+    en: "a fair-use limit per outlet so AI stays fast for every merchant; it refills daily/at the start of each month.",
+    ms: "had penggunaan wajar setiap outlet supaya AI kekal pantas untuk semua peniaga; diisi semula setiap hari/awal bulan.",
+    th: "ขีดจำกัดการใช้งานที่เหมาะสมต่อสาขา เพื่อให้ AI เร็วสำหรับทุกร้าน เติมใหม่ทุกวัน/ต้นเดือน",
+    fil: "fair-use na limit bawat outlet para mabilis ang AI para sa lahat ng merchant; napupuno ulit araw-araw/simula ng buwan.",
+    vi: "giới hạn sử dụng hợp lý cho mỗi cửa hàng để AI luôn nhanh cho mọi người bán; được làm mới mỗi ngày/đầu tháng.",
+  },
+
+  // --- Error ---
+  "aiq.err.daily": {
+    id: "Batas pertanyaan AI hari ini untuk outlet ini sudah tercapai ({used}/{limit}). Kuota terisi lagi besok.",
+    en: "This outlet has reached today's AI limit ({used}/{limit}). The quota refills tomorrow.",
+    ms: "Had AI hari ini untuk outlet ini sudah dicapai ({used}/{limit}). Kuota diisi semula esok.",
+    th: "สาขานี้ใช้ AI ครบโควตาวันนี้แล้ว ({used}/{limit}) โควตาจะเติมใหม่พรุ่งนี้",
+    fil: "Naabot na ng outlet na ito ang AI limit ngayong araw ({used}/{limit}). Mapupuno ulit bukas.",
+    vi: "Cửa hàng đã đạt giới hạn AI hôm nay ({used}/{limit}). Hạn mức sẽ được làm mới vào ngày mai.",
+  },
+  "aiq.err.monthly": {
+    id: "Batas AI bulan ini untuk outlet ini sudah tercapai ({used}/{limit}). Kuota terisi lagi awal bulan depan.",
+    en: "This outlet has reached this month's AI limit ({used}/{limit}). The quota refills at the start of next month.",
+    ms: "Had AI bulan ini untuk outlet ini sudah dicapai ({used}/{limit}). Kuota diisi semula awal bulan depan.",
+    th: "สาขานี้ใช้ AI ครบโควตาเดือนนี้แล้ว ({used}/{limit}) โควตาจะเติมใหม่ต้นเดือนหน้า",
+    fil: "Naabot na ng outlet na ito ang AI limit ngayong buwan ({used}/{limit}). Mapupuno ulit sa simula ng susunod na buwan.",
+    vi: "Cửa hàng đã đạt giới hạn AI tháng này ({used}/{limit}). Hạn mức sẽ được làm mới đầu tháng sau.",
+  },
+  "aiq.err.tokens": {
+    id: "Anggaran AI bulan ini untuk outlet ini sudah habis. Kuota terisi lagi awal bulan depan.",
+    en: "This outlet's AI budget for this month is used up. It refills at the start of next month.",
+    ms: "Bajet AI bulan ini untuk outlet ini sudah habis. Kuota diisi semula awal bulan depan.",
+    th: "งบ AI เดือนนี้ของสาขานี้หมดแล้ว จะเติมใหม่ต้นเดือนหน้า",
+    fil: "Ubos na ang AI budget ng outlet na ito ngayong buwan. Mapupuno ulit sa simula ng susunod na buwan.",
+    vi: "Ngân sách AI tháng này của cửa hàng đã hết. Sẽ được làm mới đầu tháng sau.",
+  },
+  "aiq.err.provider": {
+    id: "Layanan AI sedang sibuk atau menolak permintaan. Coba lagi sebentar lagi.",
+    en: "The AI service is busy or rejected the request. Please try again shortly.",
+    ms: "Perkhidmatan AI sedang sibuk atau menolak permintaan. Cuba lagi sebentar lagi.",
+    th: "บริการ AI ไม่ว่างหรือปฏิเสธคำขอ กรุณาลองใหม่อีกครั้งในอีกสักครู่",
+    fil: "Abala o tinanggihan ng AI service ang request. Subukan ulit mamaya.",
+    vi: "Dịch vụ AI đang bận hoặc từ chối yêu cầu. Vui lòng thử lại sau ít phút.",
+  },
+  "aiq.err.notConfigured": { id: "AI belum dikonfigurasi di server. Hubungi tim NEXBILL.", en: "AI isn't configured on the server yet. Contact the NEXBILL team.", ms: "AI belum dikonfigurasi di pelayan. Hubungi pasukan NEXBILL.", th: "ยังไม่ได้ตั้งค่า AI บนเซิร์ฟเวอร์ กรุณาติดต่อทีม NEXBILL", fil: "Hindi pa naka-configure ang AI sa server. Makipag-ugnayan sa NEXBILL team.", vi: "AI chưa được cấu hình trên máy chủ. Liên hệ đội NEXBILL." },
+  "aiq.err.network": { id: "koneksi terputus", en: "connection lost", ms: "sambungan terputus", th: "การเชื่อมต่อขาดหาย", fil: "naputol ang koneksyon", vi: "mất kết nối" },
+  "aiq.retry": { id: "Coba lagi", en: "Try again", ms: "Cuba lagi", th: "ลองอีกครั้ง", fil: "Subukan ulit", vi: "Thử lại" },
+
+  // --- Asisten ---
+  "aiq.greeting": {
+    id: "Halo! Aku Business Assistant kamu. Tanya apa saja — penjualan, rental & booking, shift kasir, stok F&B, NEXBILL TV, Kalender Bisnis (cuaca, libur, ujian, jadwal bola), sampai laba rugi. Aku cek datanya langsung.",
+    en: "Hi! I'm your Business Assistant. Ask me anything — sales, rentals & bookings, cashier shifts, F&B stock, NEXBILL TV, the Business Calendar (weather, holidays, exams, football), even profit & loss. I check the data directly.",
+    ms: "Hai! Saya Pembantu Perniagaan anda. Tanya apa sahaja — jualan, sewaan & tempahan, syif juruwang, stok F&B, NEXBILL TV, Kalendar Perniagaan (cuaca, cuti, peperiksaan, jadual bola), hingga untung rugi. Saya semak datanya terus.",
+    th: "สวัสดี! ฉันคือผู้ช่วยธุรกิจของคุณ ถามได้ทุกเรื่อง — ยอดขาย การเช่าและการจอง กะแคชเชียร์ สต็อก F&B, NEXBILL TV, ปฏิทินธุรกิจ (อากาศ วันหยุด สอบ ตารางฟุตบอล) จนถึงกำไรขาดทุน ฉันตรวจข้อมูลให้ทันที",
+    fil: "Hi! Ako ang Business Assistant mo. Magtanong ng kahit ano — benta, rental at booking, cashier shift, F&B stock, NEXBILL TV, Business Calendar (panahon, holiday, exam, football), hanggang profit & loss. Direkta kong tinitingnan ang data.",
+    vi: "Xin chào! Mình là Trợ lý kinh doanh của bạn. Hỏi gì cũng được — doanh số, cho thuê & đặt chỗ, ca thu ngân, tồn kho F&B, NEXBILL TV, Lịch kinh doanh (thời tiết, ngày lễ, kỳ thi, bóng đá), cả lãi lỗ. Mình kiểm tra dữ liệu trực tiếp.",
+  },
+  "aiq.checking": { id: "Mengecek data outlet...", en: "Checking outlet data...", ms: "Menyemak data outlet...", th: "กำลังตรวจข้อมูลสาขา...", fil: "Tinitingnan ang data ng outlet...", vi: "Đang kiểm tra dữ liệu cửa hàng..." },
+  "aiq.sources": { id: "Data dari: {list}", en: "Data from: {list}", ms: "Data daripada: {list}", th: "ข้อมูลจาก: {list}", fil: "Data mula sa: {list}", vi: "Dữ liệu từ: {list}" },
+  "aiq.suggest.now": { id: "Bagaimana kondisi outlet sekarang?", en: "How is the outlet doing right now?", ms: "Bagaimana keadaan outlet sekarang?", th: "ตอนนี้สาขาเป็นอย่างไรบ้าง?", fil: "Kumusta ang outlet ngayon?", vi: "Tình hình cửa hàng hiện tại thế nào?" },
+  "aiq.suggest.plan": {
+    id: "Buat rencana promo & stok 7 hari ke depan dari Kalender Bisnis dan booking.",
+    en: "Make a promo & stock plan for the next 7 days from the Business Calendar and bookings.",
+    ms: "Buat rancangan promosi & stok 7 hari akan datang daripada Kalendar Perniagaan dan tempahan.",
+    th: "วางแผนโปรโมชันและสต็อก 7 วันข้างหน้าจากปฏิทินธุรกิจและการจอง",
+    fil: "Gumawa ng promo at stock plan para sa susunod na 7 araw mula sa Business Calendar at booking.",
+    vi: "Lập kế hoạch khuyến mãi & tồn kho 7 ngày tới từ Lịch kinh doanh và đặt chỗ.",
+  },
+  "aiq.suggest.shift": { id: "Shift mana yang selisih kasnya paling besar bulan ini?", en: "Which shift had the biggest cash difference this month?", ms: "Syif mana yang perbezaan tunainya paling besar bulan ini?", th: "กะไหนมีส่วนต่างเงินสดมากที่สุดเดือนนี้?", fil: "Aling shift ang may pinakamalaking cash difference ngayong buwan?", vi: "Ca nào chênh lệch tiền mặt lớn nhất tháng này?" },
+  "aiq.suggest.stock": { id: "Produk F&B apa yang stoknya menipis dan paling laku?", en: "Which F&B items are running low and selling best?", ms: "Produk F&B mana yang stoknya hampir habis dan paling laris?", th: "สินค้า F&B ไหนสต็อกใกล้หมดและขายดีที่สุด?", fil: "Aling F&B items ang paubos na at pinakamabenta?", vi: "Món F&B nào sắp hết hàng và bán chạy nhất?" },
+  "aiq.suggest.tv": { id: "Apakah semua NEXBILL TV online?", en: "Are all NEXBILL TVs online?", ms: "Adakah semua NEXBILL TV dalam talian?", th: "NEXBILL TV ทุกเครื่องออนไลน์อยู่ไหม?", fil: "Online ba lahat ng NEXBILL TV?", vi: "Tất cả NEXBILL TV có đang trực tuyến không?" },
+
+  // --- Label sumber data (tool) ---
+  "aiq.tool.today": { id: "kondisi outlet saat ini", en: "current outlet status", ms: "keadaan outlet semasa", th: "สถานะสาขาปัจจุบัน", fil: "kasalukuyang lagay ng outlet", vi: "tình hình cửa hàng hiện tại" },
+  "aiq.tool.sales": { id: "penjualan", en: "sales", ms: "jualan", th: "ยอดขาย", fil: "benta", vi: "doanh số" },
+  "aiq.tool.rental": { id: "rental per unit", en: "rental per unit", ms: "sewaan setiap unit", th: "การเช่าต่อเครื่อง", fil: "rental bawat unit", vi: "cho thuê theo máy" },
+  "aiq.tool.inventory": { id: "F&B & stok", en: "F&B & stock", ms: "F&B & stok", th: "F&B และสต็อก", fil: "F&B at stock", vi: "F&B & tồn kho" },
+  "aiq.tool.customers": { id: "pelanggan", en: "customers", ms: "pelanggan", th: "ลูกค้า", fil: "customer", vi: "khách hàng" },
+  "aiq.tool.bookings": { id: "booking", en: "bookings", ms: "tempahan", th: "การจอง", fil: "booking", vi: "đặt chỗ" },
+  "aiq.tool.calendar": { id: "Kalender Bisnis", en: "Business Calendar", ms: "Kalendar Perniagaan", th: "ปฏิทินธุรกิจ", fil: "Business Calendar", vi: "Lịch kinh doanh" },
+  "aiq.tool.shifts": { id: "shift kasir", en: "cashier shifts", ms: "syif juruwang", th: "กะแคชเชียร์", fil: "cashier shift", vi: "ca thu ngân" },
+  "aiq.tool.cashiers": { id: "performa kasir", en: "cashier performance", ms: "prestasi juruwang", th: "ผลงานแคชเชียร์", fil: "performance ng cashier", vi: "hiệu suất thu ngân" },
+  "aiq.tool.tv": { id: "NEXBILL TV", en: "NEXBILL TV", ms: "NEXBILL TV", th: "NEXBILL TV", fil: "NEXBILL TV", vi: "NEXBILL TV" },
+  "aiq.tool.promos": { id: "promo", en: "promos", ms: "promosi", th: "โปรโมชัน", fil: "promo", vi: "khuyến mãi" },
+  "aiq.tool.expenses": { id: "biaya", en: "expenses", ms: "perbelanjaan", th: "ค่าใช้จ่าย", fil: "gastos", vi: "chi phí" },
+  "aiq.tool.pl": { id: "laba rugi", en: "profit & loss", ms: "untung rugi", th: "กำไรขาดทุน", fil: "profit & loss", vi: "lãi lỗ" },
+  "aiq.tool.health": { id: "kesehatan keuangan", en: "financial health", ms: "kesihatan kewangan", th: "สุขภาพการเงิน", fil: "financial health", vi: "sức khỏe tài chính" },
+  "aiq.tool.balance": { id: "neraca", en: "balance sheet", ms: "kunci kira-kira", th: "งบดุล", fil: "balance sheet", vi: "bảng cân đối" },
+  "aiq.tool.cashflow": { id: "arus kas", en: "cash flow", ms: "aliran tunai", th: "กระแสเงินสด", fil: "cash flow", vi: "dòng tiền" },
+  "aiq.tool.assets": { id: "aset", en: "assets", ms: "aset", th: "สินทรัพย์", fil: "asset", vi: "tài sản" },
+  "aiq.tool.ppob": { id: "PPOB", en: "PPOB", ms: "PPOB", th: "PPOB", fil: "PPOB", vi: "PPOB" },
+  "aiq.tool.homeRental": { id: "Rental ke Rumah", en: "Home Rental", ms: "Sewa ke Rumah", th: "เช่ากลับบ้าน", fil: "Home Rental", vi: "Cho thuê tại nhà" },
+
+  // --- Insight ---
+  "aiq.trend.up": { id: "naik", en: "up", ms: "naik", th: "เพิ่มขึ้น", fil: "pataas", vi: "tăng" },
+  "aiq.trend.down": { id: "turun", en: "down", ms: "turun", th: "ลดลง", fil: "pababa", vi: "giảm" },
+  "aiq.trend.flat": { id: "stabil", en: "stable", ms: "stabil", th: "คงที่", fil: "stable", vi: "ổn định" },
+  "aiq.until": {
+    id: "Data sampai {date} (hari ini belum selesai, tidak dihitung).",
+    en: "Data up to {date} (today isn't over yet, so it's not counted).",
+    ms: "Data sehingga {date} (hari ini belum tamat, tidak dikira).",
+    th: "ข้อมูลถึง {date} (วันนี้ยังไม่จบ จึงไม่นับรวม)",
+    fil: "Data hanggang {date} (hindi pa tapos ang araw na ito, kaya hindi kasama).",
+    vi: "Dữ liệu đến {date} (hôm nay chưa kết thúc nên chưa tính).",
+  },
+  "aiq.forecastWeekday": {
+    id: "Tren {days} hari terakhir × pola hari dalam seminggu (rata-rata harian {avg}).",
+    en: "Trend of the last {days} days × day-of-week pattern (daily average {avg}).",
+    ms: "Tren {days} hari terakhir × corak hari dalam seminggu (purata harian {avg}).",
+    th: "แนวโน้ม {days} วันล่าสุด × รูปแบบวันในสัปดาห์ (เฉลี่ยต่อวัน {avg})",
+    fil: "Trend ng huling {days} araw × pattern ng araw sa linggo (average kada araw {avg}).",
+    vi: "Xu hướng {days} ngày gần nhất × mô hình theo thứ trong tuần (trung bình ngày {avg}).",
+  },
+  "aiq.anomalyNote": {
+    id: "Dibandingkan dengan hari yang sama dalam seminggu, jadi akhir pekan yang ramai tidak terbaca anomali.",
+    en: "Compared with the same day of the week, so busy weekends aren't flagged as anomalies.",
+    ms: "Dibandingkan dengan hari yang sama dalam seminggu, jadi hujung minggu yang sibuk tidak dikira anomali.",
+    th: "เทียบกับวันเดียวกันของสัปดาห์ วันหยุดสุดสัปดาห์ที่คึกคักจึงไม่ถูกนับเป็นความผิดปกติ",
+    fil: "Ikinukumpara sa parehong araw ng linggo, kaya hindi itinuturing na anomalya ang abalang weekend.",
+    vi: "So sánh với cùng thứ trong tuần, nên cuối tuần đông khách không bị coi là bất thường.",
+  },
+  "aiq.recommendationsHint": {
+    id: "Klik \"{btn}\" untuk analisa otomatis dari tren, forecast, anomali, plus Kalender Bisnis, booking, unit PS, stok F&B, shift, dan NEXBILL TV.",
+    en: "Click \"{btn}\" for an automatic analysis from trends, forecast, anomalies, plus the Business Calendar, bookings, PS units, F&B stock, shifts, and NEXBILL TV.",
+    ms: "Klik \"{btn}\" untuk analisis automatik daripada tren, ramalan, anomali, serta Kalendar Perniagaan, tempahan, unit PS, stok F&B, syif, dan NEXBILL TV.",
+    th: "คลิก \"{btn}\" เพื่อวิเคราะห์อัตโนมัติจากแนวโน้ม พยากรณ์ ความผิดปกติ รวมถึงปฏิทินธุรกิจ การจอง เครื่อง PS สต็อก F&B กะ และ NEXBILL TV",
+    fil: "I-click ang \"{btn}\" para sa awtomatikong analysis mula sa trends, forecast, anomalya, kasama ang Business Calendar, booking, PS unit, F&B stock, shift, at NEXBILL TV.",
+    vi: "Nhấn \"{btn}\" để phân tích tự động từ xu hướng, dự báo, bất thường, cùng Lịch kinh doanh, đặt chỗ, máy PS, tồn kho F&B, ca và NEXBILL TV.",
+  },
+  "aiq.generatedAt": {
+    id: "Dibuat {time}. Hasil disimpan 6 jam — membuka ulang tidak memakai kuota.",
+    en: "Generated {time}. Saved for 6 hours — reopening doesn't use quota.",
+    ms: "Dijana {time}. Disimpan 6 jam — membuka semula tidak menggunakan kuota.",
+    th: "สร้างเมื่อ {time} บันทึกไว้ 6 ชั่วโมง — เปิดดูอีกครั้งไม่ใช้โควตา",
+    fil: "Ginawa {time}. Naka-save nang 6 na oras — hindi gumagamit ng quota ang muling pagbukas.",
+    vi: "Tạo lúc {time}. Lưu trong 6 giờ — mở lại không tốn hạn mức.",
+  },
+});

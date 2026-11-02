@@ -10,8 +10,9 @@ import { describeError } from "@/lib/api/error";
  * Platform-admin-only toggle for "akses gratis selamanya" — grants (POST) or revokes (DELETE)
  * lifetime free access for one outlet/merchant. See grantFreeForever/revokeFreeForever in
  * lib/subscription/service.ts for exactly what this does to the outlet's subscription row (new
- * "free_forever" status: unlimited devices/branches/staff, never billed again, but the AI Add-on
- * still has to be purchased separately — same as any other outlet).
+ * "free_forever" status: unlimited devices/branches/staff, never billed again, AI Business
+ * Assistant & Insights included without the AI Add-on since 2026-11-02 — capped by the per-outlet
+ * AI usage quota in lib/ai/quota.ts).
  */
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

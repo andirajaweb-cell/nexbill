@@ -144,7 +144,7 @@ export const SISTEM: HelpCategory[] = [
       "Pay a bill: choose QRIS, bank Virtual Account, or another available method. After paying, press \"Mark as Paid\" if asked.",
       "\"Change Plan\": upgrading to Pro or adding Starter unit quota takes effect once the prorated difference is paid; downgrades, smaller quotas, or a different cycle apply at the next renewal. \"Renew Now\" creates the next period's bill early.",
       "Buy hardware: choose smart plugs or installation service, set quantities, check out — they appear on one bill.",
-      "AI: free during the trial and included in Pro; on Starter it is activated as the AI Add-on for a monthly fee.",
+      "AI: free during the trial, included in Pro and Free Forever Access; on Starter it is activated as the AI Add-on for a monthly fee.",
     ],
     notes: [
       "During the trial every Pro feature is open, but smart plugs can't be added yet and Android TV control is limited to 1 unit.",
@@ -191,7 +191,7 @@ export const SISTEM: HelpCategory[] = [
     group: "sistem",
     label: "AI Business Intelligence (Ask Your Business Data)",
     summary:
-      "Ask anything about your business in everyday language — the AI reads your outlet's data (sales, rental, costs, profit & loss, cash, stock, assets) and answers. There's also an automatic analysis panel.",
+      "Ask anything about your business in everyday language — the AI reads data from the rest of NEXBILL (sales, rentals & bookings, cashier shifts, F&B stock, NEXBILL TV, Business Calendar, costs, profit & loss, cash, assets, PPOB, Home Rental) and answers. There's also an automatic analysis panel.",
     subsections: [
       {
         title: "Business Assistant",
@@ -210,7 +210,7 @@ export const SISTEM: HelpCategory[] = [
     ],
     notes: [
       "Owner and Superuser only.",
-      "Free during the trial and included in Pro; on Starter it needs the AI Add-on in the Subscription menu.",
+      "Free during the trial, included in Pro and Free Forever Access; on Starter it needs the AI Add-on in the Subscription menu. Each outlet has a fair-use quota (questions per day/month) shown at the top of the AI page.",
       "Double-check important figures in the reports before making big decisions.",
     ],
   },

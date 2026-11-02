@@ -62,6 +62,7 @@ interface PlanData extends Partial<CatalogPlan> {
 
 interface AiAddonData {
   includedViaPlan: boolean;
+  freeViaFreeForever?: boolean;
   freeViaTrial: boolean;
   active: boolean;
   periodEnd: string | null;
@@ -799,7 +800,7 @@ export default function BillingPage() {
           <p className="text-sm text-neutral-400 mt-1">
             {t(
               "billing.freeForever.body",
-              "Outlet ini mendapat akses NEXBILL gratis permanen dari tim NEXBILL — tidak akan pernah ditagih. Konsol, cabang, dan staf tanpa batas. AI Add-on (Business Assistant & Insights) tetap dibeli terpisah seperti outlet lain."
+              "Outlet ini mendapat akses NEXBILL gratis permanen dari tim NEXBILL — tidak akan pernah ditagih. Konsol, cabang, dan staf tanpa batas. AI Business Assistant & Insights sudah termasuk (dengan kuota wajar per outlet)."
             )}
           </p>
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -1105,7 +1106,8 @@ export default function BillingPage() {
           <div>
             <div className="font-semibold text-violet-300">{t("billing.ai.title", "AI Business Assistant & Insights")}</div>
             <p className="text-sm text-neutral-400 mt-1">
-              {aiAddon?.includedViaPlan && t("billing.ai.includedInPlan", "Sudah termasuk dalam paket langganan — tidak ada biaya tambahan, tidak perlu diaktifkan terpisah.")}
+              {aiAddon?.includedViaPlan && aiAddon?.freeViaFreeForever && t("billing.ai.includedFreeForever", "Sudah termasuk Akses Gratis Selamanya — tidak perlu membeli AI Add-on. Pemakaian dibatasi kuota wajar per outlet (lihat halaman AI).")}
+              {aiAddon?.includedViaPlan && !aiAddon?.freeViaFreeForever && t("billing.ai.includedInPlan", "Sudah termasuk dalam paket langganan — tidak ada biaya tambahan, tidak perlu diaktifkan terpisah.")}
               {!aiAddon?.includedViaPlan && aiAddon?.freeViaTrial && t("billing.ai.freeTrial", "Gratis selama masa percobaan berjalan — tidak perlu diaktifkan terpisah.")}
               {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && aiAddon?.active && t("billing.ai.activeUntil", "Aktif sampai {date}.").replace("{date}", aiAddon.periodEnd ? new Date(aiAddon.periodEnd).toLocaleDateString(DATE_LOCALE[lang]) : "-")}
               {!aiAddon?.includedViaPlan && !aiAddon?.freeViaTrial && !aiAddon?.active && t("billing.ai.locked", "Terkunci — di paket Starter, AI diaktifkan sebagai Add-on terpisah karena setiap pemakaiannya punya biaya nyata ke penyedia AI. Paket Pro sudah termasuk AI.")}

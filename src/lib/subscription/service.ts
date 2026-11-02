@@ -75,8 +75,8 @@ const LOCKED_STATUSES = new Set(["trial_expired", "pending_payment", "suspended"
  * Statuses where the outlet is never blocked from normal operation — no device-count/branch
  * restrictions, dashboard never shows the locked screen, never gets swept toward grace/suspended.
  * "free_forever" (platform-admin-granted, see grantFreeForever below) belongs here for that reason
- * — but is NOT automatically "AI included": assertAiAllowed has its own explicit exclusion for it,
- * since a free-forever outlet still needs the AI Add-on like a trial-graduated paying outlet would.
+ * — and since 2026-11-02 it also includes AI (planIncludesAi), with the per-outlet AI usage quota
+ * (lib/ai/quota.ts) keeping the token cost bounded.
  */
 const PAID_STATUSES = new Set(["active", "grace", "free_forever"]);
 
@@ -510,9 +510,9 @@ export function isPaidStatus(status: string): boolean {
  * period, no invoice ever generated again (see the "free_forever" doc comment on schema.ts's
  * subscriptions.status for exactly why every sweep/invoice function in this file structurally
  * can't touch it once planId is cleared and the status itself isn't "active"). Unlimited
- * devices/branches/staff, same as isPaidStatus(sub.status) grants any other paid outlet — but
- * deliberately NOT unlimited AI: assertAiAllowed has its own explicit carve-out for this status,
- * so the AI Add-on still has to be purchased separately like it would for a normal paying outlet.
+ * devices/branches/staff, same as isPaidStatus(sub.status) grants any other paid outlet, plus the
+ * AI Business Assistant & Insights without buying the AI Add-on (since 2026-11-02 — usage is still
+ * capped per outlet by the AI quota in lib/ai/quota.ts).
  * Idempotent to call again on an already-free-forever outlet (harmless re-set + another log entry).
  */
 export async function grantFreeForever(outletId: string, grantedByLabel: string, note?: string) {
@@ -595,6 +595,8 @@ export async function getSubscriptionSummary(outletId: string) {
     isAiLocked,
     aiAddon: {
       freeViaTrial: sub.status === "trial",
+      // Akses Gratis Selamanya termasuk AI sejak 2026-11-02 (dibatasi kuota per outlet).
+      freeViaFreeForever: sub.status === "free_forever",
       // True when the current plan bundles AI in (Pro) — no separate purchase needed.
       includedViaPlan,
       active: aiAddonPeriodActive,
@@ -605,9 +607,12 @@ export async function getSubscriptionSummary(outletId: string) {
   };
 }
 
-/** AI termasuk paket? Pro = ya. free_forever TIDAK berubah: hanya lewat hasUnlimitedEntitlement lamanya. */
+/**
+ * AI termasuk paket? Pro = ya. Akses Gratis Selamanya = ya (2026-11-02: AI Add-on dibuka untuk
+ * outlet gratis selamanya; biaya token dijaga oleh kuota pemakaian per outlet di lib/ai/quota.ts).
+ */
 function planIncludesAi(sub: SubscriptionRow, plan: PlanRow | null): boolean {
-  if (sub.status === "free_forever") return sub.hasUnlimitedEntitlement;
+  if (sub.status === "free_forever") return true;
   if (!isPaidStatus(sub.status)) return false;
   if (plan) return TIER_INCLUDES_AI[planTierOf(plan)];
   return sub.hasUnlimitedEntitlement;
@@ -752,9 +757,10 @@ export async function assertAiAllowed(outletId: string, role?: string): Promise<
   // Paket Pro (flat per outlet) bundles AI in — the per-call AI cost is absorbed into the flat
   // plan price, a deliberate pricing decision. Starter still buys the AI Add-on
   // (aiAddonActive/aiAddonPeriodEnd below).
-  // Struktur harga 2026-10: AI termasuk paket Pro; Starter perlu AI Add-on. free_forever TIDAK
-  // berubah — hanya lolos lewat hasUnlimitedEntitlement lamanya, selain itu tetap perlu Add-on
-  // (lihat planIncludesAi). Paket dibaca dari langganan ini sendiri, bukan paket default platform.
+  // Struktur harga 2026-10: AI termasuk paket Pro; Starter perlu AI Add-on. Sejak 2026-11-02
+  // Akses Gratis Selamanya juga termasuk AI (lihat planIncludesAi). Paket dibaca dari langganan
+  // ini sendiri, bukan paket default platform. Biaya token tiap outlet dibatasi kuota
+  // (lib/ai/quota.ts) — dicek terpisah di route AI.
   if (planIncludesAi(sub, await getPlanById(sub.planId))) return;
 
   if (sub.aiAddonActive) {

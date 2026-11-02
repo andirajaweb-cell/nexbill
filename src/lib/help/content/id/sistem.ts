@@ -144,7 +144,7 @@ export const SISTEM: HelpCategory[] = [
       "Bayar tagihan: pilih QRIS, Virtual Account bank, atau metode lain yang tersedia. Setelah membayar, tekan \"Tandai Lunas\" bila diminta.",
       "\"Ganti Paket\": naik ke Pro atau tambah kuota unit Starter langsung berlaku setelah selisih prorata dibayar; turun paket, kurangi kuota, atau ganti siklus berlaku di perpanjangan berikutnya. \"Perpanjang Sekarang\" membuat tagihan periode berikutnya lebih awal.",
       "Belanja perangkat: pilih smart plug atau jasa instalasi, atur jumlah, checkout — muncul dalam satu tagihan.",
-      "AI: gratis selama percobaan dan sudah termasuk paket Pro; di paket Starter diaktifkan sebagai AI Add-on dengan biaya bulanan.",
+      "AI: gratis selama percobaan, sudah termasuk paket Pro dan Akses Gratis Selamanya; di paket Starter diaktifkan sebagai AI Add-on dengan biaya bulanan.",
     ],
     notes: [
       "Selama masa percobaan semua fitur Pro terbuka, tetapi smart plug belum bisa ditambahkan dan kontrol Android TV dibatasi 1 unit.",
@@ -191,7 +191,7 @@ export const SISTEM: HelpCategory[] = [
     group: "sistem",
     label: "AI Business Intelligence (Tanya Data Usaha)",
     summary:
-      "Tanya apa saja tentang usahamu dalam bahasa sehari-hari — AI membaca data outletmu (penjualan, rental, biaya, laba rugi, kas, stok, aset) dan menjawab. Ada juga panel analisa otomatis.",
+      "Tanya apa saja tentang usahamu dalam bahasa sehari-hari — AI membaca data dari fitur NEXBILL lain (penjualan, rental & booking, shift kasir, stok F&B, NEXBILL TV, Kalender Bisnis, biaya, laba rugi, kas, aset, PPOB, Rental ke Rumah) dan menjawab. Ada juga panel analisa otomatis.",
     subsections: [
       {
         title: "Asisten Bisnis",
@@ -210,7 +210,7 @@ export const SISTEM: HelpCategory[] = [
     ],
     notes: [
       "Hanya untuk Owner dan Superuser.",
-      "Gratis selama masa percobaan dan termasuk paket Pro; di paket Starter butuh AI Add-on di menu Langganan.",
+      "Gratis selama masa percobaan, termasuk paket Pro dan Akses Gratis Selamanya; di paket Starter butuh AI Add-on di menu Langganan. Ada kuota pemakaian wajar per outlet (pertanyaan per hari/bulan) yang terlihat di atas halaman AI.",
       "Periksa kembali angka penting di laporan sebelum mengambil keputusan besar.",
     ],
   },

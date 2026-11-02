@@ -144,7 +144,7 @@ export const SISTEM: HelpCategory[] = [
       "Thanh toán hóa đơn: chọn QRIS, Tài khoản ảo ngân hàng hoặc phương thức khác có sẵn. Sau khi trả, bấm \"Đánh dấu đã thanh toán\" nếu được yêu cầu.",
       "\"Đổi gói\": nâng lên Pro hoặc thêm hạn mức máy Starter có hiệu lực sau khi trả phần chênh lệch theo tỷ lệ; hạ gói, giảm hạn mức hoặc đổi chu kỳ áp dụng ở lần gia hạn tiếp theo. \"Gia hạn ngay\" tạo sớm hóa đơn kỳ tiếp theo.",
       "Mua phần cứng: chọn ổ cắm thông minh hoặc dịch vụ lắp đặt, đặt số lượng, thanh toán — tất cả gộp trong một hóa đơn.",
-      "AI: miễn phí trong thời gian dùng thử và đã bao gồm trong Pro; với Starter, kích hoạt dưới dạng Tiện ích AI với phí hằng tháng.",
+      "AI: miễn phí trong thời gian dùng thử, đã bao gồm trong Pro và Quyền truy cập miễn phí vĩnh viễn; với Starter, kích hoạt dưới dạng Tiện ích AI với phí hằng tháng.",
     ],
     notes: [
       "Trong thời gian dùng thử mở toàn bộ tính năng Pro, nhưng chưa thể thêm ổ cắm thông minh và điều khiển Android TV giới hạn 1 máy.",
@@ -191,7 +191,7 @@ export const SISTEM: HelpCategory[] = [
     group: "sistem",
     label: "AI Business Intelligence (Hỏi dữ liệu kinh doanh)",
     summary:
-      "Hỏi bất cứ điều gì về việc kinh doanh bằng ngôn ngữ đời thường — AI đọc dữ liệu cửa hàng bạn (bán hàng, cho thuê, chi phí, lãi lỗ, tiền mặt, tồn kho, tài sản) và trả lời. Có thêm bảng phân tích tự động.",
+      "Hỏi bất cứ điều gì về việc kinh doanh bằng ngôn ngữ đời thường — AI đọc dữ liệu từ các tính năng khác của NEXBILL (bán hàng, cho thuê & đặt chỗ, ca thu ngân, tồn kho F&B, NEXBILL TV, Lịch kinh doanh, chi phí, lãi lỗ, tiền mặt, tài sản, PPOB, Cho thuê tại nhà) và trả lời. Có thêm bảng phân tích tự động.",
     subsections: [
       {
         title: "Trợ lý kinh doanh",
@@ -210,7 +210,7 @@ export const SISTEM: HelpCategory[] = [
     ],
     notes: [
       "Chỉ Owner và Superuser.",
-      "Miễn phí trong thời gian dùng thử và đã bao gồm trong Pro; với Starter cần Tiện ích AI trong menu Gói đăng ký.",
+      "Miễn phí trong thời gian dùng thử, đã bao gồm trong Pro và Quyền truy cập miễn phí vĩnh viễn; với Starter cần Tiện ích AI trong menu Gói đăng ký. Mỗi cửa hàng có hạn mức sử dụng hợp lý (câu hỏi mỗi ngày/tháng) hiển thị ở đầu trang AI.",
       "Hãy kiểm tra lại các số liệu quan trọng trong báo cáo trước khi ra quyết định lớn.",
     ],
   },

@@ -79,7 +79,7 @@ export default function PlatformOutletDetailPage() {
   const grantFreeForever = async () => {
     if (!data) return;
     const ok = await showConfirm(
-      `Jadikan "${data.outlet.name}" gratis selamanya? Outlet ini tidak akan pernah ditagih lagi (paket langganan dilepas, tidak ada batas jumlah konsol/cabang/staf). AI Add-on tetap harus dibeli terpisah seperti outlet lain. Bisa dicabut lagi kapan saja.`,
+      `Jadikan "${data.outlet.name}" gratis selamanya? Outlet ini tidak akan pernah ditagih lagi (paket langganan dilepas, tidak ada batas jumlah konsol/cabang/staf). AI Business Assistant & Insights ikut terbuka (dengan kuota pemakaian per outlet). Bisa dicabut lagi kapan saja.`,
       { tone: "default" }
     );
     if (!ok) return;
@@ -224,7 +224,7 @@ export default function PlatformOutletDetailPage() {
             <h2 className="gm-heading font-semibold">Akses Gratis Selamanya</h2>
             <p className="text-xs text-neutral-500 mt-1 max-w-md">
               {isFreeForever
-                ? "Outlet ini sedang gratis selamanya — tidak ditagih, tidak ada batas konsol/cabang/staf. AI Add-on tetap dibeli terpisah seperti outlet lain."
+                ? "Outlet ini sedang gratis selamanya — tidak ditagih, tidak ada batas konsol/cabang/staf. AI Business Assistant & Insights sudah termasuk (kuota pemakaian per outlet)."
                 : "Untuk outlet/merchant yang mendapat akses NEXBILL gratis permanen (mis. sudah termasuk paket beli smart plug). Melepas paket langganan yang sedang berjalan, tidak akan pernah ditagih lagi."}
             </p>
           </div>

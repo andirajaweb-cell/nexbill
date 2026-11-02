@@ -144,7 +144,7 @@ export const SISTEM: HelpCategory[] = [
       "Magbayad ng bill: piliin ang QRIS, bank Virtual Account, o ibang available na paraan. Pagkabayad, pindutin ang \"Markahang Bayad Na\" kung hihingin.",
       "\"Palitan ang Plano\": ang pag-upgrade sa Pro o dagdag na Starter unit quota ay epektibo kapag nabayaran ang prorated na diperensya; ang pag-downgrade, mas maliit na quota, o ibang cycle ay sa susunod na renewal. Gumagawa nang maaga ang \"Mag-renew Ngayon\" ng bill para sa susunod na period.",
       "Bumili ng hardware: piliin ang smart plug o serbisyo sa pag-install, i-set ang dami, mag-checkout — lalabas lahat sa iisang bill.",
-      "AI: libre habang nasa trial at kasama sa Pro; sa Starter, ina-activate ito bilang AI Add-on na may buwanang bayad.",
+      "AI: libre habang nasa trial, kasama sa Pro at Libreng Access Habambuhay; sa Starter, ina-activate ito bilang AI Add-on na may buwanang bayad.",
     ],
     notes: [
       "Habang nasa trial, bukas ang lahat ng Pro feature, pero hindi pa makakapagdagdag ng smart plug at limitado sa 1 unit ang kontrol ng Android TV.",
@@ -191,7 +191,7 @@ export const SISTEM: HelpCategory[] = [
     group: "sistem",
     label: "AI Business Intelligence (Magtanong sa Data ng Negosyo)",
     summary:
-      "Magtanong ng kahit ano tungkol sa negosyo mo sa pang-araw-araw na wika — binabasa ng AI ang data ng outlet mo (benta, rental, gastos, tubo at lugi, cash, stock, asset) at sumasagot. May panel din ng awtomatikong pagsusuri.",
+      "Magtanong ng kahit ano tungkol sa negosyo mo sa pang-araw-araw na wika — binabasa ng AI ang data mula sa iba pang feature ng NEXBILL (benta, rental at booking, cashier shift, F&B stock, NEXBILL TV, Business Calendar, gastos, tubo at lugi, cash, asset, PPOB, Home Rental) at sumasagot. May panel din ng awtomatikong pagsusuri.",
     subsections: [
       {
         title: "Business Assistant",
@@ -210,7 +210,7 @@ export const SISTEM: HelpCategory[] = [
     ],
     notes: [
       "Owner at Superuser lang.",
-      "Libre habang nasa trial at kasama sa Pro; sa Starter kailangan ng AI Add-on sa menu na Subscription.",
+      "Libre habang nasa trial, kasama sa Pro at Libreng Access Habambuhay; sa Starter kailangan ng AI Add-on sa menu na Subscription. May fair-use quota ang bawat outlet (tanong kada araw/buwan) na makikita sa itaas ng AI page.",
       "Suriin ulit ang mahahalagang numero sa mga report bago gumawa ng malalaking desisyon.",
     ],
   },

@@ -144,7 +144,7 @@ export const SISTEM: HelpCategory[] = [
       "Bayar bil: pilih QRIS, Akaun Maya bank, atau kaedah lain yang tersedia. Selepas membayar, tekan \"Tanda Sudah Dibayar\" jika diminta.",
       "\"Tukar Pelan\": naik ke Pro atau tambah kuota unit Starter berkuat kuasa selepas beza prorata dibayar; turun pelan, kurangkan kuota, atau tukar kitaran berkuat kuasa pada pembaharuan seterusnya. \"Perbaharui Sekarang\" membuat bil tempoh seterusnya lebih awal.",
       "Beli perkakasan: pilih palam pintar atau perkhidmatan pemasangan, atur kuantiti, checkout — semuanya muncul dalam satu bil.",
-      "AI: percuma semasa percubaan dan termasuk dalam Pro; pada Starter diaktifkan sebagai Tambahan AI dengan yuran bulanan.",
+      "AI: percuma semasa percubaan, termasuk dalam Pro dan Akses Percuma Selamanya; pada Starter diaktifkan sebagai Tambahan AI dengan yuran bulanan.",
     ],
     notes: [
       "Semasa percubaan semua ciri Pro dibuka, tetapi palam pintar belum boleh ditambah dan kawalan Android TV terhad kepada 1 unit.",
@@ -191,7 +191,7 @@ export const SISTEM: HelpCategory[] = [
     group: "sistem",
     label: "AI Business Intelligence (Tanya Data Perniagaan)",
     summary:
-      "Tanya apa sahaja tentang perniagaan anda dalam bahasa harian — AI membaca data outlet anda (jualan, sewa, kos, untung rugi, tunai, stok, aset) dan menjawab. Ada juga panel analisis automatik.",
+      "Tanya apa sahaja tentang perniagaan anda dalam bahasa harian — AI membaca data daripada ciri NEXBILL lain (jualan, sewa & tempahan, syif juruwang, stok F&B, NEXBILL TV, Kalendar Perniagaan, kos, untung rugi, tunai, aset, PPOB, Sewa ke Rumah) dan menjawab. Ada juga panel analisis automatik.",
     subsections: [
       {
         title: "Pembantu Perniagaan",
@@ -210,7 +210,7 @@ export const SISTEM: HelpCategory[] = [
     ],
     notes: [
       "Khas Owner dan Superuser.",
-      "Percuma semasa percubaan dan termasuk dalam Pro; pada Starter memerlukan Tambahan AI di menu Langganan.",
+      "Percuma semasa percubaan, termasuk dalam Pro dan Akses Percuma Selamanya; pada Starter memerlukan Tambahan AI di menu Langganan. Setiap outlet ada kuota penggunaan wajar (soalan sehari/sebulan) yang dipaparkan di atas halaman AI.",
       "Semak semula angka penting dalam laporan sebelum membuat keputusan besar.",
     ],
   },

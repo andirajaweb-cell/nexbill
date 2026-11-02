@@ -202,8 +202,8 @@ export interface Entitlements {
  * Aturan buka/kunci fitur per status + paket.
  *  - trial         : semua fitur (rasakan Pro selama 30 hari). Batas perangkat trial tetap diatur
  *                    assertDeviceAllowed seperti sebelumnya.
- *  - free_forever  : TIDAK DIUBAH — tetap akses penuh seperti sebelum struktur harga baru (AI tetap
- *                    lewat aturan assertAiAllowed yang lama).
+ *  - free_forever  : akses penuh semua fitur, termasuk AI tanpa Add-on (2026-11-02; dibatasi kuota
+ *                    pemakaian AI per outlet — lib/ai/quota.ts).
  *  - lainnya       : sesuai tier paket. Tanpa paket (data lama) dianggap Pro agar pelanggan lama
  *                    tidak tiba-tiba terkunci.
  */

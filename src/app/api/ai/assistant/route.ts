@@ -2,13 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { outlets } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { runBusinessAssistant, AssistantMessage } from "@/lib/ai/assistant";
+import { runBusinessAssistant } from "@/lib/ai/assistant";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
-import { describeError } from "@/lib/api/error";
 import { assertAiAllowed, assertAiRoleAllowed } from "@/lib/subscription/service";
+import { getAiUsageSummary, reserveAiCall } from "@/lib/ai/quota";
+import { aiConfigured } from "@/lib/ai/models";
+import { aiErrorResponse, aiNotConfiguredResponse, langOf } from "@/lib/ai/http";
 
-/** Internal AI Business Assistant chat — gated by view_reports (same audience as Reports/Dashboard, since it only reads business data, never mutates), plus the NEXBILL subscription AI-lock (locked during trial/expired/suspended — see lib/subscription/service.ts). */
+export const maxDuration = 60;
+
+/**
+ * AI Business Assistant (chat). Urutan penjagaan: login → view_reports → role Owner/Superuser →
+ * hak AI (trial / Pro / AI Add-on / Akses Gratis Selamanya) → kuota pemakaian outlet (COGS).
+ * Body: { messages: {role, content}[], lang?: LangCode } — riwayat dirapikan & dipotong di server.
+ */
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -18,19 +26,21 @@ export async function POST(req: NextRequest) {
     }
     assertAiRoleAllowed(session.role);
     await assertAiAllowed(session.outletId, session.role);
+    if (!aiConfigured()) return aiNotConfiguredResponse();
 
-    const { messages } = (await req.json()) as { messages: AssistantMessage[] };
-    if (!Array.isArray(messages) || messages.length === 0) {
+    const body = (await req.json().catch(() => null)) as { messages?: unknown; lang?: unknown } | null;
+    if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
       return NextResponse.json({ error: "messages wajib diisi." }, { status: 400 });
     }
     const outletId = session.outletId;
-
-    const [outlet] = await db.select().from(outlets).where(eq(outlets.id, outletId)).limit(1);
+    const [outlet] = await db.select({ name: outlets.name }).from(outlets).where(eq(outlets.id, outletId)).limit(1);
     if (!outlet) return NextResponse.json({ error: "Outlet tidak ditemukan." }, { status: 404 });
 
-    const result = await runBusinessAssistant(outletId, outlet.name, messages);
-    return NextResponse.json(result);
+    await reserveAiCall(outletId, "assistant", session.role);
+    const result = await runBusinessAssistant(outletId, outlet.name, body.messages, { lang: langOf(body.lang), role: session.role });
+    const quota = await getAiUsageSummary(outletId, session.role).catch(() => null);
+    return NextResponse.json({ reply: result.reply, toolsCalled: result.toolsCalled, quota });
   } catch (err: unknown) {
-    return NextResponse.json({ error: describeError(err) }, { status: 500 });
+    return aiErrorResponse(err);
   }
 }
