@@ -1,7 +1,7 @@
 import { db } from "@/db/client";
 import { sql } from "drizzle-orm";
-import { outlets, staffUsers, billingGroups, subscriptions, outletMemberships } from "@/db/schema";
-import { eq, inArray, and, ne } from "drizzle-orm";
+import { outlets, staffUsers, billingGroups, subscriptions, subscriptionInvoices, subscriptionDepositMutations, outletMemberships } from "@/db/schema";
+import { eq, inArray, and, ne, isNull } from "drizzle-orm";
 import { listAllTables, tablesWithOutletIdColumn, computeDeleteOrder, scopeCondition, DERIVED_SCOPE_RULES, type Executor } from "./full-reset";
 
 /**
@@ -79,7 +79,20 @@ export async function deleteOutletPermanently(outletId: string): Promise<{ delet
     }
     // Billing groups owned by this outlet's staff that only ever served this outlet (guard above
     // already proved no surviving outlet depends on them).
+    //
+    // Bug 2026-11-10 ("update or delete on table billing_groups violates foreign key constraint
+    // subscriptions_billing_group_id_billing_groups_id_fk"): grup dulu dihapus SEBELUM baris yang
+    // menunjuknya — langganan outlet ini sendiri (dan tagihan/mutasi deposit grup) masih memegang
+    // billing_group_id, sehingga Postgres menolak dan outlet tidak bisa dihapus sama sekali.
+    // Sekarang rujukan dilepas dulu, mutasi deposit tingkat grup (tanpa subscription) dihapus,
+    // baru grupnya. Baris milik outlet ini sendiri tetap dibersihkan oleh mesin generik di bawah.
     if (ownedGroupIds.length > 0) {
+      await tx
+        .delete(subscriptionDepositMutations)
+        .where(and(inArray(subscriptionDepositMutations.billingGroupId, ownedGroupIds), isNull(subscriptionDepositMutations.subscriptionId)));
+      await tx.update(subscriptionDepositMutations).set({ billingGroupId: null }).where(inArray(subscriptionDepositMutations.billingGroupId, ownedGroupIds));
+      await tx.update(subscriptionInvoices).set({ billingGroupId: null }).where(inArray(subscriptionInvoices.billingGroupId, ownedGroupIds));
+      await tx.update(subscriptions).set({ billingGroupId: null }).where(inArray(subscriptions.billingGroupId, ownedGroupIds));
       await tx.delete(billingGroups).where(inArray(billingGroups.id, ownedGroupIds));
     }
 
