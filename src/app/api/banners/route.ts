@@ -4,7 +4,8 @@ import { banners } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
-import { describeError } from "@/lib/api/error";
+import { describeError, errorStatus } from "@/lib/api/error";
+import { normalizeBannerLink, normalizeBannerTitle } from "@/lib/booking/banner-rules";
 
 /** Dashboard listing (caller's own outlet's banners, any status) — ordered the same way the public slideshow plays them, so the admin list previews the real rotation order. */
 export async function GET() {
@@ -31,21 +32,25 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    if (!body.imageUrl) return NextResponse.json({ error: "Gambar banner wajib diupload dulu." }, { status: 400 });
+    if (typeof body.imageUrl !== "string" || !/^https?:\/\//i.test(body.imageUrl)) return NextResponse.json({ error: "Gambar banner wajib diupload dulu." }, { status: 400 });
+    // Banner baru selalu di urutan paling akhir (dulu = jumlah baris dari klien, bisa kembar
+    // setelah ada yang dihapus sehingga tombol naik/turun tidak berpengaruh).
+    const existing = await db.select({ sortOrder: banners.sortOrder }).from(banners).where(eq(banners.outletId, session.outletId));
+    const nextOrder = existing.reduce((m, r) => Math.max(m, r.sortOrder), -1) + 1;
 
     const [row] = await db
       .insert(banners)
       .values({
         outletId: session.outletId,
         imageUrl: body.imageUrl,
-        linkUrl: body.linkUrl || null,
-        title: body.title || null,
-        sortOrder: body.sortOrder ?? 0,
-        isActive: body.isActive ?? true,
+        linkUrl: normalizeBannerLink(body.linkUrl),
+        title: normalizeBannerTitle(body.title),
+        sortOrder: nextOrder,
+        isActive: body.isActive !== false,
       })
       .returning();
     return NextResponse.json(row);
   } catch (err: unknown) {
-    return NextResponse.json({ error: describeError(err) }, { status: 400 });
+    return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });
   }
 }

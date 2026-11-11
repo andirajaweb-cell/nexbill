@@ -186,7 +186,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Hidupkan \"terima tempahan dalam talian\" dan salin pautan halaman tempahan outlet di Tetapan → Perniagaan & Cukai → Tempahan / Reservasi.",
           "Kongsikan pautannya di WhatsApp, Instagram, atau Google Maps. Pelanggan melihat unit yang kosong, memilih masa, dan mendapat kod tempahan.",
           "Tetapkan jeda antara tempahan, had masa daftar masuk (tempahan yang tidak hadir dilepaskan automatik), dan tempoh minimum menempah sebelum masa bermain.",
-          "Sepanduk promosi di halaman tempahan diatur di Tetapan → Sepanduk Iklan.",
+          "Sepanduk promosi di halaman tempahan diatur di halaman Tempahan → kad Sepanduk Iklan (di bawah profil halaman tempahan).",
           "Sebaik pelanggan menempah dalam talian atau melalui WhatsApp, pop-up \"Tempahan baru masuk!\" muncul di mana-mana halaman papan pemuka (dengan bunyi): Sahkan, Lihat di Peta Tempahan, atau WhatsApp pelanggan.",
         ],
       },

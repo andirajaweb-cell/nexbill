@@ -186,7 +186,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Turn on \"accept online bookings\" and copy the outlet's booking page link in Settings → Business & Tax → Booking / Reservation.",
           "Share the link on WhatsApp, Instagram, or Google Maps. Customers see free units, pick a time, and get a booking code.",
           "Set the gap between bookings, the check-in deadline (no-shows are released automatically), and the minimum time before play that booking is allowed.",
-          "Promo banners on the booking page are set in Settings → Ad Banners.",
+          "Promo banners on the booking page are set on the Booking page → Ad Banners card (below the booking page profile).",
           "As soon as a customer books online or via WhatsApp, a \"New booking received!\" pop-up appears on any dashboard page (with a sound): Confirm, View on Booking Map, or WhatsApp the customer.",
         ],
       },

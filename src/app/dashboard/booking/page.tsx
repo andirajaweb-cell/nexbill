@@ -15,6 +15,7 @@ import { PageGuide } from "@/components/dashboard/PageGuide";
 import { ShareBookingLink } from "./share-booking-link";
 import { NoShowBlacklistCard, NoShowPhoneWarning } from "./no-show-blacklist";
 import { BookingPageProfileCard } from "./booking-page-profile";
+import { BookingBannersCard } from "./booking-banners";
 import "@/lib/i18n/dict-setup";
 
 interface Booking {
@@ -392,6 +393,9 @@ export default function BookingPage() {
       <NoShowBlacklistCard />
 
       <BookingPageProfileCard />
+
+      {/* Banner Iklan halaman booking publik — dipindah dari Pengaturan (2026-11-11). */}
+      <BookingBannersCard />
     </div>
   );
 }

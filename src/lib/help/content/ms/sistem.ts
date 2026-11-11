@@ -84,7 +84,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Sepanduk Iklan, TV Screensaver, Notifikasi",
         steps: [
-          "Sepanduk Iklan: gambar promosi (disarankan sekurang-kurangnya 1600×500 px) untuk halaman tempahan dalam talian — atur susunan, pautan, aktif/tidak aktif.",
+          "Sepanduk Iklan kini di halaman Tempahan (bukan Tetapan): gambar promosi untuk halaman tempahan dalam talian (disarankan 2400×750 px, maks. 3MB) — atur susunan, tajuk, pautan, aktif/tidak aktif.",
           "TV Screensaver: skrin promosi di Android TV bilik — lihat topik TV Screensaver.",
           "Notifikasi: pilih peringatan yang dipaparkan (stok hampir habis, perbelanjaan menunggu kelulusan, perbezaan tunai, tempahan). Penyelenggaraan Unit Prediktif: jam penggunaan sebelum unit ditanda perlu diservis.",
         ],

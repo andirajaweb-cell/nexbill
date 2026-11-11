@@ -84,7 +84,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Banner Iklan, TV Screensaver, Notifikasi",
         steps: [
-          "Banner Iklan: gambar promosi (disarankan minimal 1600×500 px) untuk halaman booking online — atur urutan, tautan, aktif/nonaktif.",
+          "Banner Iklan sekarang di halaman Booking (bukan Pengaturan): gambar promosi untuk halaman booking online (disarankan 2400×750 px, maks. 3MB) — atur urutan, judul, tautan, aktif/nonaktif.",
           "TV Screensaver: tampilan layar promosi di TV Android bilik — lihat topik TV Screensaver.",
           "Notifikasi: pilih pengingat yang ditampilkan (stok menipis, pengeluaran menunggu persetujuan, selisih kas, booking). Maintenance Prediktif Unit: batas jam pemakaian sebelum unit ditandai perlu servis.",
         ],

@@ -122,7 +122,7 @@ export const TV_SCREENSAVER_FLAG_DEFS: FeatureFlagDef[] = [
     key: "TV_SCREENSAVER_SLIDESHOW",
     parentKey: "TV_SCREENSAVER_ENABLED",
     label: "Slideshow Banner Promo",
-    description: "Putar banner promo bergantian di layar bilik, memakai banner yang sama dengan halaman booking publik (Pengaturan > Banner Iklan). (Segera — fase berikutnya)",
+    description: "Putar banner promo bergantian di layar bilik, memakai banner yang sama dengan halaman booking publik (Booking > Banner Iklan). (Segera — fase berikutnya)",
     wired: false,
   },
   {

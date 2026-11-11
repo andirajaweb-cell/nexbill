@@ -84,7 +84,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Banner quảng cáo, TV Screensaver, Thông báo",
         steps: [
-          "Banner quảng cáo: ảnh khuyến mãi (khuyên dùng tối thiểu 1600×500 px) cho trang đặt chỗ trực tuyến — đặt thứ tự, đường dẫn, bật/tắt.",
+          "Banner quảng cáo giờ nằm ở trang Đặt chỗ (không còn ở Cài đặt): ảnh khuyến mãi cho trang đặt chỗ trực tuyến (khuyên dùng 2400×750 px, tối đa 3MB) — đặt thứ tự, tiêu đề, đường dẫn, bật/tắt.",
           "TV Screensaver: màn hình quảng cáo trên Android TV trong phòng — xem chủ đề TV Screensaver.",
           "Thông báo: chọn nhắc nhở nào được hiển thị (hàng sắp hết, khoản chi chờ duyệt, chênh lệch tiền mặt, đặt chỗ). Bảo trì máy dự đoán: số giờ sử dụng trước khi máy bị đánh dấu cần bảo dưỡng.",
         ],

@@ -186,7 +186,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Bật \"nhận đặt chỗ trực tuyến\" và sao chép đường dẫn trang đặt chỗ của cửa hàng tại Cài đặt → Kinh doanh & Thuế → Đặt chỗ / Giữ chỗ.",
           "Chia sẻ đường dẫn trên WhatsApp, Instagram hoặc Google Maps. Khách thấy máy trống, chọn giờ và nhận mã đặt chỗ.",
           "Đặt khoảng cách giữa các lượt đặt, hạn nhận phòng (khách không đến sẽ tự được nhả chỗ) và thời gian tối thiểu trước giờ chơi được phép đặt.",
-          "Banner khuyến mãi trên trang đặt chỗ đặt tại Cài đặt → Banner quảng cáo.",
+          "Banner khuyến mãi trên trang đặt chỗ đặt tại trang Đặt chỗ → thẻ Banner quảng cáo (dưới hồ sơ trang đặt chỗ).",
           "Ngay khi khách đặt online hoặc qua WhatsApp, cửa sổ \"Có lượt đặt mới!\" hiện ở bất kỳ trang dashboard nào (kèm âm báo): Xác nhận, Xem trên sơ đồ, hoặc nhắn WhatsApp cho khách.",
         ],
       },

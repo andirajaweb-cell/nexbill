@@ -84,7 +84,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Mga Ad Banner, TV Screensaver, Notification",
         steps: [
-          "Mga Ad Banner: larawan ng promo (inirerekomenda ang hindi bababa sa 1600×500 px) para sa online booking page — i-set ang ayos, link, aktibo/hindi aktibo.",
+          "Nasa Booking page na ang Mga Ad Banner (hindi na sa Setting): larawan ng promo para sa online booking page (inirerekomenda ang 2400×750 px, max 3MB) — i-set ang ayos, pamagat, link, aktibo/hindi aktibo.",
           "TV Screensaver: ang promo screen sa Android TV sa booth — tingnan ang paksang TV Screensaver.",
           "Notification: piliin kung aling paalala ang ipapakita (paubos na stock, gastos na naghihintay ng apruba, diperensya ng cash, reservation). Predictive na Maintenance ng Unit: oras ng paggamit bago ma-flag na kailangan ng serbisyo ang unit.",
         ],

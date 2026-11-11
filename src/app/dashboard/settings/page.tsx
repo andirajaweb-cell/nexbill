@@ -28,7 +28,7 @@ import { DeleteAccountCard } from "./DeleteAccountCard";
 import { PushNotificationsCard } from "./PushNotificationsCard";
 import { IntegerInput } from "@/components/ui/IntegerInput";
 
-const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "Banner Iklan", "TV Screensaver", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
+const TABS = ["Business & Tax", "Preferensi", "Cabang", "Satuan", "Kategori Produk", "Durasi Rental", "TV Screensaver", "Notifikasi", "Feature Management", "Audit Log", "Akun Saya"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
@@ -38,7 +38,6 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Satuan": { key: "settings.tab.unit", fallback: "Satuan" },
   "Kategori Produk": { key: "settings.tab.productCategory", fallback: "Kategori Produk" },
   "Durasi Rental": { key: "settings.tab.durationPreset", fallback: "Durasi Rental" },
-  "Banner Iklan": { key: "settings.tab.banner", fallback: "Banner Iklan" },
   "TV Screensaver": { key: "settings.tab.tvScreensaver", fallback: "TV Screensaver" },
   "Notifikasi": { key: "settings.tab.notification", fallback: "Notifikasi" },
   "Feature Management": { key: "settings.tab.featureManagement", fallback: "Feature Management" },
@@ -53,6 +52,8 @@ export default function SettingsPage() {
   useEffect(() => {
     const want = new URLSearchParams(window.location.search).get("tab");
     if (want === "tv") setTab("TV Screensaver");
+    // Banner Iklan pindah ke halaman Booking (2026-11-11) — tautan lama tetap sampai ke tempatnya.
+    if (want === "banner") window.location.replace("/dashboard/booking#banner-iklan");
   }, []);
   const { user } = useAuth();
   const { t } = useDashboardLang();
@@ -106,8 +107,6 @@ export default function SettingsPage() {
         <ProductCategoryTab outletId={outletId} canManage={canManage} />
       ) : tab === "Durasi Rental" ? (
         <DurationPresetTab outletId={outletId} canManage={canManage} />
-      ) : tab === "Banner Iklan" ? (
-        <BannerTab outletId={outletId} canManage={canManage} />
       ) : tab === "TV Screensaver" ? (
         <TvScreensaverTab canManage={canManage} />
       ) : tab === "Notifikasi" ? (
@@ -1482,173 +1481,6 @@ function FeatureManagementTab({ outletId, isSuperuser }: { outletId: string; isS
           </div>
         );
       })}
-    </div>
-  );
-}
-
-interface BannerRow {
-  id: string;
-  imageUrl: string;
-  linkUrl: string | null;
-  title: string | null;
-  sortOrder: number;
-  isActive: boolean;
-}
-
-/**
- * CRUD for the looping ad/promo banner shown on the public /book page right after the
- * booking form — upload image, optional click-through link, optional title, reorder with
- * up/down (sortOrder), toggle active. The public page only ever sees isActive rows, in
- * sortOrder — this list intentionally shows everything (including inactive) so an owner can
- * stage a banner before switching it live.
- */
-function BannerTab({ outletId, canManage }: { outletId: string; canManage: boolean }) {
-  const [rows, setRows] = useState<BannerRow[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [pending, setPending] = useState<{ imageUrl: string; title: string; linkUrl: string } | null>(null);
-  const [saving, setSaving] = useState(false);
-  const { t } = useDashboardLang();
-
-  const load = () => fetchJsonArray<BannerRow>("/api/banners").then(setRows);
-  useEffect(() => { load(); }, []);
-
-  const uploadImage = async (file: File) => {
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/settings/logo", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) return showAlert(data.error);
-      setPending({ imageUrl: data.url, title: "", linkUrl: "" });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const addBanner = async () => {
-    if (!pending) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/banners", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          outletId,
-          imageUrl: pending.imageUrl,
-          title: pending.title || undefined,
-          linkUrl: pending.linkUrl || undefined,
-          sortOrder: rows.length,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) return showAlert(data.error);
-      setPending(null);
-      load();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const patchBanner = async (id: string, patch: Record<string, unknown>) => {
-    const res = await fetch(`/api/banners/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
-    load();
-  };
-
-  const move = async (row: BannerRow, dir: -1 | 1) => {
-    const sorted = [...rows].sort((a, b) => a.sortOrder - b.sortOrder);
-    const idx = sorted.findIndex((r) => r.id === row.id);
-    const swapWith = sorted[idx + dir];
-    if (!swapWith) return;
-    await Promise.all([
-      fetch(`/api/banners/${row.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sortOrder: swapWith.sortOrder }) }),
-      fetch(`/api/banners/${swapWith.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sortOrder: row.sortOrder }) }),
-    ]);
-    load();
-  };
-
-  const removeBanner = async (row: BannerRow) => {
-    const confirmMsg = row.title
-      ? t("settings.banner.deleteConfirmWithTitle", 'Hapus banner "{title}"?').replace("{title}", row.title)
-      : t("settings.banner.deleteConfirmNoTitle", "Hapus banner?");
-    if (!(await showConfirm(confirmMsg))) return;
-    const res = await fetch(`/api/banners/${row.id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
-    load();
-  };
-
-  const sorted = [...rows].sort((a, b) => a.sortOrder - b.sortOrder);
-
-  return (
-    <div className="space-y-4">
-      <Card className="space-y-3">
-        <h2 className="font-medium">{t("settings.banner.heading", "Banner Iklan — Halaman Booking Publik")}</h2>
-        <p className="text-xs text-neutral-500">
-          {t("settings.banner.desc", "Slideshow looping otomatis, tampil di halaman booking publik outlet ini tepat setelah bagian booking. Bisa dipakai untuk iklan sponsor, promo F&B, atau pengumuman event. Klik banner akan membuka Link (opsional) di tab baru.")}
-        </p>
-
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3 text-xs text-neutral-400 space-y-1">
-          <div className="font-medium text-neutral-300">{t("settings.banner.sizeHeading", "Ukuran gambar (responsive — 1 gambar dipakai untuk semua layar)")}</div>
-          <p>
-            {t("settings.banner.cropPrefix", "Banner otomatis crop mengikuti lebar layar pengunjung: rasio ")}<span className="text-neutral-200">16:5</span>{t("settings.banner.cropMiddle", " di HP dan ")}<span className="text-neutral-200">21:6</span>{t("settings.banner.cropSuffix", " di layar lebih lebar (tablet/desktop). Supaya tetap tajam & tidak terpotong aneh di kedua rasio:")}
-          </p>
-          <ul className="list-disc list-inside space-y-0.5">
-            <li>{t("settings.banner.resPrefix", "Resolusi disarankan ")}<span className="text-neutral-200">min. 1600×500px</span>{t("settings.banner.resMiddle", ", idealnya ")}<span className="text-neutral-200">2400×750px</span>{t("settings.banner.resSuffix", " (landscape/wide).")}</li>
-            <li>{t("settings.banner.centerPrefix", "Taruh teks, logo, atau elemen penting di ")}<span className="text-neutral-200">{t("settings.banner.centerHighlight", "tengah gambar")}</span>{t("settings.banner.centerSuffix", " — bagian kiri/kanan lebih berpotensi terpotong di layar sempit.")}</li>
-            <li>{t("settings.banner.formatNote", "Format PNG/JPG/WEBP, maksimal 2MB per gambar.")}</li>
-          </ul>
-        </div>
-
-        {canManage && (
-          <div className="rounded-lg border border-neutral-800 p-3 space-y-2">
-            {!pending ? (
-              <label className="text-xs">
-                <span className="inline-block rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 cursor-pointer hover:bg-neutral-700">{uploading ? t("settings.common.uploading", "Mengunggah...") : t("settings.banner.uploadImageButton", "Upload Gambar Banner")}</span>
-                <input type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden" disabled={uploading} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); }} />
-              </label>
-            ) : (
-              <div className="space-y-2">
-                <img src={pending.imageUrl} alt="Preview banner" className="w-full max-h-40 object-cover rounded-lg border border-neutral-700" />
-                <div className="grid sm:grid-cols-2 gap-2">
-                  <Field label={t("settings.field.bannerTitle", "Judul (opsional, untuk alt text)")}><input className={inputCls} value={pending.title} onChange={(e) => setPending({ ...pending, title: e.target.value })} /></Field>
-                  <Field label={t("settings.field.bannerLinkUrl", "Link tujuan saat diklik (opsional)")}><input className={inputCls} placeholder="https://..." value={pending.linkUrl} onChange={(e) => setPending({ ...pending, linkUrl: e.target.value })} /></Field>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={addBanner} disabled={saving}>{saving ? t("settings.common.saving", "Menyimpan...") : t("settings.banner.addToSlideshowButton", "Tambah ke Slideshow")}</Button>
-                  <Button variant="secondary" onClick={() => setPending(null)}>{t("settings.common.cancel", "Batal")}</Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-
-      <div className="space-y-2">
-        {sorted.map((b, i) => (
-          <Card key={b.id} className="flex items-center gap-3">
-            <img src={b.imageUrl} alt={b.title ?? ""} className="w-24 h-14 object-cover rounded-lg border border-neutral-800 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium truncate">{b.title || t("settings.banner.noTitlePlaceholder", "(tanpa judul)")}</div>
-              {b.linkUrl && <div className="text-xs text-neutral-500 truncate">{b.linkUrl}</div>}
-              <div className="text-xs text-neutral-600">{t("settings.banner.orderLabel", "Urutan #{n}").replace("{n}", String(i + 1))}</div>
-            </div>
-            {canManage && (
-              <div className="flex items-center gap-1 shrink-0">
-                <Button variant="ghost" className="text-xs px-2" disabled={i === 0} onClick={() => move(b, -1)}>↑</Button>
-                <Button variant="ghost" className="text-xs px-2" disabled={i === sorted.length - 1} onClick={() => move(b, 1)}>↓</Button>
-                <Button variant={b.isActive ? "secondary" : "primary"} className="text-xs" onClick={() => patchBanner(b.id, { isActive: !b.isActive })}>
-                  {b.isActive ? t("settings.common.active", "Aktif") : t("settings.common.inactive", "Nonaktif")}
-                </Button>
-                <Button variant="danger" className="text-xs" onClick={() => removeBanner(b)}>{t("settings.common.delete", "Hapus")}</Button>
-              </div>
-            )}
-          </Card>
-        ))}
-        {sorted.length === 0 && <div className="text-sm text-neutral-500 text-center py-6">{t("settings.banner.emptyState", "Belum ada banner. Upload gambar di atas untuk mulai.")}</div>}
-      </div>
     </div>
   );
 }

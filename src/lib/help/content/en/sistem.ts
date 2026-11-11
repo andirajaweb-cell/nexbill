@@ -84,7 +84,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Ad Banners, TV Screensaver, Notifications",
         steps: [
-          "Ad Banners: promo images (at least 1600×500 px recommended) for the online booking page — set order, link, active/inactive.",
+          "Ad Banners now live on the Booking page (not Settings): promo images for the online booking page (2400×750 px recommended, max 3MB) — set order, title, link, active/inactive.",
           "TV Screensaver: the promo screen on booth Android TVs — see the TV Screensaver topic.",
           "Notifications: choose which reminders are shown (low stock, expenses awaiting approval, cash differences, bookings). Predictive Unit Maintenance: hours of use before a unit is flagged as needing service.",
         ],

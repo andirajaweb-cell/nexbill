@@ -186,7 +186,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "Aktifkan \"terima booking online\" dan salin tautan halaman booking outlet di Pengaturan → Business & Tax → Booking / Reservasi.",
           "Bagikan tautannya di WhatsApp, Instagram, atau Google Maps. Pelanggan melihat unit yang kosong, memilih jam, dan mendapat kode booking.",
           "Atur jeda antar-booking, batas waktu check-in (booking yang tidak datang dilepas otomatis), dan batas minimal waktu pesan sebelum jam main.",
-          "Banner promosi di halaman booking diatur di Pengaturan → Banner Iklan.",
+          "Banner promosi di halaman booking diatur di halaman Booking → kartu Banner Iklan (di bawah Profil Halaman Booking).",
           "Begitu pelanggan booking online atau lewat WhatsApp, pop-up \"Booking baru masuk!\" muncul di halaman dashboard mana pun (dengan bunyi): Konfirmasi, Lihat di Map Booking, atau chat WA pelanggan.",
         ],
       },

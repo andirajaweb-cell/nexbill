@@ -186,7 +186,7 @@ export const OPERASIONAL: HelpCategory[] = [
           "I-on ang \"tumanggap ng online booking\" at kopyahin ang link ng booking page ng outlet sa Setting → Negosyo at Buwis → Pagpapareserba / Reservation.",
           "I-share ang link sa WhatsApp, Instagram, o Google Maps. Makikita ng customer ang mga bakanteng unit, pipili ng oras, at makakakuha ng booking code.",
           "I-set ang pagitan ng mga reservation, ang deadline ng check-in (awtomatikong pinapakawalan ang mga no-show), at ang pinakamaikling oras bago maglaro na puwede pang mag-book.",
-          "Ang mga promo banner sa booking page ay sine-set sa Setting → Mga Ad Banner.",
+          "Ang mga promo banner sa booking page ay sine-set sa Booking page → card na Ad Banner (sa ilalim ng profile ng booking page).",
           "Kapag nag-book ang customer online o sa WhatsApp, lalabas ang pop-up na \"May bagong booking!\" sa kahit anong page ng dashboard (may tunog): Kumpirmahin, Tingnan sa Booking Map, o i-WhatsApp ang customer.",
         ],
       },

@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { showAlert } from "@/lib/ui/dialog";
 import { BranchesSection, ContactLocationSection, HeaderContactButtons, PhotoGallery, type PublicProfile } from "./profile-sections";
+import { safeBannerHref } from "@/lib/booking/banner-rules";
 
 const CONSOLE_LABEL: Record<string, string> = {
   ps2: "PS2", ps3: "PS3", ps4: "PS4", ps4_pro: "PS4 Pro", ps5: "PS5", ps5_slim: "PS5 Slim", ps6: "PS6",
@@ -27,30 +28,45 @@ type TimelineData = { windowStart: string; windowEnd: string; units: TimelineUni
 type BannerSlide = { id: string; imageUrl: string; linkUrl: string | null; title: string | null };
 
 /**
- * Auto-looping ad/promo banner slideshow — managed from the dashboard (Pengaturan > Banner
+ * Auto-looping ad/promo banner slideshow — managed from the dashboard (Booking > Banner
  * Iklan), fetched via /api/public/banners. Advances every 5s and wraps back to the first
  * slide (true loop, not a "reset to start" that pauses at the end). Renders nothing if there
  * are no active banners, so an outlet that hasn't set any up sees no empty gap on the page.
  */
 function BannerCarousel({ slides }: { slides: BannerSlide[] }) {
-  const [index, setIndex] = useState(0);
+  const [rawIndex, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  // Jumlah slide bisa berubah — jaga indeks tetap di dalam rentang.
+  const index = slides.length ? rawIndex % slides.length : 0;
 
   useEffect(() => {
-    if (slides.length <= 1) return;
-    const id = setInterval(() => setIndex((i) => (i + 1) % slides.length), 5000);
+    if (slides.length <= 1 || paused) return;
+    const id = setInterval(() => {
+      // Tab tidak terlihat: jangan memutar (hemat baterai, tidak "lompat" saat kembali).
+      if (typeof document !== "undefined" && document.hidden) return;
+      setIndex((i) => (i + 1) % slides.length);
+    }, 5000);
     return () => clearInterval(id);
-  }, [slides.length]);
+  }, [slides.length, paused]);
 
   if (slides.length === 0) return null;
 
   return (
     <section>
-      <div className="relative rounded-xl border border-blue-500/15 bg-[#0d1526]/80 backdrop-blur-md overflow-hidden shadow-[0_0_0_1px_rgba(59,130,246,0.06),0_8px_24px_-8px_rgba(0,0,0,0.7)]">
+      <div
+        className="relative rounded-xl border border-blue-500/15 bg-[#0d1526]/80 backdrop-blur-md overflow-hidden shadow-[0_0_0_1px_rgba(59,130,246,0.06),0_8px_24px_-8px_rgba(0,0,0,0.7)]"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onTouchStart={() => setPaused(true)}
+        onTouchEnd={() => setPaused(false)}
+      >
         <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${index * 100}%)` }}>
           {slides.map((s) => {
-            const img = <img src={s.imageUrl} alt={s.title ?? "Banner"} className="w-full aspect-[16/5] sm:aspect-[21/6] object-cover shrink-0 grow-0 basis-full" />;
-            return s.linkUrl ? (
-              <a key={s.id} href={s.linkUrl} target="_blank" rel="noreferrer" className="shrink-0 grow-0 basis-full">
+            const img = <img src={s.imageUrl} alt={s.title ?? "Banner"} loading="lazy" className="w-full aspect-[16/5] sm:aspect-[21/6] object-cover shrink-0 grow-0 basis-full" />;
+            // Hanya link http(s) yang dipasang — data lama bisa berisi "javascript:" atau link tanpa https://.
+            const href = safeBannerHref(s.linkUrl);
+            return href ? (
+              <a key={s.id} href={href} target="_blank" rel="noopener noreferrer" className="shrink-0 grow-0 basis-full">
                 {img}
               </a>
             ) : (
