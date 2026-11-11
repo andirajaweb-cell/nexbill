@@ -61,7 +61,7 @@ export function ProfitLossSteps({ pl, rupiah, onRow }: { pl: ProfitLossData; rup
   return (
     <div>
       {block(t("accounting.pl.sec.operatingRevenue", "Pendapatan usaha"), t("accounting.pl.hint.operatingRevenue", "Rental, F&B, produk, PPOB, membership, home rental, dan pendapatan operasional lain — setelah diskon/retur (49xx)."), s.operatingRevenue, "+", "4xxx")}
-      {block(t("accounting.pl.sec.cogs", "Harga pokok penjualan (HPP)"), t("accounting.pl.hint.cogs", "Modal barang yang terjual, termasuk selisih opname & barang rusak."), s.cogs, "−", "5xxx")}
+      {block(t("accounting.pl.sec.cogs", "Harga pokok penjualan (HPP)"), t("accounting.pl.hint.cogs", "Modal barang yang terjual dan barang rusak/waste. Selisih stock opname & penyesuaian stok dicatat sebagai koreksi persediaan di ekuitas."), s.cogs, "−", "5xxx")}
       {subtotal(t("accounting.pl.grossProfit", "Laba Kotor"), pl.grossProfit)}
       {block(t("accounting.pl.sec.operatingExpense", "Beban operasional"), t("accounting.pl.hint.operatingExpense", "Gaji, sewa, listrik, internet, perawatan, pemasaran, administrasi, transport, asuransi, penyusutan."), s.operatingExpense, "−", "6xxx")}
       {subtotal(t("accounting.pl.operatingProfit", "Laba Usaha"), pl.operatingProfit ?? 0)}
