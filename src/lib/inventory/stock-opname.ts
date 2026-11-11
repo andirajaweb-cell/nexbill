@@ -90,6 +90,14 @@ export async function completeStockOpname(stockOpnameId: string) {
    * products — correctness is worth far more than the milliseconds this gives up.
    */
   const updatedOpname = await db.transaction(async (tx) => {
+    // Kunci + cek status DI DALAM transaksi. Dulu status hanya dicek di luar, jadi klik "Terapkan"
+    // berulang saat proses masih jalan menerapkan opname yang sama berkali-kali (data nyata:
+    // OPN-95606b26 diterapkan 6x — stok bergeser 6x lipat dan 6 jurnal koreksi tercatat).
+    await lockEntity(tx, `stock_opname:${stockOpnameId}`);
+    const [fresh] = await tx.select({ status: stockOpnames.status }).from(stockOpnames).where(eq(stockOpnames.id, stockOpnameId)).limit(1);
+    if (!fresh || fresh.status === "completed") {
+      throw Object.assign(new Error("Stock opname sudah selesai diproses."), { status: 409 });
+    }
     // stockMovements rows are independent of each other — one bulk insert instead of N.
     if (changed.length > 0) {
       await tx.insert(stockMovements).values(

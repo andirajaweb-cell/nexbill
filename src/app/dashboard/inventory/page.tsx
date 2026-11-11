@@ -231,6 +231,7 @@ function ProductTab({ outletId }: { outletId: string }) {
     return { total: Object.keys(counts).length, more, less, same };
   }, [counts, products]);
   const applyCount = async () => {
+    if (applying) return;
     const items = Object.entries(counts).map(([productId, actualQty]) => ({ productId, actualQty }));
     if (items.length === 0) return showAlert(t("inventory.count.nothing", "Belum ada produk yang dihitung. Isi kolom Fisik atau scan barang."));
     const ok = await showConfirm(
@@ -2086,15 +2087,23 @@ function StockOpnameHistory({ productName }: { productName: (id: string) => stri
     };
   }, []);
 
+  const [completingId, setCompletingId] = useState<string | null>(null);
   const complete = async (id: string) => {
-    const res = await fetch(`/api/stock-opnames/${id}/complete`, { method: "POST" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return showAlert(data.error ?? res.statusText);
-    showAlert(t("inventory.opname.completeMsg", "Selesai. {n} item disesuaikan.").replace("{n}", String(data.itemsApplied)));
-    load();
+    if (completingId) return;
+    setCompletingId(id);
+    try {
+      const res = await fetch(`/api/stock-opnames/${id}/complete`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? res.statusText);
+      showAlert(t("inventory.opname.completeMsg", "Selesai. {n} item disesuaikan.").replace("{n}", String(data.itemsApplied)));
+      load();
+    } finally {
+      setCompletingId(null);
+    }
   };
 
   const reclassify = async () => {
+    if (reclassBusy) return;
     if (!(await showConfirm(t("inventory.opname.reclassConfirm", "Pindahkan selisih stock opname & Penyesuaian Barang lama dari Laba Rugi ke Koreksi Persediaan? Stok tidak berubah — hanya jurnalnya. Barang rusak/waste tetap di Laba Rugi. Jurnal lama dibatalkan dan dicatat ulang pada tanggal yang sama."), { confirmLabel: t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan") }))) return;
     setReclassBusy(true);
     try {
@@ -2156,7 +2165,7 @@ function StockOpnameHistory({ productName }: { productName: (id: string) => stri
                   </button>
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge status={o.status === "completed" ? "available" : "pending"}>{o.status}</Badge>
-                    {canManage && o.status !== "completed" && <Button className="text-xs" onClick={() => complete(o.id)}>{t("inventory.opname.applyButton", "Terapkan Penyesuaian")}</Button>}
+                    {canManage && o.status !== "completed" && <Button className="text-xs" disabled={completingId !== null} onClick={() => complete(o.id)}>{t("inventory.opname.applyButton", "Terapkan Penyesuaian")}</Button>}
                   </div>
                 </div>
                 {expanded && items.length > 0 && (
