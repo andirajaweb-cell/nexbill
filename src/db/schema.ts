@@ -2971,7 +2971,8 @@ export const platformLeads = pgTable(
     painPoints: text("pain_points"),
     acquisitionAngle: text("acquisition_angle"),
     nextAction: text("next_action"),
-    status: text("status", { enum: ["baru", "dihubungi", "follow_up", "demo", "trial", "closing", "tidak_tertarik"] })
+    // "tutup" (usaha tutup / tidak ditemukan) ditambah 2026-11-12 — kolom teks biasa, tanpa migrasi.
+    status: text("status", { enum: ["baru", "dihubungi", "follow_up", "demo", "trial", "closing", "tidak_tertarik", "tutup"] })
       .notNull()
       .default("baru"),
     // Tanggal (YYYY-MM-DD) tindak lanjut berikutnya — dipakai filter "Jatuh Tempo".

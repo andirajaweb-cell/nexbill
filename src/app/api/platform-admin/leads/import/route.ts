@@ -4,13 +4,14 @@ import { db } from "@/db/client";
 import { platformLeads } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
-import type { PlaceResult } from "@/lib/leads/constants";
+import { initialLeadStatus, type PlaceResult } from "@/lib/leads/constants";
 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 /**
- * Saves selected Google Maps results as CRM leads (status "baru"). Places already in the CRM are
+ * Saves selected Google Maps results as CRM leads (status "baru", or "tutup" when Google marks the
+ * place CLOSED_PERMANENTLY). Places already in the CRM are
  * skipped via the unique place_id index, so re-importing the same search is harmless.
  */
 export async function POST(req: NextRequest) {
@@ -41,6 +42,8 @@ export async function POST(req: NextRequest) {
         rating: num(p.rating),
         reviewCount: num(p.reviewCount),
         businessStatus: str(p.businessStatus),
+        // Ditandai Google "tutup permanen" → langsung status "Tutup / Tidak Ada", tidak masuk antrean hubungi.
+        status: initialLeadStatus(str(p.businessStatus)),
         area,
         createdBy: session.sub,
       }));

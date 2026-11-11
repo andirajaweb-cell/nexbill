@@ -1,11 +1,12 @@
-import { and, desc, eq, ilike, isNotNull, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNotNull, lte, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
-import { platformLeadActivities, platformLeads } from "@/db/schema";
+import { platformLeadActivities, platformLeads, platformWaOutbox } from "@/db/schema";
 import { outletDateYmd } from "@/lib/time/outlet-time";
 import {
   LEAD_CLOSED_STATUSES,
   LEAD_PRIORITIES,
   LEAD_STATUSES,
+  LEAD_STATUS_LABEL,
   LEAD_TEMPERATURES,
   type LeadActivityType,
   type LeadPriority,
@@ -87,6 +88,9 @@ export function parseQualification(body: Record<string, unknown>): Partial<typeo
 function buildWhere(f: LeadFilters): SQL | undefined {
   const conds: SQL[] = [];
   if (isLeadStatus(f.status)) conds.push(eq(platformLeads.status, f.status));
+  // Tanpa filter status, daftar "Semua" hanya berisi prospek aktif — usaha yang sudah tutup/tidak ada
+  // punya daftar sendiri (filter status "tutup") supaya tidak ikut dihubungi.
+  else conds.push(ne(platformLeads.status, "tutup"));
   if (f.city) conds.push(eq(platformLeads.city, f.city));
   if (isLeadPriority(f.priority)) conds.push(eq(platformLeads.priority, f.priority));
   if (isLeadTemperature(f.temperature)) conds.push(eq(platformLeads.temperature, f.temperature));
@@ -129,9 +133,59 @@ export async function leadSummary() {
     .where(isNotNull(platformLeads.area))
     .orderBy(platformLeads.area);
 
+  const [googleClosed] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(platformLeads)
+    .where(googleClosedOpenWhere());
+
   const counts = Object.fromEntries(LEAD_STATUSES.map((s) => [s, 0])) as Record<LeadStatus, number>;
-  for (const row of byStatus) counts[row.status] = row.count;
-  return { counts, dueCount: due?.count ?? 0, cities: cities.map((c) => c.city as string), areas: areas.map((a) => a.area as string) };
+  for (const row of byStatus) if (isLeadStatus(row.status)) counts[row.status] = row.count;
+  return {
+    counts,
+    dueCount: due?.count ?? 0,
+    /** Lead yang ditandai Google "tutup permanen" tapi statusnya di CRM masih berjalan. */
+    googleClosedCount: googleClosed?.count ?? 0,
+    cities: cities.map((c) => c.city as string),
+    areas: areas.map((a) => a.area as string),
+  };
+}
+
+/** Google Maps bilang tutup permanen, tapi di CRM belum "tutup" (dan belum jadi pelanggan). */
+function googleClosedOpenWhere(): SQL {
+  return and(eq(platformLeads.businessStatus, "CLOSED_PERMANENTLY"), notInArray(platformLeads.status, ["tutup", "closing"]))!;
+}
+
+/**
+ * Antrean WA yang belum terkirim untuk lead ini dihapus — usaha yang sudah tutup tidak perlu dikirimi
+ * pesan. Pesan yang sedang/sudah terkirim tidak disentuh.
+ */
+export async function cancelPendingWaForLeads(leadIds: string[]): Promise<number> {
+  if (leadIds.length === 0) return 0;
+  const rows = await db
+    .delete(platformWaOutbox)
+    .where(and(inArray(platformWaOutbox.leadId, leadIds), inArray(platformWaOutbox.status, ["pending", "failed"])))
+    .returning({ id: platformWaOutbox.id });
+  return rows.length;
+}
+
+/**
+ * Menandai sekaligus semua lead yang menurut Google Maps sudah "tutup permanen" sebagai
+ * "Tutup / Tidak Ada" (kecuali yang sudah jadi pelanggan), lengkap dengan catatan aktivitas.
+ */
+export async function markGoogleClosedLeads(admin: { sub: string | null; name: string }): Promise<{ marked: number; waCancelled: number }> {
+  const targets = await db.select({ id: platformLeads.id, status: platformLeads.status }).from(platformLeads).where(googleClosedOpenWhere());
+  if (targets.length === 0) return { marked: 0, waCancelled: 0 };
+  const ids = targets.map((t) => t.id);
+  await db
+    .update(platformLeads)
+    .set({ status: "tutup", updatedAt: new Date().toISOString() })
+    .where(and(inArray(platformLeads.id, ids), googleClosedOpenWhere()));
+  for (const t of targets) {
+    const from = isLeadStatus(t.status) ? LEAD_STATUS_LABEL[t.status] : t.status;
+    await addLeadActivity(t.id, "status", `${from} → ${LEAD_STATUS_LABEL.tutup} (Google Maps: tutup permanen)`, admin);
+  }
+  const waCancelled = await cancelPendingWaForLeads(ids);
+  return { marked: ids.length, waCancelled };
 }
 
 /** admin.sub null = dicatat oleh sistem (mis. bot WhatsApp mencatat balasan masuk dari lead). */

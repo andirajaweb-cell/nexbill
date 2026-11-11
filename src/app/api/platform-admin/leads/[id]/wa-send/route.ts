@@ -19,8 +19,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!text) return NextResponse.json({ error: "Isi pesan wajib diisi." }, { status: 400 });
     if (text.length > WA_BODY_MAX) return NextResponse.json({ error: `Isi pesan maksimal ${WA_BODY_MAX} karakter.` }, { status: 400 });
 
-    const [lead] = await db.select({ waNumber: platformLeads.waNumber, phone: platformLeads.phone }).from(platformLeads).where(eq(platformLeads.id, id)).limit(1);
+    const [lead] = await db
+      .select({ waNumber: platformLeads.waNumber, phone: platformLeads.phone, status: platformLeads.status })
+      .from(platformLeads)
+      .where(eq(platformLeads.id, id))
+      .limit(1);
     if (!lead) return NextResponse.json({ error: "Lead tidak ditemukan." }, { status: 404 });
+    if (lead.status === "tutup") {
+      return NextResponse.json({ error: "Usaha ini ditandai Tutup / Tidak Ada. Ubah statusnya dulu bila ternyata masih buka." }, { status: 400 });
+    }
     const phone = leadWaNumber(lead.waNumber, lead.phone);
     if (!phone) return NextResponse.json({ error: "Lead belum punya nomor WhatsApp yang valid (format 08xx/628xx)." }, { status: 400 });
 

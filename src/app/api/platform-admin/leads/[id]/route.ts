@@ -6,7 +6,7 @@ import { requirePlatformAdmin } from "@/lib/auth/platform-session";
 import { describeError } from "@/lib/api/error";
 import { LEAD_STATUS_LABEL } from "@/lib/leads/constants";
 import { toWhatsappNumber } from "@/lib/leads/places";
-import { addLeadActivity, isLeadStatus, parseQualification } from "@/lib/leads/service";
+import { addLeadActivity, cancelPendingWaForLeads, isLeadStatus, parseQualification } from "@/lib/leads/service";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -81,6 +81,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (patch.status && patch.status !== lead.status) {
       await addLeadActivity(id, "status", `${LEAD_STATUS_LABEL[lead.status]} → ${LEAD_STATUS_LABEL[patch.status]}`, session);
+      // Usaha tutup / tidak ada → pesan WA yang masih antre tidak perlu dikirim.
+      if (patch.status === "tutup") await cancelPendingWaForLeads([id]);
     }
     return NextResponse.json(updated);
   } catch (err: unknown) {

@@ -10,6 +10,7 @@ import {
   LEAD_BASE,
   LEAD_CLOSED_STATUSES,
   LEAD_FUNNEL,
+  LEAD_LOST_STATUSES,
   LEAD_PRIORITIES,
   LEAD_PRIORITY_LABEL,
   LEAD_STATUSES,
@@ -36,6 +37,7 @@ const STATUS_COLOR: Record<LeadStatus, string> = {
   trial: "text-fuchsia-300 border-fuchsia-400/30 bg-fuchsia-500/10",
   closing: "text-emerald-300 border-emerald-400/30 bg-emerald-500/10",
   tidak_tertarik: "text-neutral-400 border-white/10 bg-white/5",
+  tutup: "text-rose-300/80 border-rose-400/20 bg-rose-500/5 line-through decoration-rose-400/40",
 };
 
 const PRIORITY_COLOR: Record<LeadPriority, string> = {
@@ -90,6 +92,9 @@ interface Lead {
   source: "google_maps" | "manual";
   searchQuery: string | null;
   convertedOutletId: string | null;
+  /** Status usaha dari Google Maps: OPERATIONAL / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY. */
+  businessStatus: string | null;
+  updatedAt?: string;
   /** Balasan WA dari lead ke nomor bot CRM yang belum dibuka admin (migrasi 0026). */
   inboundUnread?: boolean;
   lastInboundAt?: string | null;
@@ -117,8 +122,17 @@ interface ListData {
   leads: Lead[];
   counts: Record<LeadStatus, number>;
   dueCount: number;
+  /** Lead yang ditandai Google "tutup permanen" tapi di CRM belum berstatus Tutup / Tidak Ada. */
+  googleClosedCount?: number;
   cities: string[];
   areas: string[];
+}
+
+/** Label status usaha dari Google Maps (kolom business_status) — hanya bila bukan "buka". */
+function googleStatusLabel(s: string | null | undefined): string | null {
+  if (s === "CLOSED_PERMANENTLY") return "Google: tutup permanen";
+  if (s === "CLOSED_TEMPORARILY") return "Google: tutup sementara";
+  return null;
 }
 
 type SearchResult = PlaceResult & { existingLeadId: string | null };
@@ -395,7 +409,27 @@ function CrmTab() {
     }
   };
 
-  const total = data ? Object.values(data.counts).reduce((a, b) => a + b, 0) : 0;
+  const [marking, setMarking] = useState(false);
+  const markGoogleClosed = async () => {
+    const n = data?.googleClosedCount ?? 0;
+    if (!n) return;
+    if (!(await showConfirm(`Pindahkan ${n} prospek yang menurut Google Maps sudah tutup permanen ke daftar "Tutup / Tidak Ada"? Pesan WA yang masih antre untuk mereka dibatalkan. Status bisa dikembalikan kapan saja.`))) return;
+    setMarking(true);
+    try {
+      const r = await send(`/api/platform-admin/leads/mark-closed`, "POST", {});
+      const res = r as { marked?: number; waCancelled?: number } | null;
+      await load();
+      await showAlert(`${res?.marked ?? 0} prospek dipindah ke "Tutup / Tidak Ada"${res?.waCancelled ? `, ${res.waCancelled} pesan WA antre dibatalkan` : ""}.`);
+    } catch (e) {
+      showAlert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setMarking(false);
+    }
+  };
+
+  // "Semua" = prospek aktif; usaha yang tutup/tidak ada punya daftar sendiri.
+  const total = data ? LEAD_STATUSES.filter((s) => s !== "tutup").reduce((a, s) => a + (data.counts[s] ?? 0), 0) : 0;
+  const closedView = status === "tutup";
   const todayStr = today();
 
   // Server orders by updatedAt; the other orders are applied here (the list is a few hundred rows at most).
@@ -423,17 +457,47 @@ function CrmTab() {
   return (
     <div className="space-y-4">
       {data && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
           <button onClick={() => { setStatus(""); setDue(false); }} className={clsx("rounded-xl border p-3 text-left transition", !status && !due ? "border-amber-400/50 bg-amber-500/10" : "border-white/10 bg-white/[0.02] hover:bg-white/5")}>
-            <div className="text-[10px] uppercase tracking-wide text-neutral-500">Semua</div>
+            <div className="text-[10px] uppercase tracking-wide text-neutral-500">Semua aktif</div>
             <div className="text-xl font-bold text-neutral-100">{total}</div>
           </button>
           {LEAD_STATUSES.map((s) => (
-            <button key={s} onClick={() => { setStatus(s); setDue(false); }} className={clsx("rounded-xl border p-3 text-left transition", status === s ? "border-amber-400/50 bg-amber-500/10" : "border-white/10 bg-white/[0.02] hover:bg-white/5")}>
-              <div className="text-[10px] uppercase tracking-wide text-neutral-500 truncate">{LEAD_STATUS_LABEL[s].replace(" (Jadi Pelanggan)", "")}</div>
-              <div className="text-xl font-bold text-neutral-100">{data.counts[s]}</div>
+            <button
+              key={s}
+              onClick={() => { setStatus(s); setDue(false); }}
+              title={s === "tutup" ? "Usaha yang sudah tutup, tidak ditemukan, atau nomornya mati — tidak ikut dihubungi" : undefined}
+              className={clsx(
+                "rounded-xl border p-3 text-left transition",
+                status === s ? "border-amber-400/50 bg-amber-500/10" : s === "tutup" ? "border-rose-400/20 bg-rose-500/[0.04] hover:bg-rose-500/10" : "border-white/10 bg-white/[0.02] hover:bg-white/5"
+              )}
+            >
+              <div className={clsx("text-[10px] uppercase tracking-wide truncate", s === "tutup" ? "text-rose-300/80" : "text-neutral-500")}>{LEAD_STATUS_LABEL[s].replace(" (Jadi Pelanggan)", "")}</div>
+              <div className="text-xl font-bold text-neutral-100">{data.counts[s] ?? 0}</div>
             </button>
           ))}
+        </div>
+      )}
+
+      {data && (closedView || (data.googleClosedCount ?? 0) > 0) && (
+        <div className="rounded-xl border border-rose-400/20 bg-rose-500/[0.05] p-3 text-sm flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[240px] text-neutral-300">
+            {closedView ? (
+              <>
+                <span className="font-semibold text-rose-200">Daftar usaha tutup / tidak ada lagi ({data.counts.tutup ?? 0}).</span>{" "}
+                Tidak tampil di daftar aktif, tidak masuk Jatuh Tempo Follow Up, dan tidak bisa dikirimi WA. Bila ternyata masih buka, ganti statusnya — prospek kembali ke daftar aktif.
+              </>
+            ) : (
+              <>
+                <span className="font-semibold text-rose-200">{data.googleClosedCount} prospek</span> ditandai Google Maps &quot;tutup permanen&quot; tapi masih ada di daftar aktif.
+              </>
+            )}
+          </div>
+          {(data.googleClosedCount ?? 0) > 0 && (
+            <Button variant="secondary" onClick={markGoogleClosed} disabled={marking}>
+              {marking ? "Memindahkan..." : `Pindahkan ${data.googleClosedCount} ke Tutup / Tidak Ada`}
+            </Button>
+          )}
         </div>
       )}
 
@@ -453,7 +517,9 @@ function CrmTab() {
                 </div>
               </div>
             ))}
-            <div className="pl-2 self-center text-neutral-500">Tidak tertarik: {data.counts.tidak_tertarik}</div>
+            <div className="pl-2 self-center text-neutral-500">
+              {LEAD_LOST_STATUSES.map((s) => `${LEAD_STATUS_LABEL[s]}: ${data.counts[s] ?? 0}`).join(" · ")}
+            </div>
           </div>
         </div>
       )}
@@ -518,7 +584,11 @@ function CrmTab() {
           <p className="text-sm text-neutral-500">Memuat...</p>
         ) : leads.length === 0 ? (
           <p className="text-sm text-neutral-500">
-            {total === 0 ? "Belum ada prospek. Mulai dari tab \"Cari di Google Maps\" atau tambah lead manual." : "Tidak ada prospek yang cocok dengan filter."}
+            {closedView
+              ? "Belum ada usaha yang ditandai Tutup / Tidak Ada. Ganti status prospek ke \"Tutup / Tidak Ada\" bila usahanya sudah tidak ada saat dikunjungi atau nomornya mati."
+              : total === 0
+                ? "Belum ada prospek. Mulai dari tab \"Cari di Google Maps\" atau tambah lead manual."
+                : "Tidak ada prospek yang cocok dengan filter."}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -539,7 +609,7 @@ function CrmTab() {
                 {leads.map((l) => {
                   const overdue = !!l.nextFollowUpDate && l.nextFollowUpDate <= todayStr && !LEAD_CLOSED_STATUSES.includes(l.status);
                   return (
-                    <tr key={l.id} className="border-b border-white/5 align-top hover:bg-white/[0.02]">
+                    <tr key={l.id} className={clsx("border-b border-white/5 align-top hover:bg-white/[0.02]", l.status === "tutup" && "opacity-60")}>
                       <td className="py-2 pr-2"><PriorityBadge priority={l.priority} /></td>
                       <td className="py-2 pr-3">
                         <div className="flex items-center gap-2">
@@ -558,6 +628,8 @@ function CrmTab() {
                           {l.category ?? (l.source === "manual" ? "Input manual" : "—")}
                           {l.rating != null && ` · ★ ${l.rating} (${l.reviewCount ?? 0})`}
                           {l.currentBilling && ` · billing: ${l.currentBilling}`}
+                          {googleStatusLabel(l.businessStatus) && <span className="text-rose-300/80"> · {googleStatusLabel(l.businessStatus)}</span>}
+                          {l.status === "tutup" && l.updatedAt && <span> · diperbarui {fmtDateTime(l.updatedAt)}</span>}
                         </div>
                         {l.nextAction && <div className="text-[11px] text-cyan-300/80">→ {l.nextAction}</div>}
                       </td>
@@ -580,7 +652,7 @@ function CrmTab() {
                         {overdue && <div className="text-[10px]">jatuh tempo</div>}
                       </td>
                       <td className="py-2 whitespace-nowrap space-x-2 text-[12px]">
-                        {leadWaNumber(l.waNumber, l.phone) && (
+                        {l.status !== "tutup" && leadWaNumber(l.waNumber, l.phone) && (
                           <button onClick={() => setWaLead(l)} className="text-emerald-400 hover:underline" title="Kirim WA dengan template sesuai tahap">WA</button>
                         )}
                         {l.mapsUrl && <a href={l.mapsUrl} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">Maps</a>}

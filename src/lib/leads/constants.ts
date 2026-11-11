@@ -3,7 +3,12 @@
  * db/server import so the "use client" page can import it directly.
  */
 
-export const LEAD_STATUSES = ["baru", "dihubungi", "follow_up", "demo", "trial", "closing", "tidak_tertarik"] as const;
+/**
+ * "tutup" (2026-11-12) = usahanya sudah tutup / tidak ditemukan saat dikunjungi / nomor mati — beda
+ * dengan "tidak_tertarik" (pemiliknya ada tapi menolak). Disimpan di kolom teks `status` yang sama
+ * (tanpa CHECK constraint di DB), jadi tidak perlu migrasi.
+ */
+export const LEAD_STATUSES = ["baru", "dihubungi", "follow_up", "demo", "trial", "closing", "tidak_tertarik", "tutup"] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
@@ -14,14 +19,26 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   trial: "Trial",
   closing: "Closing (Jadi Pelanggan)",
   tidak_tertarik: "Tidak Tertarik",
+  tutup: "Tutup / Tidak Ada",
 };
 
 /** Statuses where the pipeline is finished — no follow-up reminder is ever "due" for these. */
-export const LEAD_CLOSED_STATUSES: LeadStatus[] = ["closing", "tidak_tertarik"];
+export const LEAD_CLOSED_STATUSES: LeadStatus[] = ["closing", "tidak_tertarik", "tutup"];
+
+/** Lost states — shown beside the funnel, never inside it. */
+export const LEAD_LOST_STATUSES: LeadStatus[] = ["tidak_tertarik", "tutup"];
 
 /**
- * Pipeline order for the funnel view ("% lolos" per stage). "tidak_tertarik" is a lost state, not a
- * stage, so it's left out of the funnel math.
+ * Status awal saat menyimpan hasil Google Maps: tempat yang ditandai Google "CLOSED_PERMANENTLY"
+ * langsung masuk "tutup" supaya tidak ikut dihubungi/dikunjungi. Tutup sementara tetap "baru".
+ */
+export function initialLeadStatus(businessStatus: string | null | undefined): LeadStatus {
+  return businessStatus === "CLOSED_PERMANENTLY" ? "tutup" : "baru";
+}
+
+/**
+ * Pipeline order for the funnel view ("% lolos" per stage). "tidak_tertarik" and "tutup" are lost
+ * states, not stages, so they're left out of the funnel math.
  */
 export const LEAD_FUNNEL: LeadStatus[] = ["baru", "dihubungi", "follow_up", "demo", "trial", "closing"];
 

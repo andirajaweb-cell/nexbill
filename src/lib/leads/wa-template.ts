@@ -16,11 +16,18 @@ import { LEAD_STATUSES, LEAD_STATUS_LABEL, type LeadStatus } from "./constants";
 
 /* ------------------------------------------------------------------ tahap ------------------------------------------------------------------ */
 
-export const WA_TEMPLATE_STAGES = [...LEAD_STATUSES, "umum"] as const;
-export type WaTemplateStage = (typeof WA_TEMPLATE_STAGES)[number];
+/** Lead "tutup" (usaha tutup / tidak ada) tidak dihubungi lagi, jadi tidak punya tahap template sendiri. */
+type TemplateLeadStatus = Exclude<LeadStatus, "tutup">;
+const TEMPLATE_LEAD_STATUSES = LEAD_STATUSES.filter((s): s is TemplateLeadStatus => s !== "tutup");
+
+export const WA_TEMPLATE_STAGES: readonly (TemplateLeadStatus | "umum")[] = [...TEMPLATE_LEAD_STATUSES, "umum"];
+export type WaTemplateStage = TemplateLeadStatus | "umum";
+
+const { tutup: _tutup, ...TEMPLATE_STATUS_LABEL } = LEAD_STATUS_LABEL;
+void _tutup;
 
 export const WA_STAGE_LABEL: Record<WaTemplateStage, string> = {
-  ...LEAD_STATUS_LABEL,
+  ...TEMPLATE_STATUS_LABEL,
   closing: "Closing",
   umum: "Umum (semua tahap)",
 };
