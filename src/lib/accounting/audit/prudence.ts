@@ -87,6 +87,8 @@ export async function findProductsSoldWithoutCost(outletId: string): Promise<{ n
         gte(orders.createdAt, since),
         sql`coalesce(${products.costPrice}, 0) = 0`,
         sql`${products.category} <> 'device_rental'`,
+        // Produk "tidak dilacak" (ambang stok negatif) sengaja ber-HPP 0 — bahannya dicatat di Pengeluaran.
+        sql`${products.lowStockThreshold} >= 0`,
         eq(orderItems.itemType, "product")
       )
     )
