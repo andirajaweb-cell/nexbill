@@ -19,7 +19,10 @@ import { HistoricalImportSection } from "./HistoricalImport";
 import { MigrationSop } from "./MigrationSop";
 import { ProfitLossSteps } from "./ProfitLossSteps";
 import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
-import { BookOpen, Lock } from "lucide-react";
+import { BookOpen, ChevronRight, FileBarChart, HandCoins, LayoutDashboard, Lock, Settings2, ShieldCheck } from "lucide-react";
+import { ACCOUNTING_OVERVIEW, accountingGroupOf, accountingTabFromSlug, accountingTabSlug, visibleAccountingGroups, type AccountingGroupId, type AccountingTab } from "@/lib/accounting/nav";
+import { OverviewTab } from "./OverviewTab";
+import "@/lib/i18n/dict-accounting-nav";
 import Link from "next/link";
 import { usePlanFeatures } from "@/lib/subscription/use-plan-features";
 import { LockedFeaturePreview } from "@/components/dashboard/LockedFeaturePreview";
@@ -43,10 +46,19 @@ const inputClsSm = "w-full rounded-lg bg-neutral-800 border border-neutral-700 p
 function Field({ label, children }: { label: string; children: any }) {
   return <label className="space-y-1 block"><div className="text-xs text-neutral-500">{label}</div>{children}</label>;
 }
-const TABS = ["Chart of Accounts", "Account Mapping", "Jurnal", "Neraca Saldo", "Piutang (AR)", "Hutang (AP)", "Laba Rugi", "Rekonsiliasi", "Neraca", "Arus Kas", "CALK (SAK EMKM)", "Audit", "Tutup Periode", "Migrasi Data"] as const;
-type Tab = (typeof TABS)[number];
+type Tab = AccountingTab;
+
+const GROUP_META: Record<AccountingGroupId, { key: string; fallback: string; descKey: string; descFallback: string; icon: React.ReactNode }> = {
+  overview: { key: "accNav.group.overview", fallback: "Ringkasan", descKey: "accNav.groupDesc.overview", descFallback: "Kinerja & kesehatan pembukuan", icon: <LayoutDashboard size={16} /> },
+  statements: { key: "accNav.group.statements", fallback: "Laporan Keuangan", descKey: "accNav.groupDesc.statements", descFallback: "Laba Rugi, Neraca, Arus Kas, CALK", icon: <FileBarChart size={16} /> },
+  ledger: { key: "accNav.group.ledger", fallback: "Buku Besar", descKey: "accNav.groupDesc.ledger", descFallback: "Jurnal, Neraca Saldo, daftar akun", icon: <BookOpen size={16} /> },
+  arap: { key: "accNav.group.arap", fallback: "Piutang & Hutang", descKey: "accNav.groupDesc.arap", descFallback: "Tagihan pelanggan & supplier", icon: <HandCoins size={16} /> },
+  control: { key: "accNav.group.control", fallback: "Kontrol & Tutup Buku", descKey: "accNav.groupDesc.control", descFallback: "Audit, rekonsiliasi, tutup periode", icon: <ShieldCheck size={16} /> },
+  setup: { key: "accNav.group.setup", fallback: "Pengaturan", descKey: "accNav.groupDesc.setup", descFallback: "Pemetaan akun & migrasi data", icon: <Settings2 size={16} /> },
+};
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
+  "Ringkasan": { key: "accNav.tab.overview", fallback: "Ringkasan Eksekutif" },
   "Chart of Accounts": { key: "accounting.tab.coa", fallback: "Chart of Accounts" },
   "Account Mapping": { key: "accounting.tab.mapping", fallback: "Account Mapping" },
   "Jurnal": { key: "accounting.tab.journal", fallback: "Jurnal" },
@@ -65,22 +77,54 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
 
 export default function AccountingPage() {
   const [outletId, setOutletId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("Neraca Saldo");
+  const [tab, setTabState] = useState<Tab>(ACCOUNTING_OVERVIEW);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const { user } = useAuth();
   const { t } = useDashboardLang();
-  // Paket Starter: halaman ini terbuka untuk Laba Rugi ringkas; tab pembukuan lain tetap terlihat
-  // tapi menampilkan pratinjau terkunci (lihat STARTER_FEATURES di lib/subscription/pricing.ts).
+  // Paket Starter: halaman ini terbuka untuk Laba Rugi ringkas; sub-halaman pembukuan lain tetap
+  // terlihat tapi menampilkan pratinjau terkunci (lihat STARTER_FEATURES di lib/subscription/pricing.ts).
   const plan = usePlanFeatures();
   const fullBooks = plan.has("accounting");
   const [tabChosen, setTabChosen] = useState(false);
-  useEffect(() => {
-    if (plan.loaded && !fullBooks && !tabChosen) setTab("Laba Rugi");
-  }, [plan.loaded, fullBooks, tabChosen]);
   const role = (user?.role ?? "cashier") as any;
   const isMigrationRole = role === "superuser" || role === "owner";
   const canSeePeriodLock = hasPermission(role, "close_period") || hasPermission(role, "reopen_period");
-  const visibleTabs = TABS.filter((tb) => (tb !== "Migrasi Data" || isMigrationRole) && (tb !== "Tutup Periode" || canSeePeriodLock));
+  const groups = visibleAccountingGroups((tb) => (tb !== "Migrasi Data" || isMigrationRole) && (tb !== "Tutup Periode" || canSeePeriodLock));
+  const visibleTabs = groups.flatMap((g) => g.tabs);
+  const isLocked = (tb: Tab) => !fullBooks && tb !== "Laba Rugi";
+
+  // Sub-halaman tersimpan di URL (?tab=laba-rugi) — bisa dibagikan/di-bookmark dan tombol Back bekerja.
+  const setTab = (tb: Tab, mode: "push" | "replace" = "push") => {
+    setTabState(tb);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", accountingTabSlug(tb));
+    window.history[mode === "push" ? "pushState" : "replaceState"](null, "", url);
+  };
+  useEffect(() => {
+    const read = () => {
+      const want = accountingTabFromSlug(new URLSearchParams(window.location.search).get("tab"));
+      if (want) {
+        setTabChosen(true);
+        setTabState(want);
+      }
+    };
+    read();
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, []);
+  useEffect(() => {
+    if (plan.loaded && !fullBooks && !tabChosen) setTabState("Laba Rugi");
+  }, [plan.loaded, fullBooks, tabChosen]);
+  const activeTab: Tab = visibleTabs.includes(tab) ? tab : ACCOUNTING_OVERVIEW;
+  const activeGroup = groups.find((g) => g.id === accountingGroupOf(activeTab)) ?? groups[0];
+  const openTab = (tb: Tab) => {
+    if (!visibleTabs.includes(tb)) return;
+    setTabChosen(true);
+    setTab(tb);
+    setShowWorkflow(false);
+  };
+  const tabLabel = (tb: Tab) => t(TAB_LABEL_KEYS[tb].key, TAB_LABEL_KEYS[tb].fallback);
 
   const { data: outlet } = useApi<{ id: string }>("/api/outlets/default");
   useEffect(() => {
@@ -103,60 +147,86 @@ export default function AccountingPage() {
         <WorkflowGuide
           onClose={() => setShowWorkflow(false)}
           shortcuts={(["Neraca Saldo", "Audit", "Laba Rugi", "Tutup Periode"] as Tab[]).filter((tb) => visibleTabs.includes(tb))}
-          tabLabel={(tb) => (TAB_LABEL_KEYS[tb as Tab] ? t(TAB_LABEL_KEYS[tb as Tab].key, TAB_LABEL_KEYS[tb as Tab].fallback) : tb)}
-          onOpenTab={(tb) => {
-            setTabChosen(true);
-            setTab(tb as Tab);
-            setShowWorkflow(false);
-          }}
+          tabLabel={(tb) => (TAB_LABEL_KEYS[tb as Tab] ? tabLabel(tb as Tab) : tb)}
+          onOpenTab={(tb) => openTab(tb as Tab)}
         />
       )}
 
-      <div className="flex gap-1 border-b border-neutral-800 overflow-x-auto">
-        {visibleTabs.map((tb) => (
-          <button
-            key={tb}
-            onClick={() => {
-              setTabChosen(true);
-              setTab(tb);
-            }}
-            className={`px-3 py-2 text-sm whitespace-nowrap ${tab === tb ? "border-b-2 border-emerald-500 text-emerald-400" : "text-neutral-500 hover:text-neutral-300"}`}
-          >
-            {t(TAB_LABEL_KEYS[tb].key, TAB_LABEL_KEYS[tb].fallback)}
-            {!fullBooks && tb !== "Laba Rugi" && <Lock size={11} className="inline ml-1 -mt-0.5 text-amber-300/80" />}
-          </button>
-        ))}
-      </div>
+      {/* Menu dua tingkat: kelompok → sub-halaman (2026-11-12). */}
+      <nav aria-label={t("accounting.header.title", "Accounting")} className="space-y-3 print:hidden">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          {groups.map((g) => {
+            const meta = GROUP_META[g.id];
+            const active = g.id === activeGroup.id;
+            return (
+              <button
+                key={g.id}
+                onClick={() => openTab(g.tabs.find((tb) => !isLocked(tb)) ?? g.tabs[0])}
+                aria-current={active ? "page" : undefined}
+                className={`group rounded-xl border p-3 text-left transition ${active ? "border-cyan-400/50 bg-gradient-to-b from-cyan-500/15 to-transparent shadow-[0_0_0_1px_rgba(34,211,238,0.15),0_12px_30px_-18px_rgba(34,211,238,0.6)]" : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"}`}
+              >
+                <span className={`flex items-center gap-2 text-sm font-medium ${active ? "text-cyan-200" : "text-neutral-200"}`}>
+                  <span className={`grid h-7 w-7 place-items-center rounded-lg ${active ? "bg-cyan-400/20 text-cyan-200" : "bg-white/5 text-neutral-400 group-hover:text-neutral-200"}`}>{meta.icon}</span>
+                  {t(meta.key, meta.fallback)}
+                </span>
+                <span className="mt-1.5 block text-[11px] leading-snug text-neutral-500">{t(meta.descKey, meta.descFallback)}</span>
+              </button>
+            );
+          })}
+        </div>
 
-      {outletId && <TabGuide key={tab} tab={tab} label={t(TAB_LABEL_KEYS[tab].key, TAB_LABEL_KEYS[tab].fallback)} />}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1 text-xs text-neutral-500">
+            {t(GROUP_META[activeGroup.id].key, GROUP_META[activeGroup.id].fallback)}
+            <ChevronRight size={12} />
+          </span>
+          <div className="flex gap-1 overflow-x-auto rounded-full border border-white/10 bg-white/[0.02] p-1">
+            {activeGroup.tabs.map((tb) => (
+              <button
+                key={tb}
+                onClick={() => openTab(tb)}
+                aria-current={activeTab === tb ? "page" : undefined}
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm transition ${activeTab === tb ? "bg-cyan-400/15 text-cyan-200 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]" : "text-neutral-400 hover:text-neutral-100"}`}
+              >
+                {tabLabel(tb)}
+                {isLocked(tb) && <Lock size={11} className="inline ml-1 -mt-0.5 text-amber-300/80" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
 
-      {!outletId ? null : !fullBooks && tab !== "Laba Rugi" ? (
+      {outletId && activeTab !== ACCOUNTING_OVERVIEW && <TabGuide key={activeTab} tab={activeTab} label={tabLabel(activeTab)} />}
+
+      {!outletId ? null : isLocked(activeTab) ? (
         <LockedFeaturePreview feature="accounting" compact note={t("planPreview.accountingTab", "Tab ini bagian dari pembukuan lengkap paket Pro. Laba Rugi ringkas tetap terbuka di paket Anda.")} />
-      ) : tab === "Chart of Accounts" ? (
+      ) : activeTab === ACCOUNTING_OVERVIEW ? (
+        <OverviewTab onOpen={openTab} />
+      ) : activeTab === "Chart of Accounts" ? (
         <ChartOfAccountsTab outletId={outletId} />
-      ) : tab === "Account Mapping" ? (
+      ) : activeTab === "Account Mapping" ? (
         <AccountMappingTab outletId={outletId} />
-      ) : tab === "Jurnal" ? (
+      ) : activeTab === "Jurnal" ? (
         <JournalTab outletId={outletId} />
-      ) : tab === "Neraca Saldo" ? (
+      ) : activeTab === "Neraca Saldo" ? (
         <TrialBalanceTab outletId={outletId} />
-      ) : tab === "Piutang (AR)" ? (
+      ) : activeTab === "Piutang (AR)" ? (
         <ReceivablesTab outletId={outletId} />
-      ) : tab === "Hutang (AP)" ? (
+      ) : activeTab === "Hutang (AP)" ? (
         <PayablesTab outletId={outletId} />
-      ) : tab === "Laba Rugi" ? (
+      ) : activeTab === "Laba Rugi" ? (
         <ProfitLossTab outletId={outletId} />
-      ) : tab === "Rekonsiliasi" ? (
+      ) : activeTab === "Rekonsiliasi" ? (
         <ReconciliationTab outletId={outletId} />
-      ) : tab === "Neraca" ? (
+      ) : activeTab === "Neraca" ? (
         <BalanceSheetTab outletId={outletId} />
-      ) : tab === "Arus Kas" ? (
+      ) : activeTab === "Arus Kas" ? (
         <CashFlowTab outletId={outletId} />
-      ) : tab === "CALK (SAK EMKM)" ? (
+      ) : activeTab === "CALK (SAK EMKM)" ? (
         <CalkTab />
-      ) : tab === "Audit" ? (
+      ) : activeTab === "Audit" ? (
         <AuditTab />
-      ) : tab === "Tutup Periode" ? (
+      ) : activeTab === "Tutup Periode" ? (
         <PeriodLockTab />
       ) : (
         <DataMigrationTab outletId={outletId} />
