@@ -137,7 +137,10 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "product_sale_cogs", transactionKey: "other", accountCode: "5400", label: "HPP Produk Lainnya (kategori non-standar)" },
   // Stock count / manual adjustment differences, valued at harga modal — see
   // lib/accounting/inventory-postings.ts.
-  { module: "product", transactionKey: "opname_difference", accountCode: "5310", label: "Selisih Stock Opname" },
+  // Sejak 2026-11-11 stock opname dikoreksi ke ekuitas (tidak masuk Laba Rugi). Baris 5310 tetap
+  // ada untuk jurnal lama sebelum dipindahkan lewat tombol di tab Stock Opname.
+  { module: "product", transactionKey: "opname_correction", accountCode: "3400", label: "Koreksi Persediaan — Stock Opname (ekuitas, tidak masuk Laba Rugi)" },
+  { module: "product", transactionKey: "opname_difference", accountCode: "5310", label: "Selisih Stock Opname (lama — tidak dipakai opname baru)" },
   { module: "product", transactionKey: "damaged", accountCode: "5320", label: "Barang Rusak / Waste" },
   { module: "product", transactionKey: "adjustment", accountCode: "5340", label: "Penyesuaian Stok Manual" },
   { module: "product", transactionKey: "opening_stock", accountCode: "3400", label: "Stok Awal Produk (Opening Balance Equity)" },

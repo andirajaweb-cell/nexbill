@@ -63,7 +63,7 @@ export const INVENTORI: HelpCategory[] = [
           "Đếm hàng trên kệ/trong kho và nhập kết quả cạnh số của hệ thống — chênh lệch hiện ngay. Lưu dưới dạng nháp.",
           "Quét để đếm: chạm \"Quét để đếm\" (camera) hoặc quét vào ô tìm kiếm — mỗi lần quét cộng 1 cho sản phẩm đó. Vẫn có thể sửa số thủ công.",
           "Mở bản nháp để xem chênh lệch từng sản phẩm.",
-          "Bấm Áp dụng điều chỉnh: thừa được ghi là điều chỉnh, thiếu được ghi là hao hụt. Không thể áp dụng hai lần.",
+          "Bấm Áp dụng điều chỉnh: tồn kho hệ thống được đặt bằng số đếm, chênh lệch ghi là Điều chỉnh tồn kho (không vào Lãi lỗ). Để trống sản phẩm không đếm. Không thể áp dụng hai lần.",
         ],
       },
     ],

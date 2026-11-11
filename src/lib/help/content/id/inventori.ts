@@ -63,7 +63,7 @@ export const INVENTORI: HelpCategory[] = [
           "Hitung stok di rak/gudang, isi hasilnya di samping angka sistem — selisih langsung terlihat. Simpan sebagai draf.",
           "Scan untuk hitung: tekan \"Scan untuk hitung\" (kamera) atau tembak scanner ke kotak cari — setiap scan menambah hitungan produk itu 1. Angka tetap bisa dikoreksi manual.",
           "Buka draf untuk memeriksa selisih per produk.",
-          "Tekan Terapkan Penyesuaian: kelebihan dicatat sebagai penyesuaian, kekurangan sebagai waste. Tidak bisa diterapkan dua kali.",
+          "Tekan Terapkan Penyesuaian: stok sistem disamakan dengan hasil hitung, selisihnya dicatat sebagai Koreksi Persediaan (tidak masuk Laba Rugi). Kosongkan produk yang tidak dihitung. Tidak bisa diterapkan dua kali.",
         ],
       },
     ],

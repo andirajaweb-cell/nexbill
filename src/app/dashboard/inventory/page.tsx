@@ -14,6 +14,7 @@ import { useCurrency } from "@/lib/currency/client";
 import { resolveSendToKitchen } from "@/lib/kitchen/routing";
 import "@/lib/i18n/dict-inventory";
 import "@/lib/i18n/dict-inventory-draft";
+import "@/lib/i18n/dict-inventory-opname";
 import "@/lib/i18n/dict-accounting";
 import { SupplierTab } from "./SupplierTab";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
@@ -1920,7 +1921,9 @@ function StockOpnameTab({ outletId }: { outletId: string }) {
   }, [outletId]);
 
   const submit = async () => {
-    const items = Object.entries(counts).filter(([, v]) => v !== undefined).map(([productId, actualQty]) => ({ productId, actualQty }));
+    const items = Object.entries(counts)
+      .filter(([, v]) => typeof v === "number" && Number.isInteger(v) && v >= 0)
+      .map(([productId, actualQty]) => ({ productId, actualQty }));
     if (items.length === 0) return;
     const res = await fetch("/api/stock-opnames", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId, items }) });
     if (!res.ok) return showAlert((await res.json().catch(() => ({}))).error ?? res.statusText);
@@ -1937,6 +1940,24 @@ function StockOpnameTab({ outletId }: { outletId: string }) {
   };
 
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? t("inventory.recipe.deletedProduct", "(produk terhapus)");
+  const negativeCount = products.filter((p) => p.stockQty < 0).length;
+  const [reclassBusy, setReclassBusy] = useState(false);
+  const reclassify = async () => {
+    if (!(await showConfirm(t("inventory.opname.reclassConfirm", "Pindahkan selisih stock opname lama dari Laba Rugi (Kerugian Stock Opname) ke Koreksi Persediaan? Stok tidak berubah — hanya jurnalnya. Jurnal lama dibatalkan dan dicatat ulang pada tanggal yang sama."), { confirmLabel: t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan") }))) return;
+    setReclassBusy(true);
+    try {
+      const res = await fetch("/api/stock-opnames/reclassify", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? res.statusText);
+      showAlert(
+        data.moved > 0
+          ? t("inventory.opname.reclassDone", "{n} jurnal opname dipindahkan ke Koreksi Persediaan (Rp{amount}). Laba Rugi tidak lagi memuat selisih stock opname.").replace("{n}", String(data.moved)).replace("{amount}", Math.abs(data.amount).toLocaleString("id-ID"))
+          : t("inventory.opname.reclassNone", "Tidak ada jurnal opname lama yang perlu dipindahkan.")
+      );
+    } finally {
+      setReclassBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -1965,6 +1986,10 @@ function StockOpnameTab({ outletId }: { outletId: string }) {
           />
         </div>
         <p className="text-[11px] text-neutral-500 mb-2">{t("inventory.barcode.opnameHelp", "Tiap scan barcode (kamera atau scanner) = +1 pada hitungan produk itu. Produk yang tidak di-scan dan tidak diisi tidak ikut diopname.")}</p>
+        <p className="text-[11px] text-neutral-400 mb-2">{t("inventory.opname.ruleNote", "Isi jumlah barang yang benar-benar ada. Saat diterapkan, stok sistem disamakan dengan hasil hitung (dikurangi penjualan sesudah dihitung). Selisihnya dicatat sebagai Koreksi Persediaan — tidak masuk Laba Rugi. Barang rusak/hilang yang ingin dibebankan, catat lewat Penyesuaian Barang di tab Produk.")}</p>
+        {negativeCount > 0 && (
+          <p className="text-[11px] text-amber-300 mb-2">{t("inventory.opname.negativeNote", "{n} produk punya stok sistem minus — artinya ada penjualan yang belanjanya tidak dicatat lewat Belanja Supplier. Hitung fisik produk itu dan isi angkanya agar stok kembali benar; ke depan catat belanja di tab Belanja Supplier.").replace("{n}", String(negativeCount))}</p>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {visibleOpnameProducts.map((p) => {
             const counted = counts[p.id];
@@ -1977,14 +2002,38 @@ function StockOpnameTab({ outletId }: { outletId: string }) {
                     <span className={diff > 0 ? "text-emerald-400 text-xs ml-1" : "text-red-400 text-xs ml-1"}>{diff > 0 ? `+${diff}` : diff}</span>
                   )}
                 </span>
-                <input type="number" className="w-20 shrink-0 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" placeholder={String(p.stockQty)}
-                  value={counts[p.id] ?? ""} onChange={(e) => setCounts({ ...counts, [p.id]: Number(e.target.value) })} />
+                {/* Dulu placeholder = angka sistem (bisa minus) dan kotak yang dikosongkan tersimpan sebagai 0.
+                    Sekarang kosong = tidak ikut diopname; hanya bilangan bulat 0 ke atas. */}
+                <input type="number" min={0} step={1} inputMode="numeric"
+                  className="w-20 shrink-0 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" placeholder={t("inventory.opname.countPlaceholder", "fisik")}
+                  value={counts[p.id] ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.trim();
+                    const next = { ...counts };
+                    if (raw === "") delete next[p.id];
+                    else {
+                      const n = Math.floor(Number(raw));
+                      if (!Number.isFinite(n) || n < 0) return;
+                      next[p.id] = n;
+                    }
+                    countsRef.current = next;
+                    setCounts(next);
+                  }} />
               </div>
             );
           })}
         </div>
         <Button className="mt-3" onClick={submit}>{t("inventory.opname.saveCountButton", "Simpan Hasil Hitung")}</Button>
       </Card>
+
+      {opnames.some((o) => o.status === "completed") && (
+        <Card className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <p className="text-xs text-neutral-400">{t("inventory.opname.reclassHint", "Selisih opname sebelum 11 Nov 2026 tercatat sebagai Kerugian Stock Opname di Laba Rugi. Pindahkan ke Koreksi Persediaan supaya Laba Rugi tidak minus karena opname.")}</p>
+          <Button variant="secondary" className="text-xs shrink-0" onClick={reclassify} disabled={reclassBusy}>
+            {reclassBusy ? t("inventory.opname.reclassBusy", "Memindahkan...") : t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan")}
+          </Button>
+        </Card>
+      )}
 
       <div className="space-y-2">
         {opnames.map((o) => {

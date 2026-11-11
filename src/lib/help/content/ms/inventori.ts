@@ -63,7 +63,7 @@ export const INVENTORI: HelpCategory[] = [
           "Kira stok di rak/stor, isi hasilnya di sebelah angka sistem — perbezaan terus kelihatan. Simpan sebagai draf.",
           "Imbas untuk kira: tekan \"Imbas untuk kira\" (kamera) atau tembak pengimbas ke kotak carian — setiap imbasan menambah kiraan produk itu 1. Angka masih boleh dibetulkan secara manual.",
           "Buka draf untuk menyemak perbezaan bagi setiap produk.",
-          "Tekan Terapkan Pelarasan: lebihan direkod sebagai pelarasan, kekurangan sebagai waste. Tidak boleh diterapkan dua kali.",
+          "Tekan Terapkan Pelarasan: stok sistem disamakan dengan hasil kiraan, perbezaannya direkod sebagai Pembetulan Inventori (tidak masuk Untung Rugi). Kosongkan produk yang tidak dikira. Tidak boleh diterapkan dua kali.",
         ],
       },
     ],

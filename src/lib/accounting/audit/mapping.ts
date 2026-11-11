@@ -35,6 +35,7 @@ const KEY_TYPE: Record<string, "asset" | "liability" | "equity" | "revenue" | "e
   "product:adjustment": "expense",
   "product:damaged": "expense",
   "product:opname_difference": "expense",
+  "product:opname_correction": "equity",
   "ppob:payable": "liability",
   "ppob:provider_fee": "expense", // legacy, kept for old journals
   "home_rental:deposit": "liability",

@@ -23,7 +23,13 @@ export type InventoryAdjustmentReason = "opname" | "damaged" | "adjustment" | "o
 // Account Mapping (module "product"). Stock gains credit the same account they'd debit on a loss,
 // so a count that finds surplus simply reduces that period's selisih expense.
 const CONTRA: Record<InventoryAdjustmentReason, { key: string; code: string; label: string }> = {
-  opname: { key: "opname_difference", code: "5310", label: "Selisih stock opname" },
+  // Sejak 2026-11-11 selisih stock opname TIDAK lagi masuk Laba Rugi: stok disamakan dengan hitung
+  // fisik, nilainya dikoreksi ke ekuitas (bawaan 3400). Alasan: di outlet rental PS, belanja snack
+  // sering tidak dicatat lewat Belanja Supplier sehingga stok sistem minus/kacau — membukukan
+  // selisihnya sebagai beban membuat laba bulan itu anjlok tanpa arti. Barang rusak/hilang yang
+  // memang ingin dibebankan tetap lewat "Penyesuaian Barang" (damaged → 5320). Mapping lama
+  // "opname_difference" (5310) hanya dipakai jurnal lama; lihat reclassifyOpnameJournals().
+  opname: { key: "opname_correction", code: "3400", label: "Koreksi persediaan (stock opname)" },
   damaged: { key: "damaged", code: "5320", label: "Barang rusak / waste" },
   adjustment: { key: "adjustment", code: "5340", label: "Penyesuaian stok manual" },
   opening: { key: "opening_stock", code: "3400", label: "Stok awal produk" },

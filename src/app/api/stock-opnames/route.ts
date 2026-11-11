@@ -4,7 +4,7 @@ import { stockOpnames, stockOpnameItems } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { createStockOpname } from "@/lib/inventory/stock-opname";
 import { getSession } from "@/lib/auth/session";
-import { describeError } from "@/lib/api/error";
+import { describeError, errorStatus } from "@/lib/api/error";
 import { forbidUnless } from "@/lib/auth/require-permission";
 
 export async function GET() {
@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Belum login." }, { status: 401 });
   const denied = forbidUnless(session, ["manage_inventory_purchasing"], "Role kamu tidak punya izin membuat stock opname.");
   if (denied) return denied;
-  const body = await req.json();
-  return NextResponse.json(await createStockOpname({ ...body, outletId: session.outletId }));
+  try {
+    const body = await req.json();
+    return NextResponse.json(await createStockOpname({ ...body, outletId: session.outletId }));
+  } catch (err: unknown) {
+    return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });
+  }
 }

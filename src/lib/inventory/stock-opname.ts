@@ -1,8 +1,11 @@
 import { db } from "@/db/client";
-import { stockOpnames, stockOpnameItems, products, stockMovements } from "@/db/schema";
-import { eq, sql, inArray } from "drizzle-orm";
+import { stockOpnames, stockOpnameItems, products, stockMovements, journalEntries, journalLines } from "@/db/schema";
+import { and, eq, sql, inArray, isNull } from "drizzle-orm";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
 import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-postings";
+import { getMappedAccountId } from "@/lib/accounting/account-mapping";
+import { postJournal, voidJournal, type JournalSourceType } from "@/lib/accounting/journal";
+import { isPeriodLocked } from "@/lib/accounting/periods";
 
 // PARALLEL_CHUNK_SIZE used to live here, bounding how many stock updates ran per Promise.all
 // batch. completeStockOpname now applies them sequentially inside a single transaction instead —
@@ -18,6 +21,12 @@ export interface CreateStockOpnameInput {
 
 /** Snapshot current system stock vs. counted actual stock — differences are applied when the opname is completed. */
 export async function createStockOpname(input: CreateStockOpnameInput) {
+  if (!Array.isArray(input.items) || input.items.length === 0) throw Object.assign(new Error("Belum ada produk yang dihitung."), { status: 400 });
+  for (const item of input.items) {
+    if (!Number.isInteger(item.actualQty) || item.actualQty < 0) {
+      throw Object.assign(new Error("Hasil hitung fisik harus bilangan bulat 0 atau lebih."), { status: 400 });
+    }
+  }
   const [opname] = await db
     .insert(stockOpnames)
     .values({ outletId: input.outletId, warehouseId: input.warehouseId, staffUserId: input.staffUserId, status: "draft" })
@@ -77,7 +86,9 @@ export async function completeStockOpname(stockOpnameId: string) {
       await tx.insert(stockMovements).values(
         changed.map((item) => ({
           productId: item.productId,
-          type: item.differenceQty > 0 ? ("adjustment" as const) : ("waste" as const),
+          // Selalu "adjustment": dulu kekurangan dicatat sebagai "waste", sehingga selisih hitung
+          // ikut muncul sebagai barang rusak di Laporan Inventori.
+          type: "adjustment" as const,
           qty: item.differenceQty,
           note: `Stock opname ${new Date(opname.opnameDate).toLocaleDateString("id-ID")}`,
           staffUserId: opname.staffUserId,
@@ -94,10 +105,10 @@ export async function completeStockOpname(stockOpnameId: string) {
         .where(eq(products.id, item.productId));
     }
 
-    // Book the counted difference (valued at harga modal) against Persediaan in the same
-    // transaction — before this, an opname changed stock but Persediaan in the Neraca never moved,
-    // and missing stock never showed up as a loss in Laba Rugi. A closed accounting period makes
-    // postJournal throw, which rolls the whole opname back instead of applying it half-booked.
+    // Nilai selisih (harga modal) dikoreksi ke Persediaan dalam transaksi yang sama, lawannya akun
+    // ekuitas "Koreksi Persediaan" (bawaan 3400) — sejak 2026-11-11 TIDAK masuk Laba Rugi (lihat
+    // CONTRA.opname di inventory-postings.ts). Periode tertutup membuat postJournal gagal sehingga
+    // seluruh opname dibatalkan, bukan setengah jalan.
     await postInventoryAdjustmentJournal(
       {
         outletId: opname.outletId,
@@ -120,4 +131,70 @@ export async function completeStockOpname(stockOpnameId: string) {
   await autoFillLowStockPurchaseOrders(opname.outletId);
 
   return { opname: updatedOpname, itemsApplied: items.filter((i) => i.differenceQty !== 0).length };
+}
+
+/**
+ * Memindahkan jurnal selisih stock opname LAMA (yang dulu dibebankan ke 5310 Kerugian Stock Opname
+ * / akun mapping "opname_difference") ke akun Koreksi Persediaan (ekuitas). Stok tidak berubah —
+ * hanya jurnalnya: jurnal lama di-void (pembalik bertanggal sama), lalu dicatat ulang dengan akun
+ * lawan diganti. Idempoten: jurnal yang sudah memakai akun koreksi dilewati.
+ */
+export async function reclassifyOpnameJournals(outletId: string): Promise<{ moved: number; amount: number; skipped: number }> {
+  const opnames = await db
+    .select({ id: stockOpnames.id })
+    .from(stockOpnames)
+    .where(and(eq(stockOpnames.outletId, outletId), eq(stockOpnames.status, "completed")));
+  if (opnames.length === 0) return { moved: 0, amount: 0, skipped: 0 };
+
+  const correctionId = await getMappedAccountId(outletId, "product", "opname_correction", "3400");
+  const inventoryId = await getMappedAccountId(outletId, "product", "inventory", "1161");
+  const entries = await db
+    .select()
+    .from(journalEntries)
+    .where(
+      and(
+        eq(journalEntries.outletId, outletId),
+        eq(journalEntries.sourceType, "inventory_adjustment"),
+        eq(journalEntries.status, "posted"),
+        isNull(journalEntries.reversalOfEntryId),
+        inArray(journalEntries.sourceId, opnames.map((o) => o.id))
+      )
+    );
+
+  let moved = 0;
+  let amount = 0;
+  let skipped = 0;
+  for (const entry of entries) {
+    const lines = await db.select().from(journalLines).where(eq(journalLines.journalEntryId, entry.id));
+    const contra = lines.filter((l) => l.accountId !== inventoryId && l.accountId !== correctionId);
+    if (contra.length === 0) {
+      skipped++;
+      continue;
+    }
+    await db.transaction(async (tx) => {
+      await voidJournal(entry.id, "Dipindahkan ke Koreksi Persediaan (stock opname tidak masuk Laba Rugi)", tx);
+      const locked = await isPeriodLocked(outletId, entry.entryDate, tx);
+      await postJournal(
+        {
+          outletId,
+          entryDate: locked ? new Date().toISOString() : entry.entryDate,
+          reference: entry.reference ?? undefined,
+          description: `${entry.description} — koreksi persediaan${locked ? ` (asal periode ${entry.entryDate.slice(0, 7)})` : ""}`,
+          sourceType: entry.sourceType as JournalSourceType,
+          sourceId: entry.sourceId ?? undefined,
+          staffUserId: entry.staffUserId ?? undefined,
+          lines: lines.map((l) => ({
+            accountId: l.accountId === inventoryId ? l.accountId : correctionId,
+            debit: l.debit,
+            credit: l.credit,
+            description: l.accountId === inventoryId ? (l.description ?? undefined) : "Koreksi persediaan (stock opname)",
+          })),
+        },
+        tx
+      );
+    });
+    moved++;
+    amount += contra.reduce((s, l) => s + l.debit - l.credit, 0);
+  }
+  return { moved, amount: Math.round(amount), skipped };
 }
