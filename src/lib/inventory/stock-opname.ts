@@ -4,6 +4,7 @@ import { and, eq, sql, inArray, isNull } from "drizzle-orm";
 import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
 import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-postings";
 import { getMappedAccountId } from "@/lib/accounting/account-mapping";
+import { getAccountIdByCode } from "@/lib/accounting/coa";
 import { postJournal, voidJournal, type JournalSourceType } from "@/lib/accounting/journal";
 import { isPeriodLocked } from "@/lib/accounting/periods";
 import { isStockTracked } from "./stock-tracking-rules";
@@ -142,20 +143,23 @@ export async function completeStockOpname(stockOpnameId: string) {
 }
 
 /**
- * Memindahkan jurnal selisih stock opname LAMA (yang dulu dibebankan ke 5310 Kerugian Stock Opname
- * / akun mapping "opname_difference") ke akun Koreksi Persediaan (ekuitas). Stok tidak berubah —
- * hanya jurnalnya: jurnal lama di-void (pembalik bertanggal sama), lalu dicatat ulang dengan akun
- * lawan diganti. Idempoten: jurnal yang sudah memakai akun koreksi dilewati.
+ * Memindahkan jurnal koreksi stok LAMA dari Laba Rugi ke akun Koreksi Persediaan (ekuitas):
+ *  - selisih stock opname (5310 / mapping "opname_difference"), dan
+ *  - "Penyesuaian Barang" Tambah/Kurangi/Set ke jumlah (5340 / mapping "adjustment").
+ * Barang rusak/waste (5320) TIDAK dipindahkan — itu memang beban. Stok tidak berubah, hanya
+ * jurnalnya: jurnal lama di-void (pembalik bertanggal sama), lalu dicatat ulang dengan akun lawan
+ * diganti. Idempoten: jurnal yang sudah tidak menyentuh 5310/5340 dilewati.
  */
 export async function reclassifyOpnameJournals(outletId: string): Promise<{ moved: number; amount: number; skipped: number }> {
-  const opnames = await db
-    .select({ id: stockOpnames.id })
-    .from(stockOpnames)
-    .where(and(eq(stockOpnames.outletId, outletId), eq(stockOpnames.status, "completed")));
-  if (opnames.length === 0) return { moved: 0, amount: 0, skipped: 0 };
-
   const correctionId = await getMappedAccountId(outletId, "product", "opname_correction", "3400");
-  const inventoryId = await getMappedAccountId(outletId, "product", "inventory", "1161");
+  const legacyIds = new Set([
+    await getMappedAccountId(outletId, "product", "opname_difference", "5310").catch(() => ""),
+    await getAccountIdByCode(outletId, "5310").catch(() => ""),
+    await getMappedAccountId(outletId, "product", "adjustment", "5340").catch(() => ""),
+    await getAccountIdByCode(outletId, "5340").catch(() => ""),
+  ].filter((id) => id && id !== correctionId));
+  if (legacyIds.size === 0) return { moved: 0, amount: 0, skipped: 0 };
+
   const entries = await db
     .select()
     .from(journalEntries)
@@ -164,8 +168,7 @@ export async function reclassifyOpnameJournals(outletId: string): Promise<{ move
         eq(journalEntries.outletId, outletId),
         eq(journalEntries.sourceType, "inventory_adjustment"),
         eq(journalEntries.status, "posted"),
-        isNull(journalEntries.reversalOfEntryId),
-        inArray(journalEntries.sourceId, opnames.map((o) => o.id))
+        isNull(journalEntries.reversalOfEntryId)
       )
     );
 
@@ -174,13 +177,13 @@ export async function reclassifyOpnameJournals(outletId: string): Promise<{ move
   let skipped = 0;
   for (const entry of entries) {
     const lines = await db.select().from(journalLines).where(eq(journalLines.journalEntryId, entry.id));
-    const contra = lines.filter((l) => l.accountId !== inventoryId && l.accountId !== correctionId);
-    if (contra.length === 0) {
+    const legacy = lines.filter((l) => legacyIds.has(l.accountId));
+    if (legacy.length === 0) {
       skipped++;
       continue;
     }
     await db.transaction(async (tx) => {
-      await voidJournal(entry.id, "Dipindahkan ke Koreksi Persediaan (stock opname tidak masuk Laba Rugi)", tx);
+      await voidJournal(entry.id, "Dipindahkan ke Koreksi Persediaan (koreksi stok tidak masuk Laba Rugi)", tx);
       const locked = await isPeriodLocked(outletId, entry.entryDate, tx);
       await postJournal(
         {
@@ -192,17 +195,17 @@ export async function reclassifyOpnameJournals(outletId: string): Promise<{ move
           sourceId: entry.sourceId ?? undefined,
           staffUserId: entry.staffUserId ?? undefined,
           lines: lines.map((l) => ({
-            accountId: l.accountId === inventoryId ? l.accountId : correctionId,
+            accountId: legacyIds.has(l.accountId) ? correctionId : l.accountId,
             debit: l.debit,
             credit: l.credit,
-            description: l.accountId === inventoryId ? (l.description ?? undefined) : "Koreksi persediaan (stock opname)",
+            description: legacyIds.has(l.accountId) ? "Koreksi persediaan" : (l.description ?? undefined),
           })),
         },
         tx
       );
     });
     moved++;
-    amount += contra.reduce((s, l) => s + l.debit - l.credit, 0);
+    amount += legacy.reduce((s, l) => s + l.debit - l.credit, 0);
   }
   return { moved, amount: Math.round(amount), skipped };
 }

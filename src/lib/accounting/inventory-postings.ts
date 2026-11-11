@@ -31,7 +31,11 @@ const CONTRA: Record<InventoryAdjustmentReason, { key: string; code: string; lab
   // "opname_difference" (5310) hanya dipakai jurnal lama; lihat reclassifyOpnameJournals().
   opname: { key: "opname_correction", code: "3400", label: "Koreksi persediaan (stock opname)" },
   damaged: { key: "damaged", code: "5320", label: "Barang rusak / waste" },
-  adjustment: { key: "adjustment", code: "5340", label: "Penyesuaian stok manual" },
+  // Sejak 2026-11-12 "Penyesuaian Barang" (Tambah/Kurangi/Set ke jumlah) juga koreksi ke ekuitas —
+  // sama dengan stock opname. Dulu ke 5340 (Laba Rugi): menyamakan stok minus ke stok fisik lewat
+  // Set ke Jumlah Tertentu tercatat sebagai "pendapatan" Rp7 jt dan HPP jadi minus. Barang yang
+  // memang rusak/hilang dibebankan lewat alasan "Rusak / Waste" (damaged → 5320).
+  adjustment: { key: "opname_correction", code: "3400", label: "Koreksi persediaan (penyesuaian stok)" },
   opening: { key: "opening_stock", code: "3400", label: "Stok awal produk" },
 };
 

@@ -142,7 +142,7 @@ export const DEFAULT_MAPPING_SEED: DefaultMappingSeed[] = [
   { module: "product", transactionKey: "opname_correction", accountCode: "3400", label: "Koreksi Persediaan — Stock Opname (ekuitas, tidak masuk Laba Rugi)" },
   { module: "product", transactionKey: "opname_difference", accountCode: "5310", label: "Selisih Stock Opname (lama — tidak dipakai opname baru)" },
   { module: "product", transactionKey: "damaged", accountCode: "5320", label: "Barang Rusak / Waste" },
-  { module: "product", transactionKey: "adjustment", accountCode: "5340", label: "Penyesuaian Stok Manual" },
+  { module: "product", transactionKey: "adjustment", accountCode: "5340", label: "Penyesuaian Stok Manual (lama — sekarang ke Koreksi Persediaan)" },
   { module: "product", transactionKey: "opening_stock", accountCode: "3400", label: "Stok Awal Produk (Opening Balance Equity)" },
   // Revenue accounts below now receive ONLY the admin fee/margin (feeAdmin) — see
   // buildPpobCollectionLines in lib/ppob/engine.ts. The provider's own cut (providerFee) is no

@@ -756,6 +756,7 @@ function ProductTab({ outletId }: { outletId: string }) {
                             <input className={smallInputCls} value={adjustNote} onChange={(e) => setAdjustNote(e.target.value)} placeholder={t("inventory.product.notePlaceholder", "mis. hasil cek gudang")} />
                           </div>
                         </div>
+                        <p className="text-[11px] text-neutral-500">{t("inventory.product.adjustNote", "Selisih Tambah/Kurangi/Set dicatat sebagai Koreksi Persediaan (tidak masuk Laba Rugi). Pilih alasan Rusak / Waste bila barang memang rusak atau hilang — itu dibebankan ke Laba Rugi.")}</p>
                         {adjustMode === "set" && (
                           <div className="text-xs">
                             {(() => {
@@ -2094,7 +2095,7 @@ function StockOpnameHistory({ productName }: { productName: (id: string) => stri
   };
 
   const reclassify = async () => {
-    if (!(await showConfirm(t("inventory.opname.reclassConfirm", "Pindahkan selisih stock opname lama dari Laba Rugi (Kerugian Stock Opname) ke Koreksi Persediaan? Stok tidak berubah — hanya jurnalnya. Jurnal lama dibatalkan dan dicatat ulang pada tanggal yang sama."), { confirmLabel: t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan") }))) return;
+    if (!(await showConfirm(t("inventory.opname.reclassConfirm", "Pindahkan selisih stock opname & Penyesuaian Barang lama dari Laba Rugi ke Koreksi Persediaan? Stok tidak berubah — hanya jurnalnya. Barang rusak/waste tetap di Laba Rugi. Jurnal lama dibatalkan dan dicatat ulang pada tanggal yang sama."), { confirmLabel: t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan") }))) return;
     setReclassBusy(true);
     try {
       const res = await fetch("/api/stock-opnames/reclassify", { method: "POST" });
@@ -2102,7 +2103,7 @@ function StockOpnameHistory({ productName }: { productName: (id: string) => stri
       if (!res.ok) return showAlert(data.error ?? res.statusText);
       showAlert(
         data.moved > 0
-          ? t("inventory.opname.reclassDone", "{n} jurnal opname dipindahkan ke Koreksi Persediaan (Rp{amount}). Laba Rugi tidak lagi memuat selisih stock opname.").replace("{n}", String(data.moved)).replace("{amount}", Math.abs(data.amount).toLocaleString("id-ID"))
+          ? t("inventory.opname.reclassDone", "{n} jurnal koreksi stok dipindahkan ke Koreksi Persediaan (Rp{amount}). Laba Rugi tidak lagi memuat selisih opname/penyesuaian stok.").replace("{n}", String(data.moved)).replace("{amount}", Math.abs(data.amount).toLocaleString("id-ID"))
           : t("inventory.opname.reclassNone", "Tidak ada jurnal opname lama yang perlu dipindahkan.")
       );
     } finally {
@@ -2110,11 +2111,21 @@ function StockOpnameHistory({ productName }: { productName: (id: string) => stri
     }
   };
 
-  if (opnames.length === 0) return null;
+  if (opnames.length === 0 && !canManage) return null;
   const drafts = opnames.filter((o) => o.status !== "completed").length;
+  const reclassBox = canManage && (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between rounded-lg border border-neutral-800 p-3">
+      <p className="text-xs text-neutral-400">{t("inventory.opname.reclassHint", "Selisih opname & Penyesuaian Barang lama tercatat di Laba Rugi (Kerugian Stock Opname / Penyusutan Persediaan) sehingga laba bisa minus atau HPP minus. Pindahkan ke Koreksi Persediaan.")}</p>
+      <Button variant="secondary" className="text-xs shrink-0" onClick={reclassify} disabled={reclassBusy}>
+        {reclassBusy ? t("inventory.opname.reclassBusy", "Memindahkan...") : t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan")}
+      </Button>
+    </div>
+  );
+  if (opnames.length === 0) return <Card>{reclassBox}</Card>;
 
   return (
     <Card className="space-y-3">
+      {reclassBox}
       <button className="w-full flex items-center justify-between text-left" onClick={() => setOpen((v) => !v)}>
         <span className="font-medium">
           {t("inventory.opname.historyTitle", "Riwayat Stock Opname")} <span className="text-xs text-neutral-500">({opnames.length})</span>
@@ -2124,14 +2135,6 @@ function StockOpnameHistory({ productName }: { productName: (id: string) => stri
       </button>
       {open && (
         <div className="space-y-2">
-          {canManage && opnames.some((o) => o.status === "completed") && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between rounded-lg border border-neutral-800 p-3">
-              <p className="text-xs text-neutral-400">{t("inventory.opname.reclassHint", "Selisih opname sebelum 11 Nov 2026 tercatat sebagai Kerugian Stock Opname di Laba Rugi. Pindahkan ke Koreksi Persediaan supaya Laba Rugi tidak minus karena opname.")}</p>
-              <Button variant="secondary" className="text-xs shrink-0" onClick={reclassify} disabled={reclassBusy}>
-                {reclassBusy ? t("inventory.opname.reclassBusy", "Memindahkan...") : t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan")}
-              </Button>
-            </div>
-          )}
           {opnames.map((o) => {
             const items = (o.items ?? []) as { id: string; productId: string; systemQty: number; actualQty: number; differenceQty: number }[];
             const over = items.filter((i) => i.differenceQty > 0);
