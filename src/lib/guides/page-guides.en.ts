@@ -51,7 +51,7 @@ export const PAGE_GUIDES_EN: PageGuideBook = {
         "Add products in the Products tab (name, category, selling price, opening stock), or Import Products from Excel for many at once.",
         "Record supplier purchases in the Supplier Purchases tab — stock goes up and the cost price is updated.",
         "Set Minimum Stock to get low-stock alerts. When a product has a Main Supplier, a draft Purchase Order is created automatically.",
-        "Count physical stock regularly in the Stock Opname tab.",
+        "Count physical stock regularly with the Stock Count Mode button on the Products tab; turn off Track stock for made-to-order/service items so they never go negative.",
       ],
       tips: [
         "Prepared food is set up in the Recipe / BOM tab, so its ingredients are deducted when it sells.",

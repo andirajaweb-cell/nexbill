@@ -130,7 +130,8 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
           id: existing.id,
           rowNum,
           name,
-          patch: { name, category, barcode, price, costPrice, lowStockThreshold, unit, updatedAt: new Date().toISOString() },
+          // Produk "tidak dilacak" (ambang negatif) tetap tidak dilacak walau file Excel berisi angka minimum stok.
+          patch: { name, category, barcode, price, costPrice, lowStockThreshold: existing.lowStockThreshold < 0 ? existing.lowStockThreshold : lowStockThreshold, unit, updatedAt: new Date().toISOString() },
         });
       } else {
         const stockQty = stockRaw !== undefined && stockRaw !== "" ? Number(stockRaw) : 0;

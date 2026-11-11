@@ -60,10 +60,10 @@ export const INVENTORI: HelpCategory[] = [
       {
         title: "Stock Count (pisikal na pagbilang)",
         steps: [
-          "Bilangin ang stock sa estante/bodega at ilagay ang resulta katabi ng numero ng sistema — agad makikita ang diperensya. I-save bilang draft.",
-          "I-scan para bilangin: i-tap ang \"I-scan para bilangin\" (camera) o i-scan sa search box — bawat scan ay +1 sa bilang ng produktong iyon. Puwede pa ring itama nang manu-mano.",
-          "Buksan ang draft para suriin ang diperensya kada produkto.",
-          "Pindutin ang Ilapat ang Adjustment: gagawing katumbas ng bilang ang stock ng sistema at itatala ang diperensya bilang Inventory Correction (hindi sa Profit & Loss). Iwanang blangko ang hindi binilang na produkto. Hindi ito mailalapat nang dalawang beses.",
+          "Tab na Produkto → button na Stock Count Mode: lalabas ang column na Bilang sa listahan. Ilagay kung ilan talaga ang mayroon; iwanang blangko ang hindi binilang.",
+          "I-scan para bilangin: i-tap ang \"I-scan para bilangin\" (camera) o i-scan sa search box — bawat scan ay +1. Puwede pa ring itama nang manu-mano.",
+          "Pindutin ang I-save at Ilapat: gagawing katumbas ng bilang ang stock, at itatala ang diperensya bilang Inventory Correction (hindi sa Profit & Loss). Nasa ilalim ng listahan ang history.",
+          "Niluluto/serbisyo (timplang kape, noodles + itlog, renta ng controller): I-edit ang produkto → Subaybayan ang stock: I-off. Hindi binabawasan ng benta ang stock kaya hindi nagiging negatibo, at hindi kasama sa bilang.",
         ],
       },
     ],

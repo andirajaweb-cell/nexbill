@@ -51,7 +51,7 @@ export const PAGE_GUIDES_FIL: PageGuideBook = {
         "Magdagdag ng produkto sa tab na Products (pangalan, kategorya, presyo, panimulang stock), o i-Import mula sa Excel para sa marami nang sabay.",
         "Itala ang pamimili sa supplier sa tab na Belanja Supplier — tumataas ang stock at naa-update ang puhunan.",
         "Ilagay ang Minimum Stock para sa babala ng paubos na stock. Kapag may Main Supplier ang produkto, kusang gagawa ng draft na Purchase Order.",
-        "Bilangin ang aktuwal na stock paminsan-minsan sa tab na Stock Opname.",
+        "Bilangin ang aktuwal na stock paminsan-minsan gamit ang Stock Count Mode sa tab na Produkto; i-off ang Subaybayan ang stock para sa niluluto/serbisyo para hindi maging negatibo.",
       ],
       tips: [
         "Ang lutong pagkain ay ginagawa sa tab na Recipe / BOM, kaya ang sangkap ang nababawasan kapag nabenta.",

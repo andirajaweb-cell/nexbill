@@ -60,10 +60,10 @@ export const INVENTORI: HelpCategory[] = [
       {
         title: "Stock Opname (hitung stok fisik)",
         steps: [
-          "Hitung stok di rak/gudang, isi hasilnya di samping angka sistem — selisih langsung terlihat. Simpan sebagai draf.",
-          "Scan untuk hitung: tekan \"Scan untuk hitung\" (kamera) atau tembak scanner ke kotak cari — setiap scan menambah hitungan produk itu 1. Angka tetap bisa dikoreksi manual.",
-          "Buka draf untuk memeriksa selisih per produk.",
-          "Tekan Terapkan Penyesuaian: stok sistem disamakan dengan hasil hitung, selisihnya dicatat sebagai Koreksi Persediaan (tidak masuk Laba Rugi). Kosongkan produk yang tidak dihitung. Tidak bisa diterapkan dua kali.",
+          "Tab Produk → tombol Mode Hitung Stok: kolom Fisik muncul di daftar produk. Isi jumlah barang yang benar-benar ada; kosongkan produk yang tidak dihitung.",
+          "Scan untuk hitung: tekan \"Scan untuk hitung\" (kamera) atau tembak scanner ke kotak cari — setiap scan menambah 1. Angka masih bisa dikoreksi manual.",
+          "Tekan Simpan & Terapkan: stok sistem disamakan dengan hitungan, selisihnya dicatat sebagai Koreksi Persediaan (tidak masuk Laba Rugi). Riwayatnya ada di bawah daftar produk.",
+          "Menu racikan/jasa (kopi seduh, mie + telor, sewa stik): Edit produk → Lacak stok: Matikan. Penjualannya tidak memotong stok sehingga tidak pernah minus, dan tidak ikut opname.",
         ],
       },
     ],

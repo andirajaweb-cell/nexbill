@@ -15,6 +15,8 @@ export interface FnbProduct {
   category: string;
   price: number;
   stockQty?: number | null;
+  /** Negatif = stok tidak dilacak. */
+  lowStockThreshold?: number | null;
   sku?: string | null;
   barcode?: string | null;
 }
@@ -138,7 +140,7 @@ export function FnbPicker({
           <div className="truncate font-medium text-neutral-100">{p.name}</div>
           <div className="truncate text-[10px] text-neutral-500">
             {formatMoney(p.price)}
-            {typeof p.stockQty === "number" ? ` · ${t("rental.fnbStock", "Stok {n}").replace("{n}", String(p.stockQty))}` : ""}
+            {typeof p.stockQty === "number" && (p.lowStockThreshold ?? 0) >= 0 ? ` · ${t("rental.fnbStock", "Stok {n}").replace("{n}", String(p.stockQty))}` : ""}
             {showCategory ? ` · ${labelOf(p.category)}` : ""}
             {code ? ` · ${code}` : ""}
           </div>

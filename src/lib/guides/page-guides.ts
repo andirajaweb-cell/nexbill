@@ -77,7 +77,7 @@ export const PAGE_GUIDES_ID: PageGuideBook = {
         "Tambah produk di tab Produk (nama, kategori, harga jual, stok awal), atau Import Produk dari Excel untuk banyak produk sekaligus.",
         "Catat belanja ke supplier di tab Belanja Supplier — stok bertambah dan harga modal ikut diperbarui.",
         "Isi Minimum Stok supaya ada peringatan stok menipis. Bila produk punya Supplier Utama, draft Purchase Order dibuat otomatis.",
-        "Hitung stok fisik secara berkala lewat tab Stock Opname.",
+        "Hitung stok fisik secara berkala lewat tombol Mode Hitung Stok di tab Produk; matikan Lacak stok untuk menu racikan/jasa supaya tidak minus.",
       ],
       tips: [
         "Makanan olahan dibuat lewat tab Resep / BOM, sehingga stok bahan bakunya yang berkurang saat terjual.",

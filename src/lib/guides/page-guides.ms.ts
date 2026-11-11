@@ -51,7 +51,7 @@ export const PAGE_GUIDES_MS: PageGuideBook = {
         "Tambah produk di tab Produk (nama, kategori, harga jual, stok awal), atau Import Produk dari Excel untuk banyak produk sekali gus.",
         "Rekod pembelian daripada pembekal di tab Belanja Supplier — stok bertambah dan harga kos dikemas kini.",
         "Isi Stok Minimum untuk amaran stok rendah. Jika produk ada Pembekal Utama, draf Purchase Order dicipta secara automatik.",
-        "Kira stok fizikal secara berkala melalui tab Stock Opname.",
+        "Kira stok fizikal secara berkala dengan butang Mod Kira Stok di tab Produk; matikan Jejak stok untuk menu racikan/perkhidmatan supaya tidak negatif.",
       ],
       tips: [
         "Makanan yang dimasak dibuat melalui tab Resep / BOM, jadi stok bahan mentahnya yang berkurang apabila dijual.",

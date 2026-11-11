@@ -60,10 +60,10 @@ export const INVENTORI: HelpCategory[] = [
       {
         title: "Stock Count (physical count)",
         steps: [
-          "Count the stock on the shelf/in storage and enter the results next to the system figure — differences show immediately. Save as a draft.",
-          "Scan to count: tap \"Scan to count\" (camera) or shoot a scanner into the search box — every scan adds 1 to that product's count. Numbers can still be corrected manually.",
-          "Open the draft to review the difference per product.",
-          "Press Apply Adjustment: system stock is set to the count and the difference is booked as an Inventory Correction (not in Profit & Loss). Leave uncounted products empty. It can't be applied twice.",
+          "Products tab → Stock Count Mode button: a Count column appears in the product list. Enter how many items are actually there; leave uncounted products empty.",
+          "Scan to count: tap \"Scan to count\" (camera) or shoot a scanner into the search box — every scan adds 1. Numbers can still be corrected manually.",
+          "Press Save & Apply: system stock is set to the count and the difference is booked as an Inventory Correction (not in Profit & Loss). History is below the product list.",
+          "Made-to-order/service items (brewed coffee, noodles + egg, controller rental): Edit product → Track stock: Turn off. Their sales don't reduce stock, so they never go negative, and they're excluded from counts.",
         ],
       },
     ],

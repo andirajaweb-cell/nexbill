@@ -6,6 +6,7 @@ import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-posti
 import { getMappedAccountId } from "@/lib/accounting/account-mapping";
 import { postJournal, voidJournal, type JournalSourceType } from "@/lib/accounting/journal";
 import { isPeriodLocked } from "@/lib/accounting/periods";
+import { isStockTracked } from "./stock-tracking-rules";
 
 // PARALLEL_CHUNK_SIZE used to live here, bounding how many stock updates ran per Promise.all
 // batch. completeStockOpname now applies them sequentially inside a single transaction instead —
@@ -38,6 +39,13 @@ export async function createStockOpname(input: CreateStockOpnameInput) {
   const productIds = input.items.map((i) => i.productId);
   const productRows = productIds.length ? await db.select().from(products).where(inArray(products.id, productIds)) : [];
   const stockQtyById = new Map(productRows.map((p) => [p.id, p.stockQty]));
+  const untracked = productRows.filter((p) => !isStockTracked(p));
+  if (untracked.length > 0) {
+    throw Object.assign(new Error(`Produk tidak dilacak stoknya tidak ikut stock opname: ${untracked.map((p) => p.name).join(", ")}.`), { status: 400 });
+  }
+  if (productRows.length !== new Set(productIds).size || productRows.some((p) => p.outletId !== input.outletId)) {
+    throw Object.assign(new Error("Ada produk yang tidak ditemukan di outlet ini."), { status: 400 });
+  }
 
   const rows = input.items.map((item) => {
     const systemQty = stockQtyById.get(item.productId) ?? 0;

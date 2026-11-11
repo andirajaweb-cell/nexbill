@@ -31,6 +31,8 @@ interface Product {
   category: string;
   price: number;
   stockQty: number;
+  /** Negatif = stok tidak dilacak (lib/inventory/stock-tracking-rules.ts). */
+  lowStockThreshold?: number;
   isActive: boolean;
   sku?: string | null;
   barcode?: string | null;
@@ -428,7 +430,7 @@ export default function PosPage() {
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-sm font-medium">{rupiah(p.price)}</div>
-                      <div className="text-[10px] text-neutral-600">{t("pos.stockLabel", "Stok: {n}").replace("{n}", String(p.stockQty))}</div>
+                      {(p.lowStockThreshold ?? 0) >= 0 && <div className="text-[10px] text-neutral-600">{t("pos.stockLabel", "Stok: {n}").replace("{n}", String(p.stockQty))}</div>}
                     </div>
                   </button>
                 ))}
@@ -468,7 +470,7 @@ export default function PosPage() {
                   >
                     <div className="text-sm font-medium">{p.name}</div>
                     <div className="text-xs text-neutral-500">{rupiah(p.price)}</div>
-                    <div className="text-[10px] text-neutral-600">{t("pos.stockLabel", "Stok: {n}").replace("{n}", String(p.stockQty))}</div>
+                    {(p.lowStockThreshold ?? 0) >= 0 && <div className="text-[10px] text-neutral-600">{t("pos.stockLabel", "Stok: {n}").replace("{n}", String(p.stockQty))}</div>}
                   </button>
                 ))}
               </div>

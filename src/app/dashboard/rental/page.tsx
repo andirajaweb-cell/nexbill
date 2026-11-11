@@ -152,6 +152,7 @@ interface Product {
   price: number;
   isActive: boolean;
   stockQty?: number | null;
+  lowStockThreshold?: number | null;
   sku?: string | null;
   barcode?: string | null;
 }

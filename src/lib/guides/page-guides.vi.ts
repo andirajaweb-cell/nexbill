@@ -51,7 +51,7 @@ export const PAGE_GUIDES_VI: PageGuideBook = {
         "Thêm sản phẩm ở tab Sản phẩm (tên, danh mục, giá bán, tồn đầu), hoặc Nhập sản phẩm từ Excel khi có nhiều sản phẩm.",
         "Ghi nhận mua hàng từ nhà cung cấp ở tab Belanja Supplier — tồn kho tăng và giá vốn được cập nhật.",
         "Điền Tồn tối thiểu để nhận cảnh báo sắp hết hàng. Nếu sản phẩm có Nhà cung cấp chính, bản nháp Purchase Order được tạo tự động.",
-        "Kiểm kê tồn thực tế định kỳ ở tab Stock Opname.",
+        "Kiểm kê tồn thực tế định kỳ bằng nút Chế độ đếm kho ở tab Sản phẩm; tắt Theo dõi tồn kho cho món pha chế/dịch vụ để không bị âm.",
       ],
       tips: [
         "Món chế biến được tạo ở tab Công thức / BOM, nên nguyên liệu sẽ bị trừ khi bán.",

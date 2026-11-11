@@ -19,6 +19,7 @@ import { describeError, errorStatus } from "@/lib/api/error";
 import { normalizeBarcode } from "@/lib/inventory/barcode";
 import { assertBarcodeAvailable, DuplicateBarcodeError } from "@/lib/inventory/barcode-server";
 import { forbidUnless } from "@/lib/auth/require-permission";
+import { sanitizeLowStockThreshold } from "@/lib/inventory/stock-tracking-rules";
 
 /**
  * Every table with a real FK to products.id — a product can only be hard-deleted once none of
@@ -70,6 +71,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await assertBarcodeAvailable(current.outletId, current.barcode, id);
     }
     if (typeof body.sku === "string") body.sku = body.sku.trim() || null;
+    // Stok hanya berubah lewat gerakan stok (penjualan, belanja, penyesuaian, opname) — bukan edit produk.
+    delete body.stockQty;
+    // Status "Lacak stok" disimpan di lowStockThreshold (negatif = tidak dilacak) dan hanya diubah
+    // lewat /api/products/[id]/stock-tracking; edit produk tidak boleh mengubahnya diam-diam.
+    const threshold = sanitizeLowStockThreshold(body.lowStockThreshold, current.lowStockThreshold);
+    if (threshold === undefined) delete body.lowStockThreshold;
+    else body.lowStockThreshold = threshold;
     const [row] = await db.update(products).set(body).where(eq(products.id, id)).returning();
     return NextResponse.json(row);
   } catch (err: unknown) {

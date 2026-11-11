@@ -23,6 +23,7 @@ const GUARDED: [route: string, method: string][] = [
   ["stock-opnames", "POST"],
   ["stock-opnames/[id]/complete", "POST"],
   ["stock-opnames/reclassify", "POST"],
+  ["products/[id]/stock-tracking", "POST"],
   ["banners", "POST"],
   ["banners/[id]", "PATCH"],
   ["banners/[id]", "DELETE"],

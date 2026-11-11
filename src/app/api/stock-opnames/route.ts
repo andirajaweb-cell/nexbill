@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { stockOpnames, stockOpnameItems } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { createStockOpname } from "@/lib/inventory/stock-opname";
+import { completeStockOpname, createStockOpname } from "@/lib/inventory/stock-opname";
 import { getSession } from "@/lib/auth/session";
 import { describeError, errorStatus } from "@/lib/api/error";
 import { forbidUnless } from "@/lib/auth/require-permission";
@@ -28,7 +28,11 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
   try {
     const body = await req.json();
-    return NextResponse.json(await createStockOpname({ ...body, outletId: session.outletId }));
+    const opname = await createStockOpname({ items: body?.items, warehouseId: body?.warehouseId, outletId: session.outletId, staffUserId: session.sub });
+    // Mode Hitung Stok (tab Produk): simpan & langsung terapkan dalam satu langkah — tidak ada draf
+    // yang menunggu sementara stok terus berubah.
+    if (body?.apply === true) return NextResponse.json(await completeStockOpname(opname.id));
+    return NextResponse.json(opname);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: errorStatus(err, 400) });
   }

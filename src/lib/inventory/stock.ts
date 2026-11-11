@@ -2,6 +2,13 @@ import { db, type DbOrTx } from "@/db/client";
 import { products, stockMovements, recipes, recipeIngredients } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { onStockIn, onStockOut, orderUnitCost } from "./costing";
+import { isStockTracked } from "./stock-tracking-rules";
+
+/** Produk "tidak dilacak" (lihat stock-tracking-rules.ts) tidak memotong/mengembalikan stok. */
+async function trackedProduct(dbc: DbOrTx, productId: string): Promise<boolean> {
+  const [p] = await dbc.select({ lowStockThreshold: products.lowStockThreshold }).from(products).where(eq(products.id, productId)).limit(1);
+  return isStockTracked(p);
+}
 
 /**
  * Deduct stock for a sold item — follows the recipe/BOM if the product has
@@ -18,6 +25,7 @@ export async function deductStockForItem(productId: string, qty: number, orderId
   if (recipe) {
     const ingredients = await dbc.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
     for (const ing of ingredients) {
+      if (!(await trackedProduct(dbc, ing.ingredientProductId))) continue;
       const deductQty = Math.round(((ing.qtyPerYield * qty) / Math.max(1, recipe.yieldQty)) * 100) / 100;
       // FIFO outlets: consume the oldest cost layers and remember what these units cost (HPP).
       const fifo = await onStockOut(dbc, { productId: ing.ingredientProductId, qty: Math.abs(deductQty) });
@@ -38,6 +46,7 @@ export async function deductStockForItem(productId: string, qty: number, orderId
     return;
   }
 
+  if (!(await trackedProduct(dbc, productId))) return;
   const fifo = await onStockOut(dbc, { productId, qty: Math.abs(qty) });
   await dbc.insert(stockMovements).values({ productId, type: "sale_out", qty: -Math.abs(qty), unitCost: fifo ? fifo.unitCost : null, refOrderId: orderId, staffUserId });
   await dbc
@@ -66,6 +75,10 @@ export async function receiveStockForItem(
 ) {
   const [product] = await dbc.select().from(products).where(eq(products.id, productId)).limit(1);
   if (!product) throw new Error("Produk tidak ditemukan.");
+  if (!isStockTracked(product)) {
+    // Belanja produk tidak dilacak akan menambah Persediaan yang tidak pernah berkurang.
+    throw Object.assign(new Error(`Stok "${product.name}" tidak dilacak — nyalakan Lacak stok di tab Produk dulu, atau catat belanjanya di Pengeluaran.`), { status: 400 });
+  }
 
   const existingQty = Math.max(0, product.stockQty);
   const existingValue = existingQty * (product.costPrice ?? 0);
@@ -92,6 +105,7 @@ export async function restockForItem(productId: string, qty: number, orderId: st
   if (recipe) {
     const ingredients = await dbc.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipe.id));
     for (const ing of ingredients) {
+      if (!(await trackedProduct(dbc, ing.ingredientProductId))) continue;
       const restoreQty = Math.round(((ing.qtyPerYield * qty) / Math.max(1, recipe.yieldQty)) * 100) / 100;
       // FIFO: returned units go back at the cost they left with on this order.
       await onStockIn(dbc, { productId: ing.ingredientProductId, qty: restoreQty, unitCost: await orderUnitCost(dbc, orderId, ing.ingredientProductId), source: "restock", refId: orderId });
@@ -110,6 +124,7 @@ export async function restockForItem(productId: string, qty: number, orderId: st
     return;
   }
 
+  if (!(await trackedProduct(dbc, productId))) return;
   await onStockIn(dbc, { productId, qty, unitCost: await orderUnitCost(dbc, orderId, productId), source: "restock", refId: orderId });
   await dbc.insert(stockMovements).values({ productId, type: "adjustment", qty, note: `${note} (order ${orderId.slice(0, 8)})`, refOrderId: orderId });
   await dbc

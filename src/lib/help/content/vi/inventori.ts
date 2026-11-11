@@ -60,10 +60,10 @@ export const INVENTORI: HelpCategory[] = [
       {
         title: "Kiểm kê (đếm thực tế)",
         steps: [
-          "Đếm hàng trên kệ/trong kho và nhập kết quả cạnh số của hệ thống — chênh lệch hiện ngay. Lưu dưới dạng nháp.",
-          "Quét để đếm: chạm \"Quét để đếm\" (camera) hoặc quét vào ô tìm kiếm — mỗi lần quét cộng 1 cho sản phẩm đó. Vẫn có thể sửa số thủ công.",
-          "Mở bản nháp để xem chênh lệch từng sản phẩm.",
-          "Bấm Áp dụng điều chỉnh: tồn kho hệ thống được đặt bằng số đếm, chênh lệch ghi là Điều chỉnh tồn kho (không vào Lãi lỗ). Để trống sản phẩm không đếm. Không thể áp dụng hai lần.",
+          "Tab Sản phẩm → nút Chế độ đếm kho: cột Thực tế xuất hiện trong danh sách. Nhập số lượng thực có; để trống sản phẩm không đếm.",
+          "Quét để đếm: chạm \"Quét để đếm\" (camera) hoặc quét vào ô tìm kiếm — mỗi lần quét +1. Vẫn có thể sửa số thủ công.",
+          "Bấm Lưu & Áp dụng: tồn kho hệ thống được đặt bằng số đếm, chênh lệch ghi là Điều chỉnh tồn kho (không vào Lãi lỗ). Lịch sử nằm dưới danh sách sản phẩm.",
+          "Món pha chế/dịch vụ (cà phê pha, mì + trứng, thuê tay cầm): Sửa sản phẩm → Theo dõi tồn kho: Tắt. Bán hàng không trừ tồn kho nên không bao giờ âm, và không tham gia kiểm kê.",
         ],
       },
     ],

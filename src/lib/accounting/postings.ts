@@ -22,6 +22,7 @@ import { postJournal, JournalLineInput } from "./journal";
 import { getMappedAccountId, getCashBankAccountIdForPaymentMethod } from "./account-mapping";
 import { isPeriodLocked } from "./periods";
 import { orderUnitCost } from "@/lib/inventory/costing";
+import { isStockTracked } from "@/lib/inventory/stock-tracking-rules";
 
 const round = (n: number) => Math.round(n);
 
@@ -131,11 +132,17 @@ export async function computeItemCogs(productId: string | null, qty: number, dbc
         continue;
       }
       const [ingredientProduct] = await dbc.select().from(products).where(eq(products.id, ing.ingredientProductId)).limit(1);
+      // Bahan "tidak dilacak": biayanya dicatat sebagai Pengeluaran, bukan diambil dari Persediaan.
+      if (!isStockTracked(ingredientProduct)) continue;
       costPerYield += (ingredientProduct?.costPrice ?? 0) * ing.qtyPerYield;
     }
     return (costPerYield / Math.max(1, recipe.yieldQty)) * qty;
   }
 
+  // Produk "tidak dilacak" (stock-tracking-rules.ts): stoknya tidak dipotong, jadi HPP-nya juga
+  // tidak boleh mengkredit Persediaan — kalau tidak, Persediaan terus minus. Biaya bahannya masuk
+  // lewat Pengeluaran.
+  if (!isStockTracked(product)) return 0;
   const fifoCost = orderId ? await orderUnitCost(dbc, orderId, productId) : null;
   return (fifoCost ?? product.costPrice ?? 0) * qty;
 }

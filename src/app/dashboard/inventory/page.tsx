@@ -15,6 +15,7 @@ import { resolveSendToKitchen } from "@/lib/kitchen/routing";
 import "@/lib/i18n/dict-inventory";
 import "@/lib/i18n/dict-inventory-draft";
 import "@/lib/i18n/dict-inventory-opname";
+import { isStockTracked } from "@/lib/inventory/stock-tracking-rules";
 import "@/lib/i18n/dict-accounting";
 import { SupplierTab } from "./SupplierTab";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
@@ -68,7 +69,7 @@ function UnitSelect({ units, value, onChange, className }: { units: UnitOption[]
 // now follows the outlet's own country (Settings > Business & Tax > Negara) — see
 // src/lib/currency/format.ts for the SEA currency table and why this is display-only (no real
 // exchange-rate conversion of stored amounts).
-const TABS = ["Produk", "Resep / BOM", "Supplier", "Belanja Supplier", "Purchase Order", "Stock Opname"] as const;
+const TABS = ["Produk", "Resep / BOM", "Supplier", "Belanja Supplier", "Purchase Order"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
@@ -77,7 +78,6 @@ const TAB_LABEL_KEYS: Record<Tab, { key: string; fallback: string }> = {
   "Supplier": { key: "inventory.tab.supplier", fallback: "Supplier" },
   "Belanja Supplier": { key: "inventory.tab.supplierPurchase", fallback: "Belanja Supplier" },
   "Purchase Order": { key: "inventory.tab.purchaseOrder", fallback: "Purchase Order" },
-  "Stock Opname": { key: "inventory.tab.stockOpname", fallback: "Stock Opname" },
 };
 
 export default function InventoryPage() {
@@ -105,7 +105,7 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      {!outletId ? null : tab === "Produk" ? <ProductTab outletId={outletId} /> : tab === "Resep / BOM" ? <RecipeTab outletId={outletId} /> : tab === "Supplier" ? <SupplierTab /> : tab === "Belanja Supplier" ? <SupplierPurchaseTab outletId={outletId} /> : tab === "Purchase Order" ? <PurchaseOrderTab outletId={outletId} /> : <StockOpnameTab outletId={outletId} />}
+      {!outletId ? null : tab === "Produk" ? <ProductTab outletId={outletId} /> : tab === "Resep / BOM" ? <RecipeTab outletId={outletId} /> : tab === "Supplier" ? <SupplierTab /> : tab === "Belanja Supplier" ? <SupplierPurchaseTab outletId={outletId} /> : <PurchaseOrderTab outletId={outletId} />}
     </div>
   );
 }
@@ -187,6 +187,84 @@ function ProductTab({ outletId }: { outletId: string }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<ProductSortOption>("name_asc");
+
+  // Mode Hitung Stok (2026-11-11): stock opname langsung di daftar produk — tab Stock Opname
+  // terpisah dihapus. Kotak kosong = tidak ikut dihitung; "Simpan & Terapkan" membuat opname dan
+  // langsung menerapkannya (satu langkah, tidak ada draf basi).
+  const [countMode, setCountMode] = useState(false);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const countsRef = useRef<Record<string, number>>({});
+  countsRef.current = counts;
+  const [applying, setApplying] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);
+  const countOne = (p: Product) => {
+    if (!isStockTracked(p)) return t("inventory.count.untrackedSkip", "{name}: stok tidak dilacak").replace("{name}", p.name);
+    const next = (countsRef.current[p.id] ?? 0) + 1;
+    countsRef.current = { ...countsRef.current, [p.id]: next };
+    setCounts(countsRef.current);
+    return t("inventory.barcode.opnameCounted", "{name}: {n} dihitung").replace("{name}", p.name).replace("{n}", String(next));
+  };
+  const setCount = (id: string, raw: string) => {
+    const next = { ...countsRef.current };
+    const v = raw.trim();
+    if (v === "") delete next[id];
+    else {
+      const n = Math.floor(Number(v));
+      if (!Number.isFinite(n) || n < 0) return;
+      next[id] = n;
+    }
+    countsRef.current = next;
+    setCounts(next);
+  };
+  const countSummary = useMemo(() => {
+    let more = 0;
+    let less = 0;
+    let same = 0;
+    for (const [id, n] of Object.entries(counts)) {
+      const p = products.find((x) => x.id === id);
+      if (!p) continue;
+      const d = n - p.stockQty;
+      if (d > 0) more++;
+      else if (d < 0) less++;
+      else same++;
+    }
+    return { total: Object.keys(counts).length, more, less, same };
+  }, [counts, products]);
+  const applyCount = async () => {
+    const items = Object.entries(counts).map(([productId, actualQty]) => ({ productId, actualQty }));
+    if (items.length === 0) return showAlert(t("inventory.count.nothing", "Belum ada produk yang dihitung. Isi kolom Fisik atau scan barang."));
+    const ok = await showConfirm(
+      t("inventory.count.confirm", "Terapkan hasil hitung {n} produk? Stok sistem disamakan dengan hitungan fisik; selisihnya dicatat sebagai Koreksi Persediaan (tidak masuk Laba Rugi).").replace("{n}", String(items.length)),
+      { confirmLabel: t("inventory.count.apply", "Simpan & Terapkan") }
+    );
+    if (!ok) return;
+    setApplying(true);
+    try {
+      const res = await fetch("/api/stock-opnames", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items, apply: true }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? res.statusText);
+      showAlert(t("inventory.opname.completeMsg", "Selesai. {n} item disesuaikan.").replace("{n}", String(data.itemsApplied ?? 0)));
+      countsRef.current = {};
+      setCounts({});
+      setCountMode(false);
+      setHistoryKey((k) => k + 1);
+      load();
+    } finally {
+      setApplying(false);
+    }
+  };
+  const toggleTracking = async (p: Product) => {
+    const tracked = isStockTracked(p);
+    const msg = tracked
+      ? t("inventory.track.offConfirm", "Matikan Lacak stok untuk \"{name}\"? Cocok untuk menu racikan/jasa (kopi seduh, mie + telor, sewa stik). Penjualan tidak lagi memotong stok, HPP-nya tidak diambil dari Persediaan (catat bahan di Pengeluaran), dan produk tidak ikut stock opname. Stok sekarang ({qty}) dinolkan sebagai Koreksi Persediaan.").replace("{name}", p.name).replace("{qty}", String(p.stockQty))
+      : t("inventory.track.onConfirm", "Nyalakan Lacak stok untuk \"{name}\"? Stok mulai dari 0 — isi lewat Belanja Supplier atau Mode Hitung Stok.").replace("{name}", p.name);
+    if (!(await showConfirm(msg))) return;
+    const res = await fetch(`/api/products/${p.id}/stock-tracking`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracked: !tracked }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return showAlert(data.error ?? res.statusText);
+    setEditingId(null);
+    load();
+  };
 
   const load = () => {
     fetchJsonObject<CostMethodInfo>("/api/inventory/cost-method").then(setCostInfo);
@@ -413,10 +491,26 @@ function ProductTab({ outletId }: { outletId: string }) {
         <div className="flex flex-col sm:flex-row gap-2 mb-3">
           <input
             className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
-            placeholder={t("inventory.barcode.searchPlaceholder", "Cari nama produk, barcode, atau SKU...")}
+            placeholder={countMode ? t("inventory.count.searchPlaceholder", "Scan barcode / ketik nama — tiap scan +1 hitungan") : t("inventory.barcode.searchPlaceholder", "Cari nama produk, barcode, atau SKU...")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              // Mode Hitung Stok: scanner USB/Bluetooth (kode + Enter) = hitung 1 barang.
+              if (!countMode || e.key !== "Enter") return;
+              const code = normalizeBarcode(search);
+              const hit = code ? products.find((p) => (p.barcode && p.barcode.toLowerCase() === code.toLowerCase()) || (p.sku && p.sku.toLowerCase() === code.toLowerCase())) : null;
+              if (hit) { e.preventDefault(); countOne(hit); setSearch(""); }
+            }}
           />
+          {countMode ? (
+            <ProductScanButton
+              products={products}
+              mode="continuous"
+              label={t("inventory.barcode.opnameScanButton", "Scan untuk hitung")}
+              hint={t("inventory.barcode.opnameScanHint", "Scan setiap barang satu per satu — tiap scan menambah hitungan 1. Angka masih bisa dikoreksi manual.")}
+              onFound={(p) => countOne(p)}
+            />
+          ) : (
           <ProductScanButton
             products={products}
             onFound={(p) => { setSearch(p.barcode ?? p.sku ?? p.name); setCategoryFilter("all"); }}
@@ -428,6 +522,12 @@ function ProductTab({ outletId }: { outletId: string }) {
               showAlert(t("inventory.barcode.notRegistered", "Barcode {code} belum terdaftar. Barcode sudah diisikan di form Tambah Produk Baru — lengkapi nama & harganya, atau pasang barcode ini ke produk yang sudah ada lewat Edit.").replace("{code}", code));
             }}
           />
+          )}
+          {canDelete && (
+            <Button variant={countMode ? "primary" : "secondary"} className="text-xs whitespace-nowrap" onClick={() => setCountMode((v) => !v)}>
+              {countMode ? t("inventory.count.exit", "Keluar Mode Hitung") : t("inventory.count.enter", "Mode Hitung Stok")}
+            </Button>
+          )}
           <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
             <option value="all">{t("inventory.product.filterAllCategories", "Semua Kategori")}</option>
             {categories.map((c) => <option key={c.id} value={c.code}>{c.label}</option>)}
@@ -453,8 +553,35 @@ function ProductTab({ outletId }: { outletId: string }) {
         {filteredProducts.length === 0 && products.length > 0 && (
           <p className="text-sm text-neutral-500 py-4 text-center">{t("inventory.product.noSearchResults", "Tidak ada produk yang cocok dengan pencarian/filter ini.")}</p>
         )}
+        {(() => {
+          const negatives = products.filter((p) => p.isActive !== false && isStockTracked(p) && p.stockQty < 0).length;
+          return negatives > 0 && !countMode ? (
+            <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200 flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="flex-1">{t("inventory.count.negativeHint", "{n} produk stoknya minus — ada penjualan yang belanjanya tidak dicatat. Hitung fisik lewat Mode Hitung Stok, atau matikan Lacak stok untuk menu racikan/jasa (Edit produk).").replace("{n}", String(negatives))}</span>
+              {canDelete && <Button variant="secondary" className="text-xs shrink-0" onClick={() => { setSortBy("stock_asc"); setCountMode(true); }}>{t("inventory.count.enter", "Mode Hitung Stok")}</Button>}
+            </div>
+          ) : null;
+        })()}
+        {countMode && (
+          <div className="mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3 text-xs text-neutral-300 space-y-2">
+            <p>{t("inventory.count.help", "Isi jumlah barang yang benar-benar ada di kolom Fisik (atau scan barang satu per satu). Kosongkan produk yang tidak dihitung. Saat diterapkan, stok sistem disamakan dengan hitungan; selisihnya dicatat sebagai Koreksi Persediaan — tidak masuk Laba Rugi. Produk tidak dilacak dilewati.")}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <span>{t("inventory.count.summary", "{n} produk dihitung").replace("{n}", String(countSummary.total))}</span>
+              {countSummary.more > 0 && <span className="text-emerald-400">{t("inventory.opname.overCount", "{n} selisih lebih").replace("{n}", String(countSummary.more))}</span>}
+              {countSummary.less > 0 && <span className="text-red-400">{t("inventory.opname.underCount", "{n} selisih kurang").replace("{n}", String(countSummary.less))}</span>}
+              <div className="flex gap-2 ml-auto">
+                <Button className="text-xs" onClick={applyCount} disabled={applying || countSummary.total === 0}>
+                  {applying ? t("inventory.count.applying", "Menerapkan...") : t("inventory.count.apply", "Simpan & Terapkan")}
+                </Button>
+                <Button variant="ghost" className="text-xs" disabled={applying || countSummary.total === 0} onClick={() => { countsRef.current = {}; setCounts({}); }}>
+                  {t("inventory.count.clear", "Kosongkan hitungan")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         <table className="w-full text-sm">
-          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("inventory.product.table.name", "Produk")}</th><th>{t("inventory.product.table.category", "Kategori")}</th><th>{t("inventory.product.table.price", "Harga")}</th><th>{t("inventory.product.table.cost", "Modal")}<div className="text-[10px] font-normal text-sky-400">{isFifo ? "FIFO" : t("inventory.costMethod.averageShort", "rata-rata tertimbang")}</div></th><th>{t("inventory.product.table.stock", "Stok")}</th><th>{t("inventory.product.table.supplier", "Supplier Utama")}</th><th></th></tr></thead>
+          <thead><tr className="text-left text-neutral-500 border-b border-neutral-800"><th className="py-2">{t("inventory.product.table.name", "Produk")}</th><th>{t("inventory.product.table.category", "Kategori")}</th><th>{t("inventory.product.table.price", "Harga")}</th><th>{t("inventory.product.table.cost", "Modal")}<div className="text-[10px] font-normal text-sky-400">{isFifo ? "FIFO" : t("inventory.costMethod.averageShort", "rata-rata tertimbang")}</div></th><th>{t("inventory.product.table.stock", "Stok")}</th>{countMode && <th>{t("inventory.count.physical", "Fisik")}</th>}<th>{t("inventory.product.table.supplier", "Supplier Utama")}</th><th></th></tr></thead>
           <tbody>
             {filteredProducts.map((p) => (
               <Fragment key={p.id}>
@@ -483,10 +610,43 @@ function ProductTab({ outletId }: { outletId: string }) {
                       </button>
                     )}
                   </td>
-                  <td className={p.stockQty <= p.lowStockThreshold ? "text-amber-400 font-medium" : ""}>
-                    {p.stockQty} {p.unit}
-                    <div className="text-[10px] text-neutral-600 font-normal">{t("inventory.product.minLabel", "min")} {p.lowStockThreshold}</div>
-                  </td>
+                  {isStockTracked(p) ? (
+                    <td className={p.stockQty < 0 ? "text-red-400 font-medium" : p.stockQty <= p.lowStockThreshold ? "text-amber-400 font-medium" : ""}>
+                      {p.stockQty} {p.unit}
+                      <div className="text-[10px] text-neutral-600 font-normal">{t("inventory.product.minLabel", "min")} {p.lowStockThreshold}</div>
+                    </td>
+                  ) : (
+                    <td>
+                      <span className="text-[11px] rounded-md bg-neutral-800 px-1.5 py-0.5 text-neutral-400" title={t("inventory.track.untrackedHint", "Penjualan tidak memotong stok; HPP dicatat lewat Pengeluaran; tidak ikut stock opname.")}>
+                        {t("inventory.track.untracked", "Tidak dilacak")}
+                      </span>
+                    </td>
+                  )}
+                  {countMode && (
+                    <td>
+                      {isStockTracked(p) && p.isActive !== false ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            inputMode="numeric"
+                            className="w-20 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs"
+                            placeholder={t("inventory.opname.countPlaceholder", "fisik")}
+                            value={counts[p.id] ?? ""}
+                            onChange={(e) => setCount(p.id, e.target.value)}
+                          />
+                          {counts[p.id] !== undefined && counts[p.id] - p.stockQty !== 0 && (
+                            <span className={`text-[11px] ${counts[p.id] - p.stockQty > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                              {counts[p.id] - p.stockQty > 0 ? `+${counts[p.id] - p.stockQty}` : counts[p.id] - p.stockQty}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-neutral-600">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="text-xs text-neutral-500">{suppliers.find((s) => s.id === p.preferredSupplierId)?.name ?? "-"}</td>
                   <td className="text-right whitespace-nowrap">
                     {p.isActive === false ? (
@@ -505,7 +665,7 @@ function ProductTab({ outletId }: { outletId: string }) {
                       )
                     ) : (
                       <>
-                        <Button variant="secondary" className="text-xs px-2 py-1 mr-1" onClick={() => toggleAdjust(p)}>{t("inventory.product.adjustButton", "Penyesuaian")}</Button>
+                        {isStockTracked(p) && <Button variant="secondary" className="text-xs px-2 py-1 mr-1" onClick={() => toggleAdjust(p)}>{t("inventory.product.adjustButton", "Penyesuaian")}</Button>}
                         <Button variant="ghost" className="text-xs px-2 py-1" onClick={() => toggleEdit(p)}>{t("inventory.action.edit", "Edit")}</Button>
                         {canDelete && <Button variant="ghost" className="text-xs px-2 py-1 text-red-400" onClick={() => deleteProduct(p)}>{t("inventory.product.deleteButton", "Hapus")}</Button>}
                       </>
@@ -515,7 +675,7 @@ function ProductTab({ outletId }: { outletId: string }) {
 
                 {layersFor === p.id && (
                   <tr className="border-b border-neutral-900 bg-sky-500/5">
-                    <td colSpan={7} className="px-2 py-2">
+                    <td colSpan={countMode ? 8 : 7} className="px-2 py-2">
                       <div className="mb-1 text-xs font-medium text-sky-300">{t("inventory.product.fifoLayersTitle", "Lapisan harga FIFO — {name}").replace("{name}", p.name)}</div>
                       <FifoLayerList layers={layersOf(p.id)} unit={p.unit} formatMoney={rupiah} />
                     </td>
@@ -523,7 +683,7 @@ function ProductTab({ outletId }: { outletId: string }) {
                 )}
                 {editingId === p.id && editForm && (
                   <tr className="border-b border-neutral-900 bg-neutral-900/40">
-                    <td colSpan={7} className="py-3">
+                    <td colSpan={countMode ? 8 : 7} className="py-3">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <div className="col-span-2"><label className="text-xs text-neutral-500">{t("inventory.product.editForm.name", "Nama Produk")}</label><input className={smallInputCls} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
                         <div className="col-span-2">
@@ -538,7 +698,7 @@ function ProductTab({ outletId }: { outletId: string }) {
                           {isFifo && layersOf(p.id).length > 0 && <div className="text-[10px] text-neutral-500">{t("inventory.product.fifoCostLocked", "FIFO: dihitung dari lapisan belanja")}</div>}
                         </div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.unit", "Satuan")}</label><UnitSelect units={units} value={editForm.unit} onChange={(v) => setEditForm({ ...editForm, unit: v })} className={smallInputCls} /></div>
-                        <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.minStock", "Minimum Stok")}</label><input type="number" className={smallInputCls} value={editForm.lowStockThreshold} onChange={(e) => setEditForm({ ...editForm, lowStockThreshold: Number(e.target.value) })} /></div>
+                        {isStockTracked(p) && <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.minStock", "Minimum Stok")}</label><input type="number" min={0} className={smallInputCls} value={editForm.lowStockThreshold} onChange={(e) => setEditForm({ ...editForm, lowStockThreshold: Number(e.target.value) })} /></div>}
                         <div>
                           <label className="text-xs text-neutral-500">{t("inventory.product.editForm.supplier", "Supplier Utama")}</label>
                           <select className={smallInputCls} value={editForm.preferredSupplierId} onChange={(e) => setEditForm({ ...editForm, preferredSupplierId: e.target.value })}>
@@ -551,6 +711,15 @@ function ProductTab({ outletId }: { outletId: string }) {
                         <input type="checkbox" checked={editForm.sendToKitchen} onChange={(e) => setEditForm({ ...editForm, sendToKitchen: e.target.checked })} />
                         {t("inventory.product.sendToKitchenLabel", "Kirim ke Kitchen Display (produk ini diproses/dibuat, bukan kemasan siap jual)")}
                       </label>
+                      {canDelete && !recipeProductIds.has(p.id) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-neutral-800 px-2 py-1.5 text-xs">
+                          <span className="text-neutral-300">{t("inventory.track.label", "Lacak stok")}:</span>
+                          <span className={isStockTracked(p) ? "text-emerald-400" : "text-neutral-400"}>{isStockTracked(p) ? t("inventory.track.on", "Ya — penjualan memotong stok") : t("inventory.track.off", "Tidak — menu racikan/jasa")}</span>
+                          <Button variant="ghost" className="text-xs px-2 py-0.5 ml-auto" onClick={() => toggleTracking(p)}>
+                            {isStockTracked(p) ? t("inventory.track.turnOff", "Matikan") : t("inventory.track.turnOn", "Nyalakan")}
+                          </Button>
+                        </div>
+                      )}
                       <div className="flex gap-2 mt-2">
                         <Button className="text-xs px-2 py-1" onClick={() => saveEdit(p.id)}>{t("inventory.action.save", "Simpan")}</Button>
                         <Button variant="ghost" className="text-xs px-2 py-1" onClick={cancelEdit}>{t("inventory.action.cancel", "Batal")}</Button>
@@ -561,7 +730,7 @@ function ProductTab({ outletId }: { outletId: string }) {
 
                 {adjustingId === p.id && (
                   <tr className="border-b border-neutral-900 bg-neutral-900/40">
-                    <td colSpan={7} className="py-3">
+                    <td colSpan={countMode ? 8 : 7} className="py-3">
                       <div className="space-y-2 max-w-2xl">
                         <div className="flex gap-2">
                           <button className={adjustPillCls(adjustMode === "add")} onClick={() => setAdjustMode("add")}>{t("inventory.product.adjustAddUnit", "+ Tambah Unit")}</button>
@@ -610,6 +779,8 @@ function ProductTab({ outletId }: { outletId: string }) {
           </tbody>
         </table>
       </Card>
+
+      <StockOpnameHistory key={historyKey} productName={(id) => products.find((p) => p.id === id)?.name ?? t("inventory.recipe.deletedProduct", "(produk terhapus)")} />
     </div>
   );
 }
@@ -1889,59 +2060,39 @@ function PurchaseOrderTab({ outletId }: { outletId: string }) {
   );
 }
 
-function StockOpnameTab({ outletId }: { outletId: string }) {
+/**
+ * Riwayat Stock Opname — di bawah daftar produk (tab Stock Opname terpisah dihapus 2026-11-11;
+ * penghitungan lewat Mode Hitung Stok di tab Produk). Draf lama dari versi sebelumnya masih bisa
+ * diterapkan di sini; tombol pindahkan jurnal lama ke Koreksi Persediaan juga di sini.
+ */
+function StockOpnameHistory({ productName }: { productName: (id: string) => string }) {
   const { t } = useDashboardLang();
+  const { user } = useAuth();
+  const canManage = hasPermission((user?.role ?? "cashier") as StaffRole, "manage_inventory_purchasing");
   const [opnames, setOpnames] = useState<any[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [opnameSearch, setOpnameSearch] = useState("");
-  const [lastScanned, setLastScanned] = useState<string | null>(null);
-  // Scan = hitung 1 barang. Pakai ref supaya scan beruntun cepat tidak kehilangan hitungan.
-  const countsRef = useRef<Record<string, number>>({});
-  countsRef.current = counts;
-  const countOne = (p: Product) => {
-    const next = (countsRef.current[p.id] ?? 0) + 1;
-    countsRef.current = { ...countsRef.current, [p.id]: next };
-    setCounts(countsRef.current);
-    setLastScanned(p.id);
-    return t("inventory.barcode.opnameCounted", "{name}: {n} dihitung").replace("{name}", p.name).replace("{n}", String(next));
-  };
-  const opnameWords = opnameSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const visibleOpnameProducts = products.filter((p) => {
-    if (!opnameWords.length) return true;
-    const hay = `${p.name} ${p.barcode ?? ""} ${p.sku ?? ""}`.toLowerCase();
-    return opnameWords.every((w) => hay.includes(w));
-  });
+  const [open, setOpen] = useState(false);
+  const [reclassBusy, setReclassBusy] = useState(false);
 
-  const load = () => fetchJsonArray(`/api/stock-opnames?outletId=${outletId}`).then(setOpnames);
+  const load = () => fetchJsonArray("/api/stock-opnames").then(setOpnames);
   useEffect(() => {
-    load();
-    fetchJsonArray("/api/products").then(setProducts);
-  }, [outletId]);
-
-  const submit = async () => {
-    const items = Object.entries(counts)
-      .filter(([, v]) => typeof v === "number" && Number.isInteger(v) && v >= 0)
-      .map(([productId, actualQty]) => ({ productId, actualQty }));
-    if (items.length === 0) return;
-    const res = await fetch("/api/stock-opnames", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outletId, items }) });
-    if (!res.ok) return showAlert((await res.json().catch(() => ({}))).error ?? res.statusText);
-    setCounts({});
-    load();
-  };
+    let alive = true;
+    fetchJsonArray("/api/stock-opnames").then((rows) => {
+      if (alive) setOpnames(rows);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const complete = async (id: string) => {
     const res = await fetch(`/api/stock-opnames/${id}/complete`, { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return showAlert(data.error ?? res.statusText);
     showAlert(t("inventory.opname.completeMsg", "Selesai. {n} item disesuaikan.").replace("{n}", String(data.itemsApplied)));
     load();
   };
 
-  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? t("inventory.recipe.deletedProduct", "(produk terhapus)");
-  const negativeCount = products.filter((p) => p.stockQty < 0).length;
-  const [reclassBusy, setReclassBusy] = useState(false);
   const reclassify = async () => {
     if (!(await showConfirm(t("inventory.opname.reclassConfirm", "Pindahkan selisih stock opname lama dari Laba Rugi (Kerugian Stock Opname) ke Koreksi Persediaan? Stok tidak berubah — hanya jurnalnya. Jurnal lama dibatalkan dan dicatat ulang pada tanggal yang sama."), { confirmLabel: t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan") }))) return;
     setReclassBusy(true);
@@ -1959,124 +2110,70 @@ function StockOpnameTab({ outletId }: { outletId: string }) {
     }
   };
 
+  if (opnames.length === 0) return null;
+  const drafts = opnames.filter((o) => o.status !== "completed").length;
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <h2 className="font-medium mb-3">{t("inventory.opname.title", "Hitung Stok Fisik")}</h2>
-        <div className="flex flex-col sm:flex-row gap-2 mb-2">
-          <input
-            className="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm"
-            placeholder={t("inventory.barcode.searchPlaceholder", "Cari nama produk, barcode, atau SKU...")}
-            value={opnameSearch}
-            onChange={(e) => setOpnameSearch(e.target.value)}
-            onKeyDown={(e) => {
-              // Scanner USB/Bluetooth: kode + Enter = hitung 1 barang, lalu kotak cari dikosongkan lagi.
-              if (e.key !== "Enter") return;
-              const code = normalizeBarcode(opnameSearch);
-              const hit = code ? products.find((p) => (p.barcode && p.barcode.toLowerCase() === code.toLowerCase()) || (p.sku && p.sku.toLowerCase() === code.toLowerCase())) : null;
-              if (hit) { e.preventDefault(); countOne(hit); setOpnameSearch(""); }
-            }}
-          />
-          <ProductScanButton
-            products={products}
-            mode="continuous"
-            label={t("inventory.barcode.opnameScanButton", "Scan untuk hitung")}
-            hint={t("inventory.barcode.opnameScanHint", "Scan setiap barang satu per satu — tiap scan menambah hitungan 1. Angka masih bisa dikoreksi manual.")}
-            onFound={(p) => countOne(p)}
-          />
-        </div>
-        <p className="text-[11px] text-neutral-500 mb-2">{t("inventory.barcode.opnameHelp", "Tiap scan barcode (kamera atau scanner) = +1 pada hitungan produk itu. Produk yang tidak di-scan dan tidak diisi tidak ikut diopname.")}</p>
-        <p className="text-[11px] text-neutral-400 mb-2">{t("inventory.opname.ruleNote", "Isi jumlah barang yang benar-benar ada. Saat diterapkan, stok sistem disamakan dengan hasil hitung (dikurangi penjualan sesudah dihitung). Selisihnya dicatat sebagai Koreksi Persediaan — tidak masuk Laba Rugi. Barang rusak/hilang yang ingin dibebankan, catat lewat Penyesuaian Barang di tab Produk.")}</p>
-        {negativeCount > 0 && (
-          <p className="text-[11px] text-amber-300 mb-2">{t("inventory.opname.negativeNote", "{n} produk punya stok sistem minus — artinya ada penjualan yang belanjanya tidak dicatat lewat Belanja Supplier. Hitung fisik produk itu dan isi angkanya agar stok kembali benar; ke depan catat belanja di tab Belanja Supplier.").replace("{n}", String(negativeCount))}</p>
-        )}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {visibleOpnameProducts.map((p) => {
-            const counted = counts[p.id];
-            const diff = counted !== undefined && !Number.isNaN(counted) ? counted - p.stockQty : null;
+    <Card className="space-y-3">
+      <button className="w-full flex items-center justify-between text-left" onClick={() => setOpen((v) => !v)}>
+        <span className="font-medium">
+          {t("inventory.opname.historyTitle", "Riwayat Stock Opname")} <span className="text-xs text-neutral-500">({opnames.length})</span>
+          {drafts > 0 && <span className="ml-2 text-xs text-amber-300">{t("inventory.opname.draftCount", "{n} draf belum diterapkan").replace("{n}", String(drafts))}</span>}
+        </span>
+        <span className="text-xs text-neutral-500">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="space-y-2">
+          {canManage && opnames.some((o) => o.status === "completed") && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between rounded-lg border border-neutral-800 p-3">
+              <p className="text-xs text-neutral-400">{t("inventory.opname.reclassHint", "Selisih opname sebelum 11 Nov 2026 tercatat sebagai Kerugian Stock Opname di Laba Rugi. Pindahkan ke Koreksi Persediaan supaya Laba Rugi tidak minus karena opname.")}</p>
+              <Button variant="secondary" className="text-xs shrink-0" onClick={reclassify} disabled={reclassBusy}>
+                {reclassBusy ? t("inventory.opname.reclassBusy", "Memindahkan...") : t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan")}
+              </Button>
+            </div>
+          )}
+          {opnames.map((o) => {
+            const items = (o.items ?? []) as { id: string; productId: string; systemQty: number; actualQty: number; differenceQty: number }[];
+            const over = items.filter((i) => i.differenceQty > 0);
+            const under = items.filter((i) => i.differenceQty < 0);
+            const expanded = expandedId === o.id;
             return (
-              <div key={p.id} className={`flex items-center justify-between text-sm gap-2 rounded-md ${lastScanned === p.id ? "ring-1 ring-cyan-400/60 bg-cyan-500/5" : ""}`}>
-                <span className="min-w-0">
-                  {p.name} <span className="text-neutral-500">{t("inventory.opname.systemQtyLabel", "(sistem: {qty})").replace("{qty}", String(p.stockQty))}</span>
-                  {diff !== null && diff !== 0 && (
-                    <span className={diff > 0 ? "text-emerald-400 text-xs ml-1" : "text-red-400 text-xs ml-1"}>{diff > 0 ? `+${diff}` : diff}</span>
-                  )}
-                </span>
-                {/* Dulu placeholder = angka sistem (bisa minus) dan kotak yang dikosongkan tersimpan sebagai 0.
-                    Sekarang kosong = tidak ikut diopname; hanya bilangan bulat 0 ke atas. */}
-                <input type="number" min={0} step={1} inputMode="numeric"
-                  className="w-20 shrink-0 rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" placeholder={t("inventory.opname.countPlaceholder", "fisik")}
-                  value={counts[p.id] ?? ""}
-                  onChange={(e) => {
-                    const raw = e.target.value.trim();
-                    const next = { ...counts };
-                    if (raw === "") delete next[p.id];
-                    else {
-                      const n = Math.floor(Number(raw));
-                      if (!Number.isFinite(n) || n < 0) return;
-                      next[p.id] = n;
-                    }
-                    countsRef.current = next;
-                    setCounts(next);
-                  }} />
+              <div key={o.id} className="rounded-lg border border-neutral-800 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <button className="text-left flex-1" onClick={() => setExpandedId(expanded ? null : o.id)}>
+                    <div className="text-sm">{t("inventory.opname.headerLine", "Opname {date} — {n} item").replace("{date}", new Date(o.opnameDate).toLocaleString("id-ID")).replace("{n}", String(items.length))}</div>
+                    <div className="text-xs text-neutral-500 mt-0.5">
+                      {over.length > 0 && <span className="text-emerald-400">{t("inventory.opname.overCount", "{n} selisih lebih").replace("{n}", String(over.length))}</span>}
+                      {over.length > 0 && under.length > 0 && " · "}
+                      {under.length > 0 && <span className="text-red-400">{t("inventory.opname.underCount", "{n} selisih kurang").replace("{n}", String(under.length))}</span>}
+                      {over.length === 0 && under.length === 0 && t("inventory.opname.noDifference", "Tidak ada selisih")}
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge status={o.status === "completed" ? "available" : "pending"}>{o.status}</Badge>
+                    {canManage && o.status !== "completed" && <Button className="text-xs" onClick={() => complete(o.id)}>{t("inventory.opname.applyButton", "Terapkan Penyesuaian")}</Button>}
+                  </div>
+                </div>
+                {expanded && items.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-neutral-800 space-y-1">
+                    {items.filter((i) => i.differenceQty !== 0).length === 0 && <div className="text-xs text-neutral-500">{t("inventory.opname.allMatch", "Semua item cocok dengan stok sistem — tidak ada selisih.")}</div>}
+                    {items.map((i) => i.differenceQty === 0 ? null : (
+                      <div key={i.id} className="flex items-center justify-between text-xs gap-2">
+                        <span>{productName(i.productId)}</span>
+                        <span className="text-neutral-500">{t("inventory.opname.compareLine", "sistem {system} → fisik {actual}").replace("{system}", String(i.systemQty)).replace("{actual}", String(i.actualQty))}</span>
+                        <span className={i.differenceQty > 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
+                          {i.differenceQty > 0 ? t("inventory.opname.diffMore", "+{d} (lebih)").replace("{d}", String(i.differenceQty)) : t("inventory.opname.diffLess", "{d} (kurang)").replace("{d}", String(i.differenceQty))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-        <Button className="mt-3" onClick={submit}>{t("inventory.opname.saveCountButton", "Simpan Hasil Hitung")}</Button>
-      </Card>
-
-      {opnames.some((o) => o.status === "completed") && (
-        <Card className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-          <p className="text-xs text-neutral-400">{t("inventory.opname.reclassHint", "Selisih opname sebelum 11 Nov 2026 tercatat sebagai Kerugian Stock Opname di Laba Rugi. Pindahkan ke Koreksi Persediaan supaya Laba Rugi tidak minus karena opname.")}</p>
-          <Button variant="secondary" className="text-xs shrink-0" onClick={reclassify} disabled={reclassBusy}>
-            {reclassBusy ? t("inventory.opname.reclassBusy", "Memindahkan...") : t("inventory.opname.reclassButton", "Pindahkan ke Koreksi Persediaan")}
-          </Button>
-        </Card>
       )}
-
-      <div className="space-y-2">
-        {opnames.map((o) => {
-          const items = (o.items ?? []) as { id: string; productId: string; systemQty: number; actualQty: number; differenceQty: number }[];
-          const over = items.filter((i) => i.differenceQty > 0);
-          const under = items.filter((i) => i.differenceQty < 0);
-          const expanded = expandedId === o.id;
-          return (
-            <Card key={o.id}>
-              <div className="flex items-center justify-between gap-2">
-                <button className="text-left flex-1" onClick={() => setExpandedId(expanded ? null : o.id)}>
-                  <div className="text-sm">{t("inventory.opname.headerLine", "Opname {date} — {n} item").replace("{date}", new Date(o.opnameDate).toLocaleString("id-ID")).replace("{n}", String(items.length))}</div>
-                  <div className="text-xs text-neutral-500 mt-0.5">
-                    {over.length > 0 && <span className="text-emerald-400">{t("inventory.opname.overCount", "{n} selisih lebih").replace("{n}", String(over.length))}</span>}
-                    {over.length > 0 && under.length > 0 && " · "}
-                    {under.length > 0 && <span className="text-red-400">{t("inventory.opname.underCount", "{n} selisih kurang").replace("{n}", String(under.length))}</span>}
-                    {over.length === 0 && under.length === 0 && t("inventory.opname.noDifference", "Tidak ada selisih")}
-                  </div>
-                </button>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge status={o.status === "completed" ? "available" : "pending"}>{o.status}</Badge>
-                  {o.status !== "completed" && <Button className="text-xs" onClick={() => complete(o.id)}>{t("inventory.opname.applyButton", "Terapkan Penyesuaian")}</Button>}
-                </div>
-              </div>
-              {expanded && items.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-neutral-800 space-y-1">
-                  {items.filter((i) => i.differenceQty !== 0).length === 0 && <div className="text-xs text-neutral-500">{t("inventory.opname.allMatch", "Semua item cocok dengan stok sistem — tidak ada selisih.")}</div>}
-                  {items.map((i) => i.differenceQty === 0 ? null : (
-                    <div key={i.id} className="flex items-center justify-between text-xs">
-                      <span>{productName(i.productId)}</span>
-                      <span className="text-neutral-500">{t("inventory.opname.compareLine", "sistem {system} → fisik {actual}").replace("{system}", String(i.systemQty)).replace("{actual}", String(i.actualQty))}</span>
-                      <span className={i.differenceQty > 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
-                        {i.differenceQty > 0 ? t("inventory.opname.diffMore", "+{d} (lebih)").replace("{d}", String(i.differenceQty)) : t("inventory.opname.diffLess", "{d} (kurang)").replace("{d}", String(i.differenceQty))}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
-    </div>
+    </Card>
   );
 }
 

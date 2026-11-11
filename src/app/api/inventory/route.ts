@@ -9,6 +9,7 @@ import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
 import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-postings";
 import { onStockIn, onStockOut } from "@/lib/inventory/costing";
 import { forbidUnless } from "@/lib/auth/require-permission";
+import { isStockTracked } from "@/lib/inventory/stock-tracking-rules";
 
 export async function GET() {
   try {
@@ -55,6 +56,9 @@ export async function POST(req: NextRequest) {
 
     const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (!product || product.outletId !== session.outletId) return NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+    if (!isStockTracked(product)) {
+      return NextResponse.json({ error: `Stok "${product.name}" tidak dilacak. Nyalakan Lacak stok dulu bila ingin mencatat penyesuaian.` }, { status: 400 });
+    }
 
     if (type === "purchase_in" && Number(unitCost) > 0) {
       await receiveStockForItem(productId, Math.abs(qty), Number(unitCost), `manual-restock-${Date.now()}`, note ?? "Restock manual", staffUserId);

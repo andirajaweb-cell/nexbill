@@ -60,10 +60,10 @@ export const INVENTORI: HelpCategory[] = [
       {
         title: "Stock Opname (kira stok fizikal)",
         steps: [
-          "Kira stok di rak/stor, isi hasilnya di sebelah angka sistem — perbezaan terus kelihatan. Simpan sebagai draf.",
-          "Imbas untuk kira: tekan \"Imbas untuk kira\" (kamera) atau tembak pengimbas ke kotak carian — setiap imbasan menambah kiraan produk itu 1. Angka masih boleh dibetulkan secara manual.",
-          "Buka draf untuk menyemak perbezaan bagi setiap produk.",
-          "Tekan Terapkan Pelarasan: stok sistem disamakan dengan hasil kiraan, perbezaannya direkod sebagai Pembetulan Inventori (tidak masuk Untung Rugi). Kosongkan produk yang tidak dikira. Tidak boleh diterapkan dua kali.",
+          "Tab Produk → butang Mod Kira Stok: lajur Fizikal muncul dalam senarai produk. Isi jumlah barang yang benar-benar ada; kosongkan produk yang tidak dikira.",
+          "Imbas untuk kira: tekan \"Imbas untuk kira\" (kamera) atau tembak pengimbas ke kotak carian — setiap imbasan menambah 1. Angka masih boleh dibetulkan secara manual.",
+          "Tekan Simpan & Terapkan: stok sistem disamakan dengan kiraan, perbezaannya direkod sebagai Pembetulan Inventori (tidak masuk Untung Rugi). Sejarahnya di bawah senarai produk.",
+          "Menu racikan/perkhidmatan (kopi bancuh, mi + telur, sewa kawalan): Edit produk → Jejak stok: Matikan. Jualannya tidak mengurangkan stok jadi tidak pernah negatif, dan tidak ikut kiraan.",
         ],
       },
     ],
