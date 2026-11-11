@@ -5,7 +5,7 @@ import { autoFillLowStockPurchaseOrders } from "@/lib/inventory/auto-po";
 import { postInventoryAdjustmentJournal } from "@/lib/accounting/inventory-postings";
 import { getMappedAccountId } from "@/lib/accounting/account-mapping";
 import { getAccountIdByCode } from "@/lib/accounting/coa";
-import { postJournal, voidJournal, type JournalSourceType } from "@/lib/accounting/journal";
+import { lockEntity, postJournal, voidJournal, type JournalSourceType } from "@/lib/accounting/journal";
 import { isPeriodLocked } from "@/lib/accounting/periods";
 import { isStockTracked } from "./stock-tracking-rules";
 
@@ -150,7 +150,52 @@ export async function completeStockOpname(stockOpnameId: string) {
  * jurnalnya: jurnal lama di-void (pembalik bertanggal sama), lalu dicatat ulang dengan akun lawan
  * diganti. Idempoten: jurnal yang sudah tidak menyentuh 5310/5340 dilewati.
  */
-export async function reclassifyOpnameJournals(outletId: string): Promise<{ moved: number; amount: number; skipped: number }> {
+const REPOST_MARK = " — koreksi persediaan";
+const MOVED_REASON = "Dipindahkan ke Koreksi Persediaan";
+
+/**
+ * Perbaikan data (2026-11-12): tombol pindahkan yang diklik beberapa kali bersamaan dulu bisa
+ * mencatat ulang jurnal yang SAMA berkali-kali (contoh nyata: OPN-95606b26 tercatat 6x Rp1.371.404),
+ * sehingga Ekuitas Saldo Awal jadi minus jutaan. Untuk tiap jurnal asal yang di-void karena
+ * dipindahkan, hanya boleh ada SATU catatan ulang; sisanya di-void. Idempoten.
+ */
+export async function removeDuplicateCorrectionReposts(outletId: string): Promise<{ voided: number; amount: number }> {
+  const rows = await db
+    .select()
+    .from(journalEntries)
+    .where(and(eq(journalEntries.outletId, outletId), eq(journalEntries.sourceType, "inventory_adjustment"), isNull(journalEntries.reversalOfEntryId)));
+  const key = (sourceId: string | null, reference: string | null, description: string) => `${sourceId ?? ""}|${reference ?? ""}|${description}`;
+  const expected = new Map<string, number>();
+  for (const r of rows) {
+    if (r.status === "void" && (r.voidReason ?? "").startsWith(MOVED_REASON)) {
+      const k = key(r.sourceId, r.reference, r.description);
+      expected.set(k, (expected.get(k) ?? 0) + 1);
+    }
+  }
+  const reposts = new Map<string, typeof rows>();
+  for (const r of rows) {
+    if (r.status !== "posted" || !r.description.includes(REPOST_MARK)) continue;
+    const base = r.description.slice(0, r.description.indexOf(REPOST_MARK));
+    const k = key(r.sourceId, r.reference, base);
+    reposts.set(k, [...(reposts.get(k) ?? []), r]);
+  }
+  let voided = 0;
+  let amount = 0;
+  for (const [k, list] of reposts) {
+    const keep = Math.max(1, expected.get(k) ?? 1);
+    if (list.length <= keep) continue;
+    const extras = [...list].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)).slice(keep);
+    for (const e of extras) {
+      const lines = await db.select().from(journalLines).where(eq(journalLines.journalEntryId, e.id));
+      await voidJournal(e.id, "Duplikat pemindahan ke Koreksi Persediaan (klik ganda)");
+      voided++;
+      amount += lines.reduce((s, l) => s + l.debit, 0);
+    }
+  }
+  return { voided, amount: Math.round(amount) };
+}
+
+export async function reclassifyOpnameJournals(outletId: string): Promise<{ moved: number; amount: number; skipped: number; duplicatesVoided: number }> {
   const correctionId = await getMappedAccountId(outletId, "product", "opname_correction", "3400");
   const legacyIds = new Set([
     await getMappedAccountId(outletId, "product", "opname_difference", "5310").catch(() => ""),
@@ -158,7 +203,10 @@ export async function reclassifyOpnameJournals(outletId: string): Promise<{ move
     await getMappedAccountId(outletId, "product", "adjustment", "5340").catch(() => ""),
     await getAccountIdByCode(outletId, "5340").catch(() => ""),
   ].filter((id) => id && id !== correctionId));
-  if (legacyIds.size === 0) return { moved: 0, amount: 0, skipped: 0 };
+  if (legacyIds.size === 0) {
+    const dup = await removeDuplicateCorrectionReposts(outletId);
+    return { moved: 0, amount: 0, skipped: 0, duplicatesVoided: dup.voided };
+  }
 
   const entries = await db
     .select()
@@ -182,15 +230,20 @@ export async function reclassifyOpnameJournals(outletId: string): Promise<{ move
       skipped++;
       continue;
     }
-    await db.transaction(async (tx) => {
-      await voidJournal(entry.id, "Dipindahkan ke Koreksi Persediaan (koreksi stok tidak masuk Laba Rugi)", tx);
+    const done = await db.transaction(async (tx) => {
+      // Kunci + baca ulang DI DALAM transaksi: dua klik bersamaan dulu sama-sama melihat "posted",
+      // void kedua diam-diam dilewati, lalu KEDUANYA mencatat ulang → jurnal ganda.
+      await lockEntity(tx, `journal:${entry.id}`);
+      const [fresh] = await tx.select({ status: journalEntries.status }).from(journalEntries).where(eq(journalEntries.id, entry.id)).limit(1);
+      if (!fresh || fresh.status !== "posted") return false;
+      await voidJournal(entry.id, `${MOVED_REASON} (koreksi stok tidak masuk Laba Rugi)`, tx);
       const locked = await isPeriodLocked(outletId, entry.entryDate, tx);
       await postJournal(
         {
           outletId,
           entryDate: locked ? new Date().toISOString() : entry.entryDate,
           reference: entry.reference ?? undefined,
-          description: `${entry.description} — koreksi persediaan${locked ? ` (asal periode ${entry.entryDate.slice(0, 7)})` : ""}`,
+          description: `${entry.description}${REPOST_MARK}${locked ? ` (asal periode ${entry.entryDate.slice(0, 7)})` : ""}`,
           sourceType: entry.sourceType as JournalSourceType,
           sourceId: entry.sourceId ?? undefined,
           staffUserId: entry.staffUserId ?? undefined,
@@ -203,9 +256,15 @@ export async function reclassifyOpnameJournals(outletId: string): Promise<{ move
         },
         tx
       );
+      return true;
     });
+    if (!done) {
+      skipped++;
+      continue;
+    }
     moved++;
     amount += legacy.reduce((s, l) => s + l.debit - l.credit, 0);
   }
-  return { moved, amount: Math.round(amount), skipped };
+  const dup = await removeDuplicateCorrectionReposts(outletId);
+  return { moved, amount: Math.round(amount), skipped, duplicatesVoided: dup.voided };
 }

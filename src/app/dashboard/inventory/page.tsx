@@ -2101,11 +2101,13 @@ function StockOpnameHistory({ productName }: { productName: (id: string) => stri
       const res = await fetch("/api/stock-opnames/reclassify", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return showAlert(data.error ?? res.statusText);
-      showAlert(
+      const parts = [
         data.moved > 0
           ? t("inventory.opname.reclassDone", "{n} jurnal koreksi stok dipindahkan ke Koreksi Persediaan (Rp{amount}). Laba Rugi tidak lagi memuat selisih opname/penyesuaian stok.").replace("{n}", String(data.moved)).replace("{amount}", Math.abs(data.amount).toLocaleString("id-ID"))
-          : t("inventory.opname.reclassNone", "Tidak ada jurnal opname lama yang perlu dipindahkan.")
-      );
+          : t("inventory.opname.reclassNone", "Tidak ada jurnal opname lama yang perlu dipindahkan."),
+      ];
+      if (data.duplicatesVoided > 0) parts.push(t("inventory.opname.dupVoided", "{n} jurnal ganda (akibat tombol diklik berulang) dibatalkan.").replace("{n}", String(data.duplicatesVoided)));
+      showAlert(parts.join(" "));
     } finally {
       setReclassBusy(false);
     }

@@ -4,6 +4,9 @@ import { describeError, errorStatus } from "@/lib/api/error";
 import { forbidUnless } from "@/lib/auth/require-permission";
 import { reclassifyOpnameJournals } from "@/lib/inventory/stock-opname";
 
+// Banyak jurnal = banyak void + catat ulang; beri waktu cukup supaya tidak timeout lalu diklik ulang.
+export const maxDuration = 60;
+
 /**
  * Pindahkan selisih stock opname lama (Kerugian Stock Opname di Laba Rugi) ke Koreksi Persediaan
  * (ekuitas). Stok tidak berubah; hanya jurnalnya. Idempoten.
