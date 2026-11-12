@@ -1,0 +1,83 @@
+import { registerDict } from "./registry";
+
+/** Tampilan "konsol" halaman Kontrol Perangkat: ringkasan angka, sub-halaman, kartu perangkat (2026-11-12). */
+registerDict({
+  "devices.console.subtitle": { id: "Nyalakan, matikan, dan pantau smart plug & TV setiap unit dari satu layar.", en: "Turn on, turn off, and monitor every unit's smart plug & TV from one screen.", ms: "Hidupkan, matikan, dan pantau smart plug & TV setiap unit dari satu skrin.", th: "เปิด ปิด และติดตามสมาร์ทปลั๊กและทีวีของทุกเครื่องได้จากหน้าจอเดียว", fil: "I-on, i-off, at bantayan ang smart plug at TV ng bawat unit mula sa iisang screen.", vi: "Bật, tắt và theo dõi ổ cắm thông minh & TV của từng máy trên một màn hình." },
+  "devices.console.updatedAt": { id: "Diperbarui {time}", en: "Updated {time}", ms: "Dikemas kini {time}", th: "อัปเดต {time}", fil: "Na-update {time}", vi: "Cập nhật {time}" },
+  "devices.console.loading": { id: "Memuat...", en: "Loading...", ms: "Memuatkan...", th: "กำลังโหลด...", fil: "Naglo-load...", vi: "Đang tải..." },
+  "devices.console.refresh": { id: "Muat ulang", en: "Refresh", ms: "Muat semula", th: "โหลดใหม่", fil: "I-refresh", vi: "Tải lại" },
+  "devices.console.navLabel": { id: "Bagian Kontrol Perangkat", en: "Device Control sections", ms: "Bahagian Kawalan Peranti", th: "ส่วนของการควบคุมอุปกรณ์", fil: "Mga seksyon ng Device Control", vi: "Các mục Điều khiển thiết bị" },
+  "devices.console.toggleFailed": { id: "Perintah gagal dikirim. Coba lagi.", en: "The command couldn't be sent. Try again.", ms: "Arahan gagal dihantar. Cuba lagi.", th: "ส่งคำสั่งไม่สำเร็จ ลองอีกครั้ง", fil: "Hindi naipadala ang utos. Subukan ulit.", vi: "Không gửi được lệnh. Hãy thử lại." },
+  "devices.console.editTitle": { id: "Ubah perangkat: {name}", en: "Edit device: {name}", ms: "Ubah peranti: {name}", th: "แก้ไขอุปกรณ์: {name}", fil: "I-edit ang device: {name}", vi: "Sửa thiết bị: {name}" },
+  "devices.console.showing": { id: "{n} dari {total} perangkat", en: "{n} of {total} devices", ms: "{n} daripada {total} peranti", th: "{n} จาก {total} อุปกรณ์", fil: "{n} sa {total} device", vi: "{n} trên {total} thiết bị" },
+  "devices.console.noMatch": { id: "Tidak ada perangkat yang cocok dengan filter.", en: "No devices match the filters.", ms: "Tiada peranti yang sepadan dengan penapis.", th: "ไม่มีอุปกรณ์ที่ตรงกับตัวกรอง", fil: "Walang device na tumutugma sa filter.", vi: "Không có thiết bị nào khớp bộ lọc." },
+
+  "devices.console.tab.panel": { id: "Panel Kontrol", en: "Control Panel", ms: "Panel Kawalan", th: "แผงควบคุม", fil: "Control Panel", vi: "Bảng điều khiển" },
+  "devices.console.tab.units": { id: "Unit & Perangkat", en: "Units & Devices", ms: "Unit & Peranti", th: "เครื่องและอุปกรณ์", fil: "Mga Unit at Device", vi: "Máy & Thiết bị" },
+  "devices.console.tab.connection": { id: "Koneksi & Agent", en: "Connection & Agent", ms: "Sambungan & Agent", th: "การเชื่อมต่อและ Agent", fil: "Koneksyon at Agent", vi: "Kết nối & Agent" },
+  "devices.console.tab.guide": { id: "Panduan & Darurat", en: "Guides & Emergencies", ms: "Panduan & Kecemasan", th: "คู่มือและเหตุฉุกเฉิน", fil: "Gabay at Emergency", vi: "Hướng dẫn & Khẩn cấp" },
+
+  "devices.console.kpi.devices": { id: "Perangkat", en: "Devices", ms: "Peranti", th: "อุปกรณ์", fil: "Mga Device", vi: "Thiết bị" },
+  "devices.console.kpi.devicesSub": { id: "{tv} TV · {plug} smart plug", en: "{tv} TV · {plug} smart plug", ms: "{tv} TV · {plug} smart plug", th: "ทีวี {tv} · สมาร์ทปลั๊ก {plug}", fil: "{tv} TV · {plug} smart plug", vi: "{tv} TV · {plug} ổ cắm thông minh" },
+  "devices.console.kpi.unknownSub": { id: "+{n} belum diketahui", en: "+{n} unknown", ms: "+{n} belum diketahui", th: "+{n} ยังไม่ทราบ", fil: "+{n} hindi pa alam", vi: "+{n} chưa rõ" },
+  "devices.console.kpi.attentionSub": { id: "TV perlu dicek", en: "TVs need checking", ms: "TV perlu disemak", th: "ต้องตรวจสอบทีวี", fil: "Kailangang i-check ang TV", vi: "TV cần kiểm tra" },
+  "devices.console.kpi.attentionNone": { id: "Semua TV merespons", en: "All TVs responding", ms: "Semua TV bertindak balas", th: "ทีวีทุกเครื่องตอบสนอง", fil: "Tumutugon ang lahat ng TV", vi: "Mọi TV đều phản hồi" },
+  "devices.console.kpi.units": { id: "Unit terhubung", en: "Units linked", ms: "Unit dihubungkan", th: "เครื่องที่เชื่อมแล้ว", fil: "Naka-link na unit", vi: "Máy đã liên kết" },
+  "devices.console.kpi.unitsSub": { id: "{n} unit belum terhubung", en: "{n} units not linked", ms: "{n} unit belum dihubungkan", th: "{n} เครื่องยังไม่เชื่อม", fil: "{n} unit ang hindi pa naka-link", vi: "{n} máy chưa liên kết" },
+  "devices.console.kpi.unitsAll": { id: "Semua unit terhubung", en: "All units linked", ms: "Semua unit dihubungkan", th: "เชื่อมครบทุกเครื่อง", fil: "Naka-link ang lahat ng unit", vi: "Mọi máy đã liên kết" },
+  "devices.console.kpi.agents": { id: "NexbillAgent online", en: "NexbillAgent online", ms: "NexbillAgent online", th: "NexbillAgent ออนไลน์", fil: "NexbillAgent online", vi: "NexbillAgent trực tuyến" },
+  "devices.console.kpi.agentsNone": { id: "Belum dipasang", en: "Not installed yet", ms: "Belum dipasang", th: "ยังไม่ได้ติดตั้ง", fil: "Hindi pa naka-install", vi: "Chưa cài đặt" },
+  "devices.console.kpi.agentsOff": { id: "{n} offline", en: "{n} offline", ms: "{n} offline", th: "{n} ออฟไลน์", fil: "{n} offline", vi: "{n} ngoại tuyến" },
+
+  "devices.console.health.on": { id: "Menyala", en: "On", ms: "Hidup", th: "เปิดอยู่", fil: "Naka-on", vi: "Đang bật" },
+  "devices.console.health.off": { id: "Mati", en: "Off", ms: "Mati", th: "ปิดอยู่", fil: "Naka-off", vi: "Đang tắt" },
+  "devices.console.health.attention": { id: "Tidak merespons", en: "Not responding", ms: "Tidak bertindak balas", th: "ไม่ตอบสนอง", fil: "Hindi tumutugon", vi: "Không phản hồi" },
+  "devices.console.health.unknown": { id: "Belum diketahui", en: "Unknown", ms: "Belum diketahui", th: "ยังไม่ทราบ", fil: "Hindi pa alam", vi: "Chưa rõ" },
+
+  "devices.console.filter.search": { id: "Cari perangkat, unit, atau IP", en: "Search device, unit, or IP", ms: "Cari peranti, unit, atau IP", th: "ค้นหาอุปกรณ์ เครื่อง หรือ IP", fil: "Maghanap ng device, unit, o IP", vi: "Tìm thiết bị, máy hoặc IP" },
+  "devices.console.filter.all": { id: "Semua", en: "All", ms: "Semua", th: "ทั้งหมด", fil: "Lahat", vi: "Tất cả" },
+  "devices.console.filter.tv": { id: "TV", en: "TV", ms: "TV", th: "ทีวี", fil: "TV", vi: "TV" },
+  "devices.console.filter.plug": { id: "Smart plug", en: "Smart plug", ms: "Smart plug", th: "สมาร์ทปลั๊ก", fil: "Smart plug", vi: "Ổ cắm thông minh" },
+  "devices.console.filter.kind": { id: "Jenis perangkat", en: "Device type", ms: "Jenis peranti", th: "ประเภทอุปกรณ์", fil: "Uri ng device", vi: "Loại thiết bị" },
+  "devices.console.filter.state": { id: "Status", en: "Status", ms: "Status", th: "สถานะ", fil: "Status", vi: "Trạng thái" },
+  "devices.console.filter.reset": { id: "Hapus filter", en: "Clear filters", ms: "Kosongkan penapis", th: "ล้างตัวกรอง", fil: "I-clear ang filter", vi: "Xóa bộ lọc" },
+
+  "devices.console.card.unit": { id: "Unit: {units}", en: "Unit: {units}", ms: "Unit: {units}", th: "เครื่อง: {units}", fil: "Unit: {units}", vi: "Máy: {units}" },
+  "devices.console.card.noUnit": { id: "Belum dihubungkan ke unit", en: "Not linked to a unit", ms: "Belum dihubungkan ke unit", th: "ยังไม่เชื่อมกับเครื่อง", fil: "Hindi pa naka-link sa unit", vi: "Chưa liên kết với máy" },
+  "devices.console.card.seen": { id: "Terakhir merespons {ago}", en: "Last responded {ago}", ms: "Kali terakhir bertindak balas {ago}", th: "ตอบสนองล่าสุด {ago}", fil: "Huling tumugon {ago}", vi: "Phản hồi lần cuối {ago}" },
+
+  "devices.console.ago.now": { id: "baru saja", en: "just now", ms: "baru sahaja", th: "เมื่อสักครู่", fil: "ngayon lang", vi: "vừa xong" },
+  "devices.console.ago.minute": { id: "{n} mnt lalu", en: "{n} min ago", ms: "{n} min lalu", th: "{n} นาทีที่แล้ว", fil: "{n} min ang nakalipas", vi: "{n} phút trước" },
+  "devices.console.ago.hour": { id: "{n} jam lalu", en: "{n} hr ago", ms: "{n} jam lalu", th: "{n} ชั่วโมงที่แล้ว", fil: "{n} oras ang nakalipas", vi: "{n} giờ trước" },
+  "devices.console.ago.day": { id: "{n} hari lalu", en: "{n} days ago", ms: "{n} hari lalu", th: "{n} วันที่แล้ว", fil: "{n} araw ang nakalipas", vi: "{n} ngày trước" },
+
+  "devices.console.attention.title": { id: "Perlu perhatian", en: "Needs attention", ms: "Perlu perhatian", th: "ต้องดำเนินการ", fil: "Kailangang pansinin", vi: "Cần chú ý" },
+  "devices.console.attention.allGood": { id: "Tidak ada yang perlu ditindak saat ini.", en: "Nothing needs action right now.", ms: "Tiada apa yang perlu diambil tindakan buat masa ini.", th: "ตอนนี้ไม่มีสิ่งที่ต้องดำเนินการ", fil: "Walang kailangang aksyunan sa ngayon.", vi: "Hiện không có gì cần xử lý." },
+  "devices.console.attention.agentOffline": { id: "{n} NexbillAgent offline — TV tidak bisa dikontrol sampai agent berjalan lagi.", en: "{n} NexbillAgent offline — TVs can't be controlled until the agent is running again.", ms: "{n} NexbillAgent offline — TV tidak boleh dikawal sehingga agent berjalan semula.", th: "NexbillAgent ออฟไลน์ {n} ตัว — ควบคุมทีวีไม่ได้จนกว่า agent จะกลับมาทำงาน", fil: "{n} NexbillAgent ang offline — hindi makokontrol ang TV hangga't hindi tumatakbo ulit ang agent.", vi: "{n} NexbillAgent ngoại tuyến — không thể điều khiển TV cho đến khi agent chạy lại." },
+  "devices.console.attention.tvStale": { id: "{n} TV tidak merespons — pastikan TV menyala dan tersambung WiFi outlet.", en: "{n} TVs not responding — make sure they are on and connected to the outlet WiFi.", ms: "{n} TV tidak bertindak balas — pastikan TV hidup dan bersambung ke WiFi outlet.", th: "ทีวี {n} เครื่องไม่ตอบสนอง — ตรวจสอบว่าทีวีเปิดอยู่และเชื่อมต่อ WiFi ของร้าน", fil: "{n} TV ang hindi tumutugon — tiyaking naka-on at nakakonekta sa WiFi ng outlet.", vi: "{n} TV không phản hồi — hãy kiểm tra TV đang bật và đã kết nối WiFi của cửa hàng." },
+  "devices.console.attention.unitsUnlinked": { id: "{n} unit belum punya perangkat — tidak menyala/mati otomatis saat sesi.", en: "{n} units have no device — they won't turn on/off automatically with sessions.", ms: "{n} unit belum ada peranti — tidak hidup/mati secara automatik semasa sesi.", th: "{n} เครื่องยังไม่มีอุปกรณ์ — จะไม่เปิด/ปิดอัตโนมัติตามเซสชัน", fil: "{n} unit ang wala pang device — hindi awtomatikong mag-o-on/off kasabay ng session.", vi: "{n} máy chưa có thiết bị — sẽ không tự bật/tắt theo phiên." },
+  "devices.console.attention.tvFound": { id: "{n} TV ditemukan NexbillAgent dan siap ditambahkan.", en: "{n} TVs found by NexbillAgent and ready to add.", ms: "{n} TV ditemui oleh NexbillAgent dan sedia ditambah.", th: "NexbillAgent พบทีวี {n} เครื่องที่พร้อมเพิ่ม", fil: "{n} TV ang nahanap ng NexbillAgent at handa nang idagdag.", vi: "NexbillAgent đã tìm thấy {n} TV sẵn sàng để thêm." },
+  "devices.console.attention.check": { id: "Periksa", en: "Check", ms: "Semak", th: "ตรวจสอบ", fil: "Suriin", vi: "Kiểm tra" },
+  "devices.console.attention.view": { id: "Lihat", en: "View", ms: "Lihat", th: "ดู", fil: "Tingnan", vi: "Xem" },
+  "devices.console.attention.link": { id: "Hubungkan", en: "Link", ms: "Hubungkan", th: "เชื่อม", fil: "I-link", vi: "Liên kết" },
+  "devices.console.attention.add": { id: "Tambahkan", en: "Add", ms: "Tambah", th: "เพิ่ม", fil: "Idagdag", vi: "Thêm" },
+
+  "devices.console.empty.title": { id: "Belum ada perangkat", en: "No devices yet", ms: "Belum ada peranti", th: "ยังไม่มีอุปกรณ์", fil: "Wala pang device", vi: "Chưa có thiết bị" },
+  "devices.console.empty.desc": { id: "Tambahkan smart plug atau TV supaya unit menyala saat sesi dimulai dan mati saat waktu habis.", en: "Add a smart plug or TV so units turn on when a session starts and off when time runs out.", ms: "Tambah smart plug atau TV supaya unit hidup apabila sesi bermula dan mati apabila masa tamat.", th: "เพิ่มสมาร์ทปลั๊กหรือทีวี เพื่อให้เครื่องเปิดเมื่อเริ่มเซสชันและปิดเมื่อหมดเวลา", fil: "Magdagdag ng smart plug o TV para mag-on ang unit kapag nagsimula ang session at mag-off kapag ubos na ang oras.", vi: "Thêm ổ cắm thông minh hoặc TV để máy bật khi bắt đầu phiên và tắt khi hết giờ." },
+  "devices.console.empty.descView": { id: "Belum ada perangkat di outlet ini. Minta pemilik atau manajer menambahkannya.", en: "This outlet has no devices yet. Ask the owner or manager to add them.", ms: "Outlet ini belum ada peranti. Minta pemilik atau pengurus menambahnya.", th: "ร้านนี้ยังไม่มีอุปกรณ์ โปรดขอให้เจ้าของหรือผู้จัดการเพิ่ม", fil: "Wala pang device sa outlet na ito. Hilingin sa may-ari o manager na magdagdag.", vi: "Cửa hàng này chưa có thiết bị. Hãy nhờ chủ hoặc quản lý thêm." },
+
+  "devices.console.units.desc": { id: "Perangkat yang dihubungkan menyala saat sesi unit dimulai dan mati saat sesi selesai.", en: "A linked device turns on when the unit's session starts and off when it ends.", ms: "Peranti yang dihubungkan hidup apabila sesi unit bermula dan mati apabila sesi tamat.", th: "อุปกรณ์ที่เชื่อมไว้จะเปิดเมื่อเซสชันของเครื่องเริ่ม และปิดเมื่อเซสชันจบ", fil: "Ang naka-link na device ay nag-o-on kapag nagsimula ang session ng unit at nag-o-off kapag natapos.", vi: "Thiết bị đã liên kết sẽ bật khi phiên của máy bắt đầu và tắt khi phiên kết thúc." },
+  "devices.console.units.control": { id: "Kontrol", en: "Control", ms: "Kawalan", th: "ควบคุม", fil: "Kontrol", vi: "Điều khiển" },
+  "devices.console.units.inactive": { id: "nonaktif", en: "inactive", ms: "tidak aktif", th: "ปิดใช้งาน", fil: "hindi aktibo", vi: "ngừng dùng" },
+  "devices.console.units.empty": { id: "Belum ada unit rental.", en: "No rental units yet.", ms: "Belum ada unit sewa.", th: "ยังไม่มีเครื่องเช่า", fil: "Wala pang rental unit.", vi: "Chưa có máy cho thuê." },
+  "devices.console.units.noDevices": { id: "Belum ada perangkat untuk dihubungkan.", en: "There are no devices to link yet.", ms: "Belum ada peranti untuk dihubungkan.", th: "ยังไม่มีอุปกรณ์ให้เชื่อม", fil: "Wala pang device na mai-link.", vi: "Chưa có thiết bị để liên kết." },
+
+  "devices.console.add.manualTitle": { id: "Tambah manual", en: "Add manually", ms: "Tambah secara manual", th: "เพิ่มด้วยตนเอง", fil: "Manu-manong idagdag", vi: "Thêm thủ công" },
+  "devices.console.add.manualDesc": { id: "Untuk smart plug Tasmota atau Tuya, dan TV yang alamat IP-nya sudah diketahui.", en: "For Tasmota or Tuya smart plugs, and TVs whose IP address you already know.", ms: "Untuk smart plug Tasmota atau Tuya, dan TV yang alamat IP-nya sudah diketahui.", th: "สำหรับสมาร์ทปลั๊ก Tasmota หรือ Tuya และทีวีที่ทราบที่อยู่ IP แล้ว", fil: "Para sa Tasmota o Tuya smart plug, at TV na alam na ang IP address.", vi: "Dành cho ổ cắm thông minh Tasmota hoặc Tuya, và TV đã biết địa chỉ IP." },
+  "devices.console.add.guideHint": { id: "Belum pernah memasang? Langkah lengkap tiap jenis perangkat ada di", en: "First time setting up? Full steps for each device type are in", ms: "Belum pernah memasang? Langkah lengkap setiap jenis peranti ada di", th: "ยังไม่เคยติดตั้ง? ขั้นตอนทั้งหมดของอุปกรณ์แต่ละประเภทอยู่ที่", fil: "Unang beses mag-setup? Ang buong hakbang ng bawat uri ng device ay nasa", vi: "Chưa từng cài đặt? Các bước đầy đủ cho từng loại thiết bị có ở" },
+
+  "devices.console.conn.agentsTitle": { id: "NexbillAgent di outlet ini", en: "NexbillAgent at this outlet", ms: "NexbillAgent di outlet ini", th: "NexbillAgent ของร้านนี้", fil: "NexbillAgent sa outlet na ito", vi: "NexbillAgent tại cửa hàng này" },
+  "devices.console.conn.agentsDesc": { id: "Aplikasi kecil di PC atau HP outlet yang meneruskan perintah nyala/mati ke TV dan menjaga kontrol tetap jalan saat internet putus.", en: "A small app on the outlet's PC or phone that relays on/off commands to TVs and keeps control working when the internet is down.", ms: "Aplikasi kecil di PC atau telefon outlet yang meneruskan arahan hidup/mati ke TV dan memastikan kawalan terus berjalan apabila internet terputus.", th: "แอปขนาดเล็กบน PC หรือมือถือของร้าน ที่ส่งต่อคำสั่งเปิด/ปิดไปยังทีวี และทำให้ยังควบคุมได้เมื่ออินเทอร์เน็ตขัดข้อง", fil: "Maliit na app sa PC o phone ng outlet na nagpapasa ng on/off na utos sa TV at pinananatiling gumagana ang kontrol kapag walang internet.", vi: "Ứng dụng nhỏ trên PC hoặc điện thoại của cửa hàng, chuyển lệnh bật/tắt đến TV và giữ cho việc điều khiển vẫn hoạt động khi mất internet." },
+  "devices.console.conn.lastSeen": { id: "Terakhir tersambung {ago}", en: "Last connected {ago}", ms: "Kali terakhir bersambung {ago}", th: "เชื่อมต่อล่าสุด {ago}", fil: "Huling nakakonekta {ago}", vi: "Kết nối lần cuối {ago}" },
+  "devices.console.conn.never": { id: "Belum pernah tersambung", en: "Never connected", ms: "Belum pernah bersambung", th: "ยังไม่เคยเชื่อมต่อ", fil: "Hindi pa nakakonekta kailanman", vi: "Chưa từng kết nối" },
+});
