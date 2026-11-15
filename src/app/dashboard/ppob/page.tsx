@@ -10,8 +10,11 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth, isSuperRole } from "@/lib/auth/client";
 import { hasPermission } from "@/lib/auth/permissions";
 import { showAlert, showConfirm, showPrompt } from "@/lib/ui/dialog";
-import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
+import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import "@/lib/i18n/dict-ppob";
+import "@/lib/i18n/dict-cash-date";
+import "@/lib/i18n/dict-ppob-date";
+import { outletDateYmd } from "@/lib/time/outlet-time";
 import { PpobMoneyFlow } from "./PpobMoneyFlow";
 import { VendorRecommendations } from "@/components/dashboard/VendorRecommendationCard";
 
@@ -35,7 +38,18 @@ function categoryLabels(t: (key: string, fallback?: string) => string): Record<s
 
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function endOfDay(d: Date) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
-function toDateInput(d: Date) { return d.toISOString().slice(0, 10); }
+/**
+ * YYYY-MM-DD dari tanggal LOKAL browser. Dulu memakai toISOString() (UTC): di WIB, "Bulan Ini"
+ * mulai dari hari terakhir bulan lalu, dan sebelum pukul 07.00 "Hari Ini" menunjuk kemarin.
+ */
+function toDateInput(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const todayYmd = () => outletDateYmd(new Date());
+/** "12 November 2026" dalam bahasa dashboard (tanggal dipatok siang WIB supaya tidak bergeser hari). */
+function longDate(ymd: string, locale: string) {
+  return new Date(`${ymd}T12:00:00+07:00`).toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
+}
 
 export default function PpobPage() {
   const { t } = useDashboardLang();
@@ -54,8 +68,8 @@ export default function PpobPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [priceRules, setPriceRules] = useState<any[]>([]);
   const [showPriceRules, setShowPriceRules] = useState(false);
-  const [fromDate, setFromDate] = useState(toDateInput(new Date()));
-  const [toDate, setToDate] = useState(toDateInput(new Date()));
+  const [fromDate, setFromDate] = useState(todayYmd);
+  const [toDate, setToDate] = useState(todayYmd);
   const [data, setData] = useState<{ transactions: any[]; summary: any } | null>(null);
   const [saldoProvider, setSaldoProvider] = useState<number | null>(null);
 
@@ -165,14 +179,28 @@ export default function PpobPage() {
               <label className="text-xs text-neutral-500">{t("ppob.filter.to", "Sampai")}</label>
               <input type="date" className="block rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={toDate} onChange={(e) => setToDate(e.target.value)} />
             </div>
-            <Button variant="ghost" className="text-xs" onClick={() => { const d = toDateInput(new Date()); setFromDate(d); setToDate(d); }}>{t("ppob.filter.today", "Hari Ini")}</Button>
+            <Button variant="ghost" className="text-xs" onClick={() => { const d = todayYmd(); setFromDate(d); setToDate(d); }}>{t("ppob.filter.today", "Hari Ini")}</Button>
             <Button variant="ghost" className="text-xs" onClick={() => { const n = new Date(); setFromDate(toDateInput(new Date(n.getFullYear(), n.getMonth(), 1))); setToDate(toDateInput(new Date(n.getFullYear(), n.getMonth() + 1, 0))); }}>{t("ppob.filter.thisMonth", "Bulan Ini")}</Button>
             {canManage && <Button variant="ghost" className="text-xs ml-auto" onClick={() => setShowPriceRules((v) => !v)}>{showPriceRules ? t("ppob.btnCloseFormPriceRules", "Tutup Harga Provider & Margin") : t("ppob.btnManagePriceRules", "Kelola Harga Provider & Margin")}</Button>}
           </Card>
 
           {canManage && showPriceRules && <PriceRulesPanel outletId={outletId} rules={priceRules} onChanged={loadPriceRules} />}
 
-          {canManage && <EntryForm outletId={outletId} accounts={accounts} priceRules={priceRules} defaultFunding={ppobSaldoAccount?.id} defaultReceiving={cashAccount?.id} onCreated={load} />}
+          {canManage && (
+            <EntryForm
+              outletId={outletId}
+              accounts={accounts}
+              priceRules={priceRules}
+              defaultFunding={ppobSaldoAccount?.id}
+              defaultReceiving={cashAccount?.id}
+              onCreated={(date) => {
+                // Transaksi bertanggal lampau di luar filter → filter diperluas supaya barisnya terlihat.
+                if (fromDate && date < fromDate) setFromDate(date);
+                if (toDate && date > toDate) setToDate(date);
+                load();
+              }}
+            />
+          )}
 
           <Card>
             <table className="w-full text-sm">
@@ -375,9 +403,11 @@ function PriceRulesPanel({ outletId, rules, onChanged }: { outletId: string; rul
 }
 
 function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultReceiving, onCreated }: {
-  outletId: string; accounts: any[]; priceRules: any[]; defaultFunding?: string; defaultReceiving?: string; onCreated: () => void;
+  outletId: string; accounts: any[]; priceRules: any[]; defaultFunding?: string; defaultReceiving?: string; onCreated: (date: string) => void;
 }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
+  // Tanggal transaksi — bawaan hari ini; boleh mundur untuk transaksi yang lupa dicatat.
+  const [date, setDate] = useState(todayYmd);
   const CATEGORY_LABEL = categoryLabels(t);
   const [category, setCategory] = useState("ewallet_topup");
   const [product, setProduct] = useState("");
@@ -441,6 +471,7 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
         nominal: Number(nominal), modal: Number(modal || nominal), providerFee: Number(providerFee || 0), feeAdmin: Number(feeAdmin || 0),
         fundingCashBankAccountId: funding, receivingCashBankAccountId: receiving, notes: notes || null,
         idempotencyKey,
+        date,
       }),
     });
     const out = await res.json();
@@ -448,12 +479,25 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
     if (!res.ok) return showAlert(out.error);
     setProduct(""); setServiceRef(""); setProviderRef(""); setCustomerName(""); setNominal(""); setModal(""); setProviderFee(""); setFeeAdmin(""); setNotes("");
     setIdempotencyKey(crypto.randomUUID()); // fresh key for the next transaction — this one is now posted
-    onCreated();
+    const savedDate = date;
+    onCreated(savedDate);
+    if (savedDate !== todayYmd()) {
+      // Tanggal tetap dipertahankan — biasanya beberapa transaksi kemarin dicatat berurutan.
+      showAlert(t("ppob.date.savedPast", "Transaksi tersimpan dengan tanggal {date}.").replace("{date}", longDate(savedDate, DATE_LOCALE[lang])));
+    }
   };
 
   return (
     <Card className="space-y-2">
-      <h2 className="font-medium">{t("ppob.entryForm.heading", "Catat Transaksi PPOB")}</h2>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <h2 className="font-medium">{t("ppob.entryForm.heading", "Catat Transaksi PPOB")}</h2>
+        <PpobDateField value={date} onChange={setDate} />
+      </div>
+      {date !== todayYmd() && (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+          {t("cashDate.backdateHint", "Dicatat pada {date} — jurnal memakai tanggal ini dan tidak ditautkan ke shift yang sedang buka.").replace("{date}", longDate(date, DATE_LOCALE[lang]))}
+        </p>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" value={category} onChange={(e) => onCategoryChange(e.target.value)}>
           {Object.entries(CATEGORY_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
@@ -492,7 +536,9 @@ function EntryForm({ outletId, accounts, priceRules, defaultFunding, defaultRece
  * silently rewriting a posted journal.
  */
 function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: any[]; onClose: () => void; onSaved: () => void }) {
-  const { t } = useDashboardLang();
+  const { t, lang } = useDashboardLang();
+  const originalDate = tx.createdAt ? outletDateYmd(new Date(tx.createdAt)) : todayYmd();
+  const [date, setDate] = useState(originalDate);
   const [product, setProduct] = useState(tx.product ?? "");
   const [serviceRef, setServiceRef] = useState(tx.serviceRef ?? "");
   const [customerName, setCustomerName] = useState(tx.customerName ?? "");
@@ -518,6 +564,8 @@ function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: 
           product, serviceRef: serviceRef || null, customerName: customerName || null,
           nominal: Number(nominal), modal: Number(modalAmount || 0), providerFee: Number(providerFee || 0), feeAdmin: Number(feeAdmin || 0),
           fundingCashBankAccountId: funding, receivingCashBankAccountId: receiving, notes: notes || null,
+          // Hanya dikirim bila diganti — tanpa itu jurnal pengganti tetap di tanggal transaksi aslinya.
+          ...(date !== originalDate ? { date } : {}),
         }),
       });
       const out = await res.json();
@@ -536,6 +584,14 @@ function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: 
           <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200 text-sm">{t("ppob.close", "Tutup")}</button>
         </div>
         <p className="text-xs text-amber-400">{t("ppob.editModal.warning", "Jurnal lama akan dibatalkan otomatis dan diganti jurnal baru sesuai angka yang dikoreksi.")}</p>
+        <div>
+          <PpobDateField value={date} onChange={setDate} />
+          <p className={`mt-1 text-[11px] ${date !== originalDate ? "text-amber-300" : "text-neutral-500"}`}>
+            {date !== originalDate
+              ? t("ppob.date.editMoved", "Tanggal diganti dari {from} ke {to} — jurnal pengganti dicatat pada tanggal baru.").replace("{from}", longDate(originalDate, DATE_LOCALE[lang])).replace("{to}", longDate(date, DATE_LOCALE[lang]))
+              : t("ppob.date.editKeep", "Jurnal pengganti tetap dicatat pada tanggal transaksi ini.")}
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs col-span-2" placeholder={t("ppob.field.productPlaceholder", "Produk")} value={product} onChange={(e) => setProduct(e.target.value)} />
           <input className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs" placeholder={t("ppob.field.serviceRefPlaceholderShort", "No. HP / ID Pelanggan")} value={serviceRef} onChange={(e) => setServiceRef(e.target.value)} />
@@ -558,5 +614,28 @@ function PpobEditModal({ tx, accounts, onClose, onSaved }: { tx: any; accounts: 
         <Button onClick={save} disabled={saving} className="w-full">{saving ? t("ppob.entryForm.saving", "Menyimpan...") : t("ppob.editModal.submit", "Simpan Koreksi")}</Button>
       </div>
     </div>
+  );
+}
+
+/** Tanggal transaksi PPOB: bawaan hari ini, boleh mundur, tidak boleh ke depan (divalidasi juga di server). */
+function PpobDateField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t } = useDashboardLang();
+  const today = todayYmd();
+  return (
+    <label className="flex items-center gap-2 text-xs text-neutral-500">
+      {t("ppob.date.label", "Tanggal transaksi")}
+      <input
+        type="date"
+        className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs text-neutral-100"
+        value={value}
+        max={today}
+        onChange={(e) => onChange(e.target.value && e.target.value <= today ? e.target.value : today)}
+      />
+      {value !== today && (
+        <button type="button" onClick={() => onChange(today)} className="text-cyan-300 hover:underline">
+          {t("ppob.filter.today", "Hari Ini")}
+        </button>
+      )}
+    </label>
   );
 }

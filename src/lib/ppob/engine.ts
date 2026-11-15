@@ -41,6 +41,12 @@ export interface CreatePpobInput {
   notes?: string | null;
   /** Client-generated dedup key (see postPpobTransaction's doc comment) — a retry/double-submit with the same key returns the already-posted transaction instead of creating a duplicate. */
   idempotencyKey?: string | null;
+  /**
+   * Tanggal transaksi (ISO) — bawaan sekarang. Diisi bila kasir mencatat transaksi hari sebelumnya
+   * (lihat ymdToEntryIso): baris PPOB (createdAt — dipakai filter, laporan & settlement) dan KEDUA
+   * jurnalnya memakai tanggal ini. Periode yang sudah ditutup ditolak oleh postJournal.
+   */
+  entryDate?: string | null;
 }
 
 /**
@@ -197,6 +203,7 @@ export async function postPpobTransaction(input: CreatePpobInput) {
   if (!receiving || receiving.outletId !== input.outletId) throw new Error("Akun penerima uang masuk tidak ditemukan.");
 
   const label = `PPOB ${input.product}${input.serviceRef ? " - " + input.serviceRef : ""}`;
+  const entryDate = input.entryDate || new Date().toISOString();
 
   const result = await db.transaction(async (tx) => {
     let row: typeof ppobTransactions.$inferSelect;
@@ -225,6 +232,7 @@ export async function postPpobTransaction(input: CreatePpobInput) {
           notes: input.notes ?? null,
           status: "success",
           idempotencyKey: input.idempotencyKey ?? null,
+          createdAt: entryDate,
         })
         .returning();
     } catch (err) {
@@ -246,7 +254,7 @@ export async function postPpobTransaction(input: CreatePpobInput) {
     let collectionJournalId: string | null = null;
     if (collectionLines.length > 0) {
       collectionJournalId = await postJournal(
-        { outletId: input.outletId, description: `Transaksi ${label} (${input.category})`, sourceType: "ppob", sourceId: row.id, staffUserId: input.staffUserId ?? undefined, lines: collectionLines },
+        { outletId: input.outletId, entryDate, description: `Transaksi ${label} (${input.category})`, sourceType: "ppob", sourceId: row.id, staffUserId: input.staffUserId ?? undefined, lines: collectionLines },
         tx
       );
     }
@@ -256,10 +264,10 @@ export async function postPpobTransaction(input: CreatePpobInput) {
     if (principal !== 0) {
       const settlementLines = await buildPpobSettlementLines(input.outletId, label, principal, funding, tx);
       settlementJournalId = await postJournal(
-        { outletId: input.outletId, description: `Settlement ${label} ke provider`, sourceType: "ppob", sourceId: row.id, staffUserId: input.staffUserId ?? undefined, lines: settlementLines },
+        { outletId: input.outletId, entryDate, description: `Settlement ${label} ke provider`, sourceType: "ppob", sourceId: row.id, staffUserId: input.staffUserId ?? undefined, lines: settlementLines },
         tx
       );
-      settledAt = new Date().toISOString();
+      settledAt = entryDate;
     }
 
     const [updated] = await tx
@@ -283,7 +291,7 @@ export async function postPpobTransaction(input: CreatePpobInput) {
     action: "create_ppob_transaction",
     entityType: "ppob_transaction",
     entityId: result.id,
-    after: { product: input.product, category: input.category, nominal: input.nominal, modal, providerFee, feeAdmin, principal, uangMasuk },
+    after: { product: input.product, category: input.category, nominal: input.nominal, modal, providerFee, feeAdmin, principal, uangMasuk, entryDate },
   });
 
   return result;
@@ -384,6 +392,10 @@ export interface EditPpobInput {
   fundingCashBankAccountId?: string;
   receivingCashBankAccountId?: string;
   notes?: string | null;
+  /** Tanggal transaksi baru (ISO, lihat ymdToEntryIso). Kosong = tanggal transaksi tetap. */
+  entryDate?: string | null;
+  /** Shift untuk tanggal baru — hanya dipakai bila entryDate diisi (null = tidak ditautkan ke shift). */
+  shiftId?: string | null;
 }
 
 /**
@@ -414,6 +426,20 @@ export async function editPpobTransaction(id: string, input: EditPpobInput, staf
   const notes = input.notes !== undefined ? input.notes : row.notes;
   const { principal, feeAdmin, uangMasuk } = computePpobAmounts(modal, providerFee, input.feeAdmin ?? row.feeAdmin);
 
+  /*
+   * Jurnal pengganti dicatat pada TANGGAL TRANSAKSI, bukan tanggal tombol Simpan Koreksi ditekan.
+   * Sebelumnya postJournal dipanggil tanpa entryDate → mengoreksi transaksi 6 September hari ini
+   * memindahkan pendapatan margin & arus kasnya ke hari ini, sementara baris PPOB-nya tetap di
+   * September (laporan PPOB dan Laba Rugi tidak lagi cocok). Sama dengan postPpobSettlementJournal:
+   * tanggal asli dipakai kecuali periodenya sudah ditutup — jurnal koreksi lalu mendarat hari ini.
+   * Bila tanggalnya sengaja diganti (input.entryDate), periode tujuan yang terkunci ditolak
+   * postJournal dengan pesan yang jelas, bukan dipindah diam-diam.
+   */
+  const dateChanged = !!input.entryDate && input.entryDate.slice(0, 10) !== row.createdAt.slice(0, 10);
+  const txDate = dateChanged ? (input.entryDate as string) : row.createdAt;
+  const entryDate = dateChanged || !(await isPeriodLocked(row.outletId, txDate)) ? txDate : new Date().toISOString();
+  const shiftId = dateChanged ? input.shiftId ?? null : row.shiftId;
+
   const [funding] = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.id, fundingCashBankAccountId)).limit(1);
   const [receiving] = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.id, receivingCashBankAccountId)).limit(1);
   if (!funding) throw new Error("Akun settlement/sumber modal tidak ditemukan.");
@@ -435,7 +461,7 @@ export async function editPpobTransaction(id: string, input: EditPpobInput, staf
     let journalId: string | null = null;
     if (collectionLines.length > 0) {
       journalId = await postJournal(
-        { outletId: row.outletId, description: `Transaksi ${label} (${category}) — dikoreksi`, sourceType: "ppob", sourceId: row.id, staffUserId, lines: collectionLines },
+        { outletId: row.outletId, entryDate, description: `Transaksi ${label} (${category}) — dikoreksi`, sourceType: "ppob", sourceId: row.id, staffUserId, lines: collectionLines },
         tx
       );
     }
@@ -445,10 +471,10 @@ export async function editPpobTransaction(id: string, input: EditPpobInput, staf
     if (principal !== 0) {
       const settlementLines = await buildPpobSettlementLines(row.outletId, label, principal, funding, tx);
       settlementJournalId = await postJournal(
-        { outletId: row.outletId, description: `Settlement ${label} ke provider — dikoreksi`, sourceType: "ppob", sourceId: row.id, staffUserId, lines: settlementLines },
+        { outletId: row.outletId, entryDate, description: `Settlement ${label} ke provider — dikoreksi`, sourceType: "ppob", sourceId: row.id, staffUserId, lines: settlementLines },
         tx
       );
-      settledAt = new Date().toISOString();
+      settledAt = entryDate;
     }
 
     const [savedRow] = await tx
@@ -456,6 +482,7 @@ export async function editPpobTransaction(id: string, input: EditPpobInput, staf
       .set({
         category, product, serviceRef, providerRef, customerName, nominal, modal, providerFee, feeAdmin, principal, uangMasuk,
         fundingCashBankAccountId, receivingCashBankAccountId, notes,
+        ...(dateChanged ? { createdAt: txDate, shiftId } : {}),
         journalEntryId: journalId, settlementJournalEntryId: settlementJournalId, settlementStatus: "settled", settlementAmount: principal, settledAt,
         status: "success",
       })

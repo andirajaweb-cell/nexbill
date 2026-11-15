@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
 import { resolveDrawerShiftId } from "@/lib/shift/drawer";
+import { isTodayYmd, ymdToEntryIso } from "@/lib/time/entry-date";
 
 export async function GET(req: NextRequest) {
   try {
@@ -52,7 +53,13 @@ export async function POST(req: NextRequest) {
     // /api/other-income and /api/membership-payments) rather than trusted from the client — the
     // page never actually sent one, which meant every PPOB transaction's shiftId silently stayed
     // null and shift close could never account for the cash tarik-tunai/top-up moved through it.
-    const drawerShiftId = await resolveDrawerShiftId(session.outletId, session.sub);
+    //
+    // Tanggal transaksi (`date`, YYYY-MM-DD) boleh mundur untuk mencatat transaksi kemarin yang
+    // lupa diinput — tidak boleh ke depan. Transaksi tanggal lampau TIDAK ditautkan ke shift yang
+    // sedang buka (uangnya tidak lewat laci shift ini), sama seperti Setoran Kas & Pindah Kas.
+    const ymd = typeof body.date === "string" && body.date ? body.date : null;
+    const entryDate = ymdToEntryIso(ymd);
+    const drawerShiftId = isTodayYmd(ymd) ? await resolveDrawerShiftId(session.outletId, session.sub) : null;
     const currentShift = drawerShiftId ? { id: drawerShiftId } : null;
     const result = await postPpobTransaction({
       outletId: session.outletId,
@@ -75,6 +82,7 @@ export async function POST(req: NextRequest) {
       // postPpobTransaction's idempotency doc comment. Optional: a caller that never sends one
       // (e.g. an older client build) simply gets no dedup protection, same as before this feature.
       idempotencyKey: body.idempotencyKey ?? null,
+      entryDate,
     });
     return NextResponse.json(result);
   } catch (err: unknown) {

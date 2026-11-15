@@ -5,6 +5,8 @@ import { describeError } from "@/lib/api/error";
 import { db } from "@/db/client";
 import { ppobTransactions } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isTodayYmd, ymdToEntryIso } from "@/lib/time/entry-date";
+import { resolveDrawerShiftId } from "@/lib/shift/drawer";
 
 /**
  * Edit and hard-delete for PPOB transactions — both restricted to the exact
@@ -25,7 +27,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const [existing] = await db.select().from(ppobTransactions).where(eq(ppobTransactions.id, id)).limit(1);
     if (!existing || existing.outletId !== session.outletId) return NextResponse.json({ error: "Transaksi PPOB tidak ditemukan." }, { status: 404 });
     const body = await req.json();
-    const result = await editPpobTransaction(id, body, session.sub);
+    // Tanggal transaksi hanya lewat `date` (YYYY-MM-DD, divalidasi: tidak boleh masa depan) —
+    // entryDate/shiftId mentah dari klien tidak pernah diteruskan.
+    const { entryDate: _ignoredEntryDate, shiftId: _ignoredShiftId, date, ...fields } = body ?? {};
+    void _ignoredEntryDate;
+    void _ignoredShiftId;
+    const ymd = typeof date === "string" && date ? date : null;
+    const dateInput = ymd
+      ? { entryDate: ymdToEntryIso(ymd), shiftId: isTodayYmd(ymd) ? await resolveDrawerShiftId(session.outletId, session.sub) : null }
+      : {};
+    const result = await editPpobTransaction(id, { ...fields, ...dateInput }, session.sub);
     return NextResponse.json(result);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });
