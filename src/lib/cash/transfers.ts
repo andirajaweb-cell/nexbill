@@ -5,6 +5,8 @@ import { postJournal, voidJournal, lockEntity } from "@/lib/accounting/journal";
 import { isPeriodLocked } from "@/lib/accounting/periods";
 import { logAudit } from "@/lib/audit/log";
 import type { StaffRole } from "@/lib/auth/permissions";
+import { closedShiftIdsOf } from "./deposits";
+import { assertCashEditAllowed, changedCashEditFields, correctionEntryDate, lockedCashEditFields, needsRepost } from "./edit-rules";
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -158,9 +160,12 @@ export async function listCashTransfers(outletId: string, shiftId?: string) {
       .where(and(eq(approvalRequests.type, "cash_transfer"), inArray(approvalRequests.refId, pendingIds), eq(approvalRequests.status, "pending")));
     for (const a of approvals) approvalByTransferId.set(a.refId, { id: a.id });
   }
+  const closedShiftIds = await closedShiftIdsOf(rows.map((r) => r.shiftId));
 
   return rows.map((r) => ({
     ...r,
+    /** Shift tautannya sudah ditutup → jumlah/akun/tanggal tidak bisa diedit (lihat edit-rules). */
+    shiftClosed: !!r.shiftId && closedShiftIds.has(r.shiftId),
     sourceAccountName: accountNameById.get(r.sourceCashBankAccountId) ?? "-",
     destinationAccountName: accountNameById.get(r.destinationCashBankAccountId) ?? "-",
     requestedByName: staffNameById.get(r.requestedByStaffUserId) ?? "-",
@@ -183,5 +188,113 @@ export async function voidCashTransfer(id: string, reason: string, staffUserId?:
     .returning();
 
   await logAudit({ outletId: row.outletId, staffUserId, action: "void_cash_transfer", entityType: "cash_transfer", entityId: id, before: { status: row.status }, after: { status: "void", reason } });
+  return updated;
+}
+
+export interface EditCashTransferInput {
+  amount?: number;
+  sourceCashBankAccountId?: string;
+  destinationCashBankAccountId?: string;
+  notes?: string | null;
+  /** Tanggal baru (ISO, lihat ymdToEntryIso). Kosong = tanggal tetap. */
+  entryDate?: string | null;
+  /** Shift untuk tanggal baru — dipakai hanya bila tanggal benar-benar diganti. */
+  shiftId?: string | null;
+}
+
+/**
+ * Mengoreksi Pindah Kas.
+ *  - Masih "Menunggu Persetujuan": belum ada jurnal — baris (dan alasan di antrean persetujuan)
+ *    cukup diperbarui; penyetuju melihat angka yang sudah dikoreksi.
+ *  - Sudah "Posted": hanya untuk yang berhak menyetujui (`canEditPosted`, dicek di route) — jurnal
+ *    lama dibatalkan (voidJournal) dan jurnal baru diposting, sama seperti koreksi Setoran Kas.
+ *  - Ditolak / Dibatalkan: tidak bisa diedit — ajukan pindah kas baru.
+ */
+export async function editCashTransfer(id: string, input: EditCashTransferInput, staff: { id: string; canEditPosted: boolean }) {
+  const [row] = await db.select().from(cashTransfers).where(eq(cashTransfers.id, id)).limit(1);
+  if (!row) throw new Error("Pindah kas tidak ditemukan.");
+  if (row.status !== "pending_approval" && row.status !== "posted") throw new Error("Pindah kas yang ditolak atau dibatalkan tidak bisa diedit — ajukan pindah kas baru.");
+  if (row.status === "posted" && !staff.canEditPosted) throw new Error("Pindah kas yang sudah disetujui hanya bisa dikoreksi oleh Owner/Manager.");
+
+  const amount = round(input.amount ?? row.amount);
+  if (!(amount > 0)) throw new Error("Jumlah pindah kas harus lebih dari 0.");
+  const sourceId = input.sourceCashBankAccountId ?? row.sourceCashBankAccountId;
+  const destinationId = input.destinationCashBankAccountId ?? row.destinationCashBankAccountId;
+  if (sourceId === destinationId) throw new Error("Akun tujuan tidak boleh sama dengan akun sumber.");
+  const notes = input.notes !== undefined ? (input.notes?.trim() || null) : row.notes;
+  const newDate = input.entryDate || row.createdAt;
+
+  const changed = changedCashEditFields(
+    { amount: row.amount, createdAt: row.createdAt, sourceCashBankAccountId: row.sourceCashBankAccountId, destinationCashBankAccountId: row.destinationCashBankAccountId, notes: row.notes },
+    { amount, createdAt: newDate, sourceCashBankAccountId: sourceId, destinationCashBankAccountId: destinationId, notes }
+  );
+  if (changed.length === 0) return row;
+  // Pindah kas yang masih menunggu belum menggerakkan uang — shift tertutup tidak relevan.
+  const shiftClosed = row.status === "posted" && (await closedShiftIdsOf([row.shiftId])).size > 0;
+  assertCashEditAllowed(changed, lockedCashEditFields("transfer", shiftClosed));
+
+  const [source] = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.id, sourceId)).limit(1);
+  if (!source || source.outletId !== row.outletId) throw new Error("Akun kas sumber tidak ditemukan.");
+  const [destination] = await db.select().from(cashBankAccounts).where(eq(cashBankAccounts.id, destinationId)).limit(1);
+  if (!destination || destination.outletId !== row.outletId) throw new Error("Akun kas tujuan tidak ditemukan.");
+
+  const dateChanged = changed.includes("date");
+  const entryDate = correctionEntryDate({
+    dateChanged,
+    newDate,
+    originalDate: row.createdAt,
+    originalPeriodLocked: row.status === "posted" && !dateChanged && (await isPeriodLocked(row.outletId, row.createdAt)),
+  });
+
+  const updated = await db.transaction(async (tx) => {
+    // Kunci yang sama dengan executeCashTransfer: edit tidak boleh bersilang dengan persetujuan.
+    await lockEntity(tx, `cash_transfer:${id}`);
+    const [fresh] = await tx.select().from(cashTransfers).where(eq(cashTransfers.id, id)).limit(1);
+    if (!fresh || fresh.status !== row.status) throw new Error("Status pindah kas ini baru saja berubah (disetujui/ditolak/dibatalkan) — muat ulang halaman.");
+
+    let journalEntryId = fresh.journalEntryId;
+    if (fresh.status === "posted" && needsRepost(changed)) {
+      if (fresh.journalEntryId) await voidJournal(fresh.journalEntryId, "Dikoreksi (edit pindah kas)", tx);
+      const label = `Pindah Kas: ${source.name} → ${destination.name}`;
+      journalEntryId = await postJournal(
+        {
+          outletId: row.outletId,
+          entryDate,
+          description: `${notes ? `${label} (${notes})` : label} — dikoreksi`,
+          sourceType: "cash_transfer",
+          sourceId: id,
+          staffUserId: staff.id,
+          lines: [
+            { accountId: destination.accountId, debit: amount, credit: 0, description: label },
+            { accountId: source.accountId, debit: 0, credit: amount, description: label },
+          ],
+        },
+        tx
+      );
+    }
+
+    const [saved] = await tx
+      .update(cashTransfers)
+      .set({
+        amount,
+        sourceCashBankAccountId: source.id,
+        destinationCashBankAccountId: destination.id,
+        notes,
+        journalEntryId,
+        ...(dateChanged ? { createdAt: newDate, shiftId: input.shiftId ?? null } : {}),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(cashTransfers.id, id))
+      .returning();
+    if (fresh.status === "pending_approval" && changed.includes("notes")) {
+      await tx
+        .update(approvalRequests)
+        .set({ reason: notes })
+        .where(and(eq(approvalRequests.type, "cash_transfer"), eq(approvalRequests.refId, id), eq(approvalRequests.status, "pending")));
+    }
+    return saved;
+  });
+
+  await logAudit({ outletId: row.outletId, staffUserId: staff.id, action: "edit_cash_transfer", entityType: "cash_transfer", entityId: id, before: row, after: { ...updated, changed } });
   return updated;
 }

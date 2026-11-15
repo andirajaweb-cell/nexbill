@@ -17,6 +17,7 @@ import { useOutletFormat } from "@/lib/format/client";
 import "@/lib/i18n/dict-shift";
 import "@/lib/i18n/dict-cash-date";
 import "@/lib/i18n/dict-cash-move";
+import "@/lib/i18n/dict-cash-edit";
 import { outletDateYmd } from "@/lib/time/outlet-time";
 import { filterShifts, summarizeShifts, shiftYears, defaultFilterValue, type ShiftPeriodMode, type ShiftHistoryFilter } from "@/lib/shift/history-filter";
 
@@ -1054,6 +1055,7 @@ function CashDepositTab({
   const [notes, setNotes] = useState("");
   const [date, setDate] = useState(() => outletDateYmd(new Date()));
   const [submitting, setSubmitting] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
 
   const load = () => {
     if (!outletId) return;
@@ -1213,7 +1215,10 @@ function CashDepositTab({
                 <td><Badge status={d.status === "posted" ? "success" : "failed"}>{d.status === "posted" ? t("cashDeposit.statusPosted", "Posted") : t("cashDeposit.statusVoid", "Dibatalkan")}</Badge></td>
                 <td>
                   {canVoid && d.status === "posted" && (
-                    <Button variant="ghost" className="text-xs text-red-400" onClick={() => voidDeposit(d.id)}>{t("cashDeposit.voidBtn", "Batalkan")}</Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" className="text-xs text-emerald-400" onClick={() => setEditing(d)}>{t("cashEdit.editBtn", "Edit")}</Button>
+                      <Button variant="ghost" className="text-xs text-red-400" onClick={() => voidDeposit(d.id)}>{t("cashDeposit.voidBtn", "Batalkan")}</Button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -1224,6 +1229,17 @@ function CashDepositTab({
           </tbody>
         </table>
       </Card>
+      {editing && (
+        <CashEditModal
+          kind="deposit"
+          row={editing}
+          cashAccounts={cashAccounts}
+          receivers={receivers}
+          rupiah={rupiah}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); }}
+        />
+      )}
     </div>
   );
 }
@@ -1260,6 +1276,10 @@ function CashTransferTab({
   const [date, setDate] = useState(() => outletDateYmd(new Date()));
   const [submitting, setSubmitting] = useState(false);
   const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<any>(null);
+  // Menunggu persetujuan: pengaju sendiri atau penyetuju; sudah diposting: penyetuju saja (sama dengan /api/cash-transfers/[id]).
+  const canEditTransfer = (r: any) =>
+    (r.status === "posted" && canReview) || (r.status === "pending_approval" && (canReview || r.requestedByStaffUserId === user?.id));
 
   const load = () => {
     if (!outletId) return;
@@ -1410,9 +1430,14 @@ function CashTransferTab({
                   )}
                 </td>
                 <td>
-                  {canVoid && r.status === "posted" && (
-                    <Button variant="ghost" className="text-xs text-red-400" onClick={() => voidTransfer(r.id)}>{t("cashDeposit.voidBtn", "Batalkan")}</Button>
-                  )}
+                  <div className="flex gap-1">
+                    {canEditTransfer(r) && (
+                      <Button variant="ghost" className="text-xs text-emerald-400" onClick={() => setEditing(r)}>{t("cashEdit.editBtn", "Edit")}</Button>
+                    )}
+                    {canVoid && r.status === "posted" && (
+                      <Button variant="ghost" className="text-xs text-red-400" onClick={() => voidTransfer(r.id)}>{t("cashDeposit.voidBtn", "Batalkan")}</Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -1422,6 +1447,17 @@ function CashTransferTab({
           </tbody>
         </table>
       </Card>
+      {editing && (
+        <CashEditModal
+          kind="transfer"
+          row={editing}
+          cashAccounts={cashAccounts}
+          receivers={[]}
+          rupiah={rupiah}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); }}
+        />
+      )}
     </div>
   );
 }
@@ -1452,6 +1488,177 @@ function CashEntryDateField({ value, onChange }: { value: string; onChange: (v: 
           )}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Koreksi Setoran Kas / Pindah Kas (2026-11-15). Server membatalkan jurnal lama dan memposting
+ * jurnal baru (lib/cash/deposits.ts editCashDeposit, lib/cash/transfers.ts editCashTransfer);
+ * Pindah Kas yang masih menunggu persetujuan cukup diperbarui. Bila shift tautannya sudah
+ * ditutup, kolom yang menyentuh laci (jumlah, akun sumber/tujuan, tanggal) dikunci.
+ */
+function CashEditModal({
+  kind,
+  row,
+  cashAccounts,
+  receivers,
+  rupiah,
+  onClose,
+  onSaved,
+}: {
+  kind: "deposit" | "transfer";
+  row: any;
+  cashAccounts: { id: string; name: string; type: string; isDefault: boolean; balance: number }[];
+  receivers: { id: string; name: string; role: string }[];
+  rupiah: (n: number) => string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t } = useDashboardLang();
+  const originalDate = outletDateYmd(new Date(row.createdAt));
+  const [amount, setAmount] = useState<number>(Number(row.amount) || 0);
+  const [date, setDate] = useState(originalDate);
+  const [purposeType, setPurposeType] = useState<string>(row.purposeType ?? "kas_besar");
+  const [sourceId, setSourceId] = useState<string>(row.sourceCashBankAccountId ?? "");
+  const [destinationId, setDestinationId] = useState<string>(row.destinationCashBankAccountId ?? "");
+  const [receivedBy, setReceivedBy] = useState<string>(row.receivedByStaffUserId ?? "");
+  const [notes, setNotes] = useState<string>(row.notes ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const isDeposit = kind === "deposit";
+  const isPending = !isDeposit && row.status === "pending_approval";
+  // Pindah kas yang masih menunggu belum menggerakkan uang — tidak ada yang perlu dikunci.
+  const shiftClosed = !!row.shiftClosed && !isPending;
+  const lockAmount = shiftClosed;
+  const lockSource = shiftClosed;
+  const lockDestination = shiftClosed && !isDeposit;
+  const lockDate = shiftClosed;
+  const isInternalTransfer = !isDeposit || INTERNAL_TRANSFER_PURPOSES.has(purposeType);
+  const destinationOptions = cashAccounts.filter((a) => a.id !== sourceId);
+  const roleLabelMap: Record<string, string> = { owner: "Owner", superuser: "Superuser", manager: "Manager", supervisor: "Supervisor", accountant: "Accounting" };
+  const inputCls = "w-full mt-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm disabled:opacity-60";
+
+  const save = async () => {
+    if (!(amount > 0)) return showAlert(isDeposit ? t("cashDeposit.errAmount", "Jumlah setoran harus lebih dari 0.") : t("cashTransfer.errAmount", "Jumlah pindah kas harus lebih dari 0."));
+    if (!sourceId) return showAlert(t("cashDeposit.errSource", "Pilih akun kas sumber."));
+    if (isInternalTransfer && !destinationId) return showAlert(t("cashDeposit.errDestination", "Pilih akun kas tujuan."));
+    if (isDeposit && !receivedBy) return showAlert(t("cashDeposit.errReceiver", "Pilih staf penerima (Owner/Manager/Supervisor/Accounting)."));
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        amount,
+        sourceCashBankAccountId: sourceId,
+        destinationCashBankAccountId: isInternalTransfer ? destinationId : null,
+        notes: notes.trim() || null,
+        ...(date !== originalDate ? { date } : {}),
+        ...(isDeposit ? { purposeType, receivedByStaffUserId: receivedBy } : {}),
+      };
+      const res = await fetch(`/api/${isDeposit ? "cash-deposits" : "cash-transfers"}/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? t("cashEdit.failed", "Koreksi gagal disimpan."));
+      onSaved();
+      showAlert(t("cashEdit.saved", "Koreksi tersimpan."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="font-medium">{isDeposit ? t("cashEdit.titleDeposit", "Edit Setoran Kas") : t("cashEdit.titleTransfer", "Edit Pindah Kas")}</h2>
+          <button onClick={onClose} className="text-sm text-neutral-500 hover:text-neutral-200">{t("cashEdit.close", "Tutup")}</button>
+        </div>
+        <p className="text-xs text-amber-400">
+          {isPending
+            ? t("cashEdit.pendingNote", "Belum tercatat ke jurnal — penyetuju akan melihat angka yang sudah dikoreksi.")
+            : t("cashEdit.postedNote", "Jurnal lama dibatalkan otomatis dan diganti jurnal baru sesuai koreksi. Riwayatnya tetap tersimpan di audit log.")}
+        </p>
+        {shiftClosed && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            {isDeposit
+              ? t("cashEdit.shiftClosedDeposit", "Shift transaksi ini sudah ditutup — jumlah, akun sumber, dan tanggal dikunci karena hitungan kas shift itu sudah final. Untuk mengubahnya, Batalkan lalu catat ulang.")
+              : t("cashEdit.shiftClosedTransfer", "Shift transaksi ini sudah ditutup — jumlah, akun, dan tanggal dikunci karena hitungan kas shift itu sudah final. Untuk mengubahnya, Batalkan lalu ajukan ulang.")}
+          </p>
+        )}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-neutral-500">{t("cashDeposit.amountLabel", "Jumlah")}</label>
+            <input type="number" className={inputCls} value={amount || ""} disabled={lockAmount} onChange={(e) => setAmount(Number(e.target.value))} />
+          </div>
+          {lockDate ? (
+            <div>
+              <label className="text-xs text-neutral-500">{t("cashDate.label", "Tanggal")}</label>
+              <input type="date" className={inputCls} value={date} disabled readOnly />
+            </div>
+          ) : (
+            <CashEntryDateField value={date} onChange={setDate} />
+          )}
+          {isDeposit && (
+            <div>
+              <label className="text-xs text-neutral-500">{t("cashDeposit.purposeLabel", "Peruntukan")}</label>
+              <select className={inputCls} value={purposeType} onChange={(e) => { setPurposeType(e.target.value); if (!INTERNAL_TRANSFER_PURPOSES.has(e.target.value)) setDestinationId(""); }}>
+                {Object.entries(PURPOSE_LABEL_KEYS).map(([key, [labelKey, fallback]]) => (
+                  <option key={key} value={key}>{t(labelKey, fallback)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="text-xs text-neutral-500">{t("cashDeposit.sourceLabel", "Dari Akun Kas")}</label>
+            {lockSource ? (
+              <input className={inputCls} value={row.sourceAccountName ?? ""} disabled readOnly />
+            ) : (
+              <SearchableSelect
+                className="w-full mt-1"
+                value={sourceId}
+                onChange={(v) => { setSourceId(v); if (v === destinationId) setDestinationId(""); }}
+                placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
+                options={cashAccounts.map((a) => ({ value: a.id, label: accountLabel(a, rupiah, t) }))}
+              />
+            )}
+          </div>
+          {isInternalTransfer && (
+            <div>
+              <label className="text-xs text-neutral-500">{t("cashDeposit.destinationLabel", "Ke Akun Kas Tujuan")}</label>
+              {lockDestination ? (
+                <input className={inputCls} value={row.destinationAccountName ?? ""} disabled readOnly />
+              ) : (
+                <SearchableSelect
+                  className="w-full mt-1"
+                  value={destinationId}
+                  onChange={(v) => setDestinationId(v)}
+                  placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
+                  options={destinationOptions.map((a) => ({ value: a.id, label: accountLabel(a, rupiah, t) }))}
+                />
+              )}
+            </div>
+          )}
+          {isDeposit && (
+            <div className="sm:col-span-2">
+              <label className="text-xs text-neutral-500">{t("cashDeposit.receiverLabel", "Diterima/Diambil Oleh (wajib)")}</label>
+              <SearchableSelect
+                className="w-full mt-1"
+                value={receivedBy}
+                onChange={(v) => setReceivedBy(v)}
+                placeholder={t("cashDeposit.selectPlaceholder", "Pilih")}
+                options={receivers.map((r) => ({ value: r.id, label: `${r.name} (${roleLabelMap[r.role] ?? r.role})` }))}
+              />
+            </div>
+          )}
+          <div className="sm:col-span-2">
+            <label className="text-xs text-neutral-500">{t("cashDeposit.notesLabel", "Catatan (opsional)")}</label>
+            <textarea className={inputCls} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <Button onClick={save} disabled={saving} className="w-full">{saving ? t("cashDeposit.saving", "Menyimpan...") : t("cashEdit.submit", "Simpan Koreksi")}</Button>
+      </div>
     </div>
   );
 }
