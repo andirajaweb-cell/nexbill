@@ -373,8 +373,10 @@ function TransactionListTab({ outletId }: { outletId: string }) {
       </Card>
 
       {s && (
-        <>
-        <p className="text-xs text-neutral-600 -mb-1">{t("transactions.summaryScopeNote", "Kartu ringkasan di bawah dihitung dari dataset dan periode transaksi yang sama persis dengan tabel di bawahnya (berdasarkan tanggal transaksi dibuat) — bukan dari laporan Accounting/Laba Rugi yang cakupan tanggalnya berbeda (tanggal pengakuan pendapatan). Gross Sales = total seluruh transaksi valid pada tabel, Net Sales = Gross Sales dikurangi Refund. PPOB Revenue dihitung terpisah dari modul PPOB (belum tercatat sebagai baris di tabel ini) dan tidak termasuk dalam Gross/Net Sales. Laporan laba rugi di Accounting tetap terpisah dan tidak berubah.")}</p>
+        // Catatan & kartu dalam satu blok berjarak tetap — dulu catatan memakai margin negatif
+        // (-mb-1) sehingga baris terakhirnya tertimpa deretan kartu di bawahnya.
+        <div className="space-y-3">
+        <p className="max-w-5xl text-[11px] leading-relaxed text-neutral-500">{t("transactions.summaryScopeNote", "Kartu ringkasan di bawah dihitung dari dataset dan periode transaksi yang sama persis dengan tabel di bawahnya (berdasarkan tanggal transaksi dibuat) — bukan dari laporan Accounting/Laba Rugi yang cakupan tanggalnya berbeda (tanggal pengakuan pendapatan). Gross Sales = total seluruh transaksi valid pada tabel, Net Sales = Gross Sales dikurangi Refund. PPOB Revenue dihitung terpisah dari modul PPOB (belum tercatat sebagai baris di tabel ini) dan tidak termasuk dalam Gross/Net Sales. Laporan laba rugi di Accounting tetap terpisah dan tidak berubah.")}</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           {[
             [t("transactions.stat.totalTransactions", "Total Transaksi"), s.totalTransactions, false],
@@ -401,7 +403,7 @@ function TransactionListTab({ outletId }: { outletId: string }) {
             </Card>
           ))}
         </div>
-        </>
+        </div>
       )}
 
       <Card>
