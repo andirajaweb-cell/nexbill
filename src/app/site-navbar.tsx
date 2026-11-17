@@ -17,6 +17,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LANGUAGES, useLanguage } from "./landing-i18n";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 // Pulled out to a real top-level component (was previously defined INSIDE SiteNavbar's own render
 // body) — that's a classic React footgun: a function declared inside another component's render
@@ -96,7 +97,7 @@ export function SiteNavbar() {
           <div className="nav-pill-links">
             {sectionLinks.map((l) => (<a key={l.href} href={l.href}>{l.label}</a>))}
           </div>
-          <div className="logo">NEXBILL</div>
+          <Link href="/" className="logo" aria-label="NEXBILL"><NexbillLogo height={24} alt="NEXBILL" /></Link>
           <div className="nav-pill-links right">
             <Link href="/about">{t.nav.about}</Link>
             <LangDropdown align="right" />
@@ -114,7 +115,7 @@ export function SiteNavbar() {
           <button className="nav-toggle" onClick={() => setNavOpen((v) => !v)} aria-label="Menu">
             {navOpen ? "✕" : "☰"}
           </button>
-          <div className="logo">NEXBILL</div>
+          <Link href="/" className="logo" aria-label="NEXBILL"><NexbillLogo height={24} alt="NEXBILL" /></Link>
           <div style={{ justifySelf: "end" }}>
             <LangDropdown align="right" />
           </div>

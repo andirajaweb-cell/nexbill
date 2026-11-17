@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
 import { DEFAULT_PRICING } from "@/lib/subscription/pricing";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 // Shared shell for NexBill's SEO pillar pages (docs/SEO-ARCHITECTURE.md §2-3). Deliberately NOT
 // built on the homepage's SiteNavbar/SiteFooter/LanguageProvider system: those default to "id" on
@@ -103,8 +104,8 @@ export function PillarNav({ lang }: { lang: "id" | "en" }) {
   return (
     <header className="border-b border-white/5">
       <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="font-bold tracking-wide text-white">
-          NEX<span className="text-cyan-400">BILL</span>
+        <Link href="/" aria-label="NEXBILL" className="inline-flex items-center">
+          <NexbillLogo height={20} />
         </Link>
         <nav className="flex items-center gap-5 text-sm text-neutral-400">
           <Link href="/#harga" className="hover:text-white transition-colors hidden sm:inline">{t.pricing}</Link>

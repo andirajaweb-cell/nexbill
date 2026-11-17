@@ -6,6 +6,7 @@ import { computeUnitView, formatDuration, type TvUnitView } from "@/lib/tv/view"
 import { normalizePairingCode } from "@/lib/tv/pairing";
 import { tvTopicBrowser, TV_PUSH_EVENT } from "@/lib/tv/push-topic";
 import { consoleLabel } from "@/lib/tv/console-line";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 /**
  * NEXBILL TV — layar kiosk untuk TV Android di bilik rental.
@@ -754,7 +755,7 @@ function Backdrop({ accent }: { accent: string }) {
 function Wordmark({ small }: { small?: boolean }) {
   return (
     <div className={`flex items-center gap-2 font-black tracking-[0.35em] ${small ? "text-sm" : "text-lg"}`}>
-      <span className="bg-gradient-to-r from-cyan-200 via-white to-violet-200 bg-clip-text text-transparent">NEXBILL</span>
+      <NexbillLogo height={small ? 14 : 20} />
       <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[0.7em] tracking-[0.2em] text-cyan-200">TV</span>
     </div>
   );

@@ -6,6 +6,7 @@
 // before the language switcher) since it needs useLanguage() to translate its labels.
 import Link from "next/link";
 import { useLanguage } from "./landing-i18n";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 export function SiteFooter() {
   const { t, lang } = useLanguage();
@@ -15,7 +16,7 @@ export function SiteFooter() {
       <div className="wrap">
         <div>
           <div className="logo" style={{ marginBottom: "16px" }}>
-            NEXBILL
+            <NexbillLogo height={30} />
           </div>
           <div style={{ color: "var(--text-dim)", fontSize: "13.5px", maxWidth: "350px", lineHeight: "1.6" }}>
             <p style={{ marginBottom: "8px" }}><strong>{t.footer.alamatLabel}</strong><br /> Komp. Bumi Adipura Jl. Tulip V No. 40 RT.02/RW 04 Kel. Rancabolang Kec. Gedebage Kota Bandung, Jawa Barat, Indonesia 40295</p>

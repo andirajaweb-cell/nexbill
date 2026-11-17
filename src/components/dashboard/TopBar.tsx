@@ -6,12 +6,13 @@ import { useAuth } from "@/lib/auth/client";
 import { roleLabel, type StaffRole } from "@/lib/auth/permissions";
 import { Badge } from "@/components/ui/Badge";
 import { useApi } from "@/lib/api/use-api";
-import { LogOut, Bell, ShieldCheck, Building2, Check, ChevronDown, Menu, Gamepad2 } from "lucide-react";
+import { LogOut, Bell, ShieldCheck, Building2, Check, ChevronDown, Menu } from "lucide-react";
 import type { NotificationItem } from "@/lib/notifications";
 import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { LanguageSwitcher } from "@/components/dashboard/LanguageSwitcher";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { useMobileNav } from "@/components/dashboard/MobileNav";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 /**
  * Role -> Badge status mapping. Superuser (the sole top-level role) is
@@ -147,8 +148,7 @@ export function TopBar() {
           <Menu size={20} />
         </button>
         <Link href="/dashboard" className="lg:hidden flex items-center gap-1.5 min-w-0">
-          <Gamepad2 size={16} className="text-cyan-300 shrink-0" />
-          <span className="gm-display gm-gradient-title text-sm font-extrabold truncate">NEXBILL</span>
+          <NexbillLogo height={16} />
         </Link>
         <span className="relative hidden sm:flex h-2 w-2 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />

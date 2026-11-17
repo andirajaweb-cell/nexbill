@@ -13,6 +13,7 @@ import {
   starterMonthlyCost,
   type LeakageInput,
 } from "@/lib/leakage/calc";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 /**
  * Kalkulator kebocoran untuk demo penjualan (nexbill.id/kalkulator-kebocoran): pemilik outlet
@@ -402,7 +403,7 @@ function LeakageCalculator() {
       <div className="mx-auto max-w-6xl px-4 py-6 md:py-10">
         <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div className="max-w-2xl">
-            <Link href="/" className="text-sm font-bold tracking-wide text-cyan-300">NEXBILL</Link>
+            <Link href="/" className="inline-block" aria-label="NEXBILL"><NexbillLogo height={20} /></Link>
             <h1 className="mt-1 text-2xl font-bold md:text-4xl">{t.title}</h1>
             <p className="mt-2 text-sm text-slate-400 md:text-base">{t.subtitle}</p>
           </div>

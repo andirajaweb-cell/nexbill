@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 /**
  * Halaman publik "Hapus Akun" — URL ini diisi di Play Console (Keamanan data → URL penghapusan
@@ -25,6 +26,7 @@ export default function HapusAkunPage() {
     <div className="min-h-screen bg-[#05070f] px-4 py-10">
       <div className="max-w-3xl mx-auto space-y-8">
         <div>
+          <Link href="/" className="mb-4 inline-block" aria-label="NEXBILL"><NexbillLogo height={22} /></Link>
           <Breadcrumb items={[{ label: "Beranda", href: "/" }, { label: "Hapus Akun" }]} />
           <h1 className="gm-display text-2xl font-bold gm-gradient-title mt-2">Hapus Akun NEXBILL</h1>
           <p className="text-sm text-neutral-500 mt-1">

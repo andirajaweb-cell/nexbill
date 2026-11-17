@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { computeUnitView, formatDuration, type TvUnitView } from "@/lib/tv/view";
 import { currencyForCountry, formatMoney } from "@/lib/currency/format";
 import { CALL_REASONS, EXTEND_OPTIONS, type CallReason } from "@/lib/unit-qr/rules";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 /**
  * Halaman HP pelanggan dari stiker QR di bilik: sisa waktu live, perkiraan tagihan, pesan F&B,
@@ -291,7 +292,9 @@ export default function UnitQrPage({ params }: { params: Promise<{ token: string
         {state.logoUrl ? (
           <img src={state.logoUrl} alt="" className="h-10 w-10 rounded-lg object-contain bg-white/5" />
         ) : (
-          <div className="h-10 w-10 rounded-lg bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-300 font-bold">N</div>
+          <div className="h-10 w-10 rounded-lg bg-[#050810] border border-white/10 flex items-center justify-center">
+            <NexbillLogo variant="mark" height={20} alt="" />
+          </div>
         )}
         <div className="min-w-0">
           <div className="text-sm text-neutral-400 truncate">{state.outletName}</div>

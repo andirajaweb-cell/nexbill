@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 export const metadata = {
   title: "Kebijakan Refund & Pembatalan — NEXBILL",
@@ -20,6 +21,7 @@ export default function RefundPolicyPage() {
     <div className="min-h-screen bg-[#05070f] px-4 py-10">
       <div className="max-w-3xl mx-auto space-y-8">
         <div>
+          <Link href="/" className="mb-4 inline-block" aria-label="NEXBILL"><NexbillLogo height={22} /></Link>
           <Breadcrumb items={[{ label: "Beranda", href: "/" }, { label: "Kebijakan Refund & Pembatalan" }]} />
           <Link href="/dashboard/billing" className="text-xs text-cyan-400 hover:underline mt-2 inline-block">
             ← Kembali ke Halaman Langganan

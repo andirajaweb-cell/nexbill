@@ -33,6 +33,7 @@
 // solid #050810 background (see landing.css), opaque enough to fully hide whatever's rendering
 // underneath while GSAP/Lenis/ScrollTrigger and everything else in page.tsx's own effect spins up.
 import { useEffect, useState } from "react";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 const MIN_VISIBLE_MS = 3000; // "agak lama 3 detik" — long enough to read as a deliberate beat
 const EXIT_MS = 650;
@@ -110,7 +111,7 @@ export function LoadingScreen() {
         </svg>
       </div>
 
-      <div className="nb-loader-wordmark">NEXBILL</div>
+      <div className="nb-loader-wordmark"><NexbillLogo height={30} /></div>
       <div className="nb-loader-tagline">Menyiapkan sistem billing rental PS Anda</div>
 
       <div className="nb-loader-bar-track">

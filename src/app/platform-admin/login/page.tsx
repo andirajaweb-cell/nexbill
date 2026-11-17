@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 /**
  * Login for NEXBILL's own platform control panel — deliberately a separate page, separate
@@ -44,7 +45,8 @@ export default function PlatformAdminLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#05060d] px-4">
       <Card className="w-full max-w-sm space-y-4 border-amber-500/20">
         <div>
-          <div className="gm-display text-lg font-bold text-amber-400">NEXBILL Platform Control</div>
+          <NexbillLogo height={22} className="block" />
+          <div className="mt-2 gm-display text-sm font-bold text-amber-400">Platform Control</div>
           <p className="text-sm text-neutral-500">Khusus akun platform admin (Digitrajasa) — bukan login outlet/merchant.</p>
         </div>
         <form onSubmit={submit} className="space-y-3">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 /**
  * Kebijakan Privasi NEXBILL — wajib untuk Google Play (URL publik) dan UU No. 27 Tahun 2022
@@ -27,6 +28,7 @@ export default function PrivacyPolicyPage() {
     <div className="min-h-screen bg-[#05070f] px-4 py-10">
       <div className="max-w-3xl mx-auto space-y-8">
         <div>
+          <Link href="/" className="mb-4 inline-block" aria-label="NEXBILL"><NexbillLogo height={22} /></Link>
           <Breadcrumb items={[{ label: "Beranda", href: "/" }, { label: "Kebijakan Privasi" }]} />
           <Link href="/" className="text-xs text-cyan-400 hover:underline mt-2 inline-block">
             ← Kembali ke Beranda

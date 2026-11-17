@@ -47,6 +47,7 @@ import { useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { useMobileNav } from "@/components/dashboard/MobileNav";
 import { featureForDashboardPath, type PlanFeature } from "@/lib/subscription/pricing";
 import "@/lib/i18n/dict-plan";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 // Ikon per menu. Susunan, kelompok, dan aturan siapa melihat menu apa ada di lib/nav/menu.ts.
 const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
@@ -166,12 +167,9 @@ export function Sidebar() {
 
   const brand = (
     <div className="flex items-center gap-2.5 min-w-0">
-      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-400/30 shadow-[0_0_14px_rgba(34,211,238,0.35)]">
-        <Gamepad2 size={18} className="text-cyan-300" />
-      </div>
       <div className="min-w-0">
-        <div className="gm-display gm-gradient-title text-base font-extrabold leading-tight truncate">NEXBILL</div>
-        <div className="text-[9px] uppercase tracking-wider text-neutral-500 truncate">{t("sidebar.tagline")}</div>
+        <NexbillLogo height={22} className="block" />
+        <div className="mt-1.5 text-[9px] uppercase tracking-wider text-neutral-500 truncate">{t("sidebar.tagline")}</div>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, Menu, ShieldCheck } from "lucide-react";
 import { showAlert } from "@/lib/ui/dialog";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 export function PlatformAdminTopBar({ name, onMenu }: { name: string; onMenu?: () => void }) {
   const router = useRouter();
@@ -51,7 +52,7 @@ export function PlatformAdminTopBar({ name, onMenu }: { name: string; onMenu?: (
           </button>
         )}
         {/* Merek hanya tampil di layar kecil (di desktop sudah ada di sidebar). */}
-        <span className="lg:hidden gm-display text-sm font-bold text-amber-400">NEXBILL</span>
+        <NexbillLogo height={15} className="lg:hidden" />
         <span className="relative flex h-2 w-2 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />

@@ -32,6 +32,7 @@ import {
   X,
 } from "lucide-react";
 import { PlatformAdminTopBar } from "./PlatformAdminTopBar";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 interface NavItem {
   href: string;
@@ -99,10 +100,10 @@ function aktif(pathname: string, href: string): boolean {
 
 function Brand({ ciut = false }: { ciut?: boolean }) {
   return ciut ? (
-    <div className="gm-display text-base font-bold text-amber-400 text-center">N</div>
+    <div className="flex justify-center"><NexbillLogo variant="mark" height={22} /></div>
   ) : (
     <div className="min-w-0">
-      <div className="gm-display text-sm font-bold text-amber-400">NEXBILL</div>
+      <NexbillLogo height={18} className="block" />
       <div className="text-[10px] uppercase tracking-widest text-neutral-500">Platform Control</div>
     </div>
   );

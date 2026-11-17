@@ -49,6 +49,7 @@ import { getLastOutletId } from "@/lib/offline/store";
 import { PageGuide } from "@/components/dashboard/PageGuide";
 import { hasAnyPermission, hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { latestBulkPauseGroup } from "@/lib/rental/bulk-pause";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 // recharts moved to its own lazy-loaded chunk — see RentalActivityChart.tsx's doc comment.
 const RentalActivityChart = dynamic(() => import("@/components/dashboard/RentalActivityChart"), {
@@ -1181,7 +1182,7 @@ function OnlineRentalPage() {
           <h1 className="gm-display text-2xl sm:text-3xl font-bold leading-tight">
             <span className="text-neutral-200">{t("rental.pageTitle", "PUSAT KONTROL BILLING RENTAL")}</span>
             <br />
-            <span className="gm-gradient-title">NEXBILL</span>
+            <NexbillLogo height={26} className="mt-2" />
           </h1>
           <p className="text-sm text-neutral-500 mt-1">
             {t(

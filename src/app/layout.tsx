@@ -163,7 +163,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     "@type": "Organization",
     "name": "NEXBILL",
     "url": SITE_URL,
-    "logo": `${SITE_URL}/og-image.jpg`,
+    "logo": `${SITE_URL}/brand/nexbill-logo-square.png`,
     "areaServed": ["Indonesia", "Southeast Asia"],
     "sameAs": [
       "https://digitrajasa.web.id",

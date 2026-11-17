@@ -29,6 +29,7 @@
   header.hero{background:var(--dark);color:#e8ecf4;padding:52px 0 42px;position:relative;overflow:hidden}
   header.hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;border-radius:50%;background:rgba(34,211,238,.14)}
   .brand{font-weight:800;letter-spacing:.06em;color:#22d3ee;font-size:15px}
+  .brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.brand img{height:22px;width:auto;display:block}.brand .logo-b{display:none}
   .hero h1{font-size:40px;line-height:1.15;margin:10px 0 12px;max-width:760px}
   .hero p.lead{font-size:18px;color:#b6bfd3;max-width:720px;margin:0 0 22px}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -95,6 +96,7 @@
   .note{background:var(--tint);border-radius:12px;padding:14px 16px;color:var(--muted);font-size:13px}
 
   @media print{
+    .brand .logo-w{display:none}.brand .logo-b{display:block}
     .langbar,.toolbar,.cta{display:none!important}
     header.hero{background:#fff;color:var(--ink);padding:10px 0}
     header.hero::after{display:none}
@@ -125,7 +127,7 @@
 <article data-lang="id">
 <header class="hero">
   <div class="wrap">
-    <div class="brand">NEXBILL · KATALOG FITUR</div>
+    <div class="brand"><img class="logo-w" src="/brand/nexbill-wordmark-white.png" alt="NEXBILL" width="100" height="22"><img class="logo-b" src="/brand/nexbill-wordmark-black.png" alt="" width="100" height="22"><span>· KATALOG FITUR</span></div>
     <h1>Semua yang dibutuhkan bisnis rental PlayStation, dalam satu aplikasi.</h1>
     <p class="lead">Dari argo sewa, booking online, kasir &amp; F&amp;B, TV yang menyala otomatis, sampai laporan keuangan — tanpa buku catatan, tanpa hitung manual, tanpa khawatir uang bocor.</p>
     <div class="chips"><span class="chip">Bisa di HP, tablet &amp; PC</span><span class="chip">Pantau dari mana saja</span><span class="chip">Multi-cabang</span><span class="chip">6 bahasa</span><span class="chip">Pembukuan otomatis</span></div>
@@ -434,7 +436,7 @@
 <article data-lang="en" hidden>
 <header class="hero">
   <div class="wrap">
-    <div class="brand">NEXBILL · FEATURE CATALOG</div>
+    <div class="brand"><img class="logo-w" src="/brand/nexbill-wordmark-white.png" alt="NEXBILL" width="100" height="22"><img class="logo-b" src="/brand/nexbill-wordmark-black.png" alt="" width="100" height="22"><span>· FEATURE CATALOG</span></div>
     <h1>Everything a PlayStation rental business needs, in one app.</h1>
     <p class="lead">From the rental timer, online booking, POS &amp; F&amp;B, and TVs that switch on automatically, all the way to financial reports — no notebooks, no manual math, no worrying about leaking revenue.</p>
     <div class="chips"><span class="chip">Works on phone, tablet &amp; PC</span><span class="chip">Monitor from anywhere</span><span class="chip">Multi-branch</span><span class="chip">6 languages</span><span class="chip">Automatic bookkeeping</span></div>
@@ -743,7 +745,7 @@
 <article data-lang="ms" hidden>
 <header class="hero">
   <div class="wrap">
-    <div class="brand">NEXBILL · KATALOG CIRI</div>
+    <div class="brand"><img class="logo-w" src="/brand/nexbill-wordmark-white.png" alt="NEXBILL" width="100" height="22"><img class="logo-b" src="/brand/nexbill-wordmark-black.png" alt="" width="100" height="22"><span>· KATALOG CIRI</span></div>
     <h1>Semua yang diperlukan perniagaan sewa PlayStation, dalam satu aplikasi.</h1>
     <p class="lead">Daripada pemasa sewa, tempahan atas talian, kaunter jualan &amp; F&amp;B, TV yang menyala secara automatik, sehingga laporan kewangan — tanpa buku catatan, tanpa kira manual, tanpa risau duit bocor.</p>
     <div class="chips"><span class="chip">Boleh di telefon, tablet &amp; PC</span><span class="chip">Pantau dari mana-mana</span><span class="chip">Pelbagai cawangan</span><span class="chip">6 bahasa</span><span class="chip">Perakaunan automatik</span></div>
@@ -1052,7 +1054,7 @@
 <article data-lang="th" hidden>
 <header class="hero">
   <div class="wrap">
-    <div class="brand">NEXBILL · แคตตาล็อกฟีเจอร์</div>
+    <div class="brand"><img class="logo-w" src="/brand/nexbill-wordmark-white.png" alt="NEXBILL" width="100" height="22"><img class="logo-b" src="/brand/nexbill-wordmark-black.png" alt="" width="100" height="22"><span>· แคตตาล็อกฟีเจอร์</span></div>
     <h1>ทุกอย่างที่ธุรกิจร้านเช่า PlayStation ต้องการ ในแอปเดียว</h1>
     <p class="lead">ตั้งแต่ตัวจับเวลาเช่า การจองออนไลน์ แคชเชียร์และ F&amp;B ทีวีที่เปิดเองอัตโนมัติ ไปจนถึงรายงานการเงิน — ไม่ต้องจดสมุด ไม่ต้องคิดเลขเอง ไม่ต้องกังวลเงินรั่ว</p>
     <div class="chips"><span class="chip">ใช้ได้บนมือถือ แท็บเล็ต และ PC</span><span class="chip">ดูได้จากทุกที่</span><span class="chip">หลายสาขา</span><span class="chip">6 ภาษา</span><span class="chip">บัญชีอัตโนมัติ</span></div>
@@ -1361,7 +1363,7 @@
 <article data-lang="fil" hidden>
 <header class="hero">
   <div class="wrap">
-    <div class="brand">NEXBILL · KATALOGO NG MGA FEATURE</div>
+    <div class="brand"><img class="logo-w" src="/brand/nexbill-wordmark-white.png" alt="NEXBILL" width="100" height="22"><img class="logo-b" src="/brand/nexbill-wordmark-black.png" alt="" width="100" height="22"><span>· KATALOGO NG MGA FEATURE</span></div>
     <h1>Lahat ng kailangan ng negosyong paupahan ng PlayStation, sa iisang app.</h1>
     <p class="lead">Mula sa timer ng renta, online booking, kahera at F&amp;B, TV na kusang bumubukas, hanggang sa mga ulat pinansyal — walang notebook, walang manu-manong kuwenta, walang alalang may nawawalang pera.</p>
     <div class="chips"><span class="chip">Gumagana sa phone, tablet at PC</span><span class="chip">Bantayan kahit saan</span><span class="chip">Maraming sangay</span><span class="chip">6 na wika</span><span class="chip">Awtomatikong accounting</span></div>
@@ -1670,7 +1672,7 @@
 <article data-lang="vi" hidden>
 <header class="hero">
   <div class="wrap">
-    <div class="brand">NEXBILL · DANH MỤC TÍNH NĂNG</div>
+    <div class="brand"><img class="logo-w" src="/brand/nexbill-wordmark-white.png" alt="NEXBILL" width="100" height="22"><img class="logo-b" src="/brand/nexbill-wordmark-black.png" alt="" width="100" height="22"><span>· DANH MỤC TÍNH NĂNG</span></div>
     <h1>Mọi thứ một tiệm cho thuê PlayStation cần, trong một ứng dụng.</h1>
     <p class="lead">Từ đồng hồ tính giờ thuê, đặt chỗ trực tuyến, thu ngân &amp; đồ ăn uống, TV tự bật, cho đến báo cáo tài chính — không cần sổ ghi chép, không tính tay, không lo thất thoát tiền.</p>
     <div class="chips"><span class="chip">Dùng trên điện thoại, máy tính bảng &amp; PC</span><span class="chip">Theo dõi từ mọi nơi</span><span class="chip">Nhiều chi nhánh</span><span class="chip">6 ngôn ngữ</span><span class="chip">Kế toán tự động</span></div>

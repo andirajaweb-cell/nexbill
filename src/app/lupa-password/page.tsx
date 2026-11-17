@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 export default function LupaPasswordPage() {
   const [email, setEmail] = useState("");
@@ -47,10 +48,7 @@ export default function LupaPasswordPage() {
 
         <div className="flex items-center justify-center mb-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.5)] flex items-center justify-center">
-              <span className="gm-display font-bold text-neutral-950 text-sm">N</span>
-            </div>
-            <span className="gm-display font-bold text-lg tracking-wide text-white">NEXBILL</span>
+            <NexbillLogo height={26} />
           </Link>
         </div>
 

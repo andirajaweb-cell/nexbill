@@ -7,6 +7,7 @@ import { showAlert } from "@/lib/ui/dialog";
 import { createClient } from "@/lib/client";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { DEMO_PUBLIC_EMAIL, DEMO_PUBLIC_PASSWORD } from "@/lib/demo-public";
+import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 type LangCode = "id" | "en" | "ms" | "th" | "fil" | "vi";
 
@@ -382,10 +383,7 @@ function LoginForm() {
         {/* Top bar: brand + language selector */}
         <div className="flex items-center justify-between mb-6 px-1">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.5)] flex items-center justify-center">
-              <span className="gm-display font-bold text-neutral-950 text-sm">N</span>
-            </div>
-            <span className="gm-display font-bold text-lg tracking-wide text-white">NEXBILL</span>
+            <NexbillLogo height={26} />
           </Link>
 
           <div className="relative">
