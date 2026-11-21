@@ -18,6 +18,7 @@ import { TabGuide, WorkflowGuide } from "./TabGuide";
 import { HistoricalImportSection } from "./HistoricalImport";
 import { MigrationSop } from "./MigrationSop";
 import { ProfitLossSteps } from "./ProfitLossSteps";
+import { ProfitLossMultiPeriod, type DrillTarget } from "./ProfitLossMultiPeriod";
 import { cashBankOptionLabel } from "@/lib/payments/cash-bank-label";
 import { BookOpen, ChevronRight, FileBarChart, HandCoins, LayoutDashboard, Lock, Settings2, ShieldCheck } from "lucide-react";
 import { ACCOUNTING_OVERVIEW, accountingGroupOf, accountingTabFromSlug, accountingTabSlug, visibleAccountingGroups, type AccountingGroupId, type AccountingTab } from "@/lib/accounting/nav";
@@ -1480,7 +1481,6 @@ function PayablesTab({ outletId }: { outletId: string }) {
   );
 }
 
-const newPeriodEntry = () => ({ preset: "this_month" as PeriodPreset, customFrom: "", customTo: "" });
 
 function ProfitLossTab({ outletId }: { outletId: string }) {
   const { t, lang } = useDashboardLang();
@@ -1488,30 +1488,17 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
   const [pl, setPl] = useState<any>(null);
   const period = usePeriodState("this_month");
   const [compareMode, setCompareMode] = useState(false);
-  const [periods, setPeriods] = useState([newPeriodEntry(), newPeriodEntry()]);
-  const [compareData, setCompareData] = useState<any[] | null>(null);
   // Drill-down target for the audit-trail modal below — only meaningful in single-period mode
   // (compareMode shows several periods side by side, so "which period's transactions" would be
   // ambiguous for a click).
-  const [drillDown, setDrillDown] = useState<{ accountId: string; code: string; name: string; balance: number } | null>(null);
+  // from/to/periodLabel diisi oleh tabel multi-periode (kolom yang diklik); kosong = periode tunggal.
+  const [drillDown, setDrillDown] = useState<(Omit<DrillTarget, "periodLabel"> & { periodLabel?: string }) | null>(null);
 
   useEffect(() => {
     if (compareMode) return;
     const qs = new URLSearchParams({ outletId, ...(period.from ? { from: period.from } : {}), ...(period.to ? { to: period.to } : {}) });
     fetchJsonObject(`/api/accounting/profit-loss?${qs}`).then(setPl);
   }, [outletId, period.from, period.to, compareMode]);
-
-  const runCompare = async () => {
-    const results = await Promise.all(
-      periods.map(async (p) => {
-        const { from, to } = resolvePeriodPreset(p.preset, p.customFrom, p.customTo);
-        const qs = new URLSearchParams({ outletId, ...(from ? { from } : {}), ...(to ? { to } : {}) });
-        const data = await fetchJsonObject<any>(`/api/accounting/profit-loss?${qs}`);
-        return { label: describePeriod(p.preset, from, to, lang), from, to, data };
-      })
-    );
-    setCompareData(results);
-  };
 
   return (
     <div className="space-y-4">
@@ -1521,75 +1508,13 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
         ) : <span className="text-sm font-medium">{t("accounting.pl.multiPeriodMode", "Mode Multi-Periode")}</span>}
         <div className="flex items-center gap-2">
           {!compareMode && <DownloadButtons outletId={outletId} reportType="profit-loss" from={period.from} to={period.to} />}
-          <Button variant="secondary" className="text-xs" onClick={() => { setCompareMode((c) => !c); setCompareData(null); }}>
+          <Button variant="secondary" className="text-xs" onClick={() => setCompareMode((c) => !c)}>
             {compareMode ? t("accounting.pl.compareToggleOff", "Kembali ke Periode Tunggal") : t("accounting.pl.compareToggleOn", "Bandingkan Multi-Periode")}
           </Button>
         </div>
       </div>
 
-      {compareMode && (
-        <Card className="space-y-3">
-          <div className="space-y-2">
-            {periods.map((p, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-2 border-b border-neutral-900 pb-2">
-                <span className="text-xs text-neutral-500 w-16">{t("accounting.pl.periodLabel", "Periode {n}").replace("{n}", String(i + 1))}</span>
-                <select className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={p.preset} onChange={(e) => setPeriods(periods.map((x, idx) => idx === i ? { ...x, preset: e.target.value as PeriodPreset } : x))}>
-                  {["today", "yesterday", "this_week", "last_week", "this_month", "last_month", "this_year", "last_year", "custom"].map((k) => <option key={k} value={k}>{k}</option>)}
-                </select>
-                {p.preset === "custom" && (
-                  <>
-                    <input type="date" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={p.customFrom} onChange={(e) => setPeriods(periods.map((x, idx) => idx === i ? { ...x, customFrom: e.target.value } : x))} />
-                    <input type="date" className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs" value={p.customTo} onChange={(e) => setPeriods(periods.map((x, idx) => idx === i ? { ...x, customTo: e.target.value } : x))} />
-                  </>
-                )}
-                {periods.length > 2 && <button className="text-xs text-red-400" onClick={() => setPeriods(periods.filter((_, idx) => idx !== i))}>{t("accounting.common.delete", "Hapus")}</button>}
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            {periods.length < 4 && <Button variant="secondary" className="text-xs" onClick={() => setPeriods([...periods, newPeriodEntry()])}>{t("accounting.pl.addPeriodButton", "+ Tambah Periode")}</Button>}
-            <Button className="text-xs" onClick={runCompare}>{t("accounting.pl.compareButton", "Bandingkan")}</Button>
-          </div>
-        </Card>
-      )}
-
-      {compareMode && compareData && (
-        <Card className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-neutral-500 border-b border-neutral-800">
-                <th className="py-2">{t("accounting.pl.table.account", "Akun")}</th>
-                {compareData.map((c, i) => <th key={i} className="text-right whitespace-nowrap px-2">{c.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-neutral-900"><td colSpan={compareData.length + 1} className="py-1 text-xs font-semibold text-neutral-400">{t("accounting.type.revenue", "Pendapatan")}</td></tr>
-              {[...new Set(compareData.flatMap((c) => c.data.revenue.filter((r: any) => r.balance !== 0).map((r: any) => r.name)))].map((name) => (
-                <tr key={String(name)} className="border-b border-neutral-900">
-                  <td className="py-1">{(() => { const r = compareData.map((c) => c.data.revenue.find((x: any) => x.name === name)).find(Boolean); return r ? coaAccountName(t, r) : name; })()}</td>
-                  {compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.revenue.find((r: any) => r.name === name)?.balance ?? 0)}</td>)}
-                </tr>
-              ))}
-              <tr className="border-b border-neutral-900"><td colSpan={compareData.length + 1} className="py-1 text-xs font-semibold text-neutral-400 pt-3">{t("accounting.type.expense", "Beban")}</td></tr>
-              {[...new Set(compareData.flatMap((c) => c.data.expense.filter((r: any) => r.balance !== 0).map((r: any) => r.name)))].map((name) => (
-                <tr key={String(name)} className="border-b border-neutral-900">
-                  <td className="py-1">{(() => { const r = compareData.map((c) => c.data.expense.find((x: any) => x.name === name)).find(Boolean); return r ? coaAccountName(t, r) : name; })()}</td>
-                  {compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.expense.find((r: any) => r.name === name)?.balance ?? 0)}</td>)}
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-neutral-800"><td className="py-1 text-neutral-500">{t("accounting.pl.grossSales", "Gross Sales")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2 text-neutral-500">{rupiah(c.data.grossRevenue)}</td>)}</tr>
-              <tr><td className="py-1 text-amber-400">{t("accounting.pl.discount", "Discount")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2 text-amber-400">-{rupiah(c.data.totalDiscount)}</td>)}</tr>
-              <tr className="font-semibold"><td className="py-2">{t("accounting.pl.totalRevenueNet", "Total Pendapatan (Net)")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2 text-emerald-400">{rupiah(c.data.totalRevenue)}</td>)}</tr>
-              <tr className="font-semibold"><td className="py-2">{t("accounting.pl.grossProfit", "Laba Kotor")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.grossProfit)}</td>)}</tr>
-              <tr className="font-semibold"><td className="py-2">{t("accounting.pl.operatingProfit", "Laba Usaha")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.operatingProfit ?? 0)}</td>)}</tr>
-              <tr className="font-semibold"><td className="py-2">{t("accounting.pl.profitBeforeTax", "Laba Sebelum Pajak")}</td>{compareData.map((c, i) => <td key={i} className="text-right px-2">{rupiah(c.data.profitBeforeTax ?? 0)}</td>)}</tr>
-              <tr className="font-semibold"><td className="py-2">{t("accounting.pl.netProfit", "Laba Bersih")}</td>{compareData.map((c, i) => <td key={i} className={`text-right px-2 ${c.data.netProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{rupiah(c.data.netProfit)}</td>)}</tr>
-            </tfoot>
-          </table>
-        </Card>
-      )}
+      {compareMode && <ProfitLossMultiPeriod outletId={outletId} rupiah={rupiah} onDrill={(d) => setDrillDown(d)} />}
 
       {!compareMode && pl && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1645,9 +1570,9 @@ function ProfitLossTab({ outletId }: { outletId: string }) {
           code={drillDown.code}
           name={drillDown.name}
           balance={drillDown.balance}
-          from={period.from}
-          to={period.to}
-          periodLabel={describePeriod(period.preset, period.from, period.to, lang)}
+          from={drillDown.periodLabel ? drillDown.from : period.from}
+          to={drillDown.periodLabel ? drillDown.to : period.to}
+          periodLabel={drillDown.periodLabel ?? describePeriod(period.preset, period.from, period.to, lang)}
           totalLabel={t("accounting.pl.drillDownTotal", "Total (sesuai Laba Rugi)")}
           onClose={() => setDrillDown(null)}
         />
