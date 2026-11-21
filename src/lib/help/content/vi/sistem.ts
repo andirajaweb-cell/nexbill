@@ -19,7 +19,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Bảo mật đăng nhập: một tài khoản = một thiết bị",
         steps: [
-          "Khi quy tắc này bật (mặc định), tài khoản đang dùng trên một trình duyệt không đăng nhập được ở trình duyệt/PC khác cho đến khi đăng xuất, không hoạt động 30 phút, hoặc bị buộc đăng xuất.",
+          "Khi quy tắc này bật (mặc định), tài khoản đang dùng trên một trình duyệt không đăng nhập được ở trình duyệt/PC khác cho đến khi đăng xuất, không hoạt động 5 phút, hoặc bị buộc đăng xuất.",
           "Nhân viên quên đăng xuất ở máy khác? Bấm \"Buộc đăng xuất\" trên tài khoản của họ trong danh sách nhân viên.",
           "Có thể tắt quy tắc này theo từng cửa hàng (không khuyến khích).",
         ],

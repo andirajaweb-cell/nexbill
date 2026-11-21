@@ -19,7 +19,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Keselamatan log masuk: satu akaun = satu peranti",
         steps: [
-          "Apabila peraturan ini aktif (lalai), akaun yang sedang digunakan di satu pelayar tidak boleh log masuk di pelayar/PC lain sehingga log keluar, tidak aktif 30 minit, atau dilog keluarkan.",
+          "Apabila peraturan ini aktif (lalai), akaun yang sedang digunakan di satu pelayar tidak boleh log masuk di pelayar/PC lain sehingga log keluar, tidak aktif 5 minit, atau dilog keluarkan.",
           "Staf terlupa log keluar di komputer lain? Tekan \"Log keluarkan\" pada akaunnya dalam senarai staf.",
           "Peraturan ini boleh dimatikan bagi setiap outlet (tidak disarankan).",
         ],

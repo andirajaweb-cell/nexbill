@@ -43,7 +43,7 @@ export const STARTER_ANSWERS: StarterAnswer[] = [
     topic: "Akun & login",
     question: "Tidak bisa login: \"akun sedang aktif di perangkat lain\"",
     answer:
-      "Satu akun hanya boleh aktif di satu perangkat/browser. Pilih salah satu:\n1. Logout dulu dari perangkat sebelumnya (menu akun kanan atas → Keluar).\n2. Tunggu 30 menit tanpa memakai akun itu.\n3. Minta Owner membuka Staf & Hak Akses → tekan \"Keluarkan\" pada akun tersebut.\nSetiap staf sebaiknya punya akun sendiri supaya tidak saling mengeluarkan.",
+      "Satu akun hanya boleh aktif di satu perangkat/browser. Pilih salah satu:\n1. Logout dulu dari perangkat sebelumnya (menu akun kanan atas → Keluar).\n2. Tunggu 5 menit tanpa memakai akun itu.\n3. Minta Owner membuka Staf & Hak Akses → tekan \"Keluarkan\" pada akun tersebut.\nSetiap staf sebaiknya punya akun sendiri supaya tidak saling mengeluarkan.",
   },
   {
     key: "lupa-password",

@@ -106,7 +106,7 @@ export default function StaffPage() {
   const toggleSingleDevice = async (on: boolean) => {
     const ok = await showConfirm(
       on
-        ? t("staff.session.singleDeviceOnConfirm", "Aktifkan aturan satu akun satu perangkat? Akun yang sedang aktif di satu browser tidak bisa login di browser/PC lain sampai logout, 30 menit tidak dipakai, atau dikeluarkan dari halaman ini.")
+        ? t("staff.session.singleDeviceOnConfirm", "Aktifkan aturan satu akun satu perangkat? Akun yang sedang aktif di satu browser tidak bisa login di browser/PC lain sampai logout, 5 menit tidak dipakai, atau dikeluarkan dari halaman ini.")
         : t("staff.session.singleDeviceOffConfirm", "Matikan aturan ini? Satu akun bisa login di beberapa browser/PC sekaligus — kurang aman bila password staf bocor. Matikan hanya bila outlet memang memakai satu akun di beberapa perangkat (mis. kasir + tablet dapur).")
     );
     if (!ok) return;

@@ -308,7 +308,7 @@ function LoginForm() {
     }
     if (err === "session_active") {
       const device = params.get("device");
-      showAlert(`Akun ini sedang aktif di perangkat lain${device ? ` (${device})` : ""}. Demi keamanan, satu akun hanya bisa dipakai di satu browser. Logout dulu dari perangkat itu, minta Owner/Manager mengeluarkannya di Staf & Hak Akses, atau coba lagi setelah 30 menit perangkat itu tidak dipakai.`);
+      showAlert(`Akun ini sedang aktif di perangkat lain${device ? ` (${device})` : ""}. Demi keamanan, satu akun hanya bisa dipakai di satu browser. Logout dulu dari perangkat itu, minta Owner/Manager mengeluarkannya di Staf & Hak Akses, atau coba lagi setelah 5 menit perangkat itu tidak dipakai.`);
       return;
     }
     const reason = params.get("reason");

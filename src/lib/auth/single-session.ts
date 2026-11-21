@@ -18,7 +18,12 @@ import { isDemoEmail } from "./demo-account";
  *    memakai satu akun di beberapa perangkat (mis. kasir + tablet dapur).
  */
 
-export const IDLE_MINUTES = 30;
+/**
+ * 5 menit (dulu 30, diperpendek 2026-11-21 atas permintaan pemilik): akun yang ditinggal di satu
+ * browser lebih cepat bisa dipakai login di perangkat lain. Browser yang masih dibuka & dipakai tetap
+ * aman — setiap permintaan API memperbarui "terakhir aktif" (paling sering sekali per menit).
+ */
+export const IDLE_MINUTES = 5;
 const HEARTBEAT_MS = 60_000;
 const CACHE_MS = 15_000;
 

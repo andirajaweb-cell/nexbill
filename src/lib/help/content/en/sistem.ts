@@ -19,7 +19,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Login security: one account = one device",
         steps: [
-          "When this rule is on (default), an account in use in one browser can't log in on another browser/PC until it logs out, is idle for 30 minutes, or is signed out.",
+          "When this rule is on (default), an account in use in one browser can't log in on another browser/PC until it logs out, is idle for 5 minutes, or is signed out.",
           "Staff forgot to log out on another computer? Press \"Sign out\" on their account in the staff list.",
           "The rule can be turned off per outlet (not recommended).",
         ],

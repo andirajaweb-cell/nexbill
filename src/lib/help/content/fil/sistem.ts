@@ -19,7 +19,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Seguridad sa pag-log in: isang account = isang device",
         steps: [
-          "Kapag naka-on ang patakarang ito (default), ang account na ginagamit sa isang browser ay hindi makakapag-log in sa ibang browser/PC hanggang mag-log out ito, hindi magamit nang 30 minuto, o ma-sign out.",
+          "Kapag naka-on ang patakarang ito (default), ang account na ginagamit sa isang browser ay hindi makakapag-log in sa ibang browser/PC hanggang mag-log out ito, hindi magamit nang 5 minuto, o ma-sign out.",
           "Nakalimutang mag-log out ng staff sa ibang computer? Pindutin ang \"I-sign out\" sa account niya sa listahan ng staff.",
           "Puwedeng i-off ang patakaran kada outlet (hindi inirerekomenda).",
         ],

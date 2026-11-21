@@ -4,7 +4,7 @@ import { describeDevice, isSessionFresh, IDLE_MINUTES, SessionConflictError } fr
 describe("isSessionFresh — kapan akun dianggap masih dipakai", () => {
   const now = Date.parse("2026-09-27T10:00:00Z");
   it("is fresh within the idle window and stale after it", () => {
-    expect(isSessionFresh(new Date(now - 5 * 60_000).toISOString(), now)).toBe(true);
+    expect(isSessionFresh(new Date(now - (IDLE_MINUTES - 1) * 60_000).toISOString(), now)).toBe(true);
     expect(isSessionFresh(new Date(now - (IDLE_MINUTES + 1) * 60_000).toISOString(), now)).toBe(false);
     expect(isSessionFresh(null, now)).toBe(false);
   });

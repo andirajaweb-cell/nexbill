@@ -19,7 +19,7 @@ export const SISTEM: HelpCategory[] = [
       {
         title: "Keamanan login: satu akun = satu perangkat",
         steps: [
-          "Kalau aturan ini aktif (bawaan), akun yang sedang dipakai di satu browser tidak bisa login di browser/PC lain sampai: logout, 30 menit tidak dipakai, atau dikeluarkan.",
+          "Kalau aturan ini aktif (bawaan), akun yang sedang dipakai di satu browser tidak bisa login di browser/PC lain sampai: logout, 5 menit tidak dipakai, atau dikeluarkan.",
           "Staf lupa logout di komputer lain? Tekan \"Keluarkan\" pada akunnya di daftar staf.",
           "Aturan bisa dimatikan per outlet (tidak disarankan).",
         ],
