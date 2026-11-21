@@ -19,7 +19,9 @@ import { describeError, errorStatus } from "@/lib/api/error";
 import { normalizeBarcode } from "@/lib/inventory/barcode";
 import { assertBarcodeAvailable, DuplicateBarcodeError } from "@/lib/inventory/barcode-server";
 import { forbidUnless } from "@/lib/auth/require-permission";
-import { sanitizeLowStockThreshold } from "@/lib/inventory/stock-tracking-rules";
+import { isStockTracked, sanitizeLowStockThreshold } from "@/lib/inventory/stock-tracking-rules";
+import { costRevaluationDelta } from "@/lib/accounting/inventory-valuation-rules";
+import { postCostRevaluationJournal } from "@/lib/accounting/inventory-revaluation";
 
 /**
  * Every table with a real FK to products.id — a product can only be hard-deleted once none of
@@ -78,7 +80,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const threshold = sanitizeLowStockThreshold(body.lowStockThreshold, current.lowStockThreshold);
     if (threshold === undefined) delete body.lowStockThreshold;
     else body.lowStockThreshold = threshold;
-    const [row] = await db.update(products).set(body).where(eq(products.id, id)).returning();
+    // Harga modal diubah manual (metode rata-rata) pada produk yang masih punya stok → nilai
+    // Persediaan di Neraca ikut dinilai ulang, dalam transaksi yang sama. Tanpa ini "stok × harga
+    // modal" langsung berbeda dari saldo Persediaan, dan setiap penjualan berikutnya mengkredit
+    // Persediaan dengan harga baru (lihat lib/accounting/inventory-revaluation.ts).
+    const newCost = body.costPrice !== undefined ? Number(body.costPrice) : undefined;
+    const revalue =
+      newCost !== undefined && Number.isFinite(newCost) && isStockTracked(current) && current.category !== "device_rental"
+        ? costRevaluationDelta(current.stockQty, current.costPrice, newCost)
+        : 0;
+    const row = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(products).set(body).where(eq(products.id, id)).returning();
+      if (revalue !== 0) {
+        await postCostRevaluationJournal(
+          { outletId: current.outletId, items: [{ name: current.name, delta: revalue }], reference: `REVAL-${id.slice(0, 8)}`, staffUserId: session.sub },
+          tx
+        );
+      }
+      return updated;
+    });
     return NextResponse.json(row);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: err instanceof DuplicateBarcodeError ? 409 : errorStatus(err, 400) });

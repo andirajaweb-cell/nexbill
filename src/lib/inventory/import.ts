@@ -5,6 +5,10 @@ import { and, eq } from "drizzle-orm";
 import { describeError } from "@/lib/api/error";
 import { getActiveProductCategories } from "@/lib/inventory/categories";
 import { recordOpeningStock } from "@/lib/accounting/inventory-postings";
+import { getCostMethod } from "@/lib/inventory/costing";
+import { isStockTracked } from "@/lib/inventory/stock-tracking-rules";
+import { costRevaluationDelta } from "@/lib/accounting/inventory-valuation-rules";
+import { postCostRevaluationJournal } from "@/lib/accounting/inventory-revaluation";
 
 /**
  * Categories used to be a fixed 6-value enum subset hardcoded here. They're now the outlet's own
@@ -89,6 +93,10 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
   // just skip row 1, treat everything after as data (matches the template's own layout).
   const dataRows = rows.slice(1);
   const existingProducts = await db.select().from(products).where(eq(products.outletId, outletId));
+  // Harga modal produk lama yang ikut berubah lewat file: FIFO tidak boleh diubah manual (harga dari
+  // lapisan), rata-rata dinilai ulang lewat satu jurnal revaluasi (lihat inventory-revaluation.ts).
+  const isFifo = (await getCostMethod(outletId)) === "fifo";
+  const revaluations: { name: string; delta: number }[] = [];
   const bySku = new Map(existingProducts.filter((p) => p.sku).map((p) => [p.sku!.trim().toLowerCase(), p]));
   const categories = await getActiveProductCategories(outletId);
   const categoryLabelList = categories.map((c) => c.label).join(", ");
@@ -126,12 +134,21 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
       const existing = sku ? bySku.get(sku.toLowerCase()) : undefined;
 
       if (existing) {
+        // Kolom Harga Modal kosong pada produk lama = harga tetap (dulu terbaca 0 dan menghapus
+        // harga modal — HPP penjualan berikutnya jadi Rp0).
+        const costProvided = costRaw !== undefined && costRaw !== null && String(costRaw).trim() !== "";
+        let nextCost = costProvided ? costPrice : existing.costPrice ?? 0;
+        if (isFifo && existing.stockQty > 0) nextCost = existing.costPrice ?? 0;
+        else if (isStockTracked(existing) && existing.category !== "device_rental") {
+          const delta = costRevaluationDelta(existing.stockQty, existing.costPrice, nextCost);
+          if (delta !== 0) revaluations.push({ name, delta });
+        }
         toUpdate.push({
           id: existing.id,
           rowNum,
           name,
           // Produk "tidak dilacak" (ambang negatif) tetap tidak dilacak walau file Excel berisi angka minimum stok.
-          patch: { name, category, barcode, price, costPrice, lowStockThreshold: existing.lowStockThreshold < 0 ? existing.lowStockThreshold : lowStockThreshold, unit, updatedAt: new Date().toISOString() },
+          patch: { name, category, barcode, price, costPrice: nextCost, lowStockThreshold: existing.lowStockThreshold < 0 ? existing.lowStockThreshold : lowStockThreshold, unit, updatedAt: new Date().toISOString() },
         });
       } else {
         const stockQty = stockRaw !== undefined && stockRaw !== "" ? Number(stockRaw) : 0;
@@ -166,6 +183,9 @@ export async function importProductsFromWorkbook(outletId: string, fileBuffer: B
       chunk.map((u) => db.update(products).set(u.patch).where(and(eq(products.id, u.id), eq(products.outletId, outletId))))
     );
     for (const u of chunk) details.push({ row: u.rowNum, name: u.name, action: "updated" });
+  }
+  if (revaluations.length > 0) {
+    await postCostRevaluationJournal({ outletId, items: revaluations, reference: `REVAL-IMPORT-${new Date().toISOString().slice(0, 10)}`, staffUserId });
   }
 
   const created = toCreate.length;

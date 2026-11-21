@@ -257,17 +257,21 @@ export async function runAccountingAudit(outletId: string): Promise<AuditCheck[]
     summary:
       Math.abs(invDiff) < 1
         ? `Sesuai: ${rp(inventory.bookValue)}`
-        : `Buku ${rp(inventory.bookValue)} vs stok ${rp(inventory.stockValue)} — ${invDiff > 0 ? `buku lebih besar ${rp(invDiff)}` : `buku lebih kecil ${rp(-invDiff)}`}`,
+        : `Buku ${rp(inventory.bookValue)} vs stok ${rp(inventory.stockValue)} — ${invDiff > 0 ? `buku lebih besar ${rp(invDiff)}` : `buku lebih kecil ${rp(-invDiff)}`}` +
+          (inventory.negativeValue < -0.5 && invDiff < 0 ? ` (≈ ${rp(-inventory.negativeValue)} dari stok minus — belanja yang belum dicatat)` : ""),
     count: Math.abs(invDiff) >= 1 ? 1 : 0,
     amount: invDiff,
-    items: [],
+    items:
+      inventory.negativeValue < -0.5
+        ? [{ label: "Bagian dari stok minus", detail: "Penjualan saat stok tercatat habis mengurangi Persediaan untuk barang yang belum pernah dicatat masuk. Catat belanjanya (Belanja Supplier) atau Stock Opname, lalu periksa lagi.", amount: inventory.negativeValue }]
+        : [],
     fix:
       Math.abs(invDiff) >= 1
         ? {
-            label: invDiff > 0 ? "Akui selisih sebagai beban" : "Catat stok yang belum dijurnal",
+            label: invDiff > 0 ? "Samakan Persediaan dengan stok" : "Catat stok yang belum dijurnal",
             confirm:
               invDiff > 0
-                ? `Turunkan Persediaan ${rp(invDiff)} ke nilai stok dan akui sebagai beban Penyesuaian Stok (5340)? Pastikan harga modal & Stock Opname sudah benar.`
+                ? `Turunkan Persediaan ${rp(invDiff)} ke nilai stok dengan lawan Koreksi Persediaan di ekuitas (3400)? Laba Rugi tidak berubah. Pastikan harga modal & Stock Opname sudah benar.`
                 : `Naikkan Persediaan ${rp(-invDiff)} ke nilai stok dengan lawan Ekuitas Saldo Awal (3400) — untuk stok yang dulu tidak pernah dijurnal? Pastikan harga modal & Stock Opname sudah benar.`,
           }
         : undefined,
@@ -452,19 +456,22 @@ export async function applyAuditFix(outletId: string, code: AuditCode, staffUser
     const diff = inv.difference;
     if (Math.abs(diff) >= 1) {
       const inventoryAccountId = await getMappedAccountId(outletId, "product", "inventory", "1161");
+      // Sejak 2026-11-21 penurunan juga ke Koreksi Persediaan (ekuitas, mapping opname_correction) —
+      // sejalan dengan stock opname & penyesuaian stok (2026-11-11): koreksi nilai pencatatan tidak
+      // masuk Laba Rugi. Barang yang memang rusak/hilang dibebankan lewat "Rusak / Waste" (5320).
       const contraAccountId =
-        diff > 0 ? await getMappedAccountId(outletId, "product", "adjustment", "5340") : await getMappedAccountId(outletId, "product", "opening_stock", "3400");
+        diff > 0 ? await getMappedAccountId(outletId, "product", "opname_correction", "3400") : await getMappedAccountId(outletId, "product", "opening_stock", "3400");
       const amount = Math.abs(Math.round(diff * 100) / 100);
       await postJournal({
         outletId,
         reference: `AUDIT-PERSEDIAAN-${new Date().toISOString().slice(0, 10)}`,
-        description: diff > 0 ? "Audit: penurunan Persediaan ke nilai stok (barang hilang/rusak belum diakui)" : "Audit: pencatatan stok yang belum pernah dijurnal",
+        description: diff > 0 ? "Audit: Persediaan disamakan dengan nilai stok (koreksi persediaan)" : "Audit: pencatatan stok yang belum pernah dijurnal",
         sourceType: "inventory_adjustment",
         staffUserId,
         lines:
           diff > 0
             ? [
-                { accountId: contraAccountId, debit: amount, credit: 0, description: "Selisih persediaan" },
+                { accountId: contraAccountId, debit: amount, credit: 0, description: "Koreksi persediaan" },
                 { accountId: inventoryAccountId, debit: 0, credit: amount, description: "Persediaan disesuaikan ke nilai stok" },
               ]
             : [

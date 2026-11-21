@@ -3,6 +3,8 @@ import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { accountingPeriods, approvalRequests, journalEntries, orderItems, orders, products, receivables } from "@/db/schema";
 import { computeTrialBalance } from "../reports";
 import { outletDateYmd } from "@/lib/time/outlet-time";
+import { getCostMethod, listOutletLayers } from "@/lib/inventory/costing";
+import { valueStock } from "../inventory-valuation-rules";
 
 /*
  * Pemeriksaan KEHATI-HATIAN (prudence) — hal yang membuat laporan terlihat lebih baik daripada
@@ -31,6 +33,8 @@ export interface InventoryValuation {
   bookValue: number; // Persediaan (116x) in the ledger
   stockValue: number; // Σ on-hand qty × harga modal
   difference: number; // book − stock
+  /** Σ stok minus × harga modal (≤ 0) — bagian selisih yang berasal dari penjualan tanpa stok tercatat. */
+  negativeValue: number;
   negativeStock: { name: string; stockQty: number }[];
 }
 
@@ -44,13 +48,19 @@ export async function checkInventoryValuation(outletId: string): Promise<Invento
   const tb = await computeTrialBalance(outletId);
   const bookValue = tb.filter((r) => r.isPostingAllowed && r.type === "asset" && r.code.startsWith("116")).reduce((s, r) => s + r.balance, 0);
   const rows = await db
-    .select({ name: products.name, stockQty: products.stockQty, costPrice: products.costPrice, category: products.category })
+    .select({ id: products.id, name: products.name, stockQty: products.stockQty, costPrice: products.costPrice, category: products.category, lowStockThreshold: products.lowStockThreshold })
     .from(products)
     .where(eq(products.outletId, outletId));
-  const stockValue = rows.filter((p) => p.category !== "device_rental" && p.stockQty > 0).reduce((s, p) => s + p.stockQty * (p.costPrice ?? 0), 0);
-  const negativeStock = rows.filter((p) => p.stockQty < 0).map((p) => ({ name: p.name, stockQty: p.stockQty }));
+  // Outlet FIFO: nilai stok = nilai lapisan tersisa (dasar HPP sebenarnya), bukan stok × harga rata-rata.
+  // Produk tidak dilacak & produk sewa tidak termasuk (lihat valueStock).
+  let fifo: Map<string, number> | undefined;
+  if ((await getCostMethod(outletId)) === "fifo") {
+    fifo = new Map();
+    for (const l of await listOutletLayers(outletId)) fifo.set(l.productId, (fifo.get(l.productId) ?? 0) + l.qtyRemaining * l.unitCost);
+  }
+  const { stockValue, negativeValue, negativeStock } = valueStock(rows, fifo);
   const round = (n: number) => Math.round(n * 100) / 100;
-  return { bookValue: round(bookValue), stockValue: round(stockValue), difference: round(bookValue - stockValue), negativeStock };
+  return { bookValue: round(bookValue), stockValue, difference: round(bookValue - stockValue), negativeValue, negativeStock };
 }
 
 export interface AgedReceivable {
