@@ -13,6 +13,7 @@ import { LanguageSwitcher } from "@/components/dashboard/LanguageSwitcher";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { useMobileNav } from "@/components/dashboard/MobileNav";
 import { NexbillLogo } from "@/components/brand/NexbillLogo";
+import { showConfirm } from "@/lib/ui/dialog";
 
 /**
  * Role -> Badge status mapping. Superuser (the sole top-level role) is
@@ -284,6 +285,19 @@ export function TopBar() {
             </div>
           )}
         </div>
+        {/* HP (<640px): tombol ikon saja, dengan konfirmasi — dulu tombol Keluar disembunyikan di
+            layar HP sehingga satu-satunya jalan keluar ada di bawah menu ☰ (sering tidak terlihat).
+            Konfirmasi mencegah tersentuh tidak sengaja di tengah shift. */}
+        <button
+          onClick={async () => {
+            if (await showConfirm(t("topbar.logoutConfirm", "Keluar dari akun ini?"), { confirmLabel: t("sidebar.logout"), tone: "danger" })) logout();
+          }}
+          className="sm:hidden rounded-lg p-2 text-neutral-400 hover:text-rose-400 hover:bg-white/5 transition"
+          title={t("sidebar.logout")}
+          aria-label={t("sidebar.logout")}
+        >
+          <LogOut size={16} />
+        </button>
         <button onClick={logout} className="hidden sm:flex items-center gap-1 text-xs text-neutral-500 hover:text-rose-400 transition" title={t("sidebar.logout")}>
           <LogOut size={13} /> <span className="hidden md:inline">{t("sidebar.logout")}</span>
         </button>

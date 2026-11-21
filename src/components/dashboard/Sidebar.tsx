@@ -175,7 +175,7 @@ export function Sidebar() {
   );
 
   const navList = (
-    <nav className="flex-1 flex flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1" aria-label="Menu">
+    <nav className="flex-1 min-h-0 flex flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1" aria-label="Menu">
       {groups.map(({ group, items }) => (
         <div key={group.id} className="mb-1.5">
           <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t(group.key, group.fallback)}</div>
@@ -217,7 +217,7 @@ export function Sidebar() {
   );
 
   const footer = (
-    <div className="mt-2 border-t border-white/10 pt-3 px-2 pb-[env(safe-area-inset-bottom)]">
+    <div className="mt-2 shrink-0 border-t border-white/10 pt-3 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {user ? (
         <>
           <div className="text-sm font-medium truncate text-neutral-200">{user.name}</div>
@@ -255,7 +255,7 @@ export function Sidebar() {
           aria-modal="true"
           aria-label="Menu"
           className={clsx(
-            "absolute inset-y-0 left-0 w-72 max-w-[85vw] border-r border-white/10 bg-[#0a0f1e] p-3 pt-[max(0.75rem,env(safe-area-inset-top))] flex flex-col gap-1 shadow-[0_0_40px_rgba(0,0,0,0.6)] transition-transform duration-200",
+            "absolute top-0 left-0 h-[100dvh] w-72 max-w-[85vw] border-r border-white/10 bg-[#0a0f1e] p-3 pt-[max(0.75rem,env(safe-area-inset-top))] flex flex-col gap-1 shadow-[0_0_40px_rgba(0,0,0,0.6)] transition-transform duration-200",
             drawerOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
