@@ -11,7 +11,7 @@
  *  - Notifikasi push (Web Push, lib/push/service.ts).
  * Naikkan VERSION bila offline.html atau strategi cache diubah.
  */
-const VERSION = "nexbill-sw-v4"; // v4 (2026-11-17): logo & ikon baru NEXBILL — ikon pra-cache diperbarui
+const VERSION = "nexbill-sw-v5"; // v5 (2026-11-21): logo "Nexbill" bersimbol X — ikon pra-cache diperbarui
 const PAGES = "nexbill-pages-v1";
 const STATIC = "nexbill-static-v1";
 const OFFLINE_URL = "/offline.html";

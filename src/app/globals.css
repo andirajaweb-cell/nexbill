@@ -376,3 +376,8 @@ html.ps-cursor-loading-active .ps-spinner-ring {
     opacity: 1;
   }
 }
+/* Logo NEXBILL (components/brand/NexbillLogo.tsx, tone "auto"): versi putih di mode gelap,
+   versi hitam saat dashboard memakai mode terang (kelas theme-light di <html>). */
+.nb-logo-on-light { display: none !important; }
+html.theme-light .nb-logo-on-dark { display: none !important; }
+html.theme-light .nb-logo-on-light { display: inline-block !important; }
