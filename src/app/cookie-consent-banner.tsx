@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "./landing-i18n";
+import { updateGoogleConsent } from "@/lib/analytics/google-tag";
 
 const STORAGE_KEY = "nb_cookie_consent";
 const COOKIE_NAME = "nb_cookie_consent";
@@ -47,6 +48,8 @@ export function CookieConsentBanner() {
 
   const choose = (choice: "accepted" | "declined") => {
     remember(choice);
+    // Google tag: cookie analitik/iklan hanya diizinkan setelah Terima (Consent Mode v2).
+    updateGoogleConsent(choice);
     setVisible(false);
   };
 

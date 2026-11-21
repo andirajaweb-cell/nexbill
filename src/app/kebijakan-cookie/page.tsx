@@ -27,7 +27,7 @@ export default function CookiePolicyPage() {
             ← Kembali ke Beranda
           </Link>
           <h1 className="gm-display text-2xl font-bold gm-gradient-title mt-2">Kebijakan Cookie</h1>
-          <p className="text-sm text-neutral-500 mt-1">Berlaku untuk situs nexbill.id dan dashboard NEXBILL. Terakhir diperbarui: Agustus 2026.</p>
+          <p className="text-sm text-neutral-500 mt-1">Berlaku untuk situs nexbill.id dan dashboard NEXBILL. Terakhir diperbarui: November 2026.</p>
         </div>
 
         <Section title="1. Apa itu Cookie">
@@ -54,8 +54,10 @@ export default function CookiePolicyPage() {
               (<code className="text-cyan-300/80">nb_cookie_consent</code>) selama 180 hari, supaya banner tidak muncul berulang.
             </li>
             <li>
-              <strong>Cookie Analitik (bila diaktifkan)</strong> — membantu kami memahami traffic dan halaman yang paling banyak
-              dikunjungi, dalam bentuk data agregat yang tidak mengidentifikasi Anda secara pribadi.
+              <strong>Cookie Analitik &amp; Iklan (bila diaktifkan)</strong> — membantu kami memahami traffic, halaman yang paling banyak
+              dikunjungi, dan efektivitas iklan, dalam bentuk data agregat yang tidak mengidentifikasi Anda secara pribadi. Dipasang
+              lewat Google Tag Manager (Google Analytics / Google Ads) dan hanya aktif setelah Anda menekan &quot;Terima&quot; di banner
+              cookie; sebelum itu Google hanya menerima sinyal tanpa cookie.
             </li>
           </ul>
         </Section>

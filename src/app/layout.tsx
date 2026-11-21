@@ -6,6 +6,7 @@ import { AppModeDetector } from "@/components/pwa/AppModeDetector";
 import { PsCursorSystem } from "@/components/PsCursorSystem";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { GOOGLE_TAG_ENABLED, GTM_ID, googleTagBootstrapScript } from "@/lib/analytics/google-tag";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 const orbitron = Orbitron({ subsets: ["latin"], weight: ["500", "600", "700", "800", "900"], variable: "--font-display" });
@@ -183,6 +184,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={cn(orbitron.variable, rajdhani.variable, inter.variable, "font-sans", geist.variable)}
     >
       <head>
+        {/* Google tag (GTM) — tepat setelah <head>, sesuai petunjuk instalasi. Consent Mode v2:
+            cookie ditolak sampai pengunjung menekan Terima (lib/analytics/google-tag.ts). */}
+        {GOOGLE_TAG_ENABLED && (
+          <>
+            <script dangerouslySetInnerHTML={{ __html: googleTagBootstrapScript() }} />
+            <script async src={`https://www.googletagmanager.com/gtm.js?id=${GTM_ID}`} />
+          </>
+        )}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

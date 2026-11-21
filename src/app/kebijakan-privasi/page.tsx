@@ -9,7 +9,7 @@ import { NexbillLogo } from "@/components/brand/NexbillLogo";
  * pihak ketiga baru atau jenis data baru, perbarui bagian 3 & 5 di sini dan tanggal di atas.
  */
 
-const LAST_UPDATED = "4 Oktober 2026";
+const LAST_UPDATED = "21 November 2026";
 const CONTACT_EMAIL = "sales@nexbill.id";
 const CONTACT_WA = "+62 8557 3333 20";
 const CONTACT_ADDRESS = "Komp. Bumi Adipura Jl. Tulip V No. 40 RT.02/RW 04, Kel. Rancabolang, Kec. Gedebage, Kota Bandung, Jawa Barat 40295, Indonesia";
@@ -155,7 +155,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Tuya / Smart Life</strong> — kontrol smart plug melalui akun cloud milik outlet.</li>
             <li><strong>Resend</strong> — pengiriman email transaksional.</li>
             <li><strong>Anthropic</strong> — penyedia model AI untuk fitur AI Business Assistant (hanya saat fitur dipakai).</li>
-            <li><strong>Google</strong> — login dengan Google, serta Google Maps untuk informasi usaha publik (bagian 3F).</li>
+            <li><strong>Google</strong> — login dengan Google, Google Maps untuk informasi usaha publik (bagian 3F), serta Google Tag Manager, Google Analytics, dan Google Ads untuk statistik kunjungan dan pengukuran iklan — cookie analitik/iklan hanya dipakai setelah Anda menekan &quot;Terima&quot; di banner cookie.</li>
             <li><strong>Meta (Instagram/WhatsApp)</strong> — bila Anda berkomunikasi dengan kami melalui kanal tersebut.</li>
             <li><strong>Layanan push Google / browser</strong> — mengantarkan notifikasi ke HP bila Anda mengaktifkannya.</li>
           </ul>
@@ -297,7 +297,7 @@ export default function PrivacyPolicyPage() {
               Data is used only to provide and secure the service, process payments and shipments, send service messages, provide
               support, power optional AI analysis requested by the owner, and meet legal obligations. We do not sell personal data.
               Processors: Vercel, Supabase, Cloudflare, iPaymu, BukuPay, Biteship, Tuya, Resend, Anthropic, Google, and Meta; some
-              process data outside Indonesia. Data is encrypted in transit and isolated per outlet.
+              process data outside Indonesia. Google Tag Manager / Analytics / Ads cookies are only used after you click "Accept" on the cookie banner. Data is encrypted in transit and isolated per outlet.
             </p>
             <p>
               Account owners can delete their account and data in the app (Settings → Akun Saya → Hapus Akun &amp; Data, confirmed
