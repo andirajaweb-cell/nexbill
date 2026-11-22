@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
 import { NexbillLogo } from "@/components/brand/NexbillLogo";
+import { SALES_WHATSAPP, salesWhatsappLink } from "@/lib/site-config";
 
 /**
  * Halaman publik "Hapus Akun" — URL ini diisi di Play Console (Keamanan data → URL penghapusan
@@ -8,9 +9,9 @@ import { NexbillLogo } from "@/components/brand/NexbillLogo";
  * aplikasi. Detail lengkap ada di Kebijakan Privasi bagian 8–9.
  */
 const EMAIL = "sales@nexbill.id";
-const WA = "+62 8557 3333 20";
-const WA_LINK = "https://wa.me/6285573333320?text=" + encodeURIComponent("Halo NEXBILL, saya ingin menghapus akun dan data outlet saya. Nama outlet: ");
-const WA_DATA_LINK = "https://wa.me/6285573333320?text=" + encodeURIComponent("Halo NEXBILL, saya ingin menghapus sebagian data (akun tetap dipakai). Nama outlet: ... Data yang ingin dihapus: ");
+const WA = SALES_WHATSAPP.display;
+const WA_LINK = salesWhatsappLink("Halo NEXBILL, saya ingin menghapus akun dan data outlet saya. Nama outlet: ");
+const WA_DATA_LINK = salesWhatsappLink("Halo NEXBILL, saya ingin menghapus sebagian data (akun tetap dipakai). Nama outlet: ... Data yang ingin dihapus: ");
 
 function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
   return (

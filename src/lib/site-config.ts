@@ -13,9 +13,9 @@
 export const SITE_URL = "https://www.nexbill.id";
 
 /**
- * WhatsApp admin NEXBILL untuk calon pelanggan (outlet/merchant) yang ingin berlangganan atau
- * bertanya paket — dipakai footer, tombol mengambang, dan ajakan di bagian Harga situs utama
- * (2026-11-22). Ganti nomor di sini saja.
+ * WhatsApp resmi NEXBILL (2026-11-22, menggantikan +62 8557 3333 20) — satu-satunya nomor kontak:
+ * berlangganan/tanya paket (footer, tombol mengambang, bagian Harga situs utama), Kebijakan
+ * Privasi, Hapus Akun, dan email penghapusan akun. Ganti nomor di sini saja.
  */
 export const SALES_WHATSAPP = { display: "+62 856 0332 2222", e164: "6285603322222" } as const;
 

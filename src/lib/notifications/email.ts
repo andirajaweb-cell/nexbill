@@ -21,6 +21,7 @@
  *   RESEND_REPLY_TO     e.g. "sales@nexbill.id" — where replies from owners land (a real
  *                        mailbox), so the From address itself needs no inbox.
  */
+import { SALES_WHATSAPP } from "@/lib/site-config";
 
 interface SendEmailInput {
   to: string;
@@ -162,7 +163,7 @@ export function accountDeletionConfirmedEmail(name: string, outletNames: string,
       "Akun Dinonaktifkan",
       `<p>Halo ${name},</p>
        <p>Akun NEXBILL kamu dan outlet <b>${outletNames}</b> sudah dinonaktifkan sesuai permintaan.</p>
-       <p>Data pribadi akan dihapus atau dianonimkan paling lambat <b>${purgeDate}</b>. Kalau ini keliru dan ingin membatalkan, balas email ini atau hubungi WhatsApp +62 8557 3333 20 sebelum tanggal tersebut.</p>
+       <p>Data pribadi akan dihapus atau dianonimkan paling lambat <b>${purgeDate}</b>. Kalau ini keliru dan ingin membatalkan, balas email ini atau hubungi WhatsApp ${SALES_WHATSAPP.display} sebelum tanggal tersebut.</p>
        <p style="font-size:12px;color:#888">Terima kasih sudah memakai NEXBILL.</p>`
     ),
   };

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
 import { NexbillLogo } from "@/components/brand/NexbillLogo";
+import { SALES_WHATSAPP } from "@/lib/site-config";
 
 /**
  * Kebijakan Privasi NEXBILL — wajib untuk Google Play (URL publik) dan UU No. 27 Tahun 2022
@@ -11,7 +12,7 @@ import { NexbillLogo } from "@/components/brand/NexbillLogo";
 
 const LAST_UPDATED = "21 November 2026";
 const CONTACT_EMAIL = "sales@nexbill.id";
-const CONTACT_WA = "+62 8557 3333 20";
+const CONTACT_WA = SALES_WHATSAPP.display;
 const CONTACT_ADDRESS = "Komp. Bumi Adipura Jl. Tulip V No. 40 RT.02/RW 04, Kel. Rancabolang, Kec. Gedebage, Kota Bandung, Jawa Barat 40295, Indonesia";
 
 function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
