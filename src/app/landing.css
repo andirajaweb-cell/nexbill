@@ -473,8 +473,10 @@
    clear the top, so it visually overlapped with section 2's already-visible content the whole
    time. Fixed + a quick opacity fade timed to finish exactly at the hero's release point removes
    that overlap window entirely. */
+/* bottom dinaikkan (40 → 92px, HP 76px) supaya kartu video tidak tertutup tombol "Tanya Admin"
+   WhatsApp yang mengambang di pojok kanan bawah (2026-11-22). Animasi membesar membaca nilai ini. */
 .nb-landing .hero-grow-video-frame {
-  position: fixed; z-index: 4; right: 40px; bottom: 40px; width: 340px; height: 191px;
+  position: fixed; z-index: 4; right: 40px; bottom: 92px; width: 340px; height: 191px;
   border-radius: 16px; overflow: hidden; border: 1px solid var(--card-border);
   box-shadow: 0 20px 50px -15px rgba(0,0,0,.7);
 }
@@ -1065,7 +1067,7 @@
   .nb-landing .hero-corner-copy .eyebrow { font-size: 10px; padding: 5px 10px; margin-bottom: 10px; }
   .nb-landing .hero-corner-copy p { font-size: 13.5px; margin-bottom: 12px; }
   .nb-landing .hero-corner-btn { padding: 9px 18px; font-size: 12px; }
-  .nb-landing .hero-grow-video-frame { width: 130px; height: 73px; right: 20px; bottom: 20px; }
+  .nb-landing .hero-grow-video-frame { width: 130px; height: 73px; right: 20px; bottom: 80px; }
   .nb-landing .intro-headline { font-size: 34px; }
   .nb-landing .intro-section p.sub { font-size: 16px; }
   .nb-landing .feat-grid, .nb-landing .steps { grid-template-columns: 1fr; }
@@ -1235,7 +1237,7 @@
   .nb-landing .hero-corner-copy .eyebrow { font-size: 9px; padding: 4px 9px; margin-bottom: 8px; }
   .nb-landing .hero-corner-copy p { font-size: 11.5px; margin-bottom: 10px; }
   .nb-landing .hero-corner-btn { padding: 8px 13px; font-size: 10.5px; }
-  .nb-landing .hero-grow-video-frame { width: 88px; height: 50px; right: 14px; bottom: 14px; }
+  .nb-landing .hero-grow-video-frame { width: 112px; height: 63px; right: 14px; bottom: 76px; }
 
   .nb-landing .intro-headline { font-size: 27px; }
 

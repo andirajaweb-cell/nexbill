@@ -305,11 +305,43 @@ function LandingPageInner() {
             canvas.height = displayH * dpr;
           }
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          const scale = Math.max(displayW / SPIN_FRAME_W, displayH / SPIN_FRAME_H);
+          ctx.clearRect(0, 0, displayW, displayH);
+          // Layar potret (HP): "cover" pada frame 16:9 memperbesar stik sampai ~3x lebar layar dan
+          // terpotong ("gambar terlalu besar"). Di layar potret, frame diskalakan dari LEBAR (stik
+          // ±85% lebar layar), diletakkan sedikit di atas tengah, dan sisa atas/bawah diisi warna
+          // latar frame itu sendiri (atas gelap, bawah biru) dengan tepi gambar dilebur gradien,
+          // jadi tidak terlihat sambungan kotak.
+          const portrait = displayW / displayH < 0.9;
+          if (!portrait) {
+            const scale = Math.max(displayW / SPIN_FRAME_W, displayH / SPIN_FRAME_H);
+            const drawW = SPIN_FRAME_W * scale;
+            const drawH = SPIN_FRAME_H * scale;
+            ctx.drawImage(img, (displayW - drawW) / 2, (displayH - drawH) / 2, drawW, drawH);
+            return;
+          }
+          const scale = (displayW / SPIN_FRAME_W) * 1.6;
           const drawW = SPIN_FRAME_W * scale;
           const drawH = SPIN_FRAME_H * scale;
-          ctx.clearRect(0, 0, displayW, displayH);
-          ctx.drawImage(img, (displayW - drawW) / 2, (displayH - drawH) / 2, drawW, drawH);
+          const x = (displayW - drawW) / 2;
+          const y = Math.max(0, displayH * 0.46 - drawH / 2);
+          const TOP = "rgb(5,10,19)";
+          const BOTTOM = "rgb(30,45,63)";
+          ctx.fillStyle = TOP;
+          ctx.fillRect(0, 0, displayW, y + drawH / 2);
+          ctx.fillStyle = BOTTOM;
+          ctx.fillRect(0, y + drawH / 2, displayW, displayH - (y + drawH / 2));
+          ctx.drawImage(img, x, y, drawW, drawH);
+          const fade = drawH * 0.18;
+          const gTop = ctx.createLinearGradient(0, y, 0, y + fade);
+          gTop.addColorStop(0, TOP);
+          gTop.addColorStop(1, "rgba(5,10,19,0)");
+          ctx.fillStyle = gTop;
+          ctx.fillRect(0, y, displayW, fade);
+          const gBot = ctx.createLinearGradient(0, y + drawH - fade, 0, y + drawH);
+          gBot.addColorStop(0, "rgba(30,45,63,0)");
+          gBot.addColorStop(1, BOTTOM);
+          ctx.fillStyle = gBot;
+          ctx.fillRect(0, y + drawH - fade, displayW, fade + 1);
         };
 
         let loadedCount = 0;
@@ -476,12 +508,20 @@ function LandingPageInner() {
             // never a frame with neither visible.
             const fadeStart = 0.9;
             const exitAlpha = p <= fadeStart ? 1 : Math.max(0, 1 - (p - fadeStart) / (1 - fadeStart));
+            // Layar potret (HP): video 16:9 yang dibesarkan sampai penuh layar (cover) jadi
+            // terpotong & terlalu besar. Di sana target akhirnya selebar layar dengan rasio video
+            // asli, di tengah vertikal (sudut tetap sedikit membulat); desktop tetap penuh layar.
+            const portrait = vw / vh < 0.9;
+            const targetW = vw;
+            const targetH = portrait ? Math.round(vw * (small.h / small.w)) : vh;
+            const targetBottom = portrait ? Math.round((vh - targetH) / 2) : 0;
+            const targetRadius = portrait ? 12 : 0;
             gsap.set(growFrame, {
-              width: gp >= 1 ? vw : small.w + (vw - small.w) * gp,
-              height: gp >= 1 ? vh : small.h + (vh - small.h) * gp,
+              width: gp >= 1 ? targetW : small.w + (targetW - small.w) * gp,
+              height: gp >= 1 ? targetH : small.h + (targetH - small.h) * gp,
               right: small.right * (1 - gp),
-              bottom: small.bottom * (1 - gp),
-              borderRadius: small.radius * (1 - gp),
+              bottom: small.bottom + (targetBottom - small.bottom) * gp,
+              borderRadius: small.radius + (targetRadius - small.radius) * gp,
               borderWidth: small.borderWidth * (1 - gp),
               boxShadow: `0 ${20 * (1 - gp)}px ${50 * (1 - gp)}px -15px rgba(0,0,0,${(0.7 * (1 - gp)).toFixed(2)})`,
               autoAlpha: exitAlpha,
@@ -491,7 +531,9 @@ function LandingPageInner() {
             // growFrame's own opacity approaches 0 it becomes see-through, revealing the (still
             // fully opaque) canvas behind it for an instant, right before .hero-mono-sticky gets
             // display:none'd entirely — a visible "pop" at the exact handoff point.
-            gsap.set(".hero-scroll-video-frame", { autoAlpha: exitAlpha });
+            // Di HP video tidak menutup seluruh layar, jadi stik di belakangnya diredupkan seiring
+            // video membesar supaya tidak "mengintip" di atas/bawah video.
+            gsap.set(".hero-scroll-video-frame", { autoAlpha: portrait ? Math.min(exitAlpha, 1 - 0.85 * gp) : exitAlpha });
             // Wordmark and corner copy disappear early (fully faded by 40% of the way through,
             // well before the video finishes growing) so the card reads as taking over the hero.
             const contentOpacity = Math.max(0, 1 - p / 0.4);
