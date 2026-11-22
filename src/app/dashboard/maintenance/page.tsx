@@ -10,7 +10,9 @@ import { useApi } from "@/lib/api/use-api";
 import { useAuth } from "@/lib/auth/client";
 import { hasPermission, StaffRole } from "@/lib/auth/permissions";
 import { showAlert, showConfirm } from "@/lib/ui/dialog";
-import { Wrench, PlayCircle, CheckCircle2, Pencil, Trash2, ChevronDown, ChevronUp, PackagePlus, X } from "lucide-react";
+import { Wrench, PlayCircle, CheckCircle2, Pencil, Trash2, ChevronDown, ChevronUp, PackagePlus, X, Printer } from "lucide-react";
+import { maintenanceTicketNumber } from "@/lib/maintenance/label";
+import "@/lib/i18n/dict-maintenance-label";
 import { DATE_LOCALE, useDashboardLang } from "@/lib/i18n/dashboard-lang";
 import { coaAccountName } from "@/lib/accounting/coa-data";
 import "@/lib/i18n/dict-maintenance";
@@ -47,6 +49,8 @@ function MaintenancePageInner() {
   // there. Opens the new-ticket form pre-filled with the Fixed Asset linked to that rental unit
   // (fixedAssets.rentalUnitId), so staff don't have to hunt for it in the dropdown themselves.
   const deepLinkRentalUnitId = searchParams.get("rentalUnitId");
+  // Dari QR di label tiket (/dashboard/maintenance/label): sorot & gulir ke tiket itu.
+  const highlightTicketId = searchParams.get("ticket");
   const handledDeepLinkRef = useRef<string | null>(null);
   const CATEGORY_LABEL: Record<string, string> = {
     playstation: t("maintenance.category.playstation", "PlayStation / Konsol"),
@@ -157,13 +161,36 @@ function MaintenancePageInner() {
 
   const availableAssetsForNewTicket = assets.filter((a) => a.status !== "disposed");
 
-  const submitCreate = async () => {
+  /** Halaman cetak label (tab baru). autoprint: langsung buka dialog cetak setelah label siap. */
+  const openLabels = (ids: string[], autoprint = false) => {
+    if (ids.length === 0) return;
+    window.open(`/dashboard/maintenance/label?ids=${ids.map(encodeURIComponent).join(",")}${autoprint ? "&autoprint=1" : ""}`, "_blank", "noopener");
+  };
+
+  useEffect(() => {
+    if (!highlightTicketId || tickets.length === 0) return;
+    const ticket = tickets.find((x) => x.id === highlightTicketId);
+    if (!ticket) return;
+    setStatusFilter("Semua");
+    const timer = setTimeout(() => document.getElementById(`mt-${highlightTicketId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    return () => clearTimeout(timer);
+  }, [highlightTicketId, tickets]);
+
+  const submitCreate = async (printAfter = false) => {
     if (!form.fixedAssetId) return showAlert(t("maintenance.alertSelectAsset", "Pilih aset yang mau di-maintenance."));
     if (!form.description) return showAlert(t("maintenance.alertDescriptionRequired", "Deskripsi maintenance wajib diisi."));
     if (form.createExpenseFor && form.cost > 0 && !form.accountId) return showAlert(t("maintenance.alertSelectExpenseAccount", "Pilih akun beban untuk membuat expense maintenance."));
+    // Tab cetak dibuka SEBELUM menunggu server — browser memblokir window.open yang tidak langsung
+    // dari klik. Alamatnya diisi setelah tiket tersimpan; ditutup lagi bila gagal.
+    const printWin = printAfter ? window.open("about:blank", "_blank") : null;
     const res = await fetch("/api/maintenance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
+    if (!res.ok) {
+      printWin?.close();
+      return showAlert(data.error);
+    }
+    if (printWin && data?.id) printWin.location.href = `/dashboard/maintenance/label?ids=${encodeURIComponent(data.id)}&autoprint=1`;
+    else printWin?.close();
     setForm({ fixedAssetId: "", description: "", cost: 0, createExpenseFor: false, accountId: "", cashBankAccountId: "", damageLabel: "", damageType: "", damageSeverity: "" });
     setShowForm(false);
     load();
@@ -320,7 +347,16 @@ function MaintenancePageInner() {
             </button>
           ))}
         </div>
-        {canManage && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t("maintenance.closeForm", "Tutup Form") : t("maintenance.addMaintenance", "+ Tambah Maintenance")}</Button>}
+        <div className="flex flex-wrap gap-2">
+          {visibleTickets.length > 1 && (
+            <Button variant="secondary" onClick={() => openLabels(visibleTickets.map((x) => x.id))}>
+              <span className="inline-flex items-center gap-1.5">
+                <Printer size={14} /> {t("mtLabel.printList", "Cetak label ({n})").replace("{n}", String(Math.min(visibleTickets.length, 50)))}
+              </span>
+            </Button>
+          )}
+          {canManage && <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t("maintenance.closeForm", "Tutup Form") : t("maintenance.addMaintenance", "+ Tambah Maintenance")}</Button>}
+        </div>
       </div>
 
       {showForm && (
@@ -364,7 +400,14 @@ function MaintenancePageInner() {
               </>
             )}
           </div>
-          <Button onClick={submitCreate}>{t("maintenance.saveTicket", "Simpan Tiket")}</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => submitCreate(false)}>{t("maintenance.saveTicket", "Simpan Tiket")}</Button>
+            <Button variant="secondary" onClick={() => submitCreate(true)}>
+              <span className="inline-flex items-center gap-1.5">
+                <Printer size={14} /> {t("mtLabel.saveAndPrint", "Simpan & Cetak Label")}
+              </span>
+            </Button>
+          </div>
         </Card>
       )}
 
@@ -378,8 +421,11 @@ function MaintenancePageInner() {
           <tbody>
             {visibleTickets.map((ticket) => (
               <Fragment key={ticket.id}>
-              <tr className="border-b border-neutral-900 align-top">
-                <td className="py-2 text-xs font-medium">{assetName(ticket.fixedAssetId)}</td>
+              <tr id={`mt-${ticket.id}`} className={`border-b border-neutral-900 align-top ${highlightTicketId === ticket.id ? "bg-cyan-500/10 outline outline-1 outline-cyan-400/50" : ""}`}>
+                <td className="py-2 text-xs font-medium">
+                  {assetName(ticket.fixedAssetId)}
+                  <div className="font-mono text-[10px] font-normal text-neutral-500">{maintenanceTicketNumber(ticket)}</div>
+                </td>
                 <td className="text-xs">{CATEGORY_LABEL[assetCategory(ticket.fixedAssetId) ?? ""] ?? "-"}</td>
                 <td className="text-xs max-w-[220px]">
                   {editingId === ticket.id ? (
@@ -450,6 +496,9 @@ function MaintenancePageInner() {
                             <CheckCircle2 size={12} /> {t("maintenance.markDone", "Tandai Selesai")}
                           </Button>
                         )}
+                        <Button variant="ghost" className="text-xs px-2 py-1 gap-1" onClick={() => openLabels([ticket.id])}>
+                          <Printer size={12} /> {t("mtLabel.printOne", "Cetak Label")}
+                        </Button>
                         <Button variant="ghost" className="text-xs px-2 py-1 gap-1" onClick={() => togglePartsPanel(ticket.id)}>
                           {expandedParts.has(ticket.id) ? <ChevronUp size={12} /> : <ChevronDown size={12} />} {t("maintenance.parts.toggle", "Sparepart")}
                           {partsForTicket(ticket.id).length > 0 && ` (${partsForTicket(ticket.id).length})`}
