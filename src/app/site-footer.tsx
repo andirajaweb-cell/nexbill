@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useLanguage } from "./landing-i18n";
 import { NexbillLogo } from "@/components/brand/NexbillLogo";
+import { FooterWhatsapp } from "./whatsapp-contact";
 
 export function SiteFooter() {
   const { t, lang } = useLanguage();
@@ -20,7 +21,8 @@ export function SiteFooter() {
           </div>
           <div style={{ color: "var(--text-dim)", fontSize: "13.5px", maxWidth: "350px", lineHeight: "1.6" }}>
             <p style={{ marginBottom: "8px" }}><strong>{t.footer.alamatLabel}</strong><br /> Komp. Bumi Adipura Jl. Tulip V No. 40 RT.02/RW 04 Kel. Rancabolang Kec. Gedebage Kota Bandung, Jawa Barat, Indonesia 40295</p>
-            <p style={{ marginBottom: "4px" }}><strong>{t.footer.teleponLabel}</strong> +62 8557 3333 20</p>
+            {/* WhatsApp admin untuk berlangganan (nomor di lib/site-config.ts SALES_WHATSAPP). */}
+            <FooterWhatsapp />
             <p><strong>{t.footer.emailLabel}</strong> sales@nexbill.id</p>
           </div>
         </div>

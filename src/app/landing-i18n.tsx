@@ -89,6 +89,8 @@ export interface LandingCopy {
   };
   faq: { kicker: string; headline: string; sub: string; items: Faq[] };
   footer: { alamatLabel: string; teleponLabel: string; emailLabel: string; copyright: string; refundLabel: string; termsLabel: string; privacyLabel: string };
+  // Kontak WhatsApp admin untuk berlangganan (whatsapp-contact.tsx, nomor di lib/site-config.ts).
+  contact: { waLabel: string; ctaTitle: string; ctaSub: string; ctaButton: string; fab: string; message: string };
   cookieBanner: { message: string; accept: string; decline: string; policyLinkLabel: string };
   about: {
     heroTitle: string; heroLede: string; stats: Stat[];
@@ -303,6 +305,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     footer: { alamatLabel: "Alamat:", teleponLabel: "Telepon:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Semua hak dilindungi.", refundLabel: "Kebijakan Refund", termsLabel: "Syarat & Ketentuan", privacyLabel: "Kebijakan Privasi" },
+    contact: { waLabel: "WhatsApp:", ctaTitle: "Mau berlangganan atau tanya paket?", ctaSub: "Chat admin NEXBILL di WhatsApp", ctaButton: "Chat Admin via WhatsApp", fab: "Tanya Admin", message: "Halo Admin NEXBILL, saya ingin berlangganan NEXBILL untuk rental PS saya. Nama outlet: " },
     cookieBanner: {
       message: "Kami menggunakan cookie untuk meningkatkan pengalaman Anda di situs ini dan menganalisis traffic. Dengan melanjutkan, Anda menyetujui penggunaan cookie sesuai Kebijakan Cookie kami.",
       accept: "Terima",
@@ -536,6 +539,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     footer: { alamatLabel: "Address:", teleponLabel: "Phone:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. All rights reserved.", refundLabel: "Refund Policy", termsLabel: "Terms & Conditions", privacyLabel: "Privacy Policy" },
+    contact: { waLabel: "WhatsApp:", ctaTitle: "Want to subscribe or ask about plans?", ctaSub: "Chat with the NEXBILL admin on WhatsApp", ctaButton: "Chat Admin on WhatsApp", fab: "Ask Admin", message: "Hello NEXBILL Admin, I would like to subscribe to NEXBILL for my PlayStation rental. Outlet name: " },
     cookieBanner: {
       message: "We use cookies to improve your experience on this site and analyze traffic. By continuing, you agree to our use of cookies per our Cookie Policy.",
       accept: "Accept",
@@ -769,6 +773,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     footer: { alamatLabel: "Alamat:", teleponLabel: "Telefon:", emailLabel: "E-mel:", copyright: "© 2026 NEXBILL Billing System. Hak cipta terpelihara.", refundLabel: "Dasar Bayaran Balik", termsLabel: "Terma & Syarat", privacyLabel: "Dasar Privasi" },
+    contact: { waLabel: "WhatsApp:", ctaTitle: "Mahu melanggan atau bertanya tentang pakej?", ctaSub: "Sembang dengan admin NEXBILL di WhatsApp", ctaButton: "Sembang Admin di WhatsApp", fab: "Tanya Admin", message: "Helo Admin NEXBILL, saya ingin melanggan NEXBILL untuk rental PS saya. Nama outlet: " },
     cookieBanner: {
       message: "Kami menggunakan kuki untuk meningkatkan pengalaman anda di laman ini dan menganalisis trafik. Dengan meneruskan, anda bersetuju dengan penggunaan kuki mengikut Dasar Kuki kami.",
       accept: "Terima",
@@ -1005,6 +1010,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     footer: { alamatLabel: "ที่อยู่:", teleponLabel: "โทรศัพท์:", emailLabel: "อีเมล:", copyright: "© 2026 NEXBILL Billing System สงวนลิขสิทธิ์", refundLabel: "นโยบายการคืนเงิน", termsLabel: "ข้อกำหนดและเงื่อนไข", privacyLabel: "นโยบายความเป็นส่วนตัว" },
+    contact: { waLabel: "WhatsApp:", ctaTitle: "ต้องการสมัครใช้งานหรือสอบถามแพ็กเกจ?", ctaSub: "แชตกับแอดมิน NEXBILL ทาง WhatsApp", ctaButton: "แชตกับแอดมินทาง WhatsApp", fab: "ถามแอดมิน", message: "สวัสดีแอดมิน NEXBILL ฉันต้องการสมัครใช้ NEXBILL สำหรับร้านเช่า PS ของฉัน ชื่อร้าน: " },
     cookieBanner: {
       message: "เราใช้คุกกี้เพื่อปรับปรุงประสบการณ์ของคุณบนเว็บไซต์นี้และวิเคราะห์การเข้าชม การใช้งานต่อถือว่าคุณยอมรับการใช้คุกกี้ตามนโยบายคุกกี้ของเรา",
       accept: "ยอมรับ",
@@ -1241,6 +1247,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     footer: { alamatLabel: "Địa chỉ:", teleponLabel: "Điện thoại:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Bảo lưu mọi quyền.", refundLabel: "Chính sách hoàn tiền", termsLabel: "Điều khoản & Điều kiện", privacyLabel: "Chính sách quyền riêng tư" },
+    contact: { waLabel: "WhatsApp:", ctaTitle: "Muốn đăng ký hoặc hỏi về gói?", ctaSub: "Nhắn tin với quản trị viên NEXBILL qua WhatsApp", ctaButton: "Nhắn Admin qua WhatsApp", fab: "Hỏi Admin", message: "Xin chào Admin NEXBILL, tôi muốn đăng ký NEXBILL cho tiệm cho thuê PS của tôi. Tên cửa hàng: " },
     cookieBanner: {
       message: "Chúng tôi sử dụng cookie để cải thiện trải nghiệm của bạn trên trang web này và phân tích lưu lượng truy cập. Tiếp tục sử dụng nghĩa là bạn đồng ý với việc sử dụng cookie theo Chính sách Cookie của chúng tôi.",
       accept: "Chấp nhận",
@@ -1477,6 +1484,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       ],
     },
     footer: { alamatLabel: "Address:", teleponLabel: "Telepono:", emailLabel: "Email:", copyright: "© 2026 NEXBILL Billing System. Nakalaan ang lahat ng karapatan.", refundLabel: "Patakaran sa Refund", termsLabel: "Mga Tuntunin at Kundisyon", privacyLabel: "Patakaran sa Privacy" },
+    contact: { waLabel: "WhatsApp:", ctaTitle: "Gusto mong mag-subscribe o magtanong tungkol sa plano?", ctaSub: "Mag-chat sa admin ng NEXBILL sa WhatsApp", ctaButton: "I-chat ang Admin sa WhatsApp", fab: "Tanong sa Admin", message: "Hello NEXBILL Admin, gusto kong mag-subscribe sa NEXBILL para sa aking PS rental. Pangalan ng outlet: " },
     cookieBanner: {
       message: "Gumagamit kami ng cookies para mapahusay ang karanasan mo sa site na ito at suriin ang traffic. Sa pagpapatuloy, sumasang-ayon ka sa paggamit namin ng cookies ayon sa aming Patakaran sa Cookie.",
       accept: "Tanggapin",

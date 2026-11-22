@@ -14,6 +14,7 @@ import { SiteNavbar } from "../site-navbar";
 import { SiteFooter } from "../site-footer";
 import { Breadcrumb } from "@/components/seo/Breadcrumb";
 import { CookieConsentBanner } from "../cookie-consent-banner";
+import { WhatsappFab } from "../whatsapp-contact";
 import { LanguageProvider, useLanguage } from "../landing-i18n";
 
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--nb-font-display" });
@@ -103,6 +104,7 @@ function AboutPageInner() {
 
       <SiteFooter />
       <CookieConsentBanner />
+      <WhatsappFab />
     </div>
   );
 }

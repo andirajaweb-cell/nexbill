@@ -11,3 +11,15 @@
 // code with no such entanglement. layout.tsx re-exports it from here so its ~20 existing
 // `import { SITE_URL } from "@/app/layout"` call sites keep working unchanged.
 export const SITE_URL = "https://www.nexbill.id";
+
+/**
+ * WhatsApp admin NEXBILL untuk calon pelanggan (outlet/merchant) yang ingin berlangganan atau
+ * bertanya paket — dipakai footer, tombol mengambang, dan ajakan di bagian Harga situs utama
+ * (2026-11-22). Ganti nomor di sini saja.
+ */
+export const SALES_WHATSAPP = { display: "+62 856 0332 2222", e164: "6285603322222" } as const;
+
+/** Tautan wa.me dengan pesan pembuka yang sudah terisi. */
+export function salesWhatsappLink(message?: string): string {
+  return `https://wa.me/${SALES_WHATSAPP.e164}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
+}

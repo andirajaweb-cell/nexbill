@@ -13,6 +13,7 @@ import { LoadingScreen } from "./loading-screen";
 import { LanguageProvider, useLanguage } from "./landing-i18n";
 import { DEFAULT_PRICING } from "@/lib/subscription/pricing";
 import { PlanCompare } from "./plan-compare";
+import { PricingWhatsappCta, WhatsappFab } from "./whatsapp-contact";
 import { DEMO_PUBLIC_EMAIL, DEMO_PUBLIC_PASSWORD } from "@/lib/demo-public";
 import { AppShowcase } from "./landing-showcase";
 
@@ -1394,6 +1395,8 @@ function LandingPageInner() {
               </div>
             </div>
           </div>
+          {/* Berlangganan / tanya paket langsung ke admin lewat WhatsApp. */}
+          <PricingWhatsappCta />
         </div>
       </section>
 
@@ -1464,6 +1467,7 @@ function LandingPageInner() {
           and layout.tsx stays a server component. See cookie-consent-banner.tsx for the
           accept/decline persistence logic. */}
       <CookieConsentBanner />
+      <WhatsappFab />
     </div>
   );
 }
