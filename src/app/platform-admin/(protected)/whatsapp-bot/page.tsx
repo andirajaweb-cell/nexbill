@@ -112,11 +112,15 @@ export default function WhatsappBotPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="gm-display text-2xl font-bold text-amber-300">WhatsApp Bot (CRM &amp; Support 24 jam)</h1>
+        <h1 className="gm-display text-2xl font-bold text-amber-300">WhatsApp Bot (CRM, Marketing &amp; Support 24 jam)</h1>
         <p className="text-sm text-neutral-500 mt-1 max-w-3xl">
-          Nomor WhatsApp NEXBILL dengan dua tugas. <b className="text-neutral-300">CRM</b>: menghubungi prospek dari{" "}
+          Nomor WhatsApp NEXBILL dengan tiga tugas. <b className="text-neutral-300">CRM</b>: menghubungi prospek dari{" "}
           <Link href="/platform-admin/leads" className="text-amber-300 hover:underline">Leads &amp; CRM</Link> (jeda acak, batas harian); balasan lead
-          tercatat di riwayat lead dan tidak dibalas otomatis. <b className="text-neutral-300">Support 24 jam</b>: owner &amp; kasir outlet NEXBILL dijawab
+          Google Maps/manual tercatat di riwayat lead dan tidak dibalas otomatis. <b className="text-neutral-300">Marketing</b>: nomor baru yang chat
+          duluan (mis. dari tombol WhatsApp nexbill.id) otomatis jadi lead &quot;Chat WA masuk&quot;, dijawab soal harga/fitur/trial dan ditanya nama
+          outlet, kota, jumlah unit; petugas jaga dikabari bila prospek minta admin atau siap daftar. Bot diam 24 jam setelah admin membalas
+          (juga dari HP), bisa dimatikan per lead, atau seluruhnya dengan env <code className="text-neutral-300">WA_MARKETING=off</code>.{" "}
+          <b className="text-neutral-300">Support 24 jam</b>: owner &amp; kasir outlet NEXBILL dijawab
           seperti bot Telegram (FAQ → asisten AI → tiket staf, balasan tim ikut terkirim ke WhatsApp) — statistiknya di{" "}
           <Link href="/platform-admin/telegram-bot" className="text-amber-300 hover:underline">Telegram Bot</Link>. Matikan support dengan env{" "}
           <code className="text-neutral-300">WA_SUPPORT=off</code> di VPS. Bot ini tidak mengirim apa pun ke pelanggan outlet.

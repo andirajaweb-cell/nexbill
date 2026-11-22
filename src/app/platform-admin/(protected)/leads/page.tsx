@@ -26,6 +26,7 @@ import {
 } from "@/lib/leads/constants";
 import { leadWaNumber } from "@/lib/leads/wa-template";
 import { WaComposer, WaTemplatesTab } from "./wa-templates";
+import { BOT_OFF_TAG, BOT_ON_TAG, botSwitchedOff, MARKETING_BOT_NAME } from "@/lib/leads/wa-marketing-rules";
 
 const inputCls = "w-full rounded-lg bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm";
 
@@ -89,7 +90,7 @@ interface Lead {
   nextFollowUpDate: string | null;
   lastContactedAt: string | null;
   notes: string | null;
-  source: "google_maps" | "manual";
+  source: "google_maps" | "manual" | "whatsapp";
   searchQuery: string | null;
   convertedOutletId: string | null;
   /** Status usaha dari Google Maps: OPERATIONAL / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY. */
@@ -625,6 +626,7 @@ function CrmTab() {
                           )}
                         </div>
                         <div className="text-[11px] text-neutral-500">
+                          {l.source === "whatsapp" && <span className="text-emerald-300">Chat WA masuk · </span>}
                           {l.category ?? (l.source === "manual" ? "Input manual" : "—")}
                           {l.rating != null && ` · ★ ${l.rating} (${l.reviewCount ?? 0})`}
                           {l.currentBilling && ` · billing: ${l.currentBilling}`}
@@ -778,6 +780,24 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
     }
   };
 
+  /** Saklar bot marketing per lead = catatan bertanda #bot-off / #bot-on (tanpa kolom DB baru). */
+  const setBot = async (on: boolean) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await send(`/api/platform-admin/leads/${id}/activities`, "POST", {
+        type: "catatan",
+        content: on ? `Bot marketing dinyalakan lagi ${BOT_ON_TAG}` : `Bot marketing dimatikan — admin menangani sendiri ${BOT_OFF_TAG}`,
+      });
+      await load();
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const remove = async () => {
     if (!(await showConfirm(`Hapus prospek "${lead?.name}" beserta seluruh riwayat aktivitasnya?`, { tone: "danger" }))) return;
     await send(`/api/platform-admin/leads/${id}`, "DELETE");
@@ -807,7 +827,7 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
                     {lead.category ?? "—"}
                     {lead.rating != null && ` · ★ ${lead.rating} (${lead.reviewCount ?? 0} ulasan)`}
                     {" · "}
-                    {lead.source === "google_maps" ? `Google Maps: "${lead.searchQuery ?? "-"}"` : "Input manual"}
+                    {lead.source === "google_maps" ? `Google Maps: "${lead.searchQuery ?? "-"}"` : lead.source === "whatsapp" ? "Chat WhatsApp masuk (bot marketing)" : "Input manual"}
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[12px]">
                     {(lead.waNumber || lead.phone) && (
@@ -920,6 +940,10 @@ function LeadDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
                     </div>
                   ))}
                 </div>
+              )}
+
+              {lead.source === "whatsapp" && (
+                <BotMarketingPanel activities={activities} status={lead.status} busy={busy} onToggle={(on) => void setBot(on)} />
               )}
 
               <div className="border-t border-white/10 pt-4 space-y-3">
@@ -1048,6 +1072,32 @@ function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           </form>
         </Card>
       </div>
+    </div>
+  );
+}
+
+/** Status bot marketing WhatsApp untuk lead sumber "whatsapp" + saklar per lead. */
+function BotMarketingPanel({ activities, status, busy, onToggle }: { activities: Activity[]; status: string; busy: boolean; onToggle: (on: boolean) => void }) {
+  const off = botSwitchedOff(activities.map((a) => ({ ...a, createdBy: null })));
+  const replies = activities.filter((a) => a.createdByName === MARKETING_BOT_NAME && a.type === "whatsapp").length;
+  const statusOk = ["baru", "dihubungi", "follow_up"].includes(status);
+  const state = off ? "Dimatikan untuk lead ini" : !statusOk ? "Diam — status sudah lanjut (ditangani admin)" : "Aktif — menjawab otomatis";
+  return (
+    <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="font-semibold text-emerald-200">🤖 Bot marketing WhatsApp</div>
+          <div className="text-xs text-neutral-400">
+            {state} · {replies} balasan bot
+          </div>
+        </div>
+        <Button type="button" variant="secondary" disabled={busy} onClick={() => onToggle(off)}>
+          {off ? "Nyalakan bot" : "Matikan bot untuk lead ini"}
+        </Button>
+      </div>
+      <p className="mt-2 text-[11px] text-neutral-500">
+        Bot otomatis diam 24 jam setiap kali admin membalas (dari halaman ini atau langsung dari HP nomor WhatsApp NEXBILL), dan berhenti saat status jadi Demo/Trial/Closing atau Tidak Tertarik.
+      </p>
     </div>
   );
 }

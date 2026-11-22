@@ -88,7 +88,7 @@ export const LEAD_ACTIVITY_LABEL: Record<LeadActivityType, string> = {
 /** Activity types that count as actually reaching out to the lead (updates lastContactedAt). */
 export const LEAD_CONTACT_ACTIVITY_TYPES: LeadActivityType[] = ["whatsapp", "telepon", "kunjungan", "demo", "email"];
 
-export const LEAD_SOURCES = ["google_maps", "manual"] as const;
+export const LEAD_SOURCES = ["google_maps", "manual", "whatsapp"] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 
 /** One normalized Google Maps search result, as returned by /api/platform-admin/leads/search. */

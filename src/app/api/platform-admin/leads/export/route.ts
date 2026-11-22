@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       "Follow Up Berikutnya": l.nextFollowUpDate ?? "",
       "Terakhir Dihubungi": l.lastContactedAt ? l.lastContactedAt.slice(0, 10) : "",
       "Catatan": l.notes ?? "",
-      "Sumber": l.source === "google_maps" ? `Google Maps (${l.searchQuery ?? "-"})` : "Manual",
+      "Sumber": l.source === "google_maps" ? `Google Maps (${l.searchQuery ?? "-"})` : l.source === "whatsapp" ? "Chat WhatsApp masuk" : "Manual",
       "Dibuat": l.createdAt.slice(0, 10),
     }));
 

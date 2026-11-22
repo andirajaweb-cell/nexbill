@@ -5,16 +5,20 @@
  *     FAQ → asisten AI → staf (tiket Customer Service), balasan tim diteruskan ke WhatsApp. Nomor dikenali
  *     dari tautan kode (dashboard › Customer Service › "Support 24 jam di WhatsApp") atau nomor HP di
  *     Profil Outlet. Logika di src/lib/whatsapp-support/.
+ *  C. Marketing (sejak 2026-11-22): prospek yang chat duluan dijawab otomatis & dicatat sebagai lead.
  * (Tetap TIDAK membalas chat pelanggan outlet / mengirim notifikasi booking — keputusan 2026-09-29,
- *  lihat src/lib/notifications/outlet-whatsapp.ts. Lead CRM tidak pernah dibalas otomatis.)
+ *  lihat src/lib/notifications/outlet-whatsapp.ts. Lead CRM outbound tidak dibalas otomatis.)
  *
  * Tugas:
  *  1. Login via QR (seperti WhatsApp Web). Status, QR, dan heartbeat ditulis ke tabel
  *     platform_wa_bot_status supaya halaman /platform-admin/whatsapp-bot (di Vercel) bisa membacanya.
  *  2. Mengirim antrean platform_wa_outbox (pesan admin ke lead) dengan jeda acak antarpesan dan
  *     batas harian (env WA_BOT_DAILY_LIMIT, default 150), lalu mencatat aktivitas di lead.
- *  3. Pesan masuk: nomor staf outlet → support 24 jam (B). Nomor lead → dicatat ke riwayat lead + tanda
- *     "balasan baru", TIDAK dibalas otomatis. Nomor asing → sekali per 24 jam diberi tahu cara menautkan.
+ *  3. Pesan masuk: nomor staf outlet → support 24 jam (B). Nomor BARU (prospek, mis. dari tombol WhatsApp
+ *     nexbill.id) → C. bot marketing (src/lib/leads/wa-marketing.ts): lead otomatis + jawaban harga/fitur/
+ *     trial + kualifikasi, admin diberi tahu bila prospek panas (matikan: WA_MARKETING=off). Nomor lead
+ *     Google Maps/manual → dicatat ke riwayat lead + tanda "balasan baru", TIDAK dibalas otomatis.
+ *     Pesan yang admin ketik langsung di HP nomor bot → dicatat ke lead (bot marketing diam 24 jam).
  *     Chat grup diabaikan.
  *
  * Jalankan di server yang menyala 24 jam (BUKAN Vercel):  npm run bot:whatsapp
@@ -44,6 +48,7 @@ import {
   markOutboxFailed,
   markOutboxSent,
   readBotNote,
+  recordAdminPhoneReply,
   recordInbound,
   requeueStuckSending,
   writeBotStatus,
@@ -66,6 +71,7 @@ import {
   startOfTodayWibIso,
 } from "../src/lib/leads/wa-bot-rules";
 import { handleWaSupportMessage, pollTeamReplies, replyNotLinkedIfDue, type WaSender } from "../src/lib/whatsapp-support/handler";
+import { handleWaMarketingMessage, MARKETING_ON } from "../src/lib/leads/wa-marketing";
 
 /** Support 24 jam lewat WhatsApp aktif? Matikan dengan env WA_SUPPORT=off (bot kembali khusus CRM). */
 const SUPPORT_ON = (process.env.WA_SUPPORT ?? "on").toLowerCase() !== "off";
@@ -76,6 +82,21 @@ fs.mkdirSync(AUTH_DIR, { recursive: true });
 const DAILY_LIMIT = parseDailyLimit(process.env.WA_BOT_DAILY_LIMIT);
 const OUTBOX_POLL_MS = 10_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Id pesan yang dikirim proses bot ini. Pesan fromMe lain = diketik admin langsung di HP / WhatsApp Web
+ * nomor bot → dicatat ke lead sebagai sentuhan admin (bot marketing lalu diam di lead itu).
+ */
+const botSentIds = new Set<string>();
+async function sendText(sock: ReturnType<typeof makeWASocket>, jid: string, text: string): Promise<string | null> {
+  const sent = await sock.sendMessage(jid, { text });
+  const id = sent?.key?.id ?? null;
+  if (id) {
+    botSentIds.add(id);
+    if (botSentIds.size > 5000) botSentIds.delete(botSentIds.values().next().value as string);
+  }
+  return id;
+}
 
 /** Pesan error singkat (tanpa stack + kode sumber yang membanjiri log pm2). */
 function shortErr(err: unknown): string {
@@ -115,7 +136,7 @@ async function drainOutbox(sock: ReturnType<typeof makeWASocket>) {
     for (let i = 0; i < batch.length; i++) {
       const row = batch[i];
       try {
-        await sock.sendMessage(jidFromPhone(row.phone), { text: row.body });
+        await sendText(sock, jidFromPhone(row.phone), row.body);
         await markOutboxSent(row);
         console.log(`Terkirim ke ${row.phone} (lead ${row.leadId}).`);
       } catch (err: any) {
@@ -303,7 +324,7 @@ async function start() {
       if (watchdog) clearTimeout(watchdog);
       watchdog = null;
       await status({ connected: true, qrDataUrl: null, number: lastNumber, lastError: null });
-      console.log(`Bot WhatsApp terhubung sebagai ${lastNumber}. CRM: batas harian ${DAILY_LIMIT} pesan. Support 24 jam: ${SUPPORT_ON ? "aktif" : "mati (WA_SUPPORT=off)"}.`);
+      console.log(`Bot WhatsApp terhubung sebagai ${lastNumber}. CRM: batas harian ${DAILY_LIMIT} pesan. Support 24 jam: ${SUPPORT_ON ? "aktif" : "mati (WA_SUPPORT=off)"}. Bot marketing: ${MARKETING_ON ? "aktif" : "mati (WA_MARKETING=off)"}.`);
       if (!outboxPoller) {
         outboxPoller = setInterval(() => void drainOutbox(sock), OUTBOX_POLL_MS);
         void drainOutbox(sock);
@@ -315,8 +336,7 @@ async function start() {
           pollingTeam = true;
           try {
             const n = await pollTeamReplies(async (phone, text) => {
-              const sent = await sock.sendMessage(jidFromPhone(phone), { text });
-              return sent?.key?.id ?? null;
+              return sendText(sock, jidFromPhone(phone), text);
             });
             if (n > 0) console.log(`Balasan tim support diteruskan ke WhatsApp: ${n}.`);
           } catch (err) {
@@ -348,8 +368,27 @@ async function start() {
     }
   });
 
-  // Pesan masuk: staf outlet → support 24 jam; lead → dicatat (tidak dibalas); nomor asing → info tautan.
+  // Pesan masuk: staf outlet → support 24 jam; nomor baru / lead WhatsApp → bot marketing;
+  // lead Google Maps/manual → dicatat (dibalas admin); pesan admin dari HP → dicatat sebagai sentuhan admin.
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    for (const msg of messages) {
+      if (!msg.message || !msg.key.fromMe || !msg.key.id || botSentIds.has(msg.key.id)) continue;
+      if (msg.key.remoteJid?.endsWith("@g.us")) continue;
+      // Hanya pesan baru (bukan riwayat yang disinkron ulang saat sambung ulang).
+      const raw = msg.messageTimestamp as number | { toNumber(): number } | null | undefined;
+      const ts = (typeof raw === "number" ? raw : raw?.toNumber?.() ?? 0) * 1000;
+      if (!ts || Date.now() - ts > 120_000) continue;
+      const k = msg.key as typeof msg.key & { remoteJidAlt?: string };
+      const toPhone = phoneFromJids([k.remoteJid, k.remoteJidAlt]);
+      const body = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+      if (!toPhone || !body.trim()) continue;
+      try {
+        const n = await recordAdminPhoneReply(toPhone, body);
+        if (n > 0) console.log(`Balasan admin dari HP ke ${toPhone} dicatat ke ${n} lead.`);
+      } catch (err) {
+        console.error("Gagal mencatat balasan admin dari HP:", shortErr(err));
+      }
+    }
     if (type !== "notify") return;
     for (const msg of messages) {
       if (!msg.message || msg.key.fromMe) continue;
@@ -369,8 +408,7 @@ async function start() {
       if (SUPPORT_ON) {
         const out: WaSender = {
           send: async (body) => {
-            const sent = await sock.sendMessage(replyJid, { text: body });
-            return sent?.key?.id ?? null;
+            return sendText(sock, replyJid, body);
           },
           typing: async () => {
             await sock.sendPresenceUpdate("composing", replyJid).catch(() => undefined);
@@ -386,6 +424,25 @@ async function start() {
         }
       }
 
+      // Prospek: nomor baru → lead otomatis + jawaban harga/fitur/trial; lead sumber WhatsApp → dilanjutkan.
+      if (MARKETING_ON) {
+        try {
+          const res = await handleWaMarketingMessage(
+            { phone, text: mediaOnly ? "" : text, msgId: msg.key.id ?? `${phone}:${Date.now()}`, pushName: msg.pushName ?? null, mediaOnly },
+            {
+              send: (body) => sendText(sock, replyJid, body),
+              typing: async () => {
+                await sock.sendPresenceUpdate("composing", replyJid).catch(() => undefined);
+              },
+            }
+          );
+          if (res === "handled") continue;
+        } catch (err) {
+          console.error(`Gagal memproses pesan prospek dari ${phone}:`, shortErr(err));
+          continue;
+        }
+      }
+
       if (!text.trim()) continue;
       try {
         const n = await recordInbound(phone, text);
@@ -393,8 +450,7 @@ async function start() {
         else if (SUPPORT_ON) {
           await replyNotLinkedIfDue(phone, {
             send: async (body) => {
-              const sent = await sock.sendMessage(replyJid, { text: body });
-              return sent?.key?.id ?? null;
+              return sendText(sock, replyJid, body);
             },
           });
         }

@@ -6,7 +6,8 @@ import { and, asc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { platformLeads, platformWaBotStatus, platformWaOutbox, platformWaTemplates } from "@/db/schema";
 import { addLeadActivity } from "./service";
-import { inboundActivityText, outboundActivityText, phoneVariants, startOfTodayWibIso } from "./wa-bot-rules";
+import { INBOUND_MAX_CHARS, inboundActivityText, outboundActivityText, phoneVariants, startOfTodayWibIso } from "./wa-bot-rules";
+import { ADMIN_PHONE_NAME, ADMIN_PHONE_PREFIX } from "./wa-marketing-rules";
 
 const STATUS_ID = "main";
 
@@ -101,17 +102,51 @@ export async function markOutboxSent(row: typeof platformWaOutbox.$inferSelect) 
 
 /* ------------------------------------------------------------------ inbound ------------------------------------------------------------------ */
 
+/** Semua lead yang nomornya cocok (waNumber, atau kolom phone dalam format 628…/08…/8…). */
+export async function leadsForPhone(phone628: string) {
+  const variants = phoneVariants(phone628);
+  return db
+    .select({
+      id: platformLeads.id,
+      source: platformLeads.source,
+      status: platformLeads.status,
+      name: platformLeads.name,
+      city: platformLeads.city,
+      unitCount: platformLeads.unitCount,
+      currentBilling: platformLeads.currentBilling,
+      contactName: platformLeads.contactName,
+      temperature: platformLeads.temperature,
+      updatedAt: platformLeads.updatedAt,
+    })
+    .from(platformLeads)
+    .where(or(eq(platformLeads.waNumber, phone628), inArray(sql<string>`regexp_replace(coalesce(${platformLeads.phone}, ''), '[^0-9]', '', 'g')`, variants)));
+}
+
+/**
+ * Admin membalas langsung dari HP / WhatsApp Web nomor bot (pesan fromMe yang bukan kiriman bot).
+ * Dicatat ke lead yang cocok sebagai sentuhan admin → bot marketing diam di lead itu (lihat
+ * botMayReply di wa-marketing-rules.ts). Mengembalikan jumlah lead yang tercatat.
+ */
+export async function recordAdminPhoneReply(phone628: string, text: string): Promise<number> {
+  const leads = await leadsForPhone(phone628);
+  if (leads.length === 0) return 0;
+  const now = new Date().toISOString();
+  const t = text.trim();
+  const body = `${ADMIN_PHONE_PREFIX}${t.length > INBOUND_MAX_CHARS ? `${t.slice(0, INBOUND_MAX_CHARS)}…` : t}`;
+  for (const l of leads) {
+    await addLeadActivity(l.id, "whatsapp", body, { sub: null, name: ADMIN_PHONE_NAME });
+    await db.update(platformLeads).set({ lastContactedAt: now, inboundUnread: false, updatedAt: now }).where(eq(platformLeads.id, l.id));
+  }
+  return leads.length;
+}
+
 /**
  * Balasan WhatsApp masuk ke nomor bot. Dicatat ke SEMUA lead yang nomornya cocok (waNumber, atau
  * kolom phone dalam format 628…/08…/8…). Nomor yang bukan lead diabaikan — bot ini khusus CRM.
  * Mengembalikan jumlah lead yang tercatat.
  */
 export async function recordInbound(phone628: string, text: string): Promise<number> {
-  const variants = phoneVariants(phone628);
-  const leads = await db
-    .select({ id: platformLeads.id })
-    .from(platformLeads)
-    .where(or(eq(platformLeads.waNumber, phone628), inArray(sql<string>`regexp_replace(coalesce(${platformLeads.phone}, ''), '[^0-9]', '', 'g')`, variants)));
+  const leads = await leadsForPhone(phone628);
   if (leads.length === 0) return 0;
   const now = new Date().toISOString();
   for (const l of leads) {

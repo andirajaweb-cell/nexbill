@@ -2944,7 +2944,8 @@ export const platformLeads = pgTable(
   {
     id: id(),
     placeId: text("place_id"),
-    source: text("source", { enum: ["google_maps", "manual"] }).notNull().default("manual"),
+    // "whatsapp" = prospek yang chat duluan ke WhatsApp NEXBILL (bot marketing, 2026-11-22) — kolom teks, tanpa migrasi.
+    source: text("source", { enum: ["google_maps", "manual", "whatsapp"] }).notNull().default("manual"),
     searchQuery: text("search_query"),
     name: text("name").notNull(),
     category: text("category"),
