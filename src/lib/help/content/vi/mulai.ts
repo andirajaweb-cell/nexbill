@@ -23,7 +23,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Mở dashboard.nexbill.id, nhập email và mật khẩu, rồi bấm Đăng nhập. Tài khoản tạo bằng Google có thể dùng nút Google.",
           "Quên mật khẩu? Bấm \"Quên mật khẩu\" ở trang đăng nhập và làm theo đường dẫn gửi tới email của bạn.",
-          "Vì an toàn, một tài khoản chỉ hoạt động trên một thiết bị/trình duyệt tại một thời điểm. Nếu bạn đang đăng nhập trên điện thoại và thử đăng nhập trên PC, PC sẽ bị từ chối cho đến khi bạn đăng xuất trên điện thoại, tài khoản không hoạt động 30 phút, hoặc Owner bấm \"Buộc đăng xuất\" trong Nhân viên & Quyền hạn.",
+          "Vì an toàn, một tài khoản chỉ hoạt động trên một thiết bị/trình duyệt tại một thời điểm. Nếu bạn đang đăng nhập trên điện thoại và thử đăng nhập trên PC, PC sẽ bị từ chối cho đến khi bạn đăng xuất trên điện thoại, tài khoản không hoạt động 5 phút, hoặc Owner bấm \"Buộc đăng xuất\" trong Nhân viên & Quyền hạn.",
           "Khi xong việc, bấm Đăng xuất trong menu tài khoản (góc trên bên phải) — đặc biệt trên máy tính dùng chung.",
         ],
       },

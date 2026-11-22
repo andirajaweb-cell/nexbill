@@ -23,7 +23,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Buka dashboard.nexbill.id, masukkan email dan password akunmu, lalu tekan Masuk. Akun yang dibuat lewat Google bisa langsung masuk dengan tombol Google.",
           "Lupa password? Tekan \"Lupa password\" di halaman login, ikuti tautan yang dikirim ke email.",
-          "Untuk keamanan, satu akun hanya boleh aktif di satu perangkat/browser dalam waktu bersamaan. Kalau kamu login di HP lalu mencoba login di PC, PC akan ditolak sampai kamu keluar dari HP, atau akun tidak dipakai selama 30 menit, atau Owner menekan \"Keluarkan\" di menu Staf & Hak Akses.",
+          "Untuk keamanan, satu akun hanya boleh aktif di satu perangkat/browser dalam waktu bersamaan. Kalau kamu login di HP lalu mencoba login di PC, PC akan ditolak sampai kamu keluar dari HP, atau akun tidak dipakai selama 5 menit, atau Owner menekan \"Keluarkan\" di menu Staf & Hak Akses.",
           "Selesai bekerja, tekan Keluar di menu akun (kanan atas) — terutama di komputer yang dipakai bergantian.",
         ],
       },

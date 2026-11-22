@@ -23,7 +23,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Buka dashboard.nexbill.id, masukkan e-mel dan kata laluan akaun anda, kemudian tekan Log Masuk. Akaun yang dibuat melalui Google boleh terus masuk dengan butang Google.",
           "Lupa kata laluan? Tekan \"Lupa kata laluan\" di halaman log masuk, ikut pautan yang dihantar ke e-mel.",
-          "Untuk keselamatan, satu akaun hanya boleh aktif di satu peranti/pelayar pada satu masa. Jika anda log masuk di telefon lalu cuba log masuk di PC, PC akan ditolak sehingga anda log keluar dari telefon, akaun tidak digunakan selama 30 minit, atau Owner menekan \"Keluarkan\" di Staf & Kebenaran.",
+          "Untuk keselamatan, satu akaun hanya boleh aktif di satu peranti/pelayar pada satu masa. Jika anda log masuk di telefon lalu cuba log masuk di PC, PC akan ditolak sehingga anda log keluar dari telefon, akaun tidak digunakan selama 5 minit, atau Owner menekan \"Keluarkan\" di Staf & Kebenaran.",
           "Selesai bekerja, tekan Log Keluar di menu akaun (kanan atas) — terutamanya di komputer yang dikongsi.",
         ],
       },

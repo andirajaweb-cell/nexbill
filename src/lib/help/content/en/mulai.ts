@@ -23,7 +23,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Open dashboard.nexbill.id, enter your email and password, then press Log In. Accounts created with Google can use the Google button.",
           "Forgot your password? Press \"Forgot password\" on the login page and follow the link sent to your email.",
-          "For security, one account can only be active on one device/browser at a time. If you're logged in on your phone and try to log in on a PC, the PC is refused until you log out on the phone, the account is idle for 30 minutes, or the Owner presses \"Sign out\" in Staff & Permissions.",
+          "For security, one account can only be active on one device/browser at a time. If you're logged in on your phone and try to log in on a PC, the PC is refused until you log out on the phone, the account is idle for 5 minutes, or the Owner presses \"Sign out\" in Staff & Permissions.",
           "When you finish, press Log Out in the account menu (top right) — especially on shared computers.",
         ],
       },

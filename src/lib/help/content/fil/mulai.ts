@@ -23,7 +23,7 @@ export const MULAI: HelpCategory[] = [
         steps: [
           "Buksan ang dashboard.nexbill.id, ilagay ang email at password, saka pindutin ang Log In. Ang mga account na ginawa gamit ang Google ay puwedeng gumamit ng Google button.",
           "Nakalimutan ang password? Pindutin ang \"Nakalimutan ang password\" sa login page at sundin ang link na ipinadala sa email mo.",
-          "Para sa seguridad, isang device/browser lang ang puwedeng aktibo sa isang account sa isang pagkakataon. Kung naka-log in ka sa phone at sinubukan mong mag-log in sa PC, tatanggihan ang PC hanggang mag-log out ka sa phone, hindi magamit ang account nang 30 minuto, o pindutin ng Owner ang \"I-sign out\" sa Staff at Access.",
+          "Para sa seguridad, isang device/browser lang ang puwedeng aktibo sa isang account sa isang pagkakataon. Kung naka-log in ka sa phone at sinubukan mong mag-log in sa PC, tatanggihan ang PC hanggang mag-log out ka sa phone, hindi magamit ang account nang 5 minuto, o pindutin ng Owner ang \"I-sign out\" sa Staff at Access.",
           "Kapag tapos na, pindutin ang Log Out sa account menu (kanang itaas) — lalo na sa mga computer na pinagsasaluhan.",
         ],
       },
