@@ -989,7 +989,7 @@ function LandingPageInner() {
             {/* Right column no longer holds a framed picture (the photo is now the section's own
                 background) — kept only as a positioning container for the floating stat badges,
                 so they still land over the visible right-hand part of the photo. */}
-            <div className="intro-media" style={{ minHeight: '340px' }}>
+            <div className="intro-media">
               {/* intro-float-badge(-1/2/3): gentle infinite up/down bob per explicit request ("ui
                   floating dibuatkan animasi bergerak") — pure CSS keyframes (see landing.css),
                   each badge on its own slightly different duration/delay so the three drift out of

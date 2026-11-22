@@ -508,7 +508,9 @@
   position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: linear-gradient(90deg, rgba(5,8,16,0) 0%, rgba(5,8,16,0) 32%, rgba(5,8,16,0) 58%, rgba(5,8,16,0) 100%);
 }
-.nb-landing .intro-inner { position: relative; z-index: 2; width: 100%; max-width: 1180px; margin: 0 auto; padding: 110px 0 40px; }
+/* padding-top/bottom saja (bukan shorthand "110px 0 40px") — shorthand itu ikut menimpa padding kiri-kanan
+   24px milik .wrap, sehingga di HP teks section 2 menempel ke tepi layar. */
+.nb-landing .intro-inner { position: relative; z-index: 2; width: 100%; max-width: 1180px; margin: 0 auto; padding-top: 110px; padding-bottom: 40px; }
 /* Hidden by default in CSS, not just via the JS gsap.set() in page.tsx's mount effect. Before
    this rule existed, .intro-copy/.intro-media rendered fully visible (their natural, un-hidden
    DOM state) from first paint until that effect actually ran and hid them — normally an
@@ -550,7 +552,7 @@
 .nb-landing .trust-badge .trust-text strong { color: var(--text); }
 
 /* Right column — dashboard photo in a glass-glow frame, matching the section's dark/cyan theme. */
-.nb-landing .intro-media { position: relative; }
+.nb-landing .intro-media { position: relative; min-height: 340px; }
 .nb-landing .intro-media-glow {
   position: absolute; inset: -36px; z-index: 0; pointer-events: none;
   background: radial-gradient(circle, rgba(56,189,248,.22), transparent 70%);
@@ -626,7 +628,44 @@
      text sits above/below the photo rather than beside it, so switch to a uniform dark scrim. */
   .nb-landing .intro-section { min-height: auto; display: block; }
   .nb-landing .intro-bg-overlay { background: rgba(5,8,16,0); }
-  .nb-landing .intro-inner { padding: 80px 0 32px; }
+  .nb-landing .intro-inner { padding-top: 80px; padding-bottom: 32px; }
+}
+
+/* HP & tablet potret (2026-11-22, "halaman kedua di HP tidak pas"): satu kolom membuat foto latar
+   (1024×683, lanskap) di-"cover" ke section yang sangat tinggi → foto ter-zoom berlebihan, teks jatuh di
+   atas bagian foto yang ramai, dan lencana melayang di atas kotak kosong 340px. Di layar sempit foto
+   tidak lagi jadi latar: section berlatar gelap (lanjutan mulus dari video hero), teks di atas, lalu foto
+   tampil utuh sebagai kartu 3:2 di bawahnya dengan lencana di atas foto itu sendiri. URL foto sama dengan
+   <img> latar → diambil dari cache, tidak unduh dua kali. */
+@media (max-width: 900px) {
+  .nb-landing .intro-section { background: linear-gradient(180deg, #050810 0%, #0a1222 55%, #050810 100%); }
+  .nb-landing .intro-bg-photo, .nb-landing .intro-bg-overlay { display: none; }
+  .nb-landing .intro-grid { gap: 28px; }
+  .nb-landing .intro-media {
+    min-height: 0; width: 100%; max-width: 560px; margin: 0 auto; aspect-ratio: 3 / 2;
+    border-radius: 20px; overflow: hidden; border: 1px solid var(--card-border);
+    background-image: url("/intro-hero-photo.jpg");
+    background-image: image-set(url("/intro-hero-photo.webp") type("image/webp"), url("/intro-hero-photo.jpg") type("image/jpeg"));
+    background-size: cover; background-position: center;
+    box-shadow: 0 24px 60px -20px rgba(56,189,248,.35);
+  }
+  .nb-landing .intro-section p.sub { margin-bottom: 24px; }
+  .nb-landing .stat-strip { margin-top: 28px; }
+}
+@media (max-width: 560px) {
+  .nb-landing .intro-inner { padding-top: 76px; padding-bottom: 28px; }
+  .nb-landing .intro-section p.sub { font-size: 15px; line-height: 1.55; }
+  /* CTA: tombol utama selebar layar, dua tombol sekunder berdampingan di bawahnya. */
+  .nb-landing .intro-section .hero-ctas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .nb-landing .intro-section .hero-ctas .btn { width: 100%; justify-content: center; text-align: center; padding-left: 10px; padding-right: 10px; font-size: 14px; white-space: normal; line-height: 1.25; }
+  .nb-landing .intro-section .hero-ctas .btn-primary { grid-column: 1 / -1; }
+  .nb-landing .intro-section .hero-note { font-size: 12.5px; }
+  .nb-landing .intro-section .trust-badge { border-radius: 14px; text-align: left; align-items: flex-start; padding: 10px 14px; }
+  .nb-landing .intro-section .trust-badge .trust-text { font-size: 12.5px; line-height: 1.45; }
+  .nb-landing .intro-media { border-radius: 16px; }
+  .nb-landing .stat-item { padding: 14px 8px; }
+  .nb-landing .stat-num { font-size: 19px; }
+  .nb-landing .stat-label { font-size: 11.5px; }
 }
 
 /* Showcase marquee — horizontal drag/scroll track of varied-size cards (bajgartoffice.com-style).
