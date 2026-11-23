@@ -130,7 +130,8 @@ def main() -> None:
 
     store = ROOT / "android" / "store"
     play_icon = square_icon(512, 0.62)
-    save(play_icon, store / "play-icon-512.png", rgb=True)
+    # Play Console: ikon 512×512 PNG 32-bit (RGBA), maks. 1 MB.
+    save(play_icon, store / "play-icon-512.png")
     save(play_icon, ROOT / "android" / "store_icon.png")
     save(feature_graphic(), store / "feature-graphic-1024x500.png", rgb=True)
 
@@ -140,7 +141,7 @@ def main() -> None:
     save(tv_banner(320, 180), t / "drawable" / "banner.png", rgb=True)
     tstore = ROOT / "android-tv" / "store"
     save(tv_banner(1280, 720), tstore / "tv-banner-1280x720.png", rgb=True)
-    save(play_icon, tstore / "play-icon-512.png", rgb=True)
+    save(play_icon, tstore / "play-icon-512.png")
 
 
 if __name__ == "__main__":
