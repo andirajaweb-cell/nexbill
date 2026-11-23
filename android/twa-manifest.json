@@ -21,8 +21,8 @@
     "path": "./nexbill-upload.keystore",
     "alias": "nexbill"
   },
-  "appVersionName": "1.0.1",
-  "appVersionCode": 2,
+  "appVersionName": "1.0.2",
+  "appVersionCode": 3,
   "shortcuts": [
     {
       "name": "Rental PS",
@@ -58,5 +58,5 @@
   "fingerprints": [],
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
-  "appVersion": "1.0.1"
+  "appVersion": "1.0.2"
 }
