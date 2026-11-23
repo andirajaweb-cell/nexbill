@@ -130,7 +130,23 @@ try {
     }
 
     # 3) Buat/perbarui proyek Android dari twa-manifest.json.
+    #    'bubblewrap update' menghapus lalu menulis ulang seluruh proyek. Kalau ada file build lama
+    #    yang masih dikunci (daemon Gradle/Java dari build sebelumnya), update gagal di tengah jalan
+    #    (EBUSY ... classes.dex) dan proyek tertinggal setengah terhapus (gradlew.bat hilang).
+    #    Jadi: hentikan daemon Gradle + Java Bubblewrap, hapus folder build lama, baru update.
+    if (Test-Path ".\gradlew.bat") { cmd /c ".\gradlew.bat --stop >nul 2>&1" }
+    Get-Process java, javaw -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*\.bubblewrap\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    foreach ($d in @(".\app\build", ".\build")) {
+      if (Test-Path $d) {
+        Remove-Item -Recurse -Force $d -ErrorAction SilentlyContinue
+        if (Test-Path $d) { throw "Folder $d masih dikunci program lain. Tutup Android Studio/VS Code/File Explorer yang membuka folder android, atau restart PC, lalu jalankan lagi." }
+      }
+    }
     bubblewrap update --skipVersionUpgrade
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path ".\gradlew.bat")) {
+      throw "bubblewrap update gagal - proyek Android belum lengkap (gradlew.bat tidak ada). Lihat pesan 'cli ERROR' di atas."
+    }
   }
 
   # 4) Build AAB (Play Store) + APK (uji). Bubblewrap menanyakan password keystore & key -
