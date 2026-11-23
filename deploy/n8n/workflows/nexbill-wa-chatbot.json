@@ -1,0 +1,219 @@
+{
+  "name": "NEXBILL — Chatbot WhatsApp (otak bot marketing)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nexbill-wa",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b10b6e85-56e2-4c9c-a747-ebccc8d53489",
+      "name": "Pesan WhatsApp masuk",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "8a4c2d2d-6aa0-410d-a8b5-6f7fc59305fc"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===================== PENGATURAN — boleh diubah tanpa coding lain =====================\n// Instruksi tambahan untuk AI (ditambahkan ke prompt bawaan NEXBILL). Contoh: promo yang SEDANG\n// berlaku, gaya bahasa, atau hal yang tidak boleh dijanjikan. Kosongkan bila tidak ada.\nconst INSTRUKSI_TAMBAHAN_AI = ``;\n\n// FAQ tanpa AI: bila pesan prospek mengandung salah satu kata kunci, jawaban ini langsung dikirim\n// (cepat & gratis). Tulis hanya fakta yang benar. {daftar} {harga} {katalog} diisi otomatis.\nconst FAQ = [\n  {\n    kata: [\"iphone\", \"ios\"],\n    jawab: \"Dashboard NEXBILL bisa dibuka di browser iPhone 🙂 Khusus cetak struk ke printer Bluetooth, saat ini hanya dari HP Android (aplikasi NEXBILL atau Chrome Android).\",\n  },\n  {\n    kata: [\"kartu kredit\"],\n    jawab: \"Coba gratisnya tanpa kartu kredit, Kak 🙂 Daftar di {daftar}\",\n  },\n];\n// =======================================================================================\n\nconst p = $input.first().json.body || {};\nconst m = p.message || {};\nconst t = p.templates || {};\nconst links = (p.facts && p.facts.links) || {};\nconst teks = String(m.text || \"\").toLowerCase();\nconst isi = (s) => String(s).replace(\"{daftar}\", links.daftar || \"\").replace(\"{harga}\", links.harga || \"\").replace(\"{katalog}\", links.katalog || \"\");\n\nlet jawab = null;\nif (m.mediaOnly) jawab = { reply: t.mediaOnly, menu: true };\nelse if (m.menuChoice === \"price\") jawab = { reply: t.price, menu: true, intent: \"question\" };\nelse if (m.menuChoice === \"features\") jawab = { reply: t.features, menu: true, intent: \"question\" };\nelse if (m.menuChoice === \"trial\") jawab = { reply: t.trial, menu: true, intent: \"subscribe\" };\nelse if (m.menuChoice === \"human\") jawab = { reply: t.handoff, intent: \"human\", handoff: true };\nelse if (m.menuChoice === \"customer\") jawab = { reply: null, intent: \"support\" };\nelse if (m.isGreeting) jawab = { reply: t.welcome, menu: true };\nelse {\n  const faq = FAQ.find((f) => f.kata.some((k) => teks.includes(k.toLowerCase())));\n  if (faq) jawab = { reply: isi(faq.jawab), intent: \"question\" };\n}\n\nif (jawab) {\n  return [{ json: { route: \"tetap\", response: { reply: null, intent: \"other\", handoff: false, menu: false, extracted: {}, ...jawab } } }];\n}\n\n// Selain itu → tanya Claude dengan prompt bawaan NEXBILL (harga live + tabel fitur + aturan).\nconst lead = p.lead || {};\nconst sistem = [\n  (p.ai && p.ai.systemPrompt) || \"\",\n  INSTRUKSI_TAMBAHAN_AI ? `\\nINSTRUKSI TAMBAHAN DARI ADMIN NEXBILL:\\n${INSTRUKSI_TAMBAHAN_AI}` : \"\",\n  `\\nData lead saat ini: nama=\"${lead.name || \"?\"}\", kota=${lead.city || \"?\"}, unit=${lead.unitCount || \"?\"}, billing sekarang=${lead.currentBilling || \"?\"}, kontak=${lead.contactName || \"?\"}. Bahasa pelanggan kemungkinan: ${m.lang || \"id\"}.`,\n].join(\"\");\nconst riwayat = Array.isArray(p.history) && p.history.length ? p.history : [{ role: \"user\", content: String(m.text || \"\") }];\n\nreturn [\n  {\n    json: {\n      route: \"ai\",\n      anthropicRequest: { model: (p.ai && p.ai.model) || \"claude-haiku-5-5\", max_tokens: 700, system: sistem, messages: riwayat },\n    },\n  },\n];\n"
+      },
+      "id": "91ef9990-3fe5-495a-9937-97ba79ea4d53",
+      "name": "Atur alur (menu & FAQ)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "fcc7854b-5356-44ea-99c6-f57c0211ff23",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "ai",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "33242452-60b5-4c89-af95-e1c5091237b6",
+      "name": "Perlu AI?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.anthropicRequest) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "043b190e-c8e2-4d6e-8289-23dad0373d41",
+      "name": "Tanya Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Jawaban Claude → format yang dipahami bot NEXBILL. Bila AI gagal/kosong, kirim {} supaya bot\n// otomatis memakai otak bawaannya (prospek tetap dibalas).\nconst res = $input.first().json || {};\nconst teks = (res.content || []).filter((c) => c.type === \"text\").map((c) => c.text).join(\"\\n\");\nconst a = teks.indexOf(\"{\");\nconst b = teks.lastIndexOf(\"}\");\nlet o = null;\ntry {\n  o = a >= 0 && b > a ? JSON.parse(teks.slice(a, b + 1)) : null;\n} catch (e) {\n  o = null;\n}\nif (!o || typeof o.reply !== \"string\" || !o.reply.trim()) return [{ json: { response: {} } }];\nreturn [\n  {\n    json: {\n      response: { reply: o.reply, intent: o.intent || \"question\", handoff: o.handoff === true, extracted: o.extracted || {}, menu: false },\n    },\n  },\n];\n"
+      },
+      "id": "22647793-13fd-4a59-ab2f-7f4cee697dbd",
+      "name": "Olah jawaban AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {}
+      },
+      "id": "4e7cab1e-c708-40a6-8e66-1ae8e55d550e",
+      "name": "Balas ke bot NEXBILL",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Otak bot WhatsApp NEXBILL\nBot WA (pm2) mengirim setiap pesan prospek ke sini, workflow ini memutuskan balasannya.\n\n**Ubah alur:** buka node *Atur alur* → bagian PENGATURAN (FAQ & instruksi tambahan AI).\n\n**Kredensial (sekali):**\n- *Pesan WhatsApp masuk* → Header Auth: Name `X-Nexbill-Secret`, Value = `N8N_WEBHOOK_SECRET` di .env bot\n- *Tanya Claude* → Header Auth: Name `x-api-key`, Value = API key Anthropic\n\nWorkflow harus **Active**. n8n mati/gagal → bot otomatis pakai otak bawaan.",
+        "height": 340,
+        "width": 420
+      },
+      "id": "1059eec6-2422-456a-869e-304155edb390",
+      "name": "Catatan",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -120
+      ]
+    }
+  ],
+  "connections": {
+    "Pesan WhatsApp masuk": {
+      "main": [
+        [
+          {
+            "node": "Atur alur (menu & FAQ)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atur alur (menu & FAQ)": {
+      "main": [
+        [
+          {
+            "node": "Perlu AI?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perlu AI?": {
+      "main": [
+        [
+          {
+            "node": "Tanya Claude",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Balas ke bot NEXBILL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tanya Claude": {
+      "main": [
+        [
+          {
+            "node": "Olah jawaban AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Olah jawaban AI": {
+      "main": [
+        [
+          {
+            "node": "Balas ke bot NEXBILL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jakarta",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

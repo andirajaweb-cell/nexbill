@@ -72,6 +72,7 @@ import {
 } from "../src/lib/leads/wa-bot-rules";
 import { handleWaSupportMessage, pollTeamReplies, replyNotLinkedIfDue, type WaSender } from "../src/lib/whatsapp-support/handler";
 import { handleWaMarketingMessage, MARKETING_ON } from "../src/lib/leads/wa-marketing";
+import { N8N_URL } from "../src/lib/leads/n8n-bridge";
 
 /** Support 24 jam lewat WhatsApp aktif? Matikan dengan env WA_SUPPORT=off (bot kembali khusus CRM). */
 const SUPPORT_ON = (process.env.WA_SUPPORT ?? "on").toLowerCase() !== "off";
@@ -324,7 +325,7 @@ async function start() {
       if (watchdog) clearTimeout(watchdog);
       watchdog = null;
       await status({ connected: true, qrDataUrl: null, number: lastNumber, lastError: null });
-      console.log(`Bot WhatsApp terhubung sebagai ${lastNumber}. CRM: batas harian ${DAILY_LIMIT} pesan. Support 24 jam: ${SUPPORT_ON ? "aktif" : "mati (WA_SUPPORT=off)"}. Bot marketing: ${MARKETING_ON ? "aktif" : "mati (WA_MARKETING=off)"}.`);
+      console.log(`Bot WhatsApp terhubung sebagai ${lastNumber}. CRM: batas harian ${DAILY_LIMIT} pesan. Support 24 jam: ${SUPPORT_ON ? "aktif" : "mati (WA_SUPPORT=off)"}. Bot marketing: ${MARKETING_ON ? (N8N_URL ? "aktif (otak: n8n, cadangan bawaan)" : "aktif") : "mati (WA_MARKETING=off)"}.`);
       if (!outboxPoller) {
         outboxPoller = setInterval(() => void drainOutbox(sock), OUTBOX_POLL_MS);
         void drainOutbox(sock);

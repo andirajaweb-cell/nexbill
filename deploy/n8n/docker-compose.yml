@@ -1,0 +1,41 @@
+# n8n self-host untuk "otak" bot WhatsApp NEXBILL — dijalankan di VPS yang sama dengan bot (pm2).
+# Tanpa n8n Cloud: data workflow, kredensial, dan riwayat eksekusi tersimpan di volume n8n_data di VPS.
+#
+#   cd /opt/nexbill/deploy/n8n
+#   cp .env.example .env && nano .env        # isi N8N_ENCRYPTION_KEY (openssl rand -hex 32)
+#   docker compose up -d
+#
+# Port hanya dibuka ke 127.0.0.1 (tidak bisa diakses dari internet). Buka editor dari PC lewat
+# SSH tunnel:  ssh -L 5678:127.0.0.1:5678 user@ip-vps   lalu buka http://localhost:5678
+# Panduan lengkap: README.md di folder ini.
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: nexbill-n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Asia/Jakarta
+      - TZ=Asia/Jakarta
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://127.0.0.1:5678/
+      # Editor dibuka lewat http://localhost (SSH tunnel), bukan https.
+      - N8N_SECURE_COOKIE=false
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Tanpa cloud: matikan telemetri, cek versi, galeri template online.
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_TEMPLATES_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_RUNNERS_ENABLED=true
+      # Riwayat eksekusi disimpan 14 hari supaya disk VPS tidak penuh.
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=336
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:

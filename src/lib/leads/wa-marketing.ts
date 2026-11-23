@@ -15,6 +15,8 @@
  *     lead yang masih kosong + suhu (hot/warm/cold). Minat daftar/demo/minta orang → admin diberi tahu.
  *  6. STOP / "tidak tertarik" → status Tidak Tertarik, bot berhenti.
  * AI tidak tersedia / kuota harian habis / JSON rusak → menu tetap. Semua balasan bot dicatat di lead.
+ * Bila N8N_WEBHOOK_URL diisi, langkah 4–5 diputuskan workflow n8n self-host (lib/leads/n8n-bridge*.ts,
+ * deploy/n8n/); n8n gagal/lambat → otomatis kembali ke langkah 4–5 bawaan di atas.
  */
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -27,6 +29,8 @@ import { SITE_URL } from "@/lib/site-config";
 import { DASHBOARD_URL, notifyOnCall, recordBotError } from "@/lib/telegram/support-service";
 import { toWhatsAppText } from "@/lib/whatsapp-support/rules";
 import { waText } from "@/lib/whatsapp-support/text";
+import { askN8n, N8N_URL } from "./n8n-bridge";
+import { buildN8nPayload } from "./n8n-bridge-rules";
 import { addLeadActivity } from "./service";
 import { leadsForPhone, recordInbound } from "./wa-bot";
 import { startOfTodayWibIso } from "./wa-bot-rules";
@@ -55,9 +59,11 @@ import {
   placeholderLeadName,
   wantsHuman,
   type LeadActivityLite,
+  type MarketingExtracted,
   type MarketingFacts,
   type MarketingIntent,
   type MarketingLang,
+  type MenuChoice,
 } from "./wa-marketing-rules";
 
 export interface MarketingSender {
@@ -266,22 +272,74 @@ async function aiReply(out: MarketingSender, lead: LeadRow, msg: MarketingIncomi
     return false;
   }
   if (!parsed) return false;
+  await applyBrainResult(out, lead, msg, lang, activities, { ...parsed, menu: false });
+  return true;
+}
 
-  const patch = leadPatchFrom(lead, parsed.extracted, parsed.intent);
+/** Terapkan keputusan "otak" (AI bawaan atau workflow n8n): isi lead, aksi intent, balas, kabari admin. */
+async function applyBrainResult(
+  out: MarketingSender,
+  lead: LeadRow,
+  msg: MarketingIncoming,
+  lang: MarketingLang,
+  activities: LeadActivityLite[],
+  r: { reply: string | null; intent: MarketingIntent; handoff: boolean; menu: boolean; extracted: MarketingExtracted }
+) {
+  const patch = leadPatchFrom(lead, r.extracted, r.intent);
   await patchLead(lead.id, patch);
   Object.assign(lead, patch);
 
-  if (parsed.intent === "stop") {
+  if (r.intent === "stop") {
     await optOut(out, lead, msg.phone, lang);
-    return true;
+    return;
   }
-  if (parsed.intent === "support") {
+  if (r.intent === "support") {
     await customerNotice(out, lead, msg.phone, lang);
-    return true;
+    return;
   }
-  await reply(out, lead, parsed.reply, { phone: msg.phone });
-  const reason = HOT_REASON[parsed.intent] ?? (parsed.handoff ? "pertanyaan perlu dijawab admin" : null);
+  if (r.reply) await reply(out, lead, r.reply, { phone: msg.phone, menu: r.menu });
+  const reason = HOT_REASON[r.intent] ?? (r.handoff ? "pertanyaan perlu dijawab admin" : null);
   if (reason) await handoff(lead, msg.phone, reason, msg.text, activities);
+}
+
+/**
+ * Otak n8n (bila N8N_WEBHOOK_URL diisi). true = n8n sudah memutuskan (termasuk memilih diam);
+ * false = n8n tidak dipakai / gagal → pemanggil lanjut dengan otak bawaan.
+ */
+async function n8nReply(
+  out: MarketingSender,
+  lead: LeadRow,
+  msg: MarketingIncoming,
+  ctx: { lang: MarketingLang; isNew: boolean; activities: LeadActivityLite[]; facts: MarketingFacts; menuChoice: MenuChoice | null }
+): Promise<boolean> {
+  if (!N8N_URL) return false;
+  void out.typing?.();
+  const payload = buildN8nPayload({
+    msg: { id: msg.msgId, text: msg.text.trim(), mediaOnly: msg.mediaOnly, phone: msg.phone, pushName: msg.pushName },
+    lang: ctx.lang,
+    isGreeting: isGreetingOrPrefill(msg.text),
+    menuChoice: ctx.menuChoice,
+    lead: {
+      id: lead.id,
+      isNew: ctx.isNew,
+      name: lead.name,
+      status: lead.status,
+      temperature: lead.temperature,
+      city: lead.city,
+      unitCount: lead.unitCount,
+      currentBilling: lead.currentBilling,
+      contactName: lead.contactName,
+    },
+    history: conversationTurns(ctx.activities),
+    facts: ctx.facts,
+    adminUrl: LEADS_URL,
+    model: MARKETING_MODEL,
+    now: new Date(),
+  });
+  const r = await askN8n(payload);
+  if (!r) return false;
+  if (ctx.menuChoice === "trial") await patchLead(lead.id, { temperature: "hot", nextAction: "Cek apakah prospek sudah daftar trial" });
+  await applyBrainResult(out, lead, msg, ctx.lang, ctx.activities, r);
   return true;
 }
 
@@ -321,12 +379,14 @@ export async function handleWaMarketingMessage(msg: MarketingIncoming, out: Mark
       await optOut(out, lead, msg.phone, lang);
       return "handled";
     }
+    const menuFresh = Date.now() - (menuShownAt.get(msg.phone) ?? 0) < MENU_FRESH_MS;
+    const choice = menuFresh ? parseMenuChoice(text) : null;
+    // Workflow n8n (self-host) memutuskan balasan bila dipasang; gagal → lanjut otak bawaan di bawah.
+    if (await n8nReply(out, lead, msg, { lang, isNew, activities, facts, menuChoice: choice })) return "handled";
     if (msg.mediaOnly) {
       await reply(out, lead, mkText(lang, "mediaOnly"), { phone: msg.phone, menu: true });
       return "handled";
     }
-    const menuFresh = Date.now() - (menuShownAt.get(msg.phone) ?? 0) < MENU_FRESH_MS;
-    const choice = menuFresh ? parseMenuChoice(text) : null;
     if (choice === "human" || wantsHuman(text)) {
       await reply(out, lead, mkText(lang, "handoff"), { phone: msg.phone });
       await handoff(lead, msg.phone, "minta bicara dengan admin", text, activities);
