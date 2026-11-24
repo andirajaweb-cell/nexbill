@@ -29,6 +29,7 @@ import { SITE_URL } from "@/lib/site-config";
 import { DASHBOARD_URL, notifyOnCall, recordBotError } from "@/lib/telegram/support-service";
 import { toWhatsAppText } from "@/lib/whatsapp-support/rules";
 import { waText } from "@/lib/whatsapp-support/text";
+import { logAiMessage } from "./ai-conversations";
 import { askN8n, N8N_URL } from "./n8n-bridge";
 import { buildN8nPayload } from "./n8n-bridge-rules";
 import { addLeadActivity } from "./service";
@@ -221,6 +222,7 @@ async function reply(out: MarketingSender, lead: LeadRow, text: string, opts: { 
   if (opts.menu) menuShownAt.set(opts.phone, Date.now());
   else menuShownAt.delete(opts.phone);
   await addLeadActivity(lead.id, "whatsapp", `${BOT_REPLY_PREFIX}${body}`, BOT_REF);
+  await logAiMessage({ phone: opts.phone, leadId: lead.id, role: "assistant", content: body, agentName: "bot" });
   await patchLead(lead.id, { lastContactedAt: new Date().toISOString() });
 }
 
@@ -362,6 +364,7 @@ export async function handleWaMarketingMessage(msg: MarketingIncoming, out: Mark
   const isNew = !lead;
   if (!lead) lead = await createWhatsappLead(msg);
   await recordInbound(msg.phone, text || "[media]");
+  await logAiMessage({ phone: msg.phone, leadId: lead.id, role: "user", content: text || "[media]" });
   if (isNew && NOTIFY_NEW) {
     await notifyOnCall(`🆕 Prospek baru chat WhatsApp — ${lead.name} (${localPhone(msg.phone)})\n${text.slice(0, 200)}\n${LEADS_URL}`).catch(() => 0);
   }

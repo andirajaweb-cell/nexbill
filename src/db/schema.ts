@@ -3072,6 +3072,43 @@ export const platformWaOutbox = pgTable(
   (t) => [index("platform_wa_outbox_status_idx").on(t.status, t.createdAt), index("platform_wa_outbox_lead_idx").on(t.leadId)]
 );
 
+/** Riwayat percakapan AI (chatbot n8n + Claude) — migrasi 0041_ai_conversations.sql. */
+export const aiConversations = pgTable(
+  "ai_conversations",
+  {
+    id: id(),
+    channel: text("channel").notNull().default("whatsapp"),
+    visitorId: text("visitor_id"),
+    phone: text("phone"),
+    leadId: text("lead_id").references(() => platformLeads.id, { onDelete: "set null" }),
+    status: text("status").notNull().default("active"),
+    assignedAgent: text("assigned_agent"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+    updatedAt: text("updated_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [
+    index("ai_conversations_phone_idx").on(t.phone, t.createdAt),
+    index("ai_conversations_lead_idx").on(t.leadId),
+    index("ai_conversations_status_idx").on(t.status, t.updatedAt),
+  ]
+);
+
+export const aiMessages = pgTable(
+  "ai_messages",
+  {
+    id: id(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => aiConversations.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    agentName: text("agent_name"),
+    intent: text("intent"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("ai_messages_conversation_idx").on(t.conversationId, t.createdAt)]
+);
+
 /**
  * Permintaan hapus akun & data outlet (Kebijakan Privasi bagian 9, syarat Google Play). Alur:
  * pending_verification (kode 6 digit dikirim ke email Owner) → confirmed (akun & outlet langsung
