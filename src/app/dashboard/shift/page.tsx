@@ -93,6 +93,12 @@ export default function ShiftPage() {
   const canReviewShifts = hasPermission((user?.role ?? "cashier") as any, "approve_requests");
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [deletingShiftId, setDeletingShiftId] = useState<string | null>(null);
+  // Ganti Kasir — shift dibuka dengan akun kasir yang salah (Owner/Superuser).
+  const [reassignShiftId, setReassignShiftId] = useState<string | null>(null);
+  const [reassignTo, setReassignTo] = useState("");
+  const [reassignReason, setReassignReason] = useState("");
+  const [reassignBusy, setReassignBusy] = useState(false);
+  const [staffOptions, setStaffOptions] = useState<{ id: string; name: string; role: string; isActive: boolean }[]>([]);
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
@@ -274,6 +280,43 @@ export default function ShiftPage() {
     setOpeningNote("");
     setOpeningNeedsNote(false);
     setCurrentShift(data);
+  };
+
+  const toggleReassign = (shift: { id: string }) => {
+    if (reassignShiftId === shift.id) return setReassignShiftId(null);
+    setReassignShiftId(shift.id);
+    setReassignTo("");
+    setReassignReason("");
+    if (staffOptions.length === 0) fetchJsonArray<{ id: string; name: string; role: string; isActive: boolean }>("/api/staff").then(setStaffOptions);
+  };
+
+  const submitReassign = async (shift: { id: string; staffName?: string | null; openedAt: string }) => {
+    if (reassignBusy) return;
+    if (!reassignTo) return showAlert(t("shift.reassign.chooseStaff", "Pilih akun kasir yang benar."));
+    if (!reassignReason.trim()) return showAlert(t("shift.reassign.reasonRequired", "Alasan wajib diisi."));
+    const target = staffOptions.find((s) => s.id === reassignTo)?.name ?? "-";
+    const ok = await showConfirm(
+      t("shift.reassign.confirm", "Pindahkan shift {openedAt} dari {from} ke {to}? Transaksi yang dibuat {from} di shift ini ikut dipindahkan ke {to}. Hitungan kas tidak berubah; perubahan dicatat di log audit.")
+        .replace("{openedAt}", formatDateTime(shift.openedAt))
+        .split("{from}").join(shift.staffName ?? "-")
+        .split("{to}").join(target)
+    );
+    if (!ok) return;
+    setReassignBusy(true);
+    try {
+      const res = await fetch(`/api/shifts/${shift.id}/reassign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffUserId: reassignTo, reason: reassignReason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? res.statusText);
+      setReassignShiftId(null);
+      if (outletId) fetchJsonArray(`/api/shifts?outletId=${outletId}`).then(setHistory);
+      showAlert(t("shift.reassign.done", "Shift dipindahkan ke {to}.").replace("{to}", target));
+    } finally {
+      setReassignBusy(false);
+    }
   };
 
   const deleteShiftAction = async (shift: any) => {
@@ -876,6 +919,15 @@ export default function ShiftPage() {
                         {t("shift.closeOthersBtn", "Tutup Shift")}
                       </button>
                     )}
+                    {canManageShiftHistory && (
+                      <button
+                        onClick={() => toggleReassign(s)}
+                        className="text-xs text-violet-300 hover:underline ml-2"
+                        title={t("shift.reassign.tooltip", "Kasir memakai akun yang salah? Pindahkan shift & transaksinya ke akun yang benar")}
+                      >
+                        {reassignShiftId === s.id ? t("shift.editClose", "Tutup") : t("shift.reassign.button", "Ganti Kasir")}
+                      </button>
+                    )}
                     {canManageShiftHistory && s.status !== "closed" && (
                       <button
                         onClick={() => deleteShiftAction(s)}
@@ -998,6 +1050,40 @@ export default function ShiftPage() {
                           </div>
                         </div>
                       )}
+                    </td>
+                  </tr>
+                )}
+                {reassignShiftId === s.id && (
+                  <tr className="border-b border-neutral-900 bg-neutral-900/40">
+                    <td colSpan={10} className="p-4">
+                      <div className="space-y-3 max-w-2xl">
+                        <div className="text-xs text-neutral-400">
+                          {t("shift.reassign.help", "Untuk kasir yang membuka shift dengan akun yang salah. Shift ini dan transaksi yang dibuat {from} di dalamnya dipindahkan ke akun yang dipilih. Uang, selisih, dan jurnal tidak berubah.").split("{from}").join(s.staffName ?? "-")}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className="text-xs text-neutral-500 space-y-1">
+                            <span>{t("shift.reassign.toLabel", "Akun kasir yang benar")}</span>
+                            <select className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm text-neutral-100" value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
+                              <option value="">{t("shift.reassign.choose", "Pilih akun")}</option>
+                              {staffOptions.filter((o) => o.isActive && o.id !== s.staffUserId).map((o) => (
+                                <option key={o.id} value={o.id}>{o.name} ({o.role})</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="text-xs text-neutral-500 space-y-1">
+                            <span>{t("shift.reassign.reasonLabel", "Alasan")}</span>
+                            <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm text-neutral-100" value={reassignReason} onChange={(e) => setReassignReason(e.target.value)} placeholder={t("shift.reassign.reasonPlaceholder", "mis. kasir login dengan akun teman")} />
+                          </label>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button className="text-xs" disabled={reassignBusy} onClick={() => submitReassign(s)}>
+                            {reassignBusy ? t("shift.reassign.saving", "Memindahkan...") : t("shift.reassign.submit", "Pindahkan Shift")}
+                          </Button>
+                          <Button variant="secondary" className="text-xs" disabled={reassignBusy} onClick={() => setReassignShiftId(null)}>
+                            {t("shift.cancel", "Batal")}
+                          </Button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 )}

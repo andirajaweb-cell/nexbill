@@ -37,6 +37,38 @@ const productOption = (p: { id: string; name: string; barcode?: string | null; s
   searchText: [p.barcode, p.sku].filter(Boolean).join(" "),
 });
 
+/** Label pemilih produk + stok terkini, mis. "Gula Pasir — stok 12 kg". Produk tidak dilacak tetap nama saja. */
+const stockLabel = (
+  t: (key: string, fallback: string) => string,
+  p: { name: string; stockQty: number; unit: string; lowStockThreshold: number }
+) => (isStockTracked(p) ? t("inventory.stockOption", "{name} — stok {qty} {unit}").replace("{name}", p.name).replace("{qty}", String(p.stockQty)).replace("{unit}", p.unit) : p.name);
+
+/**
+ * Semua tab Inventori membaca stok dari /api/products yang sama. Data dimuat ulang saat tab dibuka
+ * DAN saat jendela kembali aktif — penjualan di Kasir (tab/perangkat lain) langsung terlihat di
+ * Produk, Resep / BOM, Belanja Supplier, dan Purchase Order tanpa memuat ulang halaman.
+ */
+function useInventorySync(reload: () => void) {
+  const ref = useRef(reload);
+  useEffect(() => {
+    ref.current = reload;
+  });
+  useEffect(() => {
+    let last = 0;
+    const run = () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < 2000) return;
+      last = Date.now();
+      ref.current();
+    };
+    window.addEventListener("focus", run);
+    document.addEventListener("visibilitychange", run);
+    return () => {
+      window.removeEventListener("focus", run);
+      document.removeEventListener("visibilitychange", run);
+    };
+  }, []);
+}
+
 interface Product {
   id: string; name: string; category: string; price: number; costPrice: number;
   stockQty: number; lowStockThreshold: number; unit: string; isActive: boolean;
@@ -274,6 +306,7 @@ function ProductTab({ outletId }: { outletId: string }) {
       setProductsLoaded(true);
     });
   };
+  useInventorySync(() => { load(); });
   useEffect(() => {
     load();
     fetchJsonArray<UnitOption>(`/api/units?outletId=${outletId}`).then((rows) => setUnits(rows.filter((u) => u.isActive)));
@@ -864,6 +897,16 @@ const emptyIngredientRow: IngredientRow = { ingredientProductId: "", qtyPerYield
  * here since it's tied to a specific existing DB record, not a fresh draft.
  */
 const RECIPE_DRAFT_KEY = "recipe_draft_v1";
+
+/** Bentuk baris GET /api/recipes yang dipakai tab Resep / BOM. */
+interface RecipeRow {
+  id: string;
+  productId: string;
+  name: string;
+  yieldQty: number;
+  product?: { name: string } | null;
+  ingredients: { id: string; ingredientProductId: string; qtyPerYield: number; unit: string; ingredientProduct?: { name: string; costPrice: number } | null }[];
+}
 interface RecipeDraft {
   mode: "new" | "existing";
   newProductName: string;
@@ -908,12 +951,17 @@ function RecipeTab({ outletId }: { outletId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editYieldQty, setEditYieldQty] = useState(1);
   const [editRows, setEditRows] = useState<IngredientRow[]>([]);
+  const [editProductName, setEditProductName] = useState("");
+  const [editRecipeName, setEditRecipeName] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const isFirstRenderDraft = useRef(true);
 
   const load = () => fetchJsonArray("/api/recipes").then(setRecipes);
+  const loadProducts = () => fetchJsonArray<Product>("/api/products").then(setProducts);
+  useInventorySync(() => { load(); loadProducts(); });
   useEffect(() => {
     load();
-    fetchJsonArray("/api/products").then(setProducts);
+    loadProducts();
     fetchJsonArray<UnitOption>(`/api/units?outletId=${outletId}`).then((rows) => setUnits(rows.filter((u) => u.isActive)));
   }, [outletId]);
 
@@ -1000,28 +1048,53 @@ function RecipeTab({ outletId }: { outletId: string }) {
     if (!res.ok) return showAlert(data.error);
     resetForm();
     load();
-    fetchJsonArray("/api/products").then(setProducts);
+    loadProducts();
   };
 
   const startEdit = (r: any) => {
     setEditingId(r.id);
     setEditYieldQty(r.yieldQty);
+    setEditProductName(productById(r.productId)?.name ?? r.product?.name ?? "");
+    setEditRecipeName(r.name ?? "");
     setEditRows(r.ingredients.map((i: any) => ({ ingredientProductId: i.ingredientProductId, qtyPerYield: i.qtyPerYield, unit: i.unit })));
   };
   const cancelEdit = () => { setEditingId(null); setEditRows([]); };
 
-  const saveEdit = async (id: string) => {
-    const validRows = editRows.filter((r) => r.ingredientProductId && r.qtyPerYield > 0);
+  const saveEdit = async (r: RecipeRow) => {
+    if (savingEdit) return;
+    const validRows = editRows.filter((row) => row.ingredientProductId && row.qtyPerYield > 0);
     if (validRows.length === 0) return showAlert(t("inventory.recipe.needIngredientEdit", "Minimal 1 bahan baku dengan qty > 0."));
-    const res = await fetch(`/api/recipes/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ yieldQty: editYieldQty, ingredients: validRows }),
-    });
-    const data = await res.json();
-    if (!res.ok) return showAlert(data.error);
-    cancelEdit();
-    load();
+    const productName = editProductName.trim();
+    const recipeName = editRecipeName.trim();
+    if (!productName) return showAlert(t("inventory.recipe.newProductNameRequired", "Nama produk baru wajib diisi."));
+    if (!recipeName) return showAlert(t("inventory.recipe.nameRequired", "Nama resep wajib diisi."));
+    setSavingEdit(true);
+    try {
+      // Nama produk disimpan di produknya sendiri (bukan salinan di resep) — tab Produk, Kasir,
+      // dan laporan langsung memakai nama baru.
+      const currentName = productById(r.productId)?.name ?? r.product?.name ?? "";
+      if (productName !== currentName) {
+        const pres = await fetch(`/api/products/${r.productId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: productName }),
+        });
+        const pdata = await pres.json().catch(() => ({}));
+        if (!pres.ok) return showAlert(pdata.error ?? pres.statusText);
+      }
+      const res = await fetch(`/api/recipes/${r.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: recipeName, yieldQty: editYieldQty, ingredients: validRows }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showAlert(data.error ?? res.statusText);
+      cancelEdit();
+      load();
+      loadProducts();
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const remove = async (r: any) => {
@@ -1032,9 +1105,26 @@ function RecipeTab({ outletId }: { outletId: string }) {
     load();
   };
 
-  const productName = (id: string) => products.find((p) => p.id === id)?.name ?? "-";
+  const productById = (id: string) => products.find((p) => p.id === id);
+  const productName = (id: string) => productById(id)?.name ?? "-";
+  /**
+   * Porsi yang masih bisa dibuat dari stok bahan saat ini — sama dengan cara Kasir memotong stok
+   * (qty per yield ÷ yield per porsi, lihat deductStockForItem). Bahan tidak dilacak diabaikan.
+   * null = tidak ada bahan yang dilacak.
+   */
+  const servingsAvailable = (r: RecipeRow): number | null => {
+    let min: number | null = null;
+    for (const i of r.ingredients) {
+      const p = productById(i.ingredientProductId);
+      if (!p || !isStockTracked(p) || !(i.qtyPerYield > 0)) continue;
+      const perServing = i.qtyPerYield / Math.max(1, r.yieldQty);
+      const n = Math.max(0, Math.floor(p.stockQty / perServing + 1e-9));
+      min = min === null ? n : Math.min(min, n);
+    }
+    return min;
+  };
   const hppEstimate = (r: any) => {
-    const total = (r.ingredients as any[]).reduce((s, i) => s + (i.ingredientProduct?.costPrice ?? 0) * i.qtyPerYield, 0);
+    const total = (r.ingredients as any[]).reduce((s, i) => s + (productById(i.ingredientProductId)?.costPrice ?? i.ingredientProduct?.costPrice ?? 0) * i.qtyPerYield, 0);
     return total / Math.max(1, r.yieldQty);
   };
 
@@ -1085,7 +1175,7 @@ function RecipeTab({ outletId }: { outletId: string }) {
                   value={row.ingredientProductId}
                   onChange={(v) => updateRow(setRows, i, { ingredientProductId: v })}
                   placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
-                  options={ingredientOptions.map((p) => productOption(p))}
+                  options={ingredientOptions.map((p) => productOption(p, stockLabel(t, p)))}
                 />
                 <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={ingredientOptions} onFound={(p) => updateRow(setRows, i, { ingredientProductId: p.id })} />
               </div>
@@ -1105,8 +1195,20 @@ function RecipeTab({ outletId }: { outletId: string }) {
           <Card key={r.id} className="space-y-2">
             {editingId === r.id ? (
               <div className="space-y-2">
-                <div className="font-medium">{r.product?.name} <span className="text-xs text-neutral-500">({r.name})</span></div>
-                <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm" placeholder={t("inventory.recipe.yieldPlaceholder", "Yield (porsi per batch resep)")} value={editYieldQty} onChange={(e) => setEditYieldQty(Number(e.target.value))} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label className="text-xs text-neutral-500 space-y-1">
+                    <span>{t("inventory.recipe.editProductName", "Nama produk (ikut berubah di tab Produk & Kasir)")}</span>
+                    <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm text-neutral-100" value={editProductName} onChange={(e) => setEditProductName(e.target.value)} />
+                  </label>
+                  <label className="text-xs text-neutral-500 space-y-1">
+                    <span>{t("inventory.recipe.editRecipeName", "Nama resep")}</span>
+                    <input className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm text-neutral-100" value={editRecipeName} onChange={(e) => setEditRecipeName(e.target.value)} />
+                  </label>
+                </div>
+                <label className="block text-xs text-neutral-500 space-y-1">
+                  <span>{t("inventory.recipe.yieldPlaceholder", "Yield (porsi per batch resep)")}</span>
+                  <input type="number" className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1 text-sm text-neutral-100" value={editYieldQty} onChange={(e) => setEditYieldQty(Number(e.target.value))} />
+                </label>
                 {editRows.map((row, i) => (
                   <div key={i} className="grid grid-cols-8 gap-2 items-center">
                     <div className="col-span-8 sm:col-span-4 flex gap-1">
@@ -1115,7 +1217,7 @@ function RecipeTab({ outletId }: { outletId: string }) {
                         value={row.ingredientProductId}
                         onChange={(v) => updateRow(setEditRows, i, { ingredientProductId: v })}
                         placeholder={t("inventory.recipe.chooseIngredientOption", "Pilih bahan")}
-                        options={ingredientOptions.map((p) => productOption(p))}
+                        options={ingredientOptions.map((p) => productOption(p, stockLabel(t, p)))}
                       />
                       <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={ingredientOptions} onFound={(p) => updateRow(setEditRows, i, { ingredientProductId: p.id })} />
                     </div>
@@ -1126,7 +1228,7 @@ function RecipeTab({ outletId }: { outletId: string }) {
                 ))}
                 <button className="text-xs text-emerald-400" onClick={() => addRow(setEditRows)}>{t("inventory.recipe.addIngredient", "+ Tambah Bahan")}</button>
                 <div className="flex gap-2">
-                  <Button className="text-xs" onClick={() => saveEdit(r.id)}>{t("inventory.action.save", "Simpan")}</Button>
+                  <Button className="text-xs" disabled={savingEdit} onClick={() => saveEdit(r)}>{t("inventory.action.save", "Simpan")}</Button>
                   <button className="text-xs text-neutral-400" onClick={cancelEdit}>{t("inventory.action.cancel", "Batal")}</button>
                 </div>
               </div>
@@ -1134,8 +1236,16 @@ function RecipeTab({ outletId }: { outletId: string }) {
               <>
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-medium">{r.product?.name ?? t("inventory.recipe.deletedProduct", "(produk terhapus)")}</div>
+                    <div className="font-medium">{productById(r.productId)?.name ?? r.product?.name ?? t("inventory.recipe.deletedProduct", "(produk terhapus)")}</div>
                     <div className="text-xs text-neutral-500">{r.name} · Yield {r.yieldQty}</div>
+                    {(() => {
+                      const n = servingsAvailable(r);
+                      return n === null ? null : (
+                        <div className={`text-xs ${n === 0 ? "text-red-400" : "text-sky-400"}`}>
+                          {t("inventory.recipe.servingsAvailable", "Stok bahan cukup untuk ±{n} porsi").replace("{n}", String(n))}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge status="available">food</Badge>
@@ -1148,12 +1258,22 @@ function RecipeTab({ outletId }: { outletId: string }) {
                   </div>
                 </div>
                 <div className="text-xs text-neutral-400 space-y-0.5">
-                  {r.ingredients.map((i: any) => (
-                    <div key={i.id} className="flex justify-between">
-                      <span>{i.ingredientProduct?.name ?? productName(i.ingredientProductId)}</span>
-                      <span>-{i.qtyPerYield} {i.unit}</span>
-                    </div>
-                  ))}
+                  {r.ingredients.map((i: any) => {
+                    const ing = productById(i.ingredientProductId);
+                    return (
+                      <div key={i.id} className="flex justify-between gap-2">
+                        <span>
+                          {ing?.name ?? i.ingredientProduct?.name ?? productName(i.ingredientProductId)}
+                          {ing && isStockTracked(ing) && (
+                            <span className={`ml-1 text-[10px] ${ing.stockQty <= 0 ? "text-red-400" : ing.stockQty <= ing.lowStockThreshold ? "text-amber-400" : "text-neutral-500"}`}>
+                              {t("inventory.recipe.ingredientStock", "(stok {qty} {unit})").replace("{qty}", String(ing.stockQty)).replace("{unit}", ing.unit)}
+                            </span>
+                          )}
+                        </span>
+                        <span className="whitespace-nowrap">-{i.qtyPerYield} {i.unit}</span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="text-xs text-emerald-400 pt-1 border-t border-neutral-800">{t("inventory.recipe.hppPerServing", "HPP per porsi:")} {rupiah(hppEstimate(r))}</div>
               </>
@@ -1287,6 +1407,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
     setDrafts(removeDraft(outletId, draft.id));
     if (activeDraftId === draft.id) setActiveDraftId(null);
   };
+  useInventorySync(() => { fetchJsonArray<Product>("/api/products").then(setProducts); });
   useEffect(() => {
     load();
     fetchJsonArray(`/api/suppliers?outletId=${outletId}`).then(setSuppliers);
@@ -1585,7 +1706,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
               value={itemForm.productId}
               onChange={(v) => setItemForm({ ...itemForm, productId: v })}
               placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
-              options={resaleProducts.map((p) => productOption(p))}
+              options={resaleProducts.map((p) => productOption(p, stockLabel(t, p)))}
             />
             <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={resaleProducts} onFound={(p) => setItemForm((f) => ({ ...f, productId: p.id, unitCost: f.unitCost || p.costPrice || 0 }))} />
           </div>
@@ -1790,7 +1911,7 @@ function SupplierPurchaseTab({ outletId }: { outletId: string }) {
                 value={editItemForm.productId}
                 onChange={(v) => setEditItemForm({ ...editItemForm, productId: v })}
                 placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
-                options={resaleProducts.map((p) => productOption(p))}
+                options={resaleProducts.map((p) => productOption(p, stockLabel(t, p)))}
               />
               <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={resaleProducts} onFound={(p) => setEditItemForm((f) => ({ ...f, productId: p.id, unitCost: f.unitCost || p.costPrice || 0 }))} />
             </div>
@@ -1924,6 +2045,7 @@ function PurchaseOrderTab({ outletId }: { outletId: string }) {
   const [autoFillMsg, setAutoFillMsg] = useState<string | null>(null);
 
   const load = () => fetchJsonArray(`/api/purchase-orders?outletId=${outletId}`).then(setPos);
+  useInventorySync(() => { load(); fetchJsonArray<Product>("/api/products").then(setProducts); });
   useEffect(() => {
     load();
     fetchJsonArray<SupplierOption>(`/api/suppliers?outletId=${outletId}`).then(setSuppliers);
@@ -2027,7 +2149,7 @@ function PurchaseOrderTab({ outletId }: { outletId: string }) {
               value={form.productId}
               onChange={(v) => setForm({ ...form, productId: v })}
               placeholder={t("inventory.option.chooseProduct", "Pilih produk")}
-              options={products.map((p) => productOption(p))}
+              options={products.map((p) => productOption(p, stockLabel(t, p)))}
             />
             <ProductScanButton label="" className="shrink-0 flex items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 text-cyan-200 hover:bg-cyan-500/20" products={products} onFound={(p) => quickAddToCart(p)} />
           </div>

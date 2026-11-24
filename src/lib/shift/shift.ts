@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions, cashDeposits, cashTransfers, assetPurchases, assetPurchasePayments } from "@/db/schema";
+import { shifts, shiftCashCounts, shiftBalanceChecks, payments, orders, expenses, cashBankAccounts, otherIncomes, homeRentalRentals, depositBalanceChannels, membershipPayments, outlets, approvalRequests, ppobTransactions, cashDeposits, cashTransfers, assetPurchases, assetPurchasePayments, staffUsers, rentalSessions, cashMovements } from "@/db/schema";
 import { eq, and, inArray, desc, isNotNull, ne } from "drizzle-orm";
 import { selectShiftPayments } from "./drawer";
 import { logAudit } from "@/lib/audit/log";
@@ -778,4 +778,73 @@ export async function deleteShift(shiftId: string): Promise<{ deletedId: string 
   });
 
   return { deletedId: shiftId };
+}
+
+/**
+ * "Ganti Kasir" — kasir membuka shift (dan bertransaksi) dengan akun yang salah. Shift beserta
+ * transaksi yang dibuat akun itu DI SHIFT INI dipindahkan ke akun kasir yang benar, dalam satu
+ * transaksi database. Hitungan kas, selisih, dan jurnal tidak berubah — hanya atribusi orangnya.
+ * Transaksi milik staf lain di shift yang sama (mis. manajer mencatat pengeluaran) tidak disentuh.
+ * Dicatat di log audit (sebelum/sesudah + alasan). Owner/Superuser saja (dicek di route).
+ */
+export async function reassignShiftStaff(input: { shiftId: string; toStaffUserId: string; reason: string; actorStaffUserId: string }) {
+  const reason = input.reason.trim();
+  if (!reason) throw Object.assign(new Error("Alasan wajib diisi."), { status: 400 });
+  const [shift] = await db.select().from(shifts).where(eq(shifts.id, input.shiftId)).limit(1);
+  if (!shift) throw Object.assign(new Error("Shift tidak ditemukan."), { status: 404 });
+  const fromStaffUserId = shift.staffUserId;
+  if (fromStaffUserId === input.toStaffUserId) throw Object.assign(new Error("Kasir tujuan sama dengan kasir shift ini."), { status: 400 });
+
+  const [target] = await db
+    .select({ id: staffUsers.id, name: staffUsers.name, outletId: staffUsers.outletId, isActive: staffUsers.isActive })
+    .from(staffUsers)
+    .where(eq(staffUsers.id, input.toStaffUserId))
+    .limit(1);
+  if (!target || target.outletId !== shift.outletId) throw Object.assign(new Error("Akun kasir tujuan tidak ditemukan di outlet ini."), { status: 400 });
+  if (!target.isActive) throw Object.assign(new Error("Akun kasir tujuan nonaktif."), { status: 400 });
+
+  // Shift yang masih berjalan: satu kasir hanya boleh punya satu shift terbuka (lihat openShift).
+  if (shift.status === "open") {
+    const [other] = await db
+      .select({ id: shifts.id })
+      .from(shifts)
+      .where(and(eq(shifts.outletId, shift.outletId), eq(shifts.staffUserId, input.toStaffUserId), eq(shifts.status, "open")))
+      .limit(1);
+    if (other) throw Object.assign(new Error(`${target.name} masih punya shift yang berjalan. Tutup shift itu dulu, lalu ganti kasir.`), { status: 409 });
+  }
+
+  const moved: Record<string, number> = {};
+  await db.transaction(async (tx) => {
+    await tx
+      .update(shifts)
+      .set({
+        staffUserId: input.toStaffUserId,
+        // Shift yang ditutup sendiri oleh akun salah → penutupnya ikut dipindah, supaya tidak
+        // terbaca "ditutup orang lain".
+        ...(shift.closedBy === fromStaffUserId ? { closedBy: input.toStaffUserId } : {}),
+      })
+      .where(eq(shifts.id, shift.id));
+
+    const tables = { rentalSessions, orders, ppobTransactions, cashMovements, expenses, otherIncomes, assetPurchases, assetPurchasePayments, membershipPayments, homeRentalRentals };
+    for (const [name, table] of Object.entries(tables)) {
+      const rows = await tx
+        .update(table)
+        .set({ staffUserId: input.toStaffUserId })
+        .where(and(eq(table.shiftId, shift.id), eq(table.staffUserId, fromStaffUserId)))
+        .returning({ id: table.id });
+      if (rows.length > 0) moved[name] = rows.length;
+    }
+  });
+
+  await logAudit({
+    outletId: shift.outletId,
+    staffUserId: input.actorStaffUserId,
+    action: "reassign_shift_staff",
+    entityType: "shift",
+    entityId: shift.id,
+    before: { staffUserId: fromStaffUserId, closedBy: shift.closedBy },
+    after: { staffUserId: input.toStaffUserId, reason, moved },
+  });
+
+  return { shiftId: shift.id, fromStaffUserId, toStaffUserId: input.toStaffUserId, toStaffName: target.name, moved };
 }
