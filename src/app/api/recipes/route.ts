@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { syncRecipeProductCosts } from "@/lib/inventory/recipe-cost";
 
 export async function GET(req: NextRequest) {
   try {
@@ -70,6 +71,8 @@ export async function POST(req: NextRequest) {
     for (const ing of ingredients as { ingredientProductId: string; qtyPerYield: number; unit: string }[]) {
       await db.insert(recipeIngredients).values({ recipeId: recipe.id, ...ing });
     }
+    // Harga modal produk jadi = HPP per porsi resep, langsung tanpa input ulang.
+    await syncRecipeProductCosts(session.outletId);
     return NextResponse.json(recipe);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 400 });

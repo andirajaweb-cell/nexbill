@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { describeError } from "@/lib/api/error";
+import { syncRecipeProductCosts } from "@/lib/inventory/recipe-cost";
 
 async function assertOwnedRecipe(recipeId: string, outletId: string) {
   const [recipe] = await db.select().from(recipes).where(eq(recipes.id, recipeId)).limit(1);
@@ -47,6 +48,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await db.insert(recipeIngredients).values({ recipeId: id, ...ing });
       }
     }
+    // Yield/bahan berubah → harga modal produk jadi ikut dihitung ulang.
+    await syncRecipeProductCosts(session.outletId);
 
     return NextResponse.json(recipe);
   } catch (err: unknown) {

@@ -16,6 +16,7 @@ import "@/lib/i18n/dict-inventory";
 import "@/lib/i18n/dict-inventory-draft";
 import "@/lib/i18n/dict-inventory-opname";
 import { isStockTracked } from "@/lib/inventory/stock-tracking-rules";
+import { recipeUnitCost } from "@/lib/inventory/recipe-cost-rules";
 import "@/lib/i18n/dict-accounting";
 import { SupplierTab } from "./SupplierTab";
 import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
@@ -640,6 +641,11 @@ function ProductTab({ outletId }: { outletId: string }) {
                   <td>{rupiah(p.price)}</td>
                   <td className="text-neutral-500">
                     {rupiah(p.costPrice)}
+                    {recipeProductIds.has(p.id) && (
+                      <div className="text-[10px] text-sky-400" title={t("inventory.product.recipeCostAuto", "Otomatis dari resep (HPP per porsi) — ubah lewat tab Resep / BOM")}>
+                        {t("inventory.product.recipeCostTag", "HPP resep")}
+                      </div>
+                    )}
                     {isFifo && layersOf(p.id).length > 0 && (
                       <button className="block text-[10px] text-sky-400 hover:underline" onClick={() => setLayersFor(layersFor === p.id ? null : p.id)}>
                         {t("inventory.product.fifoLayers", "{n} lapisan FIFO").replace("{n}", String(layersOf(p.id).length))} · {t("inventory.product.nextOut", "keluar berikutnya {cost}").replace("{cost}", rupiah(layersOf(p.id)[0].unitCost))}
@@ -730,8 +736,12 @@ function ProductTab({ outletId }: { outletId: string }) {
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.sellPrice", "Harga Jual")}</label><input type="number" className={smallInputCls} value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
                         <div>
                           <label className="text-xs text-neutral-500">{t("inventory.product.editForm.costPrice", "Harga Modal")}</label>
-                          <input type="number" className={smallInputCls} value={editForm.costPrice} disabled={isFifo && layersOf(p.id).length > 0} onChange={(e) => setEditForm({ ...editForm, costPrice: Number(e.target.value) })} />
-                          {isFifo && layersOf(p.id).length > 0 && <div className="text-[10px] text-neutral-500">{t("inventory.product.fifoCostLocked", "FIFO: dihitung dari lapisan belanja")}</div>}
+                          <input type="number" className={`${smallInputCls} disabled:opacity-60`} value={editForm.costPrice} disabled={recipeProductIds.has(p.id) || (isFifo && layersOf(p.id).length > 0)} onChange={(e) => setEditForm({ ...editForm, costPrice: Number(e.target.value) })} />
+                          {recipeProductIds.has(p.id) ? (
+                            <div className="text-[10px] text-sky-400">{t("inventory.product.recipeCostAuto", "Otomatis dari resep (HPP per porsi) — ubah lewat tab Resep / BOM")}</div>
+                          ) : (
+                            isFifo && layersOf(p.id).length > 0 && <div className="text-[10px] text-neutral-500">{t("inventory.product.fifoCostLocked", "FIFO: dihitung dari lapisan belanja")}</div>
+                          )}
                         </div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.unit", "Satuan")}</label><UnitSelect units={units} value={editForm.unit} onChange={(v) => setEditForm({ ...editForm, unit: v })} className={smallInputCls} /></div>
                         {isStockTracked(p) && <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.minStock", "Minimum Stok")}</label><input type="number" min={0} className={smallInputCls} value={editForm.lowStockThreshold} onChange={(e) => setEditForm({ ...editForm, lowStockThreshold: Number(e.target.value) })} /></div>}
@@ -1123,10 +1133,9 @@ function RecipeTab({ outletId }: { outletId: string }) {
     }
     return min;
   };
-  const hppEstimate = (r: any) => {
-    const total = (r.ingredients as any[]).reduce((s, i) => s + (productById(i.ingredientProductId)?.costPrice ?? i.ingredientProduct?.costPrice ?? 0) * i.qtyPerYield, 0);
-    return total / Math.max(1, r.yieldQty);
-  };
+  // Sama persis dengan harga modal yang disimpan server untuk produk resep (recipe-cost-rules.ts).
+  const hppEstimate = (r: RecipeRow) =>
+    recipeUnitCost(r.yieldQty, r.ingredients.map((i) => ({ qtyPerYield: i.qtyPerYield, product: productById(i.ingredientProductId) ?? null })));
 
   return (
     <div className="space-y-4">

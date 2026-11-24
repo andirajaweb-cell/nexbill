@@ -53,6 +53,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // outletId is intentionally never accepted from the body — a product can't be reassigned
     // to a different outlet through this route.
     delete body.outletId;
+    // Produk hasil resep: harga modal = HPP per porsi resep (lib/inventory/recipe-cost.ts), dihitung
+    // otomatis — angka yang diketik di form diabaikan supaya tidak menimpa hitungan resep.
+    if (body.costPrice !== undefined) {
+      const [recipe] = await db.select({ id: recipes.id }).from(recipes).where(eq(recipes.productId, id)).limit(1);
+      if (recipe) delete body.costPrice;
+    }
     // FIFO: harga modal is derived from the remaining cost layers. Typing a different number here
     // would be overwritten by the next stock movement and would never reach HPP — refuse instead
     // of silently ignoring it. (A product with no stock/layers can still get a starting price.)

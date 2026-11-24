@@ -4,6 +4,7 @@ import { products } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
+import { syncRecipeProductCosts } from "@/lib/inventory/recipe-cost";
 import { describeError } from "@/lib/api/error";
 import { recordOpeningStock } from "@/lib/accounting/inventory-postings";
 import { lockEntity } from "@/lib/accounting/journal";
@@ -18,7 +19,12 @@ export async function GET() {
     // count grows. 1000 is well above any real outlet's catalog today; this is a safety ceiling,
     // not an active pagination limit (POS product picker and Inventory both expect the full list).
     const rows = await db.select().from(products).where(eq(products.outletId, session.outletId)).limit(1000);
-    return NextResponse.json(rows);
+    // Harga modal produk hasil resep = HPP per porsi resep (otomatis, ikut harga modal bahan terbaru).
+    const synced = await syncRecipeProductCosts(session.outletId, rows).catch((err) => {
+      console.error("Gagal menyamakan harga modal produk resep:", err);
+      return rows;
+    });
+    return NextResponse.json(synced);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: 500 });
   }
