@@ -50,7 +50,7 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
       <p className="text-neutral-500">
         {t(
           "devices.guide.tvApp.updateNote",
-          "Memperbarui aplikasi: di TV tahan OK 3 detik → \"Cek pembaruan aplikasi\". Kalau ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi — pairing dan pengaturan tetap tersimpan."
+          "Memperbarui aplikasi: di menu staf pilih \"Cek pembaruan aplikasi\" (tahan OK ±3 detik, atau OK → PIN kasir → Pengaturan TV). Kalau ada versi baru, buka Downloader dan ketik nexbill.id/tvapk lagi — pairing dan pengaturan tetap tersimpan."
         )}
       </p>
       <p className="text-neutral-500">
@@ -77,6 +77,7 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
               <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500/20 text-[10px] font-bold text-cyan-300">{i + 1}</span>
               <span className="min-w-0">
                 {text}
+                {i === 0 && <code className="mt-1.5 block w-fit rounded-md border border-neutral-700 bg-black/40 px-2 py-1 font-mono text-emerald-300">nexbill.id/tvapk</code>}
                 {i === 1 && <div className="mt-1.5">{settingsLink}</div>}
               </span>
             </li>
@@ -122,9 +123,10 @@ export function TvAppGuide({ level = "full" }: { level?: GuideLevel }) {
     {
       title: t("devices.guide.tvFull.s4Title", "Pilih HDMI tempat PlayStation dicolok (sekali saja)"),
       items: [
-        t("devices.guide.tvFull.s4a", "Tahan tombol OK di remote selama 3 detik (atau tekan tombol Menu). Menu staf terbuka. Kalau diminta PIN, isi PIN layar dari Pengaturan › TV Screensaver."),
+        t("devices.guide.tvFull.s4a", "Tahan OK ±3 detik di remote → menu staf terbuka (isi PIN bila diminta). Setelah TV dipasangkan, OK biasa membuka Panel kasir (isi PIN kasir) → \"Pengaturan TV (menu staf)\"."),
         t("devices.guide.tvFull.s4b", "Pilih \"Pilih input HDMI\", lalu pilih HDMI tempat PlayStation dicolok (mis. HDMI 2)."),
         t("devices.guide.tvFull.s4c", "Coba di menu staf: \"Buka layar game (tanpa sesi)\" → 10 menit. Gambar PlayStation harus tampil dengan timer di pojok kanan atas."),
+        t("devices.guide.tvFull.s4d", "Atur bahasa (opsional): di menu staf pilih \"Bahasa\", lalu pilih salah satu dari 6 bahasa. Pilihan tersimpan di TV ini; pilih \"Ikuti bahasa TV\" untuk memakai bahasa sistem TV."),
       ],
     },
     {

@@ -242,5 +242,5 @@ describe("dashboard i18n audit", () => {
       }
     }
     expect([...problems]).toEqual([]);
-  });
+  }, 120_000); // analisis statis seluruh halaman dashboard; default 5 dtk terlalu pendek di mesin kecil
 });
