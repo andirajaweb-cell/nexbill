@@ -51,7 +51,14 @@ export async function POST(req: NextRequest) {
     if (denied) return denied;
 
     // staffUserId selalu dari sesi — dulu diambil dari body, sehingga penyesuaian/waste bisa dicatat atas nama orang lain.
-    const { productId, type, qty, note, unitCost } = await req.json();
+    const { productId, type, qty, note, unitCost, targetQty } = await req.json();
+    // "Set ke Jumlah Tertentu": klien mengirim jumlah tujuan, server menghitung selisihnya dari stok
+    // saat ini (dikunci). Dulu klien mengirim selisih dari stok yang tampil di layarnya — bila ada
+    // penjualan sejak halaman dimuat, stok akhir tidak sama dengan jumlah yang diisi.
+    const isSet = type === "adjustment" && targetQty !== undefined && targetQty !== null;
+    if (isSet && (!Number.isInteger(Number(targetQty)) || Number(targetQty) < 0)) {
+      return NextResponse.json({ error: "Jumlah stok sebenarnya harus bilangan bulat 0 atau lebih." }, { status: 400 });
+    }
     const staffUserId = session.sub;
 
     const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
@@ -72,13 +79,21 @@ export async function POST(req: NextRequest) {
     // positive for Tambah Unit or a Set-ke-Jumlah-Tertentu that increased stock, negative for
     // Kurang Unit (reason: Penyesuaian/Selisih) or a Set that decreased stock — which is what
     // lets a single "Kurang Unit" action send a negative delta straight through.
-    const delta =
+    let delta =
       type === "purchase_in" ? Math.abs(qty) : type === "sale_out" || type === "waste" ? -Math.abs(qty) : Number(qty);
+    if (!isSet && (!Number.isFinite(delta) || delta === 0)) {
+      return NextResponse.json({ error: "Qty harus lebih dari 0." }, { status: 400 });
+    }
 
     // Movement, stock change, and its Persediaan journal commit together. The journal used to be
     // missing entirely, so a Kurangi Unit for broken stock lowered the count but never booked the
     // loss, and Persediaan in the Neraca drifted away from the real stock value.
     const movement = await db.transaction(async (tx) => {
+      if (isSet) {
+        const [cur] = await tx.select({ stockQty: products.stockQty }).from(products).where(eq(products.id, productId)).for("update");
+        delta = Number(targetQty) - (cur?.stockQty ?? 0);
+        if (delta === 0) throw new Error("Jumlah sama dengan stok saat ini — tidak ada perubahan.");
+      }
       // Adjustment/waste move FIFO layers inside postInventoryAdjustmentJournal below; the other
       // (journal-less) manual types must keep them in step here.
       let fifoUnitCost: number | null = null;

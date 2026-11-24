@@ -29,24 +29,29 @@ export async function createStockOpname(input: CreateStockOpnameInput) {
       throw Object.assign(new Error("Hasil hitung fisik harus bilangan bulat 0 atau lebih."), { status: 400 });
     }
   }
-  const [opname] = await db
-    .insert(stockOpnames)
-    .values({ outletId: input.outletId, warehouseId: input.warehouseId, staffUserId: input.staffUserId, status: "draft" })
-    .returning();
-
   // Was one SELECT + one INSERT per counted product, sequentially — a full-catalog physical
   // count did 2x the SKU count in round trips. Now one batch SELECT (inArray) to snapshot
   // current system stock, then a single bulk INSERT for every counted line.
   const productIds = input.items.map((i) => i.productId);
+  if (new Set(productIds).size !== productIds.length) {
+    throw Object.assign(new Error("Ada produk yang dihitung lebih dari sekali dalam satu stock opname."), { status: 400 });
+  }
   const productRows = productIds.length ? await db.select().from(products).where(inArray(products.id, productIds)) : [];
   const stockQtyById = new Map(productRows.map((p) => [p.id, p.stockQty]));
   const untracked = productRows.filter((p) => !isStockTracked(p));
   if (untracked.length > 0) {
     throw Object.assign(new Error(`Produk tidak dilacak stoknya tidak ikut stock opname: ${untracked.map((p) => p.name).join(", ")}.`), { status: 400 });
   }
-  if (productRows.length !== new Set(productIds).size || productRows.some((p) => p.outletId !== input.outletId)) {
+  if (productRows.length !== productIds.length || productRows.some((p) => p.outletId !== input.outletId)) {
     throw Object.assign(new Error("Ada produk yang tidak ditemukan di outlet ini."), { status: 400 });
   }
+
+  // Header dibuat SETELAH validasi: dulu dibuat lebih dulu, sehingga setiap hitungan yang ditolak
+  // meninggalkan draf kosong di Riwayat Stock Opname.
+  const [opname] = await db
+    .insert(stockOpnames)
+    .values({ outletId: input.outletId, warehouseId: input.warehouseId, staffUserId: input.staffUserId, status: "draft" })
+    .returning();
 
   const rows = input.items.map((item) => {
     const systemQty = stockQtyById.get(item.productId) ?? 0;
@@ -70,7 +75,6 @@ export async function completeStockOpname(stockOpnameId: string) {
   if (opname.status === "completed") throw new Error("Stock opname sudah selesai diproses.");
 
   const items = await db.select().from(stockOpnameItems).where(eq(stockOpnameItems.stockOpnameId, stockOpnameId));
-  const changed = items.filter((i) => i.differenceQty !== 0);
 
   /*
    * Movements, every per-product adjustment, and the opname's own "completed" flag all commit as
@@ -98,6 +102,27 @@ export async function completeStockOpname(stockOpnameId: string) {
     if (!fresh || fresh.status === "completed") {
       throw Object.assign(new Error("Stock opname sudah selesai diproses."), { status: 409 });
     }
+
+    // Selisih dihitung ULANG terhadap stok SAAT INI (baris produk dikunci FOR UPDATE), bukan memakai
+    // selisih yang disimpan saat draf dibuat. Dulu selisih lama ditambahkan begitu saja: bila ada
+    // penjualan/belanja di antara hitung dan terapkan (atau draf lama diterapkan belakangan), stok
+    // akhir tidak sama dengan hitungan fisik. Sekarang hasilnya selalu = hitungan fisik.
+    const ids = items.map((i) => i.productId);
+    const current = ids.length
+      ? await tx.select({ id: products.id, stockQty: products.stockQty }).from(products).where(inArray(products.id, ids)).for("update")
+      : [];
+    const stockNow = new Map(current.map((p) => [p.id, p.stockQty]));
+    const changed: { productId: string; differenceQty: number }[] = [];
+    for (const item of items) {
+      const systemQty = stockNow.get(item.productId);
+      if (systemQty === undefined) continue;
+      const differenceQty = item.actualQty - systemQty;
+      if (systemQty !== item.systemQty || differenceQty !== item.differenceQty) {
+        await tx.update(stockOpnameItems).set({ systemQty, differenceQty }).where(eq(stockOpnameItems.id, item.id));
+      }
+      if (differenceQty !== 0) changed.push({ productId: item.productId, differenceQty });
+    }
+
     // stockMovements rows are independent of each other — one bulk insert instead of N.
     if (changed.length > 0) {
       await tx.insert(stockMovements).values(
@@ -140,14 +165,14 @@ export async function completeStockOpname(stockOpnameId: string) {
     );
 
     const [row] = await tx.update(stockOpnames).set({ status: "completed" }).where(eq(stockOpnames.id, stockOpnameId)).returning();
-    return row;
+    return { row, applied: changed.length };
   });
 
   // A physical count can easily reveal a product is lower than the system thought — check
   // whether anything just crossed its minimum stock now that the correction is applied.
   await autoFillLowStockPurchaseOrders(opname.outletId);
 
-  return { opname: updatedOpname, itemsApplied: items.filter((i) => i.differenceQty !== 0).length };
+  return { opname: updatedOpname.row, itemsApplied: updatedOpname.applied };
 }
 
 /**

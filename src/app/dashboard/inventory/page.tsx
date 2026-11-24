@@ -419,7 +419,8 @@ function ProductTab({ outletId }: { outletId: string }) {
   };
 
   const submitAdjust = async (p: Product) => {
-    let qty: number;
+    let qty: number | undefined;
+    let targetQty: number | undefined;
     let type: string;
     if (adjustMode === "add") {
       if (!adjustValue || adjustValue <= 0) return showAlert(t("inventory.product.qtyMustBePositive", "Qty harus lebih dari 0."));
@@ -430,15 +431,16 @@ function ProductTab({ outletId }: { outletId: string }) {
       if (adjustReason === "waste") { qty = adjustValue; type = "waste"; } // route negates waste automatically
       else { qty = -adjustValue; type = "adjustment"; }
     } else {
-      const delta = adjustValue - p.stockQty;
-      if (delta === 0) return showAlert(t("inventory.product.noChangeSameQty", "Jumlah sama dengan stok saat ini — tidak ada perubahan."));
-      qty = delta;
+      if (!Number.isInteger(adjustValue) || adjustValue < 0) return showAlert(t("inventory.product.qtyMustBeWhole", "Jumlah harus bilangan bulat 0 atau lebih."));
+      if (adjustValue === p.stockQty) return showAlert(t("inventory.product.noChangeSameQty", "Jumlah sama dengan stok saat ini — tidak ada perubahan."));
+      // Server menghitung selisih dari stok terkini, bukan dari angka yang tampil di layar ini.
+      targetQty = adjustValue;
       type = "adjustment";
     }
     const res = await fetch("/api/inventory", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId: p.id, type, qty, note: adjustNote || undefined }),
+      body: JSON.stringify({ productId: p.id, type, qty, targetQty, note: adjustNote || undefined }),
     });
     if (!res.ok) return showAlert((await res.json().catch(() => ({}))).error ?? res.statusText);
     setAdjustingId(null);
