@@ -176,6 +176,27 @@ export async function notifyShiftClosed(input: {
   });
 }
 
+/** Harga modal produk diubah manual (bukan dari Belanja Supplier) → peringatan ke pimpinan outlet/merchant. */
+export async function notifyManualCostChange(input: { outletId: string; productId: string; productName: string; staffUserId: string; from: number; to: number; revalue: number }) {
+  await safe("cost-manual", async () => {
+    const [staff] = await db.select({ name: staffUsers.name }).from(staffUsers).where(eq(staffUsers.id, input.staffUserId)).limit(1);
+    const r = input.revalue;
+    await notifyOutlet(
+      input.outletId,
+      "fraud",
+      "costManual",
+      {
+        product: input.productName,
+        from: formatIdr(input.from),
+        to: formatIdr(input.to),
+        staff: staff?.name ?? "-",
+        reval: `${r < 0 ? "-" : r > 0 ? "+" : ""}${formatIdr(Math.abs(r))}`,
+      },
+      { url: "/dashboard/inventory", tag: `cost-manual-${input.productId}` }
+    );
+  });
+}
+
 let lastLowStockRun = 0;
 /** Scheduler (paling sering tiap 2 menit): produk yang baru turun ke/di bawah ambang → push sekali. */
 export async function runLowStockPush(outletId?: string): Promise<number> {

@@ -29,5 +29,6 @@ registerDict({
   "notifikasi.type.subscriptionTrial": { id: "Langganan", en: "Subscription", ms: "Langganan", th: "การสมัครสมาชิก", fil: "Subscription", vi: "Gói đăng ký" },
   "notifikasi.type.announcement": { id: "Pengumuman", en: "Announcement", ms: "Pengumuman", th: "ประกาศ", fil: "Anunsyo", vi: "Thông báo chung" },
   "notifikasi.type.shiftVariance": { id: "Selisih Kas", en: "Cash Variance", ms: "Perbezaan Tunai", th: "ส่วนต่างเงินสด", fil: "Kaibahan sa Cash", vi: "Chênh lệch tiền mặt" },
+  "notifikasi.type.manualCost": { id: "Harga Modal", en: "Cost Price", ms: "Harga Kos", th: "ต้นทุน", fil: "Puhunan", vi: "Giá vốn" },
   "notifikasi.type.maintenanceDue": { id: "Maintenance", en: "Maintenance", ms: "Penyelenggaraan", th: "การบำรุงรักษา", fil: "Maintenance", vi: "Bảo trì" },
 });

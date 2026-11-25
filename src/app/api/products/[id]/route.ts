@@ -22,6 +22,9 @@ import { forbidUnless } from "@/lib/auth/require-permission";
 import { isStockTracked, sanitizeLowStockThreshold } from "@/lib/inventory/stock-tracking-rules";
 import { costRevaluationDelta } from "@/lib/accounting/inventory-valuation-rules";
 import { postCostRevaluationJournal } from "@/lib/accounting/inventory-revaluation";
+import { logAudit } from "@/lib/audit/log";
+import { runAfterResponse } from "@/lib/push/defer";
+import { notifyManualCostChange } from "@/lib/push/triggers";
 
 /**
  * Every table with a real FK to products.id — a product can only be hard-deleted once none of
@@ -79,6 +82,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await assertBarcodeAvailable(current.outletId, current.barcode, id);
     }
     if (typeof body.sku === "string") body.sku = body.sku.trim() || null;
+    // Sumber utama harga modal adalah Belanja Supplier. Mengubahnya manual tetap boleh, tetapi harus
+    // disetujui eksplisit di layar (dampaknya ditampilkan) — tanpa itu permintaan ditolak, supaya
+    // tidak ada perubahan modal diam-diam lewat form/integrasi lain.
+    const manualCostConfirmed = body.manualCostConfirmed === true;
+    delete body.manualCostConfirmed;
+    if (body.costPrice !== undefined && !Number.isFinite(Number(body.costPrice))) delete body.costPrice;
+    const costChanged = body.costPrice !== undefined && Math.abs(Number(body.costPrice) - (current.costPrice ?? 0)) > 0.005;
+    if (costChanged && !manualCostConfirmed) {
+      return NextResponse.json(
+        { error: "Harga modal diambil dari Belanja Supplier. Untuk mengubahnya manual, tekan \"Ubah manual\" di form Edit lalu setujui dampaknya." },
+        { status: 400 }
+      );
+    }
     // Stok hanya berubah lewat gerakan stok (penjualan, belanja, penyesuaian, opname) — bukan edit produk.
     delete body.stockQty;
     // Status "Lacak stok" disimpan di lowStockThreshold (negatif = tidak dilacak) dan hanya diubah
@@ -100,7 +116,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // Harga modal diketik manual → catat sebagai gerakan qty 0 ber-unitCost, supaya koreksi atau
       // pembatalan faktur Belanja Supplier nanti (cost-replay.ts) menghitung ulang Modal dari harga
       // ini, bukan menghapusnya.
-      if (newCost !== undefined && Number.isFinite(newCost) && Math.abs(newCost - (current.costPrice ?? 0)) > 0.005 && isStockTracked(current)) {
+      if (costChanged && newCost !== undefined && isStockTracked(current)) {
         await tx.insert(stockMovements).values({ productId: id, type: "adjustment", qty: 0, unitCost: newCost, note: "Harga modal diubah manual", staffUserId: session.sub });
       }
       if (revalue !== 0) {
@@ -111,6 +127,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       return updated;
     });
+    if (costChanged && newCost !== undefined) {
+      // Jejak audit + peringatan ke pimpinan outlet/merchant (bel notifikasi & push).
+      await logAudit({
+        outletId: current.outletId,
+        staffUserId: session.sub,
+        action: "manual_cost_change",
+        entityType: "product",
+        entityId: id,
+        before: { costPrice: current.costPrice ?? 0, name: current.name },
+        after: { costPrice: newCost, stockQty: current.stockQty, revalue },
+      });
+      runAfterResponse(() =>
+        notifyManualCostChange({ outletId: current.outletId, productId: id, productName: current.name, staffUserId: session.sub, from: current.costPrice ?? 0, to: newCost, revalue })
+      );
+    }
     return NextResponse.json(row);
   } catch (err: unknown) {
     return NextResponse.json({ error: describeError(err) }, { status: err instanceof DuplicateBarcodeError ? 409 : errorStatus(err, 400) });

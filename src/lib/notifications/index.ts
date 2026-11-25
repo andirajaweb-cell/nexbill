@@ -1,6 +1,6 @@
 import { db } from "@/db/client";
-import { and, eq, or, isNull, sql } from "drizzle-orm";
-import { products, approvalRequests, expenses, bookings, subscriptions, notificationReads, platformAnnouncements, outlets } from "@/db/schema";
+import { and, eq, gte, inArray, or, isNull, sql } from "drizzle-orm";
+import { products, approvalRequests, expenses, bookings, subscriptions, notificationReads, platformAnnouncements, outlets, auditLogs, staffUsers } from "@/db/schema";
 import { hasPermission, type StaffRole } from "@/lib/auth/permissions";
 import { listUnitsNeedingMaintenance } from "@/lib/rental/maintenance";
 import { translate, type LangCode } from "@/lib/i18n/registry";
@@ -21,7 +21,8 @@ export type NotificationType =
   | "booking_pending"
   | "subscription_trial"
   | "announcement"
-  | "maintenance_due";
+  | "maintenance_due"
+  | "manual_cost";
 
 export type NotificationItem = {
   key: string;
@@ -149,6 +150,53 @@ async function shiftVarianceItems(outletId: string, lang: LangCode, enabled: boo
     createdAt: a.createdAt,
     read: false,
   }));
+}
+
+// ---- Harga modal diubah manual (7 hari terakhir) — pimpinan outlet/merchant diingatkan dampaknya ----
+function formatRp(n: number): string {
+  return `Rp${Math.round(n).toLocaleString("id-ID")}`;
+}
+async function manualCostItems(outletId: string, lang: LangCode): Promise<NotificationItem[]> {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const rows = await db
+    .select()
+    .from(auditLogs)
+    .where(and(eq(auditLogs.outletId, outletId), eq(auditLogs.action, "manual_cost_change"), gte(auditLogs.createdAt, since)));
+  if (rows.length === 0) return [];
+  const staffIds = [...new Set(rows.map((r) => r.staffUserId).filter((x): x is string => !!x))];
+  const names = new Map(
+    staffIds.length ? (await db.select({ id: staffUsers.id, name: staffUsers.name }).from(staffUsers).where(inArray(staffUsers.id, staffIds))).map((s) => [s.id, s.name]) : []
+  );
+  const parse = (raw: string | null): Record<string, unknown> => {
+    try {
+      return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  };
+  return rows.map((r) => {
+    const before = parse(r.beforeData);
+    const after = parse(r.afterData);
+    const reval = Number(after.revalue ?? 0);
+    return {
+      key: `cost-manual:${r.id}`,
+      type: "manual_cost" as const,
+      severity: "warning" as const,
+      title: translate(lang, "notifications.manualCost.title", "Harga modal diubah manual: {product}").replace("{product}", String(before.name ?? "-")),
+      message: translate(
+        lang,
+        "notifications.manualCost.message",
+        "{from} → {to} oleh {staff}. HPP & laba penjualan berikutnya memakai angka ini sampai Belanja Supplier berikutnya; nilai Persediaan dinilai ulang {reval} (Koreksi Persediaan)."
+      )
+        .replace("{from}", formatRp(Number(before.costPrice ?? 0)))
+        .replace("{to}", formatRp(Number(after.costPrice ?? 0)))
+        .replace("{staff}", (r.staffUserId && names.get(r.staffUserId)) || "-")
+        .replace("{reval}", `${reval < 0 ? "-" : reval > 0 ? "+" : ""}${formatRp(Math.abs(reval))}`),
+      link: "/dashboard/inventory",
+      createdAt: r.createdAt,
+      read: false,
+    };
+  });
 }
 
 // ---- Pending expense approvals (only those who can approve expenses) ----
@@ -333,6 +381,7 @@ export async function getNotifications(
   if (hasPermission(role, "approve_requests")) {
     sourcePromises.push(approvalItems(outletId, lang));
     sourcePromises.push(shiftVarianceItems(outletId, lang, toggles.notifyShiftVariance));
+    sourcePromises.push(manualCostItems(outletId, lang));
   }
   if (hasPermission(role, "approve_expenses")) sourcePromises.push(expenseItems(outletId, lang, toggles.notifyPendingApproval));
   if (hasPermission(role, "manage_bookings")) sourcePromises.push(bookingItems(outletId, lang, toggles.notifyBookingReminder));

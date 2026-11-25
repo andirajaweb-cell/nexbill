@@ -405,8 +405,11 @@ function ProductTab({ outletId }: { outletId: string }) {
     load();
   };
 
+  // Harga modal utamanya dari Belanja Supplier; "Ubah manual" membuka kolomnya dengan sengaja.
+  const [manualCost, setManualCost] = useState(false);
   const startEdit = (p: Product) => {
     setAdjustingId(null);
+    setManualCost(false);
     setEditingId(p.id);
     setEditForm({
       name: p.name,
@@ -431,10 +434,38 @@ function ProductTab({ outletId }: { outletId: string }) {
     if (!editForm.name.trim()) return showAlert(t("inventory.product.nameRequired", "Nama produk wajib diisi."));
     const conflict = barcodeWarning(editForm.barcode, id);
     if (conflict) return showAlert(conflict);
+    const prod = products.find((x) => x.id === id);
+    const oldCost = prod?.costPrice ?? 0;
+    const costChanged = manualCost && Number.isFinite(editForm.costPrice) && Math.abs(editForm.costPrice - oldCost) > 0.005;
+    if (costChanged && prod) {
+      // Persetujuan eksplisit: tampilkan dampak perubahan manual sebelum disimpan.
+      const reval = isStockTracked(prod) && prod.stockQty > 0 ? Math.round(prod.stockQty * (editForm.costPrice - oldCost)) : 0;
+      const ok = await showConfirm(
+        t(
+          "inventory.product.manualCostConfirm",
+          "Ubah harga modal \"{name}\" secara manual dari {from} ke {to}?\n\nDampaknya:\n• HPP dan laba setiap penjualan berikutnya memakai {to}, sampai Belanja Supplier berikutnya mencampurnya lagi (rata-rata tertimbang).\n• Nilai Persediaan di Neraca dinilai ulang {reval} ({qty} {unit} × selisih) dan dicatat sebagai Koreksi Persediaan — tidak masuk Laba Rugi.\n• Laporan margin produk ini ikut berubah.\n• Perubahan dicatat di log audit dan diberitahukan ke pimpinan outlet/merchant.\n\nSumber utama harga modal tetap Belanja Supplier — pakai ubah manual hanya untuk koreksi."
+        )
+          .split("{name}").join(prod.name)
+          .split("{from}").join(rupiah(oldCost))
+          .split("{to}").join(rupiah(editForm.costPrice))
+          .split("{reval}").join(`${reval < 0 ? "-" : reval > 0 ? "+" : ""}${rupiah(Math.abs(reval))}`)
+          .split("{qty}").join(String(Math.max(0, prod.stockQty)))
+          .split("{unit}").join(prod.unit),
+        { tone: "danger", confirmLabel: t("inventory.product.manualCostAgree", "Saya paham, ubah manual") }
+      );
+      if (!ok) return;
+    }
+    const { costPrice, ...rest } = editForm;
     const res = await fetch(`/api/products/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editForm, barcode: normalizeBarcode(editForm.barcode), preferredSupplierId: editForm.preferredSupplierId || null }),
+      body: JSON.stringify({
+        ...rest,
+        // Kolom modal yang tidak dibuka "Ubah manual" tidak dikirim — modal tetap dari Belanja Supplier.
+        ...(costChanged ? { costPrice, manualCostConfirmed: true } : {}),
+        barcode: normalizeBarcode(editForm.barcode),
+        preferredSupplierId: editForm.preferredSupplierId || null,
+      }),
     });
     const data = await res.json();
     if (!res.ok) return showAlert(data.error);
@@ -736,11 +767,21 @@ function ProductTab({ outletId }: { outletId: string }) {
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.sellPrice", "Harga Jual")}</label><input type="number" className={smallInputCls} value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })} /></div>
                         <div>
                           <label className="text-xs text-neutral-500">{t("inventory.product.editForm.costPrice", "Harga Modal")}</label>
-                          <input type="number" className={`${smallInputCls} disabled:opacity-60`} value={editForm.costPrice} disabled={recipeProductIds.has(p.id) || (isFifo && layersOf(p.id).length > 0)} onChange={(e) => setEditForm({ ...editForm, costPrice: Number(e.target.value) })} />
+                          <input type="number" className={`${smallInputCls} disabled:opacity-60`} value={editForm.costPrice} disabled={!manualCost || recipeProductIds.has(p.id) || (isFifo && layersOf(p.id).length > 0)} onChange={(e) => setEditForm({ ...editForm, costPrice: Number(e.target.value) })} />
                           {recipeProductIds.has(p.id) ? (
                             <div className="text-[10px] text-sky-400">{t("inventory.product.recipeCostAuto", "Otomatis dari resep (HPP per porsi) — ubah lewat tab Resep / BOM")}</div>
+                          ) : isFifo && layersOf(p.id).length > 0 ? (
+                            <div className="text-[10px] text-neutral-500">{t("inventory.product.fifoCostLocked", "FIFO: dihitung dari lapisan belanja")}</div>
+                          ) : manualCost ? (
+                            <div className="text-[10px] text-amber-400">
+                              {t("inventory.product.manualCostOn", "Mode ubah manual — dampaknya ditampilkan saat Simpan.")}{" "}
+                              <button type="button" className="underline" onClick={() => { setManualCost(false); setEditForm({ ...editForm, costPrice: p.costPrice }); }}>{t("inventory.product.manualCostCancel", "Batalkan")}</button>
+                            </div>
                           ) : (
-                            isFifo && layersOf(p.id).length > 0 && <div className="text-[10px] text-neutral-500">{t("inventory.product.fifoCostLocked", "FIFO: dihitung dari lapisan belanja")}</div>
+                            <div className="text-[10px] text-neutral-500">
+                              {t("inventory.product.costFromPurchase", "Otomatis dari Belanja Supplier (rata-rata tertimbang).")}{" "}
+                              <button type="button" className="text-amber-400 underline" onClick={() => setManualCost(true)}>{t("inventory.product.manualCostButton", "Ubah manual")}</button>
+                            </div>
                           )}
                         </div>
                         <div><label className="text-xs text-neutral-500">{t("inventory.product.editForm.unit", "Satuan")}</label><UnitSelect units={units} value={editForm.unit} onChange={(v) => setEditForm({ ...editForm, unit: v })} className={smallInputCls} /></div>

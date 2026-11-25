@@ -258,6 +258,24 @@ const TEMPLATES = {
       "vi": "Thu {income} · {orders} giao dịch · chênh lệch tiền mặt {variance}"
     }
   },
+  "costManual": {
+    "title": {
+      "id": "⚠️ Harga modal diubah manual: {product}",
+      "en": "⚠️ Cost price changed manually: {product}",
+      "ms": "⚠️ Harga kos diubah secara manual: {product}",
+      "th": "⚠️ แก้ต้นทุนด้วยตนเอง: {product}",
+      "fil": "⚠️ Manwal na binago ang puhunan: {product}",
+      "vi": "⚠️ Giá vốn bị sửa thủ công: {product}"
+    },
+    "body": {
+      "id": "{from} → {to} oleh {staff}. HPP & laba penjualan berikutnya ikut berubah; nilai Persediaan dinilai ulang {reval}.",
+      "en": "{from} → {to} by {staff}. COGS & profit on future sales change; inventory value revalued {reval}.",
+      "ms": "{from} → {to} oleh {staff}. Kos jualan & untung jualan seterusnya turut berubah; nilai inventori dinilai semula {reval}.",
+      "th": "{from} → {to} โดย {staff} ต้นทุนขายและกำไรของการขายครั้งต่อไปจะเปลี่ยน มูลค่าสินค้าคงคลังถูกปรับ {reval}",
+      "fil": "{from} → {to} ni {staff}. Magbabago ang COGS at kita sa susunod na benta; muling tinasa ang halaga ng imbentaryo {reval}.",
+      "vi": "{from} → {to} bởi {staff}. Giá vốn & lợi nhuận các lần bán sau thay đổi; giá trị tồn kho được đánh giá lại {reval}."
+    }
+  },
   "test": {
     "title": {
       "id": "🔔 Notifikasi NEXBILL aktif",

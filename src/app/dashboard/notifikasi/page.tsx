@@ -24,6 +24,7 @@ const TYPE_LABEL_META: Record<string, { key: string; fallback: string }> = {
   announcement: { key: "notifikasi.type.announcement", fallback: "Pengumuman" },
   shift_variance: { key: "notifikasi.type.shiftVariance", fallback: "Selisih Kas" },
   maintenance_due: { key: "notifikasi.type.maintenanceDue", fallback: "Maintenance" },
+  manual_cost: { key: "notifikasi.type.manualCost", fallback: "Harga Modal" },
 };
 
 export default function NotifikasiPage() {
