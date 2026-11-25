@@ -30,15 +30,29 @@ export interface ReplayableMovement {
  * - qty is floored at 0 (a product should never go net-negative across its full history; if it
  *   does due to data issues, we don't let it drag the average calculation negative).
  */
-export function replayCostPrice(movements: ReplayableMovement[]): { qty: number; costPrice: number } {
+export function replayCostPrice(movements: ReplayableMovement[], opts: { fallbackUnitCost?: number } = {}): { qty: number; costPrice: number } {
   const sorted = [...movements].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   let qty = 0;
   let costPrice = 0;
+  let basisKnown = false;
 
   for (const m of sorted) {
+    if (m.qty === 0) {
+      // Harga modal diubah manual (Edit produk) — dicatat sebagai gerakan qty 0 dengan unitCost
+      // baru. Tanpa ini, koreksi/pembatalan faktur belanja menghapus harga modal yang diketik.
+      if (m.unitCost != null) {
+        costPrice = m.unitCost;
+        basisKnown = true;
+      }
+      continue;
+    }
     if (m.qty > 0) {
-      const incomingCost = m.unitCost ?? costPrice;
+      // unitCost kosong (data lama, mis. "Stok awal" sebelum harga modalnya ikut dicatat): pakai
+      // rata-rata berjalan; bila belum ada dasar harga sama sekali, pakai harga modal produk saat
+      // ini — dulu dianggap Rp0, sehingga membatalkan satu faktur belanja menyeret Modal turun.
+      const incomingCost = m.unitCost ?? (basisKnown ? costPrice : opts.fallbackUnitCost ?? costPrice);
+      basisKnown = true;
       const existingValue = qty * costPrice;
       const incomingValue = m.qty * incomingCost;
       const newQty = qty + m.qty;
@@ -70,8 +84,9 @@ export async function recomputeCostPriceExcludingRef(productId: string, excludeR
     .from(stockMovements)
     .where(eq(stockMovements.productId, productId));
 
+  const [current] = await dbc.select({ costPrice: products.costPrice }).from(products).where(eq(products.id, productId)).limit(1);
   const filtered = rows.filter((r) => r.refOrderId !== excludeRefOrderId);
-  const result = replayCostPrice(filtered);
+  const result = replayCostPrice(filtered, { fallbackUnitCost: current?.costPrice ?? 0 });
 
   await dbc.update(products).set({ costPrice: result.costPrice }).where(eq(products.id, productId));
 
@@ -96,8 +111,11 @@ export async function recomputeCostPricesExcludingRef(productIds: string[], excl
     if (r.refOrderId === excludeRefOrderId) continue;
     byProduct.get(r.productId)?.push(r);
   }
+  const currentCost = new Map(
+    (await dbc.select({ id: products.id, costPrice: products.costPrice }).from(products).where(inArray(products.id, ids))).map((p) => [p.id, p.costPrice ?? 0])
+  );
   const costs = new Map<string, number>();
-  for (const [id, mv] of byProduct) costs.set(id, replayCostPrice(mv).costPrice);
+  for (const [id, mv] of byProduct) costs.set(id, replayCostPrice(mv, { fallbackUnitCost: currentCost.get(id) ?? 0 }).costPrice);
   const values = sql.join(
     [...costs].map(([id, c]) => sql`(${id}, ${c}::double precision)`),
     sql`, `

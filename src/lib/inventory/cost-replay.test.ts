@@ -71,4 +71,24 @@ describe("replayCostPrice", () => {
     expect(result.qty).toBe(20);
     expect(result.costPrice).toBe(150);
   });
+
+  it("stok awal lama tanpa unitCost memakai harga modal produk, bukan Rp0 (batal faktur tidak menyeret Modal turun)", () => {
+    const movements: ReplayableMovement[] = [
+      { qty: 10, unitCost: null, createdAt: "2026-01-01T00:00:00Z" }, // "Stok awal" data lama
+      { qty: 10, unitCost: 2200, createdAt: "2026-01-02T00:00:00Z" },
+    ];
+    // Dulu: stok awal dianggap Rp0 → Modal jadi 1.100.
+    expect(replayCostPrice(movements, { fallbackUnitCost: 2000 }).costPrice).toBe(2100);
+  });
+
+  it("harga modal yang diubah manual (gerakan qty 0) menjadi dasar harga berikutnya", () => {
+    const movements: ReplayableMovement[] = [
+      { qty: 10, unitCost: 1000, createdAt: "2026-01-01T00:00:00Z" },
+      { qty: 0, unitCost: 1500, createdAt: "2026-01-02T00:00:00Z" }, // Edit produk: Harga Modal 1.500
+      { qty: 10, unitCost: 2500, createdAt: "2026-01-03T00:00:00Z" },
+    ];
+    const result = replayCostPrice(movements);
+    expect(result.qty).toBe(20);
+    expect(result.costPrice).toBe(2000);
+  });
 });

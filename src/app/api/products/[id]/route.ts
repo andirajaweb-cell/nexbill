@@ -97,6 +97,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         : 0;
     const row = await db.transaction(async (tx) => {
       const [updated] = await tx.update(products).set(body).where(eq(products.id, id)).returning();
+      // Harga modal diketik manual → catat sebagai gerakan qty 0 ber-unitCost, supaya koreksi atau
+      // pembatalan faktur Belanja Supplier nanti (cost-replay.ts) menghitung ulang Modal dari harga
+      // ini, bukan menghapusnya.
+      if (newCost !== undefined && Number.isFinite(newCost) && Math.abs(newCost - (current.costPrice ?? 0)) > 0.005 && isStockTracked(current)) {
+        await tx.insert(stockMovements).values({ productId: id, type: "adjustment", qty: 0, unitCost: newCost, note: "Harga modal diubah manual", staffUserId: session.sub });
+      }
       if (revalue !== 0) {
         await postCostRevaluationJournal(
           { outletId: current.outletId, items: [{ name: current.name, delta: revalue }], reference: `REVAL-${id.slice(0, 8)}`, staffUserId: session.sub },

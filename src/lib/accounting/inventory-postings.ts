@@ -1,6 +1,6 @@
 import { db, type DbOrTx } from "@/db/client";
 import { products, stockMovements } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { onStockIn, onStockOut } from "@/lib/inventory/costing";
 import { getMappedAccountId } from "./account-mapping";
 import { postJournal } from "./journal";
@@ -135,8 +135,12 @@ export async function recordOpeningStock(
   const withStock = created.filter((p) => p.stockQty > 0);
   if (withStock.length === 0) return null;
 
+  // unitCost = harga modal saat produk dibuat. Tanpa ini, koreksi/pembatalan faktur belanja
+  // (cost-replay.ts) menghitung ulang Modal seolah stok awal bernilai Rp0.
+  const costRows = await dbc.select({ id: products.id, costPrice: products.costPrice }).from(products).where(inArray(products.id, withStock.map((p) => p.id)));
+  const costById = new Map(costRows.map((r) => [r.id, r.costPrice]));
   await dbc.insert(stockMovements).values(
-    withStock.map((p) => ({ productId: p.id, type: "adjustment" as const, qty: p.stockQty, note: "Stok awal", staffUserId }))
+    withStock.map((p) => ({ productId: p.id, type: "adjustment" as const, qty: p.stockQty, unitCost: costById.get(p.id) ?? null, note: "Stok awal", staffUserId }))
   );
 
   return postInventoryAdjustmentJournal(
